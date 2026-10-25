@@ -1,1 +1,5 @@
 /scratch/
+/node_modules/
+**/node_modules/
+/bin/
+/backend/internal/webassets/dist/

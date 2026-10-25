@@ -1,0 +1,9 @@
+{
+  "name": "@flora/florets",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": { ".": "./src/index.tsx", "./styles.css": "./src/styles.css" },
+  "scripts": { "check": "tsc --noEmit" },
+  "peerDependencies": { "react": "^19.0.0" }
+}
