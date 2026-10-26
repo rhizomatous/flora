@@ -175,8 +175,13 @@ rejects redirects to avoid accidentally forwarding credentials elsewhere.
 
 The bundled `opencode.json` sets `permission:"allow"`, including bash/edit,
 external directory and doom-loop permissions. There is no per-action approval
-workflow. Genuine user questions are separate: **headless serve requires
-`OPENCODE_ENABLE_QUESTION_TOOL=true`**, otherwise the registry omits that tool.
+workflow. Genuine user questions are separate. At this pin,
+[`OPENCODE_CLIENT` defaults to `cli`](https://github.com/anomalyco/opencode/blob/4ee426ba549131c4903a71dfb6259200467aca81/packages/opencode/src/flag/flag.ts#L112-L115),
+and the registry includes the question tool for `app`, `cli` or `desktop`, **or**
+when `OPENCODE_ENABLE_QUESTION_TOOL` is true. The `serve` command does not override
+that client default, so headless serve does not require the explicit flag. The
+probe sets `OPENCODE_ENABLE_QUESTION_TOOL=true` as a safeguard to keep registration
+enabled if the client identity is changed; it is not a requirement of headless mode.
 The build-agent prompt identifies Flora, permits autonomous tool execution,
 requests local commits and limits pushing/draft PR creation to explicit requests.
 This overrides the build agent prompt, while runtime environment/instruction
