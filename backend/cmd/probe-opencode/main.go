@@ -92,9 +92,9 @@ func (c *client) ready(ctx context.Context) error {
 
 type message struct {
 	Info struct {
-		ID, Role, ProviderID, ModelID string
-		Time                          struct{ Completed int64 }
-		Error                         json.RawMessage
+		ID, Role, ProviderID, ModelID, Finish string
+		Time                                  struct{ Completed int64 }
+		Error                                 json.RawMessage
 	} `json:"info"`
 	Parts []json.RawMessage `json:"parts"`
 }
@@ -176,26 +176,31 @@ func (c *client) turn(ctx context.Context, session, text string, question bool) 
 		if err != nil {
 			return err
 		}
-		for _, m := range history {
+		var latest *message
+		for i := range history {
+			m := &history[i]
 			if seen[m.Info.ID] || m.Info.Role != "assistant" {
 				continue
 			}
 			if len(m.Info.Error) > 0 && string(m.Info.Error) != "null" {
 				return errors.New("assistant error recorded; inspect private history")
 			}
-			if m.Info.Time.Completed == 0 {
-				continue
+			if m.Info.ProviderID != provider || m.Info.ModelID != model {
+				return errors.New("assistant model differs from installation pin")
 			}
+			latest = m
+		}
+		if latest != nil && latest.Info.Time.Completed != 0 && latest.Info.Finish != "tool-calls" && latest.Info.Finish != "unknown" {
 			// A tool-call assistant message may complete before the final response.
 			var statuses map[string]struct{ Type string }
 			if err := c.request(ctx, "GET", "/session/status", nil, &statuses); err != nil {
 				return err
 			}
 			if s, ok := statuses[session]; ok && s.Type != "idle" {
+				if err := pause(ctx); err != nil {
+					return err
+				}
 				continue
-			}
-			if m.Info.ProviderID != provider || m.Info.ModelID != model {
-				return errors.New("assistant model differs from installation pin")
 			}
 			if question && !answered {
 				return errors.New("model did not invoke the question tool")
@@ -228,13 +233,13 @@ func (c *client) events(ctx context.Context, emit func(json.RawMessage) error) e
 func readSSE(r io.Reader, emit func(json.RawMessage) error) error {
 	s := bufio.NewScanner(r)
 	s.Buffer(make([]byte, 4096), maxBody)
-	var data []string
-	total := 0
+	var data bytes.Buffer
+	hasData := false
 	for s.Scan() {
 		line := s.Text()
 		if line == "" {
-			if len(data) > 0 {
-				b := json.RawMessage(strings.Join(data, "\n"))
+			if hasData {
+				b := append(json.RawMessage(nil), data.Bytes()...)
 				if !json.Valid(b) {
 					return errors.New("invalid event JSON")
 				}
@@ -242,16 +247,19 @@ func readSSE(r io.Reader, emit func(json.RawMessage) error) error {
 					return err
 				}
 			}
-			data = nil
-			total = 0
+			data.Reset()
+			hasData = false
 		} else if strings.HasPrefix(line, "data:") {
 			v := strings.TrimPrefix(line, "data:")
 			v = strings.TrimPrefix(v, " ")
-			total += len(v)
-			if total > maxBody {
+			if data.Len()+len(v)+1 > maxBody {
 				return errors.New("event exceeds 16 MiB")
 			}
-			data = append(data, v)
+			if hasData {
+				data.WriteByte('\n')
+			}
+			data.WriteString(v)
+			hasData = true
 		}
 	}
 	if err := s.Err(); err != nil {

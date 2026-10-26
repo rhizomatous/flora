@@ -177,3 +177,54 @@ func TestInterruptionWaitsForShellAndIdle(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTurnRejectsLaterErrorAndWrongModel(t *testing.T) {
+	for _, problem := range []string{"later-error", "wrong-model"} {
+		t.Run(problem, func(t *testing.T) {
+			started := false
+			c := fake(t, func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/session/s/message":
+					if !started {
+						fmt.Fprint(w, `[]`)
+						return
+					}
+					if problem == "wrong-model" {
+						fmt.Fprint(w, `[{"info":{"id":"new","role":"assistant","providerID":"wrong","modelID":"wrong","time":{"completed":1}}}]`)
+					} else {
+						fmt.Fprintf(w, `[{"info":{"id":"tool","role":"assistant","providerID":%q,"modelID":%q,"finish":"tool-calls","time":{"completed":1}}},{"info":{"id":"failure","role":"assistant","error":{"name":"APIError"}}}]`, provider, model)
+					}
+				case "/session/s/prompt_async":
+					started = true
+					w.WriteHeader(204)
+				case "/question":
+					fmt.Fprint(w, `[]`)
+				case "/session/status":
+					fmt.Fprint(w, `{}`)
+				default:
+					w.WriteHeader(404)
+				}
+			})
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			if err := c.turn(ctx, "s", "hello", false); err == nil {
+				t.Fatal("accepted failed turn")
+			}
+		})
+	}
+}
+
+func TestToolMarkerRequiresActualCompletedToolOutput(t *testing.T) {
+	for _, test := range []struct {
+		part string
+		want bool
+	}{
+		{`{"type":"text","text":"flora-probe-marker"}`, false},
+		{`{"type":"tool","tool":"bash","state":{"status":"error","output":"flora-probe-marker"}}`, false},
+		{`{"type":"tool","tool":"bash","state":{"status":"completed","output":"flora-probe-marker\n"}}`, true},
+	} {
+		if got := toolMarker([]message{{Parts: []json.RawMessage{json.RawMessage(test.part)}}}); got != test.want {
+			t.Errorf("toolMarker(%s)=%t", test.part, got)
+		}
+	}
+}
