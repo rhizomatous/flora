@@ -11,6 +11,7 @@ func TestRoutes(t *testing.T) {
 	handler := New(fstest.MapFS{
 		"index.html":    {Data: []byte("<!doctype html><title>Flora</title>")},
 		"assets/app.js": {Data: []byte("console.log('flora')")},
+		"docs/help.txt": {Data: []byte("Flora help")},
 	})
 	for _, tc := range []struct {
 		method, path      string
@@ -20,9 +21,27 @@ func TestRoutes(t *testing.T) {
 		{"GET", "/api/health", 200, "application/json", `{"status":"ok"}`},
 		{"GET", "/", 200, "text/html", "<title>Flora</title>"},
 		{"GET", "/chats/example", 200, "text/html", "<title>Flora</title>"},
+		{"GET", "/chats/john-doe", 200, "text/html", "<title>Flora</title>"},
+		{"GET", "/chats/john.doe", 200, "text/html", "<title>Flora</title>"},
+		{"GET", "/chats/john.doe/", 200, "text/html", "<title>Flora</title>"},
+		{"GET", "/chats/archive.css/messages", 200, "text/html", "<title>Flora</title>"},
 		{"GET", "/assets/app.js", 200, "javascript", "console.log"},
+		{"GET", "/assets", 404, "text/plain", "404"},
+		{"GET", "/assets/", 404, "text/plain", "404"},
+		{"GET", "/docs", 404, "text/plain", "404"},
+		{"GET", "/docs/", 404, "text/plain", "404"},
+		{"GET", "/assets/missing", 404, "text/plain", "404"},
 		{"GET", "/assets/missing.js", 404, "text/plain", "404"},
+		{"GET", "/missing.js", 404, "text/plain", "404"},
+		{"GET", "/missing.CSS", 404, "text/plain", "404"},
+		{"GET", "/missing.js.map", 404, "text/plain", "404"},
+		{"GET", "/favicon.ico", 404, "text/plain", "404"},
+		{"GET", "/images/missing.svg", 404, "text/plain", "404"},
+		{"GET", "/fonts/missing.woff2", 404, "text/plain", "404"},
+		{"GET", "/manifest.webmanifest", 404, "text/plain", "404"},
 		{"GET", "/api/missing", 404, "text/plain", "404"},
+		{"GET", "/api/john.doe", 404, "text/plain", "404"},
+		{"GET", "/api/", 404, "text/plain", "404"},
 		{"GET", "/api", 404, "text/plain", "404"},
 		{"POST", "/", 405, "text/plain", "Method Not Allowed"},
 	} {

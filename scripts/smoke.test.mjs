@@ -46,9 +46,16 @@ test("standalone binary serves embedded web assets and shuts down cleanly", { ti
       assert.doesNotMatch(asset.headers.get("content-type"), /text\/html/);
       assert.ok((await asset.text()).length > 0);
     }
-    assert.equal(await (await fetch(`${base}/chats/example`)).text(), html);
-    assert.equal((await fetch(`${base}/api/missing`)).status, 404);
-    assert.equal((await fetch(`${base}/assets/missing.js`)).status, 404);
+    for (const path of ["/chats/example", "/chats/john.doe", "/chats/archive.css/messages"]) {
+      const route = await fetch(`${base}${path}`);
+      assert.equal(route.status, 200, path);
+      assert.equal(await route.text(), html, path);
+    }
+    for (const path of ["/api", "/api/missing", "/api/john.doe", "/assets", "/assets/", "/assets/missing", "/assets/missing.js", "/missing.css", "/favicon.ico"]) {
+      const missing = await fetch(`${base}${path}`, { redirect: "manual" });
+      assert.equal(missing.status, 404, path);
+      assert.doesNotMatch(missing.headers.get("content-type"), /text\/html/, path);
+    }
     child.kill("SIGTERM");
     const [code, signal] = await exited;
     assert.equal(code, 0, output);

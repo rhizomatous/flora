@@ -3,6 +3,7 @@ package server
 import (
 	"io/fs"
 	"net/http"
+	"path"
 	"strings"
 )
 
@@ -25,12 +26,16 @@ func New(assets fs.FS) http.Handler {
 			files.ServeHTTP(w, r)
 			return
 		}
-		if info, err := fs.Stat(assets, name); err == nil && !info.IsDir() {
+		if info, err := fs.Stat(assets, strings.TrimSuffix(name, "/")); err == nil {
+			if info.IsDir() {
+				http.NotFound(w, r)
+				return
+			}
 			files.ServeHTTP(w, r)
 			return
 		}
 		// Missing assets are errors, not successful HTML responses.
-		if strings.HasPrefix(name, "assets/") || strings.Contains(name, ".") {
+		if name == "assets" || strings.HasPrefix(name, "assets/") || isStaticPath(name) {
 			http.NotFound(w, r)
 			return
 		}
@@ -43,4 +48,17 @@ func New(assets fs.FS) http.Handler {
 		_, _ = w.Write(index)
 	})
 	return mux
+}
+
+// Only known static extensions on the final segment suppress the SPA fallback;
+// dots in client-side route identifiers (such as /chats/john.doe) are valid.
+func isStaticPath(name string) bool {
+	switch strings.ToLower(path.Ext(name)) {
+	case ".html", ".js", ".mjs", ".css", ".map", ".json", ".webmanifest",
+		".ico", ".svg", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif",
+		".woff", ".woff2", ".ttf", ".otf", ".wasm", ".txt", ".xml":
+		return true
+	default:
+		return false
+	}
 }
