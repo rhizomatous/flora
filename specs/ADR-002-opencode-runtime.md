@@ -1,6 +1,7 @@
 # ADR 002: Pinned OpenCode execution boundary probe
 
-**Status:** Proposed, live acceptance blocked. **Date:** 2026-10-25.
+**Status:** Proposed; live non-provider checks pass, model acceptance blocked.
+**Date:** 2026-10-25. **Docker follow-up:** 2026-10-26 UTC.
 **Scope:** [issue #2](https://github.com/rhizomatous/flora/issues/2),
 [roadmap #20](https://github.com/rhizomatous/flora/issues/20).
 [PRD](PRD.md) is authoritative: Agent environment 2.1–2.5, Chats 3.1–3.2,
@@ -33,12 +34,14 @@ repositories; a release build must lock those inputs and publish its final image
 digest. The script records the actual derived image ID. Hosted model behavior is
 not bit-for-bit reproducible even with an exact model identifier.
 
-**Actually observed:** upstream source and checked-in OpenAPI at this commit,
-registry digests, and local fake-server Go tests. **Not observed:** a running
-container, an actual model response, or any live session/interruption/recovery.
-`docker info` failed because the configured OrbStack Unix socket does not exist.
-No host service was started or installed. No suitable provider key was explicitly
-supplied to this probe; no host credential stores were read or copied.
+**Initial evidence:** upstream source/OpenAPI, registry digests and fake-server
+tests. Docker was initially unavailable. On follow-up the user started OrbStack,
+and live non-provider tests passed on both Linux architectures, as detailed below.
+No host service was started or installed by the agent. The environment did not
+have `ANTHROPIC_API_KEY`; a metadata-only check of the standard OpenCode auth store
+found no Anthropic API-key entry. No secret values were printed or copied, and no
+unrelated provider credential was used. Actual hosted-model responses and question
+interactions remain unverified.
 
 ## Exact API contract
 
@@ -59,14 +62,21 @@ query parameter is another supported selector). Paths and casing matter:
 | `POST /session` | `{title:"Flora issue 2 probe"}` | 200 `Session` |
 | `GET /session/{sessionID}` | none | 200 `Session` |
 | `POST /session/{sessionID}/prompt_async` | `{agent:"build",model:{providerID:"anthropic",modelID:"claude-sonnet-4-6"},parts:[{type:"text",text:string}]}` | 204, no response body; acceptance is not completion |
+| `POST /session/{sessionID}/message` | Same prompt shape plus `noReply:true` for storage-only testing | 200 `{info:UserMessage,parts:Part[]}` with no inference |
 | `GET /session/{sessionID}/message` | no limit | 200 `Array<{info:UserMessage\|AssistantMessage,parts:Part[]}>`, complete available history |
 | `GET /session/status` | none | 200 `{[sessionID]:SessionStatus}`; idle entries may be absent |
-| `POST /session/{sessionID}/shell` | `{agent:"build",command:"sleep 60"}` | 200 `AssistantMessage` after shell finishes; used to interrupt a deterministic tool execution |
+| `POST /session/{sessionID}/shell` | `{agent:"build",command:"sleep 60"}` | 200 `{info:AssistantMessage,parts:Part[]}` after shell finishes; used to interrupt a deterministic tool execution |
 | `POST /session/{sessionID}/abort` | no JSON body | 200 boolean; cancellation request, not proof processes have exited |
 | `GET /question` | none | 200 `QuestionRequest[]`, pending requests for this runtime instance |
 | `POST /question/{requestID}/reply` | `{answers:string[][]}` | 200 boolean |
 | `POST /question/{requestID}/reject` | no body | 200 boolean |
 | `GET /event` | none | 200 `text/event-stream`, JSON in SSE `data:` frames |
+
+**Confirmed schema discrepancy:** live `/doc` declares `/shell`'s 200 response
+as `#/components/schemas/AssistantMessage`, but both architecture runtimes actually
+return `{info:AssistantMessage,parts:Part[]}`. Use the observed envelope for this
+pin; generated clients that trust the bare-message declaration need an override.
+The Docker test checks the actual envelope and reports the declared schema.
 
 Relevant schema definitions, from the pinned OpenAPI and source:
 
@@ -197,8 +207,11 @@ runtime permits overlapping prompts; Flora must enforce no queue/follow-ups
 during active work itself.
 
 `abort` calls cancel and sets idle immediately, before all command teardown is
-necessarily finished. The deterministic shell probe waits for its original
-request to finish and reconciles idle before the next model turn. Production
+necessarily finished. **Live finding:** `/shell` does not report `busy` status,
+even while its persisted bash part says `running`. The original probe's status-only
+wait therefore failed; it now watches the new tool part before sending abort,
+waits for the original request, and checks that part is no longer pending/running
+as well as reconciling idle. Production
 must additionally reconcile active tool parts and process cleanup. Full
 model-driven long-tool interruption remains a live acceptance drill.
 
@@ -253,6 +266,50 @@ that interrupted tools do not run twice.
 
 ## Acceptance still outstanding
 
+### Live non-provider evidence, 2026-10-26 UTC
+
+Built and tested the unchanged digest-pinned Docker inputs with Docker 29.8.2 on
+OrbStack (aarch64). arm64 ran natively; amd64 used the host's emulation. Derived
+image IDs as returned by `docker image inspect --format '{{.Id}}'`:
+
+| Architecture | Local test image ID |
+| --- | --- |
+| arm64 | `sha256:62ad0371d6c09a803e229c846a3b18afbb6c691e0aa4f24b7bcc4d005fa60dd3` |
+| amd64 | `sha256:5f29bdf894c56fadc38740066ec731170e7c595cc8c221911a093d1862563184` |
+
+Reproduce with the runbook's `FLORA_OPENCODE_TEST_IMAGE` command. Both executions
+of `TestDockerWithoutProvider` passed under Go's race detector (about 11 and 20
+seconds respectively). The test uses an intentionally invalid sentinel key, never
+calls model generation, and automatically removes its own containers and volumes.
+Observed on **both** architectures:
+
+- Authenticated exact-version health; unauthenticated health/session/event/mutation
+  rejection; actual fixed config and Flora agent prompt; registered question tool;
+  selected live `/doc` paths. This checks parsing/registration, not provider access
+  or a complete schema diff.
+- Two `noReply` user messages in one session; actual bash command output; a new
+  explicit shell operation after confirmed interruption. Shell responses use an
+  `info`/`parts` envelope despite the upstream declaration noted above.
+- Actual `server.connected`, message, part and status SSE events. HTTP caller and
+  SSE disconnect while a shell runs, then a fresh client/SSE stream receives the
+  completion and recovers the command's resulting file without replaying it.
+- Identical persisted message IDs, part JSON, stored model fields and workspace
+  marker after stop/start and replacement. Setup count is one after same-container
+  restart and two after replacement. These model fields are runtime metadata for
+  stored/shell messages, **not evidence of provider-generated responses**.
+- Setup installs `jq` with passwordless sudo as uid 1000. Exit 23 and timeout 124
+  prevent startup and preserve logs/status. Restart retries setup; the initially
+  failing setup succeeds on its second attempt, and timeout is attempted twice.
+- SIGKILL during a 30-second shell, then restart: `/session/status` has no entry,
+  the saved last tool state is still **`running`**, and no question is pending
+  (none was generated in this test). The shell's delayed side-effect file is
+  absent at reconciliation. Existing history/workspace and a new explicit shell
+  call remain usable. **Stale running parts must not be interpreted as live work,
+  success, or automatic resumed execution.** Pending-question loss still needs a
+  real question drill.
+
+### Remaining hosted-model acceptance
+
 Local verification on 2026-10-25 passed:
 `nix develop --command make deps`,
 `nix develop --command make check smoke build-linux`,
@@ -262,17 +319,20 @@ checks/build, standalone-binary smoke test, and Linux amd64/arm64 builds.
 `npm ci` reported zero vulnerabilities and a warning about the optional
 `fsevents` install script not being allowlisted. No dependency files changed.
 
-- [ ] Build and run the image with Docker and a suitable explicit provider key.
+- [x] Build/run both pinned architecture images and non-provider lifecycle checks.
+- [ ] Run the full hosted-model script with a suitable explicit provider key.
 - [ ] Observe two real successive turns, complete parts/tool output/model metadata
   and live event schemas; compare saved `/doc` with the pinned upstream schema.
 - [ ] Observe question asked/replied and interrupt a real model-driven tool, then
   continue without per-action approvals. The scripted deterministic shell covers
   the cancellation path but does not prove every model/tool cancellation behavior.
-- [ ] Observe driver disconnect during active work, then reconnect/answer/finish.
-- [ ] Observe idle stop/start/replacement preserving message IDs, tool outputs and
-  workspace; check setup-once markers and new-turn continuation.
-- [ ] Drill active runtime restart and pending-question loss; record exact persisted
-  state, orphan tool behavior and gaps. Drill setup failure, timeout, retry and sudo.
+- [x] Observe caller/SSE disconnect during shell execution and reconnect/completion.
+- [ ] Observe driver disconnect during model/question work, then answer/finish.
+- [x] Observe stop/start/replacement preserving stored message IDs, tool outputs,
+  workspace and setup counts; verify new explicit shell continuation.
+- [x] Drill active shell restart and setup failure, timeout, retry and sudo.
+- [ ] Verify actual model-context continuation after stop/start/replacement and
+  model-tool restart behavior; drill real pending-question loss and visible gaps.
 - [ ] Lock final utility-image inputs before production; review the runtime pin's
   security suitability and provide application-owned durable activity storage.
 

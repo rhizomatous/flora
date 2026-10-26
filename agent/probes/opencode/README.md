@@ -20,6 +20,35 @@ the actual prompt and answer request shapes, completion versus idle races,
 interruption confirmation, SSE framing, deadlines and error-body redaction.
 They are **not** live OpenCode or provider evidence.
 
+## Live Docker checks without a provider credential
+
+These tests use the real pinned OpenCode server. They deliberately inject an
+invalid sentinel key and only call `noReply` storage and shell APIs, never model
+generation. They cannot establish successful model responses or question answers.
+
+```sh
+docker build -t flora-issue2-validation:1.2.27 agent/probes/opencode
+FLORA_OPENCODE_TEST_IMAGE=flora-issue2-validation:1.2.27 \
+  nix develop --command go -C backend test -race -count=1 -v -run TestDockerWithoutProvider ./cmd/probe-opencode
+```
+
+The opt-in test verifies actual auth/readiness, config/prompt and question-tool
+registration, selected `/doc` routes, stored messages, shell output/interruption,
+HTTP and SSE disconnect/reconnect during execution, stop/start and replacement
+persistence, setup-once counts, passwordless sudo/package installation, setup
+failure/timeout/retry, and SIGKILL/restart diagnostics. It has a four-minute
+deadline and removes its own containers and volumes, including after test failure.
+It does not touch other containers or credential stores. Ordinary `make check`
+skips it unless `FLORA_OPENCODE_TEST_IMAGE` is set. To test amd64 on an arm64 host,
+build with `--platform linux/amd64` and use a separate image tag in that variable.
+
+Both arm64 and emulated amd64 passed on 2026-10-26 UTC. One important runtime
+finding: `/shell` exposes a running tool part without reporting a busy session
+status. Interruption therefore watches the new persisted part, not just status.
+After SIGKILL, the last persisted part still said `running` while runtime status
+was absent. The test verifies snapshot access and a new explicit shell operation;
+this is not automatic resumption of an interrupted tool or model turn.
+
 ## Live Docker + hosted model run
 
 Prerequisites: a running Docker daemon, registry/network access, an explicitly
@@ -34,6 +63,13 @@ empty private evidence directory outside the checkout, then run:
 ```sh
 nix develop --command bash agent/probes/opencode/probe.sh /absolute/private/evidence-directory
 ```
+
+For the validation environment, `ANTHROPIC_API_KEY` was unset and the standard
+OpenCode auth store had no Anthropic API-key entry. Other provider credentials
+are not suitable for this fixed Anthropic model and were not copied. Supply an
+Anthropic API key with access to `claude-sonnet-4-6` through the environment or
+your secret manager, and generate a fresh random runtime password. Do not paste
+either secret into an issue, PR, terminal command argument or committed file.
 
 The script creates a unique image, container and two volumes, with loopback-only
 publication on a random port, 2 CPU / 8 GiB / 512 PID limits, no privileged mode

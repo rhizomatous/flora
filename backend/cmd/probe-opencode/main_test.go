@@ -142,7 +142,7 @@ func TestErrorsDoNotPrintRuntimeBody(t *testing.T) {
 	}
 }
 
-func TestInterruptionWaitsForShellAndIdle(t *testing.T) {
+func TestInterruptionWaitsForRunningPartAndIdle(t *testing.T) {
 	// The fake coordinates the shell and abort rather than depending on sleeps.
 	active := make(chan struct{})
 	aborted := make(chan struct{})
@@ -152,21 +152,25 @@ func TestInterruptionWaitsForShellAndIdle(t *testing.T) {
 			close(active)
 			<-aborted
 			fmt.Fprint(w, `{"role":"assistant"}`)
+		case "/session/s/message":
+			select {
+			case <-active:
+				status := "running"
+				select {
+				case <-aborted:
+					status = "completed"
+				default:
+				}
+				fmt.Fprintf(w, `[{"info":{"id":"shell","role":"assistant"},"parts":[{"type":"tool","state":{"status":%q}}]}]`, status)
+			default:
+				fmt.Fprint(w, `[]`)
+			}
 		case "/session/s/abort":
 			close(aborted)
 			fmt.Fprint(w, `true`)
 		case "/session/status":
-			select {
-			case <-aborted:
-				fmt.Fprint(w, `{}`)
-			default:
-				select {
-				case <-active:
-					fmt.Fprint(w, `{"s":{"type":"busy"}}`)
-				default:
-					fmt.Fprint(w, `{}`)
-				}
-			}
+			// The pinned /shell endpoint has no busy transition.
+			fmt.Fprint(w, `{}`)
 		default:
 			w.WriteHeader(404)
 		}

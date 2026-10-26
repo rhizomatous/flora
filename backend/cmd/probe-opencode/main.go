@@ -269,6 +269,14 @@ func readSSE(r io.Reader, emit func(json.RawMessage) error) error {
 }
 
 func (c *client) interruptedShell(ctx context.Context, session string) error {
+	before, err := c.history(ctx, session)
+	if err != nil {
+		return err
+	}
+	seen := map[string]bool{}
+	for _, m := range before {
+		seen[m.Info.ID] = true
+	}
 	shellCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	done := make(chan error, 1)
@@ -276,11 +284,13 @@ func (c *client) interruptedShell(ctx context.Context, session string) error {
 		done <- c.request(shellCtx, "POST", "/session/"+url.PathEscape(session)+"/shell", map[string]string{"agent": "build", "command": "sleep 60"}, nil)
 	}()
 	for {
-		var statuses map[string]struct{ Type string }
-		if err := c.request(ctx, "GET", "/session/status", nil, &statuses); err != nil {
+		history, err := c.history(ctx, session)
+		if err != nil {
 			return err
 		}
-		if statuses[session].Type == "busy" {
+		// /shell does not publish busy status in this pin. Observe its new
+		// persisted running part instead of assuming status covers shell calls.
+		if unfinishedTool(history, seen) {
 			break
 		}
 		select {
@@ -304,17 +314,39 @@ func (c *client) interruptedShell(ctx context.Context, session string) error {
 		return ctx.Err()
 	}
 	for {
+		history, err := c.history(ctx, session)
+		if err != nil {
+			return err
+		}
 		var statuses map[string]struct{ Type string }
 		if err := c.request(ctx, "GET", "/session/status", nil, &statuses); err != nil {
 			return err
 		}
-		if s, ok := statuses[session]; !ok || s.Type == "idle" {
+		if s, ok := statuses[session]; (!ok || s.Type == "idle") && !unfinishedTool(history, seen) {
 			return nil
 		}
 		if err := pause(ctx); err != nil {
 			return err
 		}
 	}
+}
+
+func unfinishedTool(history []message, excluded map[string]bool) bool {
+	for _, m := range history {
+		if excluded[m.Info.ID] {
+			continue
+		}
+		for _, raw := range m.Parts {
+			var part struct {
+				Type  string
+				State struct{ Status string }
+			}
+			if json.Unmarshal(raw, &part) == nil && part.Type == "tool" && (part.State.Status == "running" || part.State.Status == "pending") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func run(ctx context.Context, c *client, mode, session, sessionFile, text, requestID, answers string) error {
