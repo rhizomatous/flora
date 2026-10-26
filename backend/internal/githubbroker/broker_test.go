@@ -54,6 +54,7 @@ func TestTransparentForwarding(t *testing.T) {
 		{"POST", "/api/graphql", "/graphql", "malformed JSON is GitHub's decision"},
 		{"GET", "/api/v3/user?x=1&x=2", "/user?x=1&x=2", ""},
 		{"GET", "/api/v3/repos/octo/other/contents/a%2Fb", "/repos/octo/other/contents/a%2Fb", ""},
+		{"GET", "/api/v3/repos/o/r/contents/a%2fb?ref=feature%2Fbranch", "/repos/o/r/contents/a%2fb?ref=feature%2Fbranch", ""},
 		{"DELETE", "/api/v3/repos/octo/other", "/repos/octo/other", ""},
 		{"PUT", "/api/v3/repos/octo/demo/pulls/1/merge", "/repos/octo/demo/pulls/1/merge", `{"merge_method":"squash"}`},
 		{"POST", "/api/v3/repos/octo/other/issues", "/repos/octo/other/issues", ` {"title":"hello"} `},
@@ -96,6 +97,38 @@ func TestTransparentForwarding(t *testing.T) {
 				t.Fatalf("response modified or extra lookup: hits=%d status=%d body=%s", hits, resp.StatusCode, body)
 			}
 		})
+	}
+}
+
+func TestEncodedAPIRoutePrefixesRejected(t *testing.T) {
+	rig := newRig(t)
+	cap := mintCap(t, rig.Store, "chat")
+	hits := 0
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		t.Errorf("noncanonical route reached upstream: %s", r.URL.RequestURI())
+	})
+	rig.apiUp.Config.Handler = upstream
+	rig.gitUp.Config.Handler = upstream
+	for _, path := range []string{
+		"/api%2Fv3/user",
+		"/api%2fv3/user",
+		"/%61pi/v3/user",
+		"/api/v%33/user",
+		"/api/v3%2Fuser",
+		"/api%2Fgraphql",
+		"/api/graph%71l",
+	} {
+		t.Run(path, func(t *testing.T) {
+			resp := doReqNoFollow(t, "GET", rig.front.URL+path, "token "+cap.ID, nil)
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("got %d, want 400", resp.StatusCode)
+			}
+		})
+	}
+	if hits != 0 {
+		t.Fatalf("rejected routes forwarded %d requests", hits)
 	}
 }
 

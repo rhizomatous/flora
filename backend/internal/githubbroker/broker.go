@@ -117,14 +117,27 @@ func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := r.URL.Path
+	escaped := r.URL.EscapedPath()
 	upstream := b.apiUpstream
 	switch {
 	case gitPathRE.MatchString(path):
 		upstream = b.gitUpstream
 	case path == "/api/graphql":
+		if escaped != "/api/graphql" {
+			http.Error(w, "invalid API route prefix", http.StatusBadRequest)
+			return
+		}
 		path = "/graphql"
+		escaped = "/graphql"
 	case strings.HasPrefix(path, "/api/v3/"):
+		// Only the route prefix must be literal. Encoded suffixes remain
+		// intact so API paths such as contents/a%2Fb pass through unchanged.
+		if !strings.HasPrefix(escaped, "/api/v3/") {
+			http.Error(w, "invalid API route prefix", http.StatusBadRequest)
+			return
+		}
 		path = strings.TrimPrefix(path, "/api/v3")
+		escaped = strings.TrimPrefix(escaped, "/api/v3")
 	default:
 		http.NotFound(w, r)
 		return
@@ -132,14 +145,6 @@ func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	b.logger.Info("proxy", "chat", cap.ChatID, "method", r.Method)
 	// Preserve the escaped path, query, method and body, including GraphQL
 	// variables, operationName, aliases, directives and unknown fields.
-	escaped := r.URL.EscapedPath()
-	if upstream == b.apiUpstream {
-		if r.URL.Path == "/api/graphql" {
-			escaped = "/graphql"
-		} else {
-			escaped = strings.TrimPrefix(escaped, "/api/v3")
-		}
-	}
 	b.forward(w, r, upstream, path, escaped)
 }
 

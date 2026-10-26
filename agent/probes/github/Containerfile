@@ -8,9 +8,8 @@
 
 FROM alpine:3.21
 
-# Pinned gh CLI (matches the version the broker's GraphQL policy is
-# verified against). Upgrading GH_VERSION requires reviewing the policy
-# in backend/internal/githubbroker/gqlauthz.go.
+# Pin gh for reproducible stock-CLI integration evidence. When upgrading,
+# rerun the broker probes; requests pass through without GraphQL policies.
 ARG TARGETARCH
 ARG GH_VERSION=2.103.2
 RUN apk add --no-cache git ca-certificates curl \
