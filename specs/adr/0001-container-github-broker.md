@@ -1,221 +1,140 @@
 # ADR 0001: Host-side credential broker for container git and gh
 
-- Status: Proposed (spike evidence gathered; live container run pending environment)
-- Date: 2026-10-25; hardened 2026-10-26 after review (structural GraphQL
-  authorization, REST write bounds, path normalization, gh port topology,
-  full selection-tree policy with traversal pruning)
-- Issue: #3. Requirements: PRD §2.1, §4.2–4.4, §4.8, §6.2.
+- Status: Proposed. Offline feasibility demonstrated; real private-GitHub evidence pending.
+- Date: 2026-10-25; authorization model simplified by explicit user decision 2026-10-26.
+- Issue: [#3](https://github.com/rhizomatous/flora/issues/3)
+- Superseding decision: [issue #3 comment](https://github.com/rhizomatous/flora/issues/3#issuecomment-6409227472)
+- PR: [#23](https://github.com/rhizomatous/flora/pull/23), draft until live evidence is authorized and collected.
+- Requirements: PRD Projects §2.1, Execution §4.2–4.4 and §4.8, Review §6.2.
 
-## Context
+## Context and user decision
 
-PRD §4.3 requires git and gh inside agent containers with authenticated
-access to the chat's repositories, while the administrator's fine-grained
-GitHub token stays outside agent-accessible containers and persisted
-repository configuration. PRD §4.8 requires unrestricted outbound network
-access for containers, and §4.2 forbids privileged containers and host
-Docker socket access. Anything that places the token on the container's
-network path in usable form (for example a transparent proxy that accepts
-and forwards the token, or a container-side credential helper holding the
-token) violates the isolation requirement.
+PRD §4.3 requires normal git and gh with an administrator fine-grained token
+kept outside containers and persisted repository configuration. §4.8 allows
+ordinary outbound networking; §4.2 forbids privileged containers and the host
+Docker socket.
 
-## Feasibility decision (explicit, per issue #3)
+**The user explicitly permits agents to access every repository and operation
+that the administrator's fine-grained token permits. GitHub enforces those
+permissions.** Project repository selection determines workspace setup, not an
+additional security allowlist. Administrators must restrict the token at GitHub
+to the repositories and permissions they intend agents to have.
 
-**Feasible.** A host-side broker that terminates container requests and
-re-originates them upstream satisfies ordinary git/gh use and token
-isolation, with the constraints and uncertainties listed below. Evidence:
-the automated suite (real git clone/fetch/push through the broker against
-a smart-HTTP upstream that demands the administrator token; structural
-GraphQL authorization including adversarial documents; REST write-scope
-and path-normalization tests) and the offline Docker integration run
-(`agent/probes/github/run-local.sh`, 2026-10-26), in which an
-unprivileged container cloned, pushed, fetched, and ran **stock gh
-2.103.2 (and earlier 2.63.0) `gh pr create --draft` and `gh pr view`**
-through the TLS broker against a token-demanding fake upstream, with
-cross-repository denial, nested-traversal denial and pruning, path and
-credential-boundary checks, and revocation verified. The remaining
-uncertainty is confined to live-GitHub behavior (real api.github.com
-GraphQL shapes beyond the fixture, pushing to a real private repository);
-the live run is scripted (`run-probe.sh`, opt-in `TestLiveGitHub`) and
-awaits a designated test repository and restricted token. If that run
-surfaces a blocker, this ADR must be revised rather than falling back to
-injecting the token into containers.
+This supersedes issue #3's narrower acceptance criterion for per-chat selected
+repository authorization and cross-chat repository denial. We do **not** claim
+that old criterion is met. Each chat has an independent bearer capability for
+expiry, attribution and revocation, but all valid capabilities exercise the same
+upstream token authority. Chat IDs do not prevent a stolen capability from being
+used by another chat. A compromised container can use all that authority until
+its capability expires or is revoked. Workspace isolation remains separate.
 
-## Decision
+## Feasibility decision
 
-Adopt a **host-side HTTPS reverse-proxy broker** with **per-chat
-capability tokens**:
+**Feasible for the demonstrated offline workflow.** A host-side HTTPS reverse
+proxy can keep the real token outside containers while stock git and gh work
+through separate container credentials. Real private-GitHub acceptance is still
+pending a designated test repository, token and explicit test authorization.
+No real-GitHub probe has been run for this revision. If the live run reveals a
+blocker, revise this decision instead of injecting the real token into containers.
 
-1. The broker runs on the host, reachable from containers over the
-   container bridge at a well-known name (`flora-broker`). It serves TLS
-   with a host-generated CA; the CA certificate is baked into the agent
-   image. gh requires HTTPS for enterprise-style hosts, so plain HTTP is
-   not an option for the gh surface.
-2. The administrator fine-grained token enters the broker only through
-   the host process environment. The broker injects it as
-   `Authorization: Bearer ...` on the upstream hop to `github.com` and
-   `api.github.com`, and nowhere else (enforced in the transport).
-3. Each chat gets a **capability**: an opaque random string bound to a
-   chat ID, an explicit repository allowlist, a read/write flag, an
-   expiry, and a revocation flag. Capabilities live in a host-only store
-   file and are the only credentials containers ever see.
-   - git: remote URL `https://<capability>@flora-broker/<owner>/<repo>.git`.
-     The broker answers a Basic challenge so stock git retries with the
-     URL credential; no custom git build or credential helper is needed.
-   - gh: `GH_HOST=flora-broker`, `GH_ENTERPRISE_TOKEN=<capability>`. gh
-     then speaks GHES-style REST (`/api/v3/...`) and GraphQL
-     (`/api/graphql`) to the broker.
-   - **Port constraint:** stock gh (verified 2.63.0 and 2.103.2) only
-     matches git remotes to `GH_HOST` on the default HTTPS port; a port
-     in the remote host makes gh refuse the remote. Containers therefore
-     reach the broker through a **raw-TCP sidecar relay** presenting it
-     as `flora-broker:443` inside the container network. The relay never
-     terminates TLS and never sees credentials. On a Linux production
-     host, binding the broker to the bridge gateway address on 443 is an
-     equivalent alternative.
-4. The broker never follows redirects (so the token cannot be carried to
-   a redirect target), strips upstream `WWW-Authenticate` challenges (so
-   a container can never be prompted for the administrator credential),
-   and refuses the administrator token if presented as a container
-   credential. Ambiguous request paths (dot segments, any
-   percent-encoded path) are rejected before authorization and
-   forwarding.
-5. Scoping rules, all deny-by-default:
-   - git smart HTTP only (`info/refs`, `git-upload-pack`,
-     `git-receive-pack`; receive-pack requires the write flag) for
-     allowlisted repositories.
-   - REST: read (GET/HEAD) under `/api/v3/repos/<owner>/<repo>/...` for
-     allowlisted repositories; **write is bounded to pull-request
-     operations** (`POST`/`PATCH` on `/pulls` and `/pulls/<n>`).
-     Destructive and unrelated mutating endpoints are denied even for
-     write capabilities.
-   - GraphQL: every document is parsed structurally (operations,
-     fragments with type conditions, aliases, variables, defaults,
-     directives) and authorized at two levels, both deny-by-default:
-     (1) root field shapes — query introspection (`__schema`, `__type`),
-     `repository(owner:, name:)` naming an allowlisted repository,
-     `viewer`, `node(id:)` whose ID the broker resolves upstream to an
-     allowlisted repository or an issue/PR of one, and mutation
-     `createPullRequest` whose `input.repositoryId` resolves the same
-     way (write flag required); (2) the **entire nested selection tree**
-     against an explicit type/field allowlist (`gqlTypePolicy` in
-     `gqlauthz.go`) containing only repo-local scalar fields and safe
-     object/connection structures for the pull-request workflow. No
-     policy field can traverse to a repository outside the authorized
-     set: there is no `parent`, no `forks`, no `owner.repositories`
-     enumeration, no `headRepository`. Two traversal fields stock gh
-     requests itself — `Repository.parent` (RepoNetwork) and
-     `PullRequest.headRepository` (some views) — are **pruned** from the
-     forwarded document, so gh sees null and proceeds as if the
-     repository were not a fork; a document needing pruning that also
-     carries directives is denied (the rewriter does not preserve
-     directive semantics). Unknown nested fields, unknown types, scalar
-     fields with selections, aliases/fragments/     directives used to hide
-     traversal, and oversized documents all fail closed before any
-     container document is forwarded. Node IDs are re-resolved upstream
-     on every use — deliberately uncached, so a repository rename or
-     transfer can never leave a stale mapping that bypasses the
-     allowlist.
-   - Revocation and expiry are enforced per request.
+## Decision and exact boundary
 
-## Supported operations
+1. The broker runs host-side, with the administrator token read only from
+   `FLORA_BROKER_GH_TOKEN`. The host-only capability store and TLS keys must
+   never be mounted into agent containers. Only the public CA certificate is
+   provisioned in the image.
+2. Each chat receives a random, expiring, revocable capability. git uses it as
+   the Basic username in `https://CAPABILITY@flora-broker/owner/repo.git`.
+   gh uses `GH_HOST=flora-broker` and `GH_ENTERPRISE_TOKEN=CAPABILITY`, speaking
+   GHES-style REST `/api/v3/...` and GraphQL `/api/graphql` over TLS.
+3. The broker replaces capability authentication with the real token only on
+   fixed `https://github.com` git smart-HTTP and `https://api.github.com` API
+   requests. Upstream origins cannot be set to arbitrary destinations. The
+   injecting transport checks scheme, host and port; environment HTTP proxies
+   are disabled. Inbound Host, absolute URLs, query data and request bodies
+   cannot select another upstream. Forward-proxy requests and CONNECT are denied.
+4. Redirects are returned without following them. The real token is never sent
+   to a redirect target. Container Authorization, Cookie and proxy credentials
+   are removed on the upstream hop; hop-by-hop headers are removed. Upstream
+   `WWW-Authenticate` is stripped to avoid interactive credential prompts.
+   The real token itself is rejected as a broker credential. Logs omit URLs,
+   query strings, bodies, credentials and transport error details.
+5. **No repository allowlist, read/write flags, REST PR-only restriction,
+   GraphQL parser, type policy, AST rewriting or node ownership lookup.**
+   Methods, escaped paths, query strings and request bodies are forwarded
+   unchanged apart from the documented GHES-to-GitHub route mapping and
+   credential/hop-header handling. GitHub decides whether any REST or GraphQL
+   operation is valid and authorized. This includes account endpoints,
+   multiple repositories, forks, opaque node IDs, directives, multiple
+   operations, mutations and nested traversal. No broker policy upgrades are
+   required when gh changes its queries. GitHub response statuses, payloads,
+   permission errors and rate-limit headers pass through.
+6. Capability expiry and revocation are checked per request. They prevent new
+   requests, not already authenticated in-flight requests. Capability files
+   persist revocation across restart. This is a spike's single-writer file
+   store, not production concurrent capability administration.
+7. Offline overrides require `-offline-test`, the public literal
+   `local-test-admin-token`, and HTTP loopback origin URLs. A real token is
+   rejected in that mode. The fixture token has no GitHub authority.
 
-- git clone, fetch, push over smart HTTP(S).
-- gh repository-scoped REST reads (`gh api`, `gh repo view` style) and
-  pull-request writes (`POST`/`PATCH /pulls`).
-- Stock `gh pr create --draft` and `gh pr view` (GraphQL): verified
-  end-to-end with gh 2.63.0 and 2.103.2 in the offline Docker
-  integration run. gh's enterprise `GET /meta` probe is denied and
-  tolerated; its aliased feature-detection introspection is answered.
-  **A gh upgrade requires reviewing `gqlTypePolicy` against the new
-  version's queries** — the policy is allowlist-based, so new gh fields
-  fail closed until added.
+## Supported transport and topology
 
-## Constraints honored
+- Ordinary git clone/fetch/push over smart HTTPS. No SSH shim.
+- General GitHub REST and GraphQL forwarding for gh, with upstream-enforced
+  permissions. Stock gh 2.103.2 is pinned for reproducible probe evidence,
+  not because its GraphQL shapes need a custom broker policy.
+- Stock gh matches repository remotes at the default HTTPS port. The probes
+  use a raw-TCP sidecar relay at `flora-broker:443` pointing to the host broker.
+  TLS terminates only at the broker. Both offline and live scripts use this
+  topology. A private bridge gateway listener on 443 is an alternative.
+- Probes run non-root, with `--cap-drop ALL` and `no-new-privileges`, without
+  the host Docker socket, host namespaces, devices or other chats' storage.
+  Normal outbound networking remains available. The broker is an additional
+  authenticated path, not a network firewall.
 
-- PRD §4.2: container is unprivileged (`--cap-drop ALL`,
-  `no-new-privileges`, non-root user); no host Docker socket; no host
-  namespaces or devices.
-- PRD §4.3: administrator token never in container files, environment,
-  process arguments, agent-readable broker responses, or persisted git
-  configuration (automated tests assert each of these).
-- PRD §4.4: the broker binds host loopback (verified reachable from
-  OrbStack containers through the relay; on Linux, bind the bridge
-  gateway address). It is not exposed to the LAN, publishes no ports,
-  and every request is authenticated by capability.
-- PRD §4.8: the container keeps ordinary unrestricted outbound network
-  access; the broker is an additional path, not a firewall. Direct
-  unauthenticated access to github.com (public clones) still works.
+## Evidence and remaining limits
 
-## Limitations and uncertainties
+Automated tests cover real git clone/fetch/push to two repositories using one
+capability; byte-for-byte GraphQL and REST forwarding (including formerly
+pruned fields); no extra node lookups; upstream HTTP and GraphQL denials;
+invalid, expired and revoked capabilities; independent chat revocation;
+fixed destinations, redirect non-following, credential isolation and logs.
 
-- **GraphQL is a narrow structural allowlist at every depth, not generic
-  proxying.** Read scope is exactly the policy's repo-local fields:
-  repository identity/feature metadata, refs, pull requests and issues of
-  authorized repositories (scalar fields plus author/labels/assignees/
-  milestone/reviews identity structures), schema introspection, and the
-  administrator's identity fields (`viewer` id/login/name). Cross-repo
-  traversal (`parent`, `forks`, `owner.repositories`, `headRepository`,
-  or any unlisted field at any depth) is pruned when gh needs it or
-  denied otherwise; neither route forwards the administrator credential
-  along an unauthorized path. Mutation scope is strictly
-  `createPullRequest` on allowlisted repositories with the same deep
-  output policy. Node IDs are resolved broker-side upstream before
-  authorization. gh commands needing other fields fail closed.
-- **Fork semantics:** because `parent`/`headRepository` are pruned, gh
-  treats repositories as non-forks. The same-repository PR workflow
-  (Flora's PRD scope) is unaffected; cross-fork PR creation is not
-  supported and would need explicit policy work.
-- **`viewer` identity fields disclose the administrator's account
-  id/login/name** to chats. Accepted as benign metadata required by
-  stock gh; revisit if the account identity itself is sensitive.
-- **REST write scope is pull requests only.** Creating issues, comments,
-  reviews, or merges is denied; those need explicit ADR extension if
-  required later.
-- **Account-level API endpoints are denied** (`/user` REST,
-  `/notifications`, etc.). The PR workflow does not need them.
-- **GitHub web-flow endpoints** (LFS batch API is `/.git/info/lfs` on
-  github.com, currently unhandled), `git archive`, and SSH are out of
-  scope for the spike. LFS repositories need explicit follow-up work.
-- **TLS bootstrap**: the agent image must carry the broker CA, coupling
-  broker and image at build/provision time.
-- **Sidecar relay**: stock gh requires the broker on the default HTTPS
-  port inside the container network. The probe uses a raw-TCP relay
-  sidecar; production can equivalently bind the broker on the bridge
-  gateway:443. Either way the relay/broker never terminates container
-  TLS except at the broker itself.
-- **Bridge confidentiality**: capability traffic crosses the container
-  network over TLS. A compromised container can misuse its own
-  capability until revoked, which is the intended blast radius
-  (per-chat, repo-scoped, expiring).
-- **Untested live**: the offline Docker integration passes with stock gh
-  2.103.2, but real GitHub behavior is unconfirmed because no designated
-  test repository/token was available. Remaining unknowns:
-  real api.github.com GraphQL shapes for `gh pr` beyond the fixture,
-  and pushing to a real private repository.
-  `agent/probes/github/run-probe.sh` plus the opt-in `TestLiveGitHub`
-  collect that evidence once the environment exists.
+The revised `run-local.sh` passed on 2026-10-26 on OrbStack, with stock
+**gh 2.103.2 `pr create --draft` and `pr view`**, git clone/commit/push/fetch,
+second-repository access, fake-upstream permission denials and revoked
+capability denial from both host and a fresh container. The fake API is a
+canned transport fixture, not evidence of real GitHub authorization behavior.
 
-## Alternatives considered
+Remaining limits:
 
-- **Token in container via credential helper / extraHeader**: simplest,
-  violates PRD §4.3 outright. Rejected.
-- **Transparent HTTPS proxy with SNI-based token injection**: cannot
-  distinguish authorized repositories from unauthorized ones at the git
-  path level without terminating TLS, and a misconfigured container could
-  still exfiltrate via the allowed host. The explicit broker endpoint
-  gives per-repository and per-chat scoping.
-- **Per-chat deploy keys or GitHub App installation tokens minted into
-  the container**: keeps the admin token out but still hands the agent a
-  broadly usable GitHub credential, and PRD scope excludes GitHub App
-  onboarding for the initial release. The capability model keeps every
-  usable credential broker-mediated and revocable.
-- **SSH transport**: would require host key management and a custom ssh
-  shim for scoping; HTTPS covers both git and gh with one mechanism.
+- No authorized real private-GitHub run yet. `run-probe.sh` mutates a designated
+  test repository; opt-in `TestLiveGitHub` checks API metadata and ls-remote
+  without mutations. Real response shapes, private push and PR behavior still
+  need evidence. The PR stays draft.
+- Fork requests are no longer altered, but cross-fork PR behavior is not yet
+  verified. SSH, git archive, LFS, release asset download hosts and arbitrary
+  GitHub web paths are not proxied. External redirects need unauthenticated
+  handling outside this broker; the real token must never follow them.
+- Only trusted GitHub upstreams receive real credentials. The broker is not a
+  response content sanitizer for a malicious upstream that reflects secrets.
+- Host filesystem, process environment and broker TLS keys are trusted.
+  Capabilities are secrets too, though independently revocable and unusable
+  directly at GitHub. Persisted git config can contain a capability.
+- Bridge-only listener placement/firewall rules, capability delivery, resource
+  limits, robust persistence and lifecycle wiring remain production work.
+  OrbStack/Desktop loopback reachability is not universal on Linux.
 
-## References
+## Alternatives
 
-- Implementation: `backend/internal/githubbroker`,
-  `backend/cmd/probe-github-broker`.
-- Probe assets: `agent/probes/github/`.
-- Tests: `backend/internal/githubbroker/*_test.go` (automated suite;
-  `TestLiveGitHub` opt-in live check).
+- Real token in a container credential helper or `extraHeader`: violates token
+  isolation, rejected.
+- Per-chat repository policy with a custom GraphQL parser and field pruning:
+  removed by user decision. It added maintenance cost and changed normal gh
+  semantics without serving the approved authorization model.
+- GitHub App or deploy-key provisioning: outside this spike's scope. Separate
+  broker capabilities provide independent revocation without exposing the
+  administrator token.
+
+Implementation: `backend/internal/githubbroker`,
+`backend/cmd/probe-github-broker`. Reproduction: `agent/probes/github/README.md`.

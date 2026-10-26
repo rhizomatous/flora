@@ -49,11 +49,12 @@ echo "probe fixture" > "$WORK/seed/README.md"
 git -C "$WORK/seed" add README.md
 git -C "$WORK/seed" -c user.email=probe@example.com -c user.name=Probe commit -q -m initial
 git -C "$WORK/seed" push -q origin HEAD:main
+git clone --bare -q "$WORK/gitroot/octo/demo.git" "$WORK/gitroot/octo/other.git"
 
 echo "== host-side PKI and capability"
 "$WORK/probe-github-broker" init-pki -pki "$WORK/pki" -hosts flora-broker >/dev/null
 CAPABILITY=$("$WORK/probe-github-broker" mint -caps "$WORK/capabilities.json" \
-	-chat probe-chat-1 -repos octo/demo -write -ttl 1h | sed -n 's/^capability=//p')
+	-chat probe-chat-1 -ttl 1h | sed -n 's/^capability=//p')
 
 echo "== build images"
 cp "$WORK/pki/ca.pem" "$HERE/ca.pem"
@@ -81,7 +82,7 @@ echo "== start host-side broker (token in host process environment only)"
 # containers; on Linux production, bind the container bridge gateway
 # address instead (see ADR 0001).
 FLORA_BROKER_GH_TOKEN="$TEST_TOKEN" "$WORK/probe-github-broker" serve \
-	-listen 127.0.0.1:$BROKER_PORT -caps "$WORK/capabilities.json" \
+	-offline-test -listen 127.0.0.1:$BROKER_PORT -caps "$WORK/capabilities.json" \
 	-pki "$WORK/pki" -hosts flora-broker \
 	-git-upstream "http://127.0.0.1:$FAKE_PORT" \
 	-api-upstream "http://127.0.0.1:$FAKE_PORT" &
@@ -109,6 +110,7 @@ docker run --rm \
 	-e CAPABILITY="$CAPABILITY" \
 	-e REPO=octo/demo \
 	-e OTHER_REPO=octo/other \
+	-e DENIED_REPO=octo/denied \
 	--entrypoint /bin/sh \
 	flora-probe-github /home/agent/container-local.sh
 

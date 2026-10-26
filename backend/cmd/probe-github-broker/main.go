@@ -66,7 +66,7 @@ func usage() {
 
 Subcommands:
   serve         Run the broker. Reads the administrator token from $%s.
-  mint          Mint a per-chat, repo-scoped container capability.
+  mint          Mint a per-chat, revocable container capability.
   revoke        Revoke a capability.
   init-pki      Create the host-side CA and broker TLS certificate.
   fake-upstream Serve a token-demanding fake GitHub for offline testing.
@@ -85,6 +85,7 @@ func serve(args []string) error {
 	noTLS := fs.Bool("no-tls", false, "serve plain HTTP (loopback development only)")
 	gitUpstream := fs.String("git-upstream", "", "override git upstream base URL (offline testing only)")
 	apiUpstream := fs.String("api-upstream", "", "override API upstream base URL (offline testing only)")
+	offlineTest := fs.Bool("offline-test", false, "allow loopback fixtures with the public local-test-admin-token only")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -97,9 +98,10 @@ func serve(args []string) error {
 		return err
 	}
 	cfg := githubbroker.Config{
-		Token:  token,
-		Store:  store,
-		Logger: slog.Default(),
+		OfflineTest: *offlineTest,
+		Token:       token,
+		Store:       store,
+		Logger:      slog.Default(),
 	}
 	if *gitUpstream != "" {
 		u, err := url.Parse(*gitUpstream)
@@ -166,27 +168,25 @@ func mint(args []string) error {
 	fs := flag.NewFlagSet("mint", flag.ContinueOnError)
 	capsPath := fs.String("caps", "capabilities.json", "host-only capability store path")
 	chat := fs.String("chat", "", "chat ID the capability is bound to (required)")
-	repoList := fs.String("repos", "", "comma-separated owner/name repositories (required)")
-	write := fs.Bool("write", false, "allow push and mutating API calls")
 	ttl := fs.Duration("ttl", 24*time.Hour, "capability lifetime")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *chat == "" || *repoList == "" {
-		return errors.New("-chat and -repos are required")
+	if *chat == "" {
+		return errors.New("-chat is required")
 	}
 	store, err := githubbroker.OpenStore(*capsPath)
 	if err != nil {
 		return err
 	}
-	cap, err := store.Mint(*chat, strings.Split(*repoList, ","), *write, *ttl)
+	cap, err := store.Mint(*chat, *ttl)
 	if err != nil {
 		return err
 	}
 	// The capability is a container-side credential; print it so the
 	// operator can inject it into the chat container at start time.
-	fmt.Printf("capability=%s\nchat=%s\nrepos=%s\nwrite=%t\nexpires=%s\n",
-		cap.ID, cap.ChatID, strings.Join(cap.Repos, ","), cap.Write,
+	fmt.Printf("capability=%s\nchat=%s\nexpires=%s\n",
+		cap.ID, cap.ChatID,
 		cap.ExpiresAt.Format(time.RFC3339))
 	return nil
 }

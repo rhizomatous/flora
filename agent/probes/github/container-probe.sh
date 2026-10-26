@@ -2,8 +2,8 @@
 # In-container probe for issue #3. Runs as the unprivileged "agent" user.
 # Environment (injected by run-probe.sh at container start, container-side
 # capability only):
-#   BROKER_HOST   broker address reachable from the container (flora-broker:8443)
-#   CAPABILITY    per-chat, repo-scoped, revocable capability token
+#   BROKER_HOST   broker address reachable from the container (flora-broker:443)
+#   CAPABILITY    per-chat, revocable capability token
 #   REPO          authorized repository, owner/name
 #   OTHER_REPO    a repository the capability must NOT reach
 set -eu
@@ -45,9 +45,10 @@ PR_URL=$(GH_HOST="$BROKER_HOST" gh pr create --draft \
 	--repo "$REPO" --base main --head "$BRANCH" \
 	--title "Flora probe draft PR" --body "Issue #3 broker probe.")
 echo "created: $PR_URL"
-GH_HOST="$BROKER_HOST" gh pr view "$PR_URL" --repo "$REPO" --json number,isDraft,url
+PR_NUMBER=${PR_URL##*/}
+GH_HOST="$BROKER_HOST" gh pr view "$PR_NUMBER" --repo "$REPO" --json number,isDraft,url
 
-step "cross-repository denial"
+step "upstream GitHub permission denial"
 if GH_HOST="$BROKER_HOST" gh api "repos/$OTHER_REPO" >/dev/null 2>&1; then
 	fail "capability reached an unauthorized repository (API)"
 fi

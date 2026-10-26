@@ -91,12 +91,13 @@ func newRig(t *testing.T) *probeRig {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git binary required for smart-HTTP probe tests")
 	}
-	rig := &probeRig{t: t, adminToken: "admin-fine-grained-token-TESTONLY"}
+	rig := &probeRig{t: t, adminToken: OfflineTestToken}
 	root := t.TempDir()
 	if err := os.Mkdir(filepath.Join(root, "octo"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	seedBareRepo(t, filepath.Join(root, "octo"), "demo")
+	seedBareRepo(t, filepath.Join(root, "octo"), "other")
 	rig.gitBack = newGitBackend(root, rig.adminToken)
 	rig.gitUp = httptest.NewServer(rig.gitBack)
 	t.Cleanup(rig.gitUp.Close)
@@ -128,6 +129,7 @@ func newBroker(t *testing.T, rig *probeRig) *Broker {
 	gitURL := mustParse(t, rig.gitUp.URL)
 	apiURL := mustParse(t, rig.apiUp.URL)
 	broker, err := New(Config{
+		OfflineTest: true,
 		Token:       rig.adminToken,
 		GitUpstream: gitURL,
 		APIUpstream: apiURL,
@@ -148,9 +150,9 @@ func mustParse(t *testing.T, raw string) *url.URL {
 	return u
 }
 
-func mintCap(t *testing.T, store *Store, chat string, repos []string, write bool) Capability {
+func mintCap(t *testing.T, store *Store, chat string) Capability {
 	t.Helper()
-	cap, err := store.Mint(chat, repos, write, time.Hour)
+	cap, err := store.Mint(chat, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}

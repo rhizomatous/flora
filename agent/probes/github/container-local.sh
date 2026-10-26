@@ -4,9 +4,10 @@
 # fake token-demanding upstream. No real GitHub credentials are involved.
 # Environment (injected by run-local.sh):
 #   BROKER_HOST   broker address (flora-broker:PORT)
-#   CAPABILITY    per-chat, repo-scoped capability token
+#   CAPABILITY    per-chat, revocable capability token
 #   REPO          authorized repository, owner/name
-#   OTHER_REPO    a repository the capability must NOT reach
+#   OTHER_REPO    another repository permitted by the upstream token
+#   DENIED_REPO   a repository denied by the fake upstream
 set -eu
 
 fail() { echo "LOCAL PROBE FAIL: $*" >&2; exit 1; }
@@ -54,12 +55,16 @@ gh pr view 1 --repo "$REPO" --json isDraft | grep -q '"isDraft":true' \
 	|| fail "gh pr view did not confirm the draft PR"
 cd ..
 
-step "cross-repository denial"
-if gh api "repos/$OTHER_REPO" >/dev/null 2>&1; then
-	fail "capability reached an unauthorized repository (API)"
+step "multiple repositories allowed by upstream"
+gh api "repos/$OTHER_REPO" >/dev/null || fail "second repository API failed"
+git ls-remote "https://$CAPABILITY@$BROKER_HOST/$OTHER_REPO.git" >/dev/null || fail "second repository git failed"
+
+step "upstream permission denial"
+if gh api "repos/$DENIED_REPO" >/dev/null 2>&1; then
+	fail "upstream denial lost (API)"
 fi
-if git ls-remote "https://$CAPABILITY@$BROKER_HOST/$OTHER_REPO.git" >/dev/null 2>&1; then
-	fail "capability reached an unauthorized repository (git)"
+if git ls-remote "https://$CAPABILITY@$BROKER_HOST/$DENIED_REPO.git" >/dev/null 2>&1; then
+	fail "upstream denial lost (git)"
 fi
 
 step "administrator token is not usable as a container credential"

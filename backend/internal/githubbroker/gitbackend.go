@@ -90,6 +90,11 @@ type FakeGitHub struct {
 
 func (f *FakeGitHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
+	// Explicit upstream denial fixture. The broker must preserve this denial.
+	if strings.Contains(path, "/octo/denied") {
+		http.Error(w, "Resource not accessible by personal access token", http.StatusForbidden)
+		return
+	}
 	// Git smart-HTTP requests hit /owner/repo.git/...; the broker's API
 	// traffic arrives as /repos/... (REST) or /graphql.
 	if !strings.Contains(path, ".git") {
@@ -132,11 +137,7 @@ func cannedAPIResponse(path string) string {
 	}
 }
 
-// Fixture node IDs used by the fake GraphQL responder.
-const (
-	FakeRepoNodeID    = "repo-node-octo-demo"
-	FakeForeignNodeID = "repo-node-octo-other"
-)
+const FakeRepoNodeID = "repo-node-octo-demo"
 
 // fakePullRequest is a superset of the fields gh pr view asks for, so the
 // stock gh binary can render a draft PR from the fixture.
@@ -162,22 +163,6 @@ func FakeGraphQL(body []byte) string {
 	}
 	q := req.Query
 	switch {
-	case strings.Contains(q, "node(id:"):
-		// Broker-side node resolution. Only the fixture IDs resolve.
-		id, _ := req.Variables["id"].(string)
-		if id == "" {
-			if m := regexp.MustCompile(`node\(\s*id\s*:\s*"([^"]+)"`).FindStringSubmatch(q); m != nil {
-				id = m[1]
-			}
-		}
-		switch id {
-		case FakeRepoNodeID:
-			return `{"data":{"node":{"__typename":"Repository","nameWithOwner":"octo/demo"}}}`
-		case FakeForeignNodeID:
-			return `{"data":{"node":{"__typename":"Repository","nameWithOwner":"octo/other"}}}`
-		default:
-			return `{"data":{"node":null}}`
-		}
 	case strings.Contains(q, "createPullRequest"):
 		return `{"data":{"createPullRequest":{"pullRequest":{` + fakePullRequest + `}}}}`
 	case strings.Contains(q, "__schema"):

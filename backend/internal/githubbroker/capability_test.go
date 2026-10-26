@@ -16,18 +16,23 @@ func TestStoreMintRevokePersistence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cap, err := store.Mint("chat-9", []string{"Octo/Demo.git"}, true, time.Hour)
+	cap, err := store.Mint("chat-9", time.Hour)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if cap.Repos[0] != "octo/demo" {
-		t.Fatalf("repository not normalized: %q", cap.Repos[0])
 	}
 	if !cap.ValidAt(time.Now()) {
 		t.Fatal("fresh capability should be valid")
 	}
+	// A separately opened broker store observes CLI-style external revocation.
+	watcher, err := OpenStore(path)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := store.Revoke(cap.ID); err != nil {
 		t.Fatal(err)
+	}
+	if got, ok := watcher.Lookup(cap.ID); !ok || !got.Revoked {
+		t.Fatal("running broker did not observe external revocation")
 	}
 	reopened, err := OpenStore(path)
 	if err != nil {
@@ -50,5 +55,15 @@ func TestStoreMintRevokePersistence(t *testing.T) {
 	const adminToken = "admin-fine-grained-token-TESTONLY"
 	if bytes.Contains(data, []byte(adminToken)) {
 		t.Fatal("capability store must never contain the administrator token")
+	}
+}
+
+func TestObsoleteScopeSettingsRejected(t *testing.T) {
+	path := t.TempDir() + "/capabilities.json"
+	if err := os.WriteFile(path, []byte(`{"capabilities":[{"id":"old","repos":["octo/demo"],"write":false}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenStore(path); err == nil {
+		t.Fatal("old scope settings silently accepted")
 	}
 }

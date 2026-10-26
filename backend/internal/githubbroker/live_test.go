@@ -44,7 +44,7 @@ func TestLiveGitHub(t *testing.T) {
 	front := httptest.NewServer(broker)
 	defer front.Close()
 
-	cap, err := store.Mint("live-probe", []string{repo}, true, 30*time.Minute)
+	cap, err := store.Mint("live-probe", 30*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}

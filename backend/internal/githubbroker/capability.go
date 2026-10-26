@@ -7,6 +7,7 @@
 package githubbroker
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -18,20 +19,20 @@ import (
 	"time"
 )
 
-// Capability is a scoped, revocable container-side credential. It is minted
-// host-side and delivered to a single chat's container. It never grants
-// anything by itself; the broker exchanges it for the administrator token on
-// the upstream hop.
+// Capability is a revocable container-side credential. It is minted
+// host-side and delivered to a single chat's container. It carries no
+// repository or operation scope of its own: by explicit product decision
+// (2026-10-26, recorded in ADR 0001 and on issue #3), the authorization
+// boundary is the administrator fine-grained token's own permissions,
+// which GitHub enforces upstream. The broker guarantees only that the
+// administrator token never enters containers and that access is
+// revocable per chat.
 type Capability struct {
 	// ID is the opaque bearer string the container presents.
 	ID string `json:"id"`
-	// ChatID binds the capability to one chat's execution boundary.
+	// ChatID binds the capability to one chat's execution boundary, for
+	// audit logging and per-chat revocation.
 	ChatID string `json:"chat_id"`
-	// Repos lists authorized repositories as "owner/name" (lowercase).
-	Repos []string `json:"repos"`
-	// Write allows git push and mutating API calls. Read-only capabilities
-	// permit clone/fetch and GET/HEAD API requests.
-	Write bool `json:"write"`
 	// ExpiresAt gives the capability a bounded lifetime.
 	ExpiresAt time.Time `json:"expires_at"`
 	// Revoked marks the capability dead before expiry.
@@ -55,23 +56,6 @@ func normalizeRepo(repo string) (string, error) {
 		return "", fmt.Errorf("repository %q must have the form owner/name", repo)
 	}
 	return parts[0] + "/" + parts[1], nil
-}
-
-// NormalizeRepo canonicalizes an "owner/name" repository for comparison.
-func NormalizeRepo(repo string) (string, error) { return normalizeRepo(repo) }
-
-// AllowsRepo reports whether the capability authorizes owner/name.
-func (c Capability) AllowsRepo(repo string) bool {
-	repo, err := normalizeRepo(repo)
-	if err != nil {
-		return false
-	}
-	for _, r := range c.Repos {
-		if r == repo {
-			return true
-		}
-	}
-	return false
 }
 
 // ValidAt reports whether the capability is usable at t.
@@ -117,12 +101,16 @@ func (s *Store) reloadLocked() error {
 	}
 	var f storeFile
 	if len(data) > 0 {
-		if err := json.Unmarshal(data, &f); err != nil {
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		// Reject obsolete repo/write scope settings rather than silently
+		// broadening an old capability when this spike is upgraded.
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&f); err != nil {
 			return fmt.Errorf("parse capability store: %w", err)
 		}
 	}
 	caps := map[string]Capability{}
-	for _, c := range f.Caps() {
+	for _, c := range f.Capabilities {
 		caps[c.ID] = c
 	}
 	s.caps = caps
@@ -131,8 +119,6 @@ func (s *Store) reloadLocked() error {
 	}
 	return nil
 }
-
-func (f storeFile) Caps() []Capability { return f.Capabilities }
 
 func (s *Store) saveLocked() error {
 	f := storeFile{}
@@ -181,20 +167,9 @@ func (s *Store) Lookup(id string) (Capability, bool) {
 }
 
 // Mint creates and persists a new capability.
-func (s *Store) Mint(chatID string, repos []string, write bool, ttl time.Duration) (Capability, error) {
+func (s *Store) Mint(chatID string, ttl time.Duration) (Capability, error) {
 	if chatID == "" {
 		return Capability{}, errors.New("chat ID is required")
-	}
-	if len(repos) == 0 {
-		return Capability{}, errors.New("at least one repository is required")
-	}
-	norm := make([]string, 0, len(repos))
-	for _, r := range repos {
-		n, err := normalizeRepo(r)
-		if err != nil {
-			return Capability{}, err
-		}
-		norm = append(norm, n)
 	}
 	id, err := NewCapabilityID()
 	if err != nil {
@@ -203,8 +178,6 @@ func (s *Store) Mint(chatID string, repos []string, write bool, ttl time.Duratio
 	cap := Capability{
 		ID:        id,
 		ChatID:    chatID,
-		Repos:     norm,
-		Write:     write,
 		ExpiresAt: time.Now().Add(ttl).UTC(),
 	}
 	s.mu.Lock()
