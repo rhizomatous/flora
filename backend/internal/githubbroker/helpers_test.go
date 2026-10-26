@@ -1,7 +1,6 @@
 package githubbroker
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,73 +9,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
 
-// gitBackend serves a real git smart-HTTP endpoint for the bare repositories
-// under projectRoot by wrapping `git http-backend`. When token is non-empty,
-// requests must carry `Authorization: Bearer <token>`, emulating GitHub's
-// private-repository behavior and proving the broker injects the
-// administrator token on the upstream hop.
-type gitBackend struct {
-	t           *testing.T
-	projectRoot string
-	token       string
-	// sawToken records whether any request arrived with the admin token.
-	sawToken bool
-	// requests counts upstream hits.
-	requests int
-}
-
-func (g *gitBackend) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	g.requests++
-	if g.token != "" {
-		if r.Header.Get("Authorization") != "Bearer "+g.token {
-			http.Error(w, "upstream auth required", http.StatusUnauthorized)
-			return
-		}
-		g.sawToken = true
-	}
-	cmd := exec.Command("git", "http-backend")
-	cmd.Env = append(os.Environ(),
-		"GIT_PROJECT_ROOT="+g.projectRoot,
-		"GIT_HTTP_EXPORT_ALL=1",
-		"PATH_INFO="+r.URL.Path,
-		"REQUEST_METHOD="+r.Method,
-		"QUERY_STRING="+r.URL.RawQuery,
-		"CONTENT_TYPE="+r.Header.Get("Content-Type"),
-		"CONTENT_LENGTH="+strconv.FormatInt(r.ContentLength, 10),
-		"REMOTE_USER=probe",
-	)
-	cmd.Stdin = r.Body
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = io.Discard
-	if err := cmd.Run(); err != nil {
-		http.Error(w, "backend failed", http.StatusInternalServerError)
-		return
-	}
-	header, body, _ := bytes.Cut(out.Bytes(), []byte("\r\n\r\n"))
-	status := http.StatusOK
-	for _, line := range strings.Split(string(header), "\r\n") {
-		k, v, ok := strings.Cut(line, ": ")
-		if !ok {
-			continue
-		}
-		if strings.EqualFold(k, "Status") {
-			code, _, _ := strings.Cut(v, " ")
-			if n, err := strconv.Atoi(code); err == nil {
-				status = n
-			}
-			continue
-		}
-		w.Header().Set(k, v)
-	}
-	w.WriteHeader(status)
-	_, _ = w.Write(body)
+// newGitBackend serves a real git smart-HTTP endpoint for the bare
+// repositories under projectRoot, requiring the administrator-style token
+// so tests prove the broker injects credentials upstream.
+func newGitBackend(projectRoot, token string) *GitBackend {
+	return &GitBackend{ProjectRoot: projectRoot, RequireToken: token}
 }
 
 // seedBareRepo creates a bare repository with one commit under dir.
@@ -132,7 +74,7 @@ func newStore(t *testing.T) *Store {
 type probeRig struct {
 	t          *testing.T
 	adminToken string
-	gitBack    *gitBackend
+	gitBack    *GitBackend
 	gitUp      *httptest.Server
 	apiUp      *httptest.Server
 	apiHandler http.HandlerFunc
@@ -152,7 +94,7 @@ func newRig(t *testing.T) *probeRig {
 		t.Fatal(err)
 	}
 	seedBareRepo(t, filepath.Join(root, "octo"), "demo")
-	rig.gitBack = &gitBackend{t: t, projectRoot: root, token: rig.adminToken}
+	rig.gitBack = newGitBackend(root, rig.adminToken)
 	rig.gitUp = httptest.NewServer(rig.gitBack)
 	t.Cleanup(rig.gitUp.Close)
 	rig.apiHandler = func(w http.ResponseWriter, r *http.Request) {

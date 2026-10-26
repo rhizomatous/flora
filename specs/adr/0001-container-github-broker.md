@@ -20,15 +20,20 @@ token) violates the isolation requirement.
 
 **Feasible.** A host-side broker that terminates container requests and
 re-originates them upstream satisfies ordinary git/gh use and token
-isolation, with the constraints and uncertainties listed below. This
-decision is based on the passing automated suite (real git
-clone/fetch/push through the broker against a smart-HTTP upstream that
-demands the administrator token, plus REST/GraphQL scoping tests). The
-remaining uncertainty is integration-level, not design-level: the full
-container run against live GitHub is scripted but was not executed
-because the implementation host had no Docker daemon and no designated
-test repository/token. If that run surfaces a blocker, this ADR must be
-revised rather than falling back to injecting the token into containers.
+isolation, with the constraints and uncertainties listed below. Evidence:
+the automated suite (real git clone/fetch/push through the broker against
+a smart-HTTP upstream that demands the administrator token, plus
+REST/GraphQL scoping tests) and the offline Docker integration run
+(`agent/probes/github/run-local.sh`, 2026-10-25), in which an
+unprivileged container cloned, pushed, fetched, and made gh API calls
+through the TLS broker against a token-demanding fake upstream, with
+cross-repository denial and revocation verified. The remaining
+uncertainty is confined to live-GitHub behavior (real `gh pr` GraphQL
+routes, GH_HOST details, pushing to a real private repository); the live
+run is scripted (`run-probe.sh`, opt-in `TestLiveGitHub`) and awaits a
+designated test repository and restricted token. If that run surfaces a
+blocker, this ADR must be revised rather than falling back to injecting
+the token into containers.
 
 ## Decision
 
@@ -108,8 +113,9 @@ capability tokens**:
   bridge over TLS, so other containers cannot read it; a compromised
   container could still misuse its own capability until revoked, which is
   the intended blast radius (per-chat, repo-scoped, expiring).
-- **Untested live**: Docker daemon and a designated test repository/token
-  were unavailable during the spike. `agent/probes/github/run-probe.sh`
+- **Untested live**: the offline Docker integration passes, but real
+  GitHub behavior is unconfirmed because no designated test
+  repository/token was available. `agent/probes/github/run-probe.sh`
   plus the opt-in `TestLiveGitHub` are the acceptance evidence to collect
   once the environment exists. gh's exact GH_HOST behaviors (port
   handling, GraphQL routes used by `gh pr view`) are the main

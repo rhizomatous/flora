@@ -8,7 +8,7 @@
 
 FROM alpine:3.21
 
-RUN apk add --no-cache git github-cli ca-certificates
+RUN apk add --no-cache git github-cli ca-certificates curl
 
 # Broker CA certificate, copied in at build time from the host-side PKI
 # directory (see run-probe.sh). Only the public certificate enters the
@@ -26,4 +26,5 @@ ENV GIT_TERMINAL_PROMPT=0 \
     GH_PROMPT_DISABLED=1
 
 COPY container-probe.sh /home/agent/container-probe.sh
+COPY container-local.sh /home/agent/container-local.sh
 ENTRYPOINT ["/bin/sh", "/home/agent/container-probe.sh"]

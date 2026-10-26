@@ -25,7 +25,7 @@ func TestGitCloneFetchPushThroughBroker(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(work, "README.md")); err != nil {
 		t.Fatalf("clone missing README.md: %v", err)
 	}
-	if !rig.gitBack.sawToken {
+	if !rig.gitBack.SawToken {
 		t.Fatal("upstream never saw the administrator token; broker did not inject it")
 	}
 

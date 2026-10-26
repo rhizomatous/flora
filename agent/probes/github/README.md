@@ -31,6 +31,31 @@ capabilities, REST and GraphQL repository scoping, redirect protection,
 and credential-boundary checks (token never in responses, git config, or
 error output; admin token never accepted as a container credential).
 
+## Offline container integration (Docker, no secrets)
+
+```
+agent/probes/github/run-local.sh
+```
+
+Runs the real topology with a token-demanding fake upstream fixture
+(`fake-upstream` subcommand serving git smart HTTP plus canned API JSON,
+from `Containerfile.fake-upstream`): host-side broker with TLS,
+unprivileged probe container (`--cap-drop ALL`, `no-new-privileges`, no
+Docker socket), per-chat capability. Verified on 2026-10-25 with OrbStack
+(Docker 29.8.2):
+
+- fake upstream rejects tokenless requests (401) and serves the fixture
+  with the bearer token (200)
+- container git clone, commit, push, and fetch through the broker over
+  TLS succeed; broker logs show the per-chat capability scope
+- `gh api` repository view, draft PR create (`POST /pulls`), and PR view
+  through the broker succeed
+- cross-repository access denied inside the container for both git and
+  the API; the upstream token itself is rejected as a container
+  credential
+- after `revoke`, the capability is denied from the host (401) and inside
+  the container
+
 ## Opt-in live checks (real GitHub, no mutations)
 
 ```
@@ -55,8 +80,11 @@ revoked capability is denied.
 
 ## Status
 
-Blocked on environment, not on design: at implementation time this host
-had no Docker daemon and no designated private test repository or test
-token, so the container end-to-end and live GitHub checks above are
-written and wired but not yet executed. The local automated suite passes
-in full.
+The offline container integration run (`run-local.sh`) and the automated
+suite pass in full. Remaining gap: a run against **real GitHub** with a
+designated private test repository and restricted token
+(`run-probe.sh` + `TestLiveGitHub`), which needs environment inputs that
+were not available at implementation time. Main uncertainties to confirm
+there: gh's GH_HOST behavior against api.github.com-shaped endpoints,
+including the GraphQL routes `gh pr create/view` use, and end-to-end push
+to a real private repository.

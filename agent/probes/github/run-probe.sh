@@ -14,7 +14,7 @@
 set -eu
 
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-ROOT=$(CDPATH= cd -- "$HERE/../.." && pwd)
+ROOT=$(CDPATH= cd -- "$HERE/../../.." && pwd)
 WORK=$(mktemp -d /tmp/flora-probe-3.XXXXXX)
 trap 'rm -rf "$WORK"' EXIT
 

@@ -1,0 +1,20 @@
+# Fake GitHub upstream for the offline issue #3 container integration run.
+# Serves token-demanding git smart HTTP plus canned REST/GraphQL JSON via
+# the probe-github-broker binary in fake-upstream mode. Test fixture only;
+# no real credentials are involved.
+
+FROM alpine:3.21
+
+# git-daemon provides git-http-backend, which the fake uses to serve
+# smart HTTP for the fixture repositories.
+RUN apk add --no-cache git git-daemon
+
+# The fixture repositories are mounted from the host and owned by the
+# host user; allow git to serve them regardless of ownership.
+RUN git config --system --add safe.directory '*'
+
+COPY probe-github-broker-linux /usr/local/bin/probe-github-broker
+
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/probe-github-broker", "fake-upstream"]
+CMD ["-listen", "0.0.0.0:8080", "-root", "/srv/git"]

@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -49,6 +50,8 @@ func run(args []string) error {
 		return revoke(args[1:])
 	case "init-pki":
 		return initPKI(args[1:])
+	case "fake-upstream":
+		return fakeUpstream(args[1:])
 	default:
 		usage()
 		return fmt.Errorf("unknown subcommand %q", args[0])
@@ -59,10 +62,11 @@ func usage() {
 	fmt.Fprintf(os.Stderr, `probe-github-broker: host-side GitHub credential broker (issue #3 spike)
 
 Subcommands:
-  serve      Run the broker. Reads the administrator token from $%s.
-  mint       Mint a per-chat, repo-scoped container capability.
-  revoke     Revoke a capability.
-  init-pki   Create the host-side CA and broker TLS certificate.
+  serve         Run the broker. Reads the administrator token from $%s.
+  mint          Mint a per-chat, repo-scoped container capability.
+  revoke        Revoke a capability.
+  init-pki      Create the host-side CA and broker TLS certificate.
+  fake-upstream Serve a token-demanding fake GitHub for offline testing.
 
 Run "<subcommand> -h" for flags.
 `, tokenEnv)
@@ -75,6 +79,8 @@ func serve(args []string) error {
 	pkiDir := fs.String("pki", "pki", "host-only PKI directory from init-pki")
 	hosts := fs.String("hosts", "flora-broker,localhost,127.0.0.1", "comma-separated TLS host names")
 	noTLS := fs.Bool("no-tls", false, "serve plain HTTP (loopback development only)")
+	gitUpstream := fs.String("git-upstream", "", "override git upstream base URL (offline testing only)")
+	apiUpstream := fs.String("api-upstream", "", "override API upstream base URL (offline testing only)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -86,11 +92,26 @@ func serve(args []string) error {
 	if err != nil {
 		return err
 	}
-	broker, err := githubbroker.New(githubbroker.Config{
+	cfg := githubbroker.Config{
 		Token:  token,
 		Store:  store,
 		Logger: slog.Default(),
-	})
+	}
+	if *gitUpstream != "" {
+		u, err := url.Parse(*gitUpstream)
+		if err != nil {
+			return fmt.Errorf("git upstream: %w", err)
+		}
+		cfg.GitUpstream = u
+	}
+	if *apiUpstream != "" {
+		u, err := url.Parse(*apiUpstream)
+		if err != nil {
+			return fmt.Errorf("API upstream: %w", err)
+		}
+		cfg.APIUpstream = u
+	}
+	broker, err := githubbroker.New(cfg)
 	if err != nil {
 		return err
 	}
@@ -200,4 +221,30 @@ func initPKI(args []string) error {
 	}
 	fmt.Printf("ca=%s\ncert=%s\n", pki.CACertPath, pki.CertPath)
 	return nil
+}
+
+// fakeUpstream serves a token-demanding fake GitHub (git smart HTTP plus
+// canned REST/GraphQL JSON) for offline integration testing. It needs a
+// git binary for http-backend.
+func fakeUpstream(args []string) error {
+	fs := flag.NewFlagSet("fake-upstream", flag.ContinueOnError)
+	listen := fs.String("listen", "127.0.0.1:8080", "listen address")
+	root := fs.String("root", "", "directory containing bare owner/name.git repositories (required)")
+	token := fs.String("token", "", "administrator-style bearer token to require (required)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *root == "" || *token == "" {
+		return errors.New("-root and -token are required")
+	}
+	fake := &githubbroker.FakeGitHub{
+		Git: &githubbroker.GitBackend{ProjectRoot: *root, RequireToken: *token},
+	}
+	srv := &http.Server{
+		Addr:              *listen,
+		Handler:           fake,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	slog.Info("fake upstream listening", "address", "http://"+*listen, "root", *root)
+	return srv.ListenAndServe()
 }
