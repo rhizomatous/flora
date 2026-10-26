@@ -53,6 +53,8 @@ func TestTransparentForwarding(t *testing.T) {
 		{"POST", "/api/graphql", "/graphql", `{"query":"query { node(id:\"opaque\") { ... on Repository { parent @include(if:true) { id } } } }"}`},
 		{"POST", "/api/graphql", "/graphql", "malformed JSON is GitHub's decision"},
 		{"GET", "/api/v3/user?x=1&x=2", "/user?x=1&x=2", ""},
+		{"GET", "/api/v3/user?x=one+two&x=one%20two&literal=a;b&empty=", "/user?x=one+two&x=one%20two&literal=a;b&empty=", ""},
+		{"GET", "/api/v3/user?", "/user?", ""},
 		{"GET", "/api/v3/repos/octo/other/contents/a%2Fb", "/repos/octo/other/contents/a%2Fb", ""},
 		{"GET", "/api/v3/repos/o/r/contents/a%2fb?ref=feature%2Fbranch", "/repos/o/r/contents/a%2fb?ref=feature%2Fbranch", ""},
 		{"DELETE", "/api/v3/repos/octo/other", "/repos/octo/other", ""},
@@ -73,10 +75,21 @@ func TestTransparentForwarding(t *testing.T) {
 				if r.Header.Get("Authorization") != "Bearer "+rig.adminToken || r.Header.Get("Cookie") != "" || r.Header.Get("Proxy-Authorization") != "" {
 					t.Error("credential boundary failed")
 				}
+				if r.Host != rig.broker.apiUpstream.Host {
+					t.Errorf("outbound Host not fixed: %q", r.Host)
+				}
+				for _, name := range []string{"Connection", "Upgrade", "Te", "X-Container-Hop"} {
+					if r.Header.Get(name) != "" {
+						t.Errorf("request hop header forwarded: %s", name)
+					}
+				}
 				if r.Header.Get("Accept") != "application/vnd.github+json" || r.Header.Get("X-Github-Api-Version") != "2022-11-28" {
 					t.Error("API headers modified")
 				}
 				w.Header().Set("X-GitHub-Request-Id", "fixture-id")
+				w.Header().Set("Connection", "X-Upstream-Hop")
+				w.Header().Set("X-Upstream-Hop", "private")
+				w.Header().Set("Proxy-Authenticate", "private")
 				w.WriteHeader(http.StatusAccepted)
 				io.WriteString(w, `{"upstream":"unchanged"}`)
 			})
@@ -84,6 +97,10 @@ func TestTransparentForwarding(t *testing.T) {
 			req.Header.Set("Authorization", "token "+cap.ID)
 			req.Header.Set("Cookie", "container-session=private")
 			req.Header.Set("Proxy-Authorization", "Basic container-secret")
+			req.Header.Set("Connection", "X-Container-Hop, Upgrade")
+			req.Header.Set("X-Container-Hop", "private")
+			req.Header.Set("Upgrade", "websocket")
+			req.Header.Set("Te", "trailers")
 			req.Header.Set("Accept", "application/vnd.github+json")
 			req.Header.Set("X-Github-Api-Version", "2022-11-28")
 			req.Host = "evil.test" // Incoming Host never selects the upstream.
@@ -93,6 +110,11 @@ func TestTransparentForwarding(t *testing.T) {
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
+			for _, name := range []string{"Connection", "X-Upstream-Hop", "Proxy-Authenticate"} {
+				if resp.Header.Get(name) != "" {
+					t.Errorf("response hop header forwarded: %s", name)
+				}
+			}
 			if hits != 1 || resp.StatusCode != 202 || string(body) != `{"upstream":"unchanged"}` || resp.Header.Get("X-GitHub-Request-Id") != "fixture-id" {
 				t.Fatalf("response modified or extra lookup: hits=%d status=%d body=%s", hits, resp.StatusCode, body)
 			}
@@ -207,12 +229,12 @@ func TestDestinationAndRedirectProtection(t *testing.T) {
 	rig.apiUp.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, target.URL+"/stolen", 302) })
 	resp := doReqNoFollow(t, "GET", rig.front.URL+"/api/v3/user", "token "+cap.ID, nil)
 	resp.Body.Close()
-	if resp.StatusCode != 302 || hits != 0 {
+	if resp.StatusCode != 302 || resp.Header.Get("Location") != target.URL+"/stolen" || hits != 0 {
 		t.Fatal("redirect followed")
 	}
 	req, _ := http.NewRequest("GET", target.URL, nil)
 	req.Header.Set("Authorization", "Bearer "+rig.adminToken)
-	if resp, err := rig.broker.client.Do(req); err == nil {
+	if resp, err := rig.broker.transport.RoundTrip(req); err == nil {
 		resp.Body.Close()
 		t.Fatal("foreign destination accepted")
 	}
@@ -221,7 +243,7 @@ func TestDestinationAndRedirectProtection(t *testing.T) {
 	}
 	for _, destination := range []string{"http://github.com", "https://github.com.evil.test", "https://api.github.com:444", "https://github.com@evil.test"} {
 		req, _ := http.NewRequest("GET", destination, nil)
-		if resp, err := rig.broker.client.Do(req); err == nil {
+		if resp, err := rig.broker.transport.RoundTrip(req); err == nil {
 			resp.Body.Close()
 			t.Fatal("unintended origin accepted")
 		}
@@ -259,7 +281,7 @@ func TestNoCredentialLeakInLogsOrResponses(t *testing.T) {
 			t.Fatal("admin token in response")
 		}
 	}
-	rig.broker.client.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+	rig.broker.transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		return nil, errors.New("transport error with secret " + rig.adminToken)
 	})
 	resp := doReq(t, "GET", rig.front.URL+"/api/v3/user", "token "+cap.ID, nil)
@@ -282,7 +304,7 @@ func TestProductionTokenDestinations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	transport := b.client.Transport.(*authTransport)
+	transport := b.transport.(*authTransport)
 	if transport.base.(*http.Transport).Proxy != nil {
 		t.Fatal("environment proxy enabled")
 	}
@@ -296,7 +318,7 @@ func TestProductionTokenDestinations(t *testing.T) {
 	})
 	for _, origin := range []string{"https://github.com", "https://api.github.com"} {
 		req, _ := http.NewRequest("GET", origin+"/path", nil)
-		resp, err := b.client.Do(req)
+		resp, err := b.transport.RoundTrip(req)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -304,14 +326,14 @@ func TestProductionTokenDestinations(t *testing.T) {
 	}
 	for _, origin := range []string{"http://github.com", "https://github.com.evil.test", "https://api.github.com:444", "https://github.com@evil.test", "https://evil.test"} {
 		req, _ := http.NewRequest("GET", origin, nil)
-		if resp, err := b.client.Do(req); err == nil {
+		if resp, err := b.transport.RoundTrip(req); err == nil {
 			resp.Body.Close()
 			t.Fatalf("accepted %s", origin)
 		}
 	}
 	req, _ := http.NewRequest("GET", "https://github.com/path", nil)
 	req.Host = "evil.test"
-	if resp, err := b.client.Do(req); err == nil {
+	if resp, err := b.transport.RoundTrip(req); err == nil {
 		resp.Body.Close()
 		t.Fatal("Host mismatch accepted")
 	}

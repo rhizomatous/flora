@@ -4,9 +4,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"log"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"regexp"
 	"strings"
@@ -40,7 +42,7 @@ type Broker struct {
 	store       *Store
 	logger      *slog.Logger
 	now         func() time.Time
-	client      *http.Client
+	transport   http.RoundTripper
 }
 
 func New(cfg Config) (*Broker, error) {
@@ -82,10 +84,7 @@ func New(cfg Config) (*Broker, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 	b := &Broker{token: cfg.Token, store: cfg.Store, logger: logger, now: now, gitUpstream: gitURL, apiUpstream: apiURL}
-	b.client = &http.Client{
-		Transport:     &authTransport{base: transport, token: cfg.Token, origins: map[string]bool{gitURL.Scheme + "://" + gitURL.Host: true, apiURL.Scheme + "://" + apiURL.Host: true}},
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
-	}
+	b.transport = &authTransport{base: transport, token: cfg.Token, origins: map[string]bool{gitURL.Scheme + "://" + gitURL.Host: true, apiURL.Scheme + "://" + apiURL.Host: true}}
 	return b, nil
 }
 
@@ -173,41 +172,37 @@ func (b *Broker) authenticate(w http.ResponseWriter, r *http.Request) (Capabilit
 	return Capability{}, false
 }
 
-func stripHopHeaders(h http.Header) {
-	for _, value := range h.Values("Connection") {
-		for _, name := range strings.Split(value, ",") {
-			h.Del(strings.TrimSpace(name))
-		}
-	}
-	for _, name := range []string{"Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization", "Te", "Trailer", "Transfer-Encoding", "Upgrade"} {
-		h.Del(name)
-	}
-}
-
 func (b *Broker) forward(w http.ResponseWriter, r *http.Request, upstream *url.URL, path, escaped string) {
-	out := r.Clone(r.Context())
-	out.URL = &url.URL{Scheme: upstream.Scheme, Host: upstream.Host, Path: path, RawPath: escaped, RawQuery: r.URL.RawQuery}
-	out.RequestURI = ""
-	out.Host = upstream.Host
-	out.Header = r.Header.Clone()
-	stripHopHeaders(out.Header)
-	out.Header.Del("Authorization")
-	out.Header.Del("Cookie")
-	resp, err := b.client.Do(out)
-	if err != nil {
-		// Transport errors can contain credential-bearing URLs. Never log them.
-		b.logger.Info("upstream unavailable")
-		http.Error(w, "upstream unavailable", http.StatusBadGateway)
-		return
+	proxy := &httputil.ReverseProxy{
+		// ReverseProxy uses RoundTrip directly, so redirects are not followed.
+		Transport: b.transport,
+		Rewrite: func(req *httputil.ProxyRequest) {
+			req.SetURL(upstream) // Fixed origin and outbound Host, never the inbound Host.
+			req.Out.URL.Path = path
+			req.Out.URL.RawPath = escaped
+			// Rewrite normally cleans unparsable queries. We do not interpret
+			// query parameters for authorization, so preserve the original bytes.
+			req.Out.URL.RawQuery = req.In.URL.RawQuery
+			req.Out.URL.ForceQuery = req.In.URL.ForceQuery
+			req.Out.Header.Del("Authorization")
+			req.Out.Header.Del("Cookie")
+			// The standard proxy strips hop headers, but opts back into
+			// upgrades and trailer negotiation. This broker supports neither.
+			req.Out.Header.Del("Connection")
+			req.Out.Header.Del("Upgrade")
+			req.Out.Header.Del("Te")
+		},
+		ModifyResponse: func(resp *http.Response) error {
+			resp.Header.Del("WWW-Authenticate")
+			return nil
+		},
+		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, _ error) {
+			// Transport errors can contain credential-bearing URLs. Never log them.
+			b.logger.Info("upstream unavailable")
+			http.Error(w, "upstream unavailable", http.StatusBadGateway)
+		},
+		// Internal copy/stream errors can contain secrets too.
+		ErrorLog: log.New(io.Discard, "", 0),
 	}
-	defer resp.Body.Close()
-	stripHopHeaders(resp.Header)
-	resp.Header.Del("WWW-Authenticate")
-	for k, vs := range resp.Header {
-		for _, v := range vs {
-			w.Header().Add(k, v)
-		}
-	}
-	w.WriteHeader(resp.StatusCode)
-	_, _ = io.Copy(w, resp.Body)
+	proxy.ServeHTTP(w, r)
 }
