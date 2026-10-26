@@ -81,6 +81,9 @@ type probeRig struct {
 	broker     *Broker
 	front      *httptest.Server
 	Store      *Store
+	// gqlBodies records GraphQL payloads the fake upstream received, so
+	// tests can assert what was actually forwarded.
+	gqlBodies []string
 }
 
 func newRig(t *testing.T) *probeRig {
@@ -105,6 +108,7 @@ func newRig(t *testing.T) *probeRig {
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/graphql" {
 			body, _ := io.ReadAll(r.Body)
+			rig.gqlBodies = append(rig.gqlBodies, string(body))
 			io.WriteString(w, FakeGraphQL(body))
 			return
 		}

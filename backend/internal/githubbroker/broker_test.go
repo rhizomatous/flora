@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -263,8 +264,10 @@ func TestGraphQLStructuralAuthorization(t *testing.T) {
 	check("repository with unresolvable owner",
 		`{"query":"query($owner:String!){ repository(owner:$owner,name:\"demo\"){ id } }"}`,
 		auth, http.StatusForbidden)
-	check("viewer id field",
-		`{"query":"query { viewer { id } }"}`, auth, http.StatusForbidden)
+	check("viewer email field",
+		`{"query":"query { viewer { email } }"}`, auth, http.StatusForbidden)
+	check("viewer identity fields allowed for gh",
+		`{"query":"query { viewer { id login name } }"}`, auth, http.StatusOK)
 	check("search field",
 		`{"query":"query { search(query:\"x\", type:REPOSITORY, first:1){ nodes { __typename } } }"}`, auth, http.StatusForbidden)
 	check("multiple operations",
@@ -281,6 +284,140 @@ func TestGraphQLStructuralAuthorization(t *testing.T) {
 		`{"query":"mutation { repository(owner:\"octo\", name:\"demo\") { id } }"}`, auth, http.StatusForbidden)
 	check("unparseable document",
 		`{"query":"query { repository("}`, auth, http.StatusForbidden)
+}
+
+// TestGraphQLNestedTraversalDenied covers R1: cross-repo reads nested
+// beneath authorized root fields must fail before any forwarding.
+func TestGraphQLNestedTraversalDenied(t *testing.T) {
+	rig := newRig(t)
+	cap := mintCap(t, rig.Store, "chat-1", []string{"octo/demo"}, true)
+	auth := "token " + cap.ID
+
+	check := func(name, body string, want int) {
+		t.Helper()
+		before := len(rig.gqlBodies)
+		resp := doReq(t, http.MethodPost, rig.front.URL+"/api/graphql", auth, strings.NewReader(body))
+		defer resp.Body.Close()
+		respBody, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode != want {
+			t.Errorf("%s: got %d, want %d; body: %s", name, resp.StatusCode, want, respBody)
+		}
+		// The broker's own node-resolution query may hit the upstream
+		// even when the container's document is denied; the container's
+		// document itself must never be forwarded. The resolver body is
+		// identified by its exact query text.
+		for _, fwd := range rig.gqlBodies[before:] {
+			if strings.Contains(fwd, nodeResolutionQuery) {
+				continue
+			}
+			if want == http.StatusForbidden {
+				t.Errorf("%s: denied document was forwarded upstream: %s", name, fwd)
+			}
+		}
+	}
+
+	denied := []struct{ name, query string }{
+		{"GLM decoy: owner organization repository",
+			`query { repository(owner:"octo",name:"demo") { owner { ... on Organization { repository(name:"other-private") { object(expression:"main:secret.txt") { ... on Blob { text } } } } } } }`},
+		{"owner repositories enumeration",
+			`query { repository(owner:"octo",name:"demo") { owner { repositories(first:10) { nodes { name } } } } }`},
+		{"forks connection",
+			`query { repository(owner:"octo",name:"demo") { forks(first:10) { nodes { name } } } }`},
+		{"node repository owner traversal",
+			`query($id:ID!) { node(id:$id) { ... on Repository { owner { repositories(first:5) { nodes { nameWithOwner } } } } } }`},
+		{"mutation result traversal",
+			`mutation($input:CreatePullRequestInput!) { createPullRequest(input:$input) { pullRequest { repository { name } } } }`},
+		{"unknown nested scalar fails closed",
+			`query { repository(owner:"octo",name:"demo") { createdAt } }`},
+		{"unknown nested object fails closed",
+			`query { repository(owner:"octo",name:"demo") { securityPolicy { body } } }`},
+		{"scalar with selections",
+			`query { repository(owner:"octo",name:"demo") { name { length } } }`},
+		{"object without selections",
+			`query { repository(owner:"octo",name:"demo") { owner } }`},
+		{"fragment-wrapped owner traversal",
+			`query { repository(owner:"octo",name:"demo") { ...O } } fragment O on Repository { owner { ... on Organization { repositories(first:5) { nodes { name } } } } }`},
+		{"alias-wrapped owner traversal",
+			`query { repository(owner:"octo",name:"demo") { x: owner { y: repositories(first:5) { nodes { name } } } } }`},
+		{"directive-wrapped traversal still denied",
+			`query { repository(owner:"octo",name:"demo") { owner { repositories(first:5) @include(if:true) { nodes { name } } } } }`},
+		{"deeply nested unknown path",
+			`query { repository(owner:"octo",name:"demo") { pullRequests(first:1) { nodes { reviews(first:1) { nodes { author { ... on User { repositories(first:5) { nodes { name } } } } } } } } } }`},
+	}
+	for _, tc := range denied {
+		vars := ""
+		if strings.Contains(tc.query, "$id") {
+			vars = `,"variables":{"id":"` + FakeRepoNodeID + `"}`
+		}
+		if strings.Contains(tc.query, "$input") {
+			vars = `,"variables":{"input":{"repositoryId":"` + FakeRepoNodeID + `"}}`
+		}
+		check(tc.name, `{"query":`+strconv.Quote(tc.query)+vars+`}`, http.StatusForbidden)
+	}
+}
+
+// TestGraphQLTraversalPruning verifies the two traversal fields stock gh
+// requests itself are pruned from the forwarded document rather than
+// forwarded or hard-denied.
+func TestGraphQLTraversalPruning(t *testing.T) {
+	rig := newRig(t)
+	cap := mintCap(t, rig.Store, "chat-1", []string{"octo/demo"}, true)
+	auth := "token " + cap.ID
+
+	post := func(body string) string {
+		t.Helper()
+		resp := doReq(t, http.MethodPost, rig.front.URL+"/api/graphql", auth, strings.NewReader(body))
+		defer resp.Body.Close()
+		out, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("got %d, want 200; body: %s", resp.StatusCode, out)
+		}
+		return string(out)
+	}
+
+	// RepoNetwork shape: parent must be pruned from the forwarded query.
+	rig.gqlBodies = nil
+	post(`{"query":"fragment repo on Repository { id, databaseId, name, owner { login }, viewerPermission, defaultBranchRef { name }, isPrivate } query RepositoryNetwork { viewer { login }, repo_000: repository(owner:\"octo\", name:\"demo\") { ...repo, parent { ...repo } } }"}`)
+	forwarded := rig.gqlBodies[len(rig.gqlBodies)-1]
+	if strings.Contains(forwarded, "parent") {
+		t.Fatalf("parent was forwarded upstream: %s", forwarded)
+	}
+	if !strings.Contains(forwarded, "repo_000") || !strings.Contains(forwarded, "fragment repo") {
+		t.Fatalf("rewrite lost aliased repository or fragment: %s", forwarded)
+	}
+
+	// PullRequest view shape: headRepository must be pruned.
+	rig.gqlBodies = nil
+	post(`{"query":"query($owner:String!,$repo:String!,$number:Int!){ repository(owner:$owner,name:$repo){ pullRequest(number:$number){ id, number, title, state, isDraft, url, headRepository { id, name } } } }","variables":{"owner":"octo","repo":"demo","number":1}}`)
+	forwarded = rig.gqlBodies[len(rig.gqlBodies)-1]
+	if strings.Contains(forwarded, "headRepository") {
+		t.Fatalf("headRepository was forwarded upstream: %s", forwarded)
+	}
+	if !strings.Contains(forwarded, "isDraft") {
+		t.Fatalf("rewrite lost requested fields: %s", forwarded)
+	}
+
+	// Mutation output shape: headRepository beneath createPullRequest
+	// must be pruned too.
+	rig.gqlBodies = nil
+	post(`{"query":"mutation($input:CreatePullRequestInput!){ createPullRequest(input:$input){ pullRequest { id, url, headRepository { name } } } }","variables":{"input":{"repositoryId":"` + FakeRepoNodeID + `"}}}`)
+	forwarded = rig.gqlBodies[len(rig.gqlBodies)-1]
+	if strings.Contains(forwarded, "headRepository") {
+		t.Fatalf("headRepository was forwarded upstream: %s", forwarded)
+	}
+
+	// A document that needs pruning but carries directives cannot be
+	// safely rewritten and is denied instead.
+	resp := doReq(t, http.MethodPost, rig.front.URL+"/api/graphql", auth, strings.NewReader(
+		`{"query":"query { repository(owner:\"octo\", name:\"demo\") @skip(if:false) { id, parent { id } } }"}`))
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("directive-carrying prunable document: got %d, want 403", resp.StatusCode)
+	}
+
+	// Stock gh create/view shapes survive intact end to end.
+	rig.gqlBodies = nil
+	post(`{"query":"query PullRequest($owner:String!,$repo:String!,$number:Int!){ repository(owner:$owner,name:$repo){ pullRequest(number:$number){ id, number, title, state, isDraft, url } } }","variables":{"owner":"octo","repo":"demo","number":1}}`)
 }
 
 // TestAmbiguousPathsRejected covers path normalization attacks: dot

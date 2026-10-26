@@ -2,6 +2,8 @@ package githubbroker
 
 import (
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -53,27 +55,33 @@ type GQLSelection struct {
 // treats directives as opaque and conservatively assumes the selection
 // applies.
 type GQLInlineFragment struct {
-	Selections []GQLSelection
+	TypeCondition string // empty when the fragment has no "on Type"
+	Selections    []GQLSelection
 }
 
 // GQLOperation is one executable operation definition.
 type GQLOperation struct {
 	Type        string // "query", "mutation", or "subscription"
 	Name        string
+	Anonymous   bool              // shorthand "{ ... }" form
+	VarTypes    map[string]string // variable name -> raw type text
+	VarOrder    []string          // variable definition order
 	VarDefaults map[string]GQLValue
 	Selections  []GQLSelection
 }
 
 // GQLFragment is a named fragment definition.
 type GQLFragment struct {
-	Name       string
-	Selections []GQLSelection
+	Name          string
+	TypeCondition string
+	Selections    []GQLSelection
 }
 
 // GQLDocument is a parsed GraphQL request document.
 type GQLDocument struct {
-	Operations []*GQLOperation
-	Fragments  map[string]*GQLFragment
+	Operations    []*GQLOperation
+	Fragments     map[string]*GQLFragment
+	HasDirectives bool // any directive anywhere in the document
 }
 
 type gqlToken struct {
@@ -205,8 +213,9 @@ func (l *gqlLexer) lexString() (string, error) {
 }
 
 type gqlParser struct {
-	toks []gqlToken
-	pos  int
+	toks          []gqlToken
+	pos           int
+	hasDirectives bool
 }
 
 func (p *gqlParser) peek() (gqlToken, bool) {
@@ -294,11 +303,17 @@ func ParseGraphQL(src string) (*GQLDocument, error) {
 	if len(doc.Operations) == 0 {
 		return nil, fmt.Errorf("no operation in document")
 	}
+	doc.HasDirectives = p.hasDirectives
 	return doc, nil
 }
 
 func (p *gqlParser) parseOperation(opType string) (*GQLOperation, error) {
-	op := &GQLOperation{Type: opType, VarDefaults: map[string]GQLValue{}}
+	op := &GQLOperation{
+		Type:        opType,
+		Anonymous:   opType == "",
+		VarTypes:    map[string]string{},
+		VarDefaults: map[string]GQLValue{},
+	}
 	if opType == "" {
 		op.Type = "query"
 	}
@@ -325,9 +340,12 @@ func (p *gqlParser) parseOperation(opType string) (*GQLOperation, error) {
 			if err := p.expectPunct(':'); err != nil {
 				return nil, err
 			}
-			if err := p.skipType(); err != nil {
+			typeText, err := p.parseType()
+			if err != nil {
 				return nil, err
 			}
+			op.VarTypes[name] = typeText
+			op.VarOrder = append(op.VarOrder, name)
 			if t, _ := p.peek(); t.kind == '=' {
 				p.pos++
 				v, err := p.parseValue()
@@ -353,28 +371,34 @@ func (p *gqlParser) parseOperation(opType string) (*GQLOperation, error) {
 	return op, nil
 }
 
-// skipType consumes a type reference: Named, [List], with ! modifiers.
-func (p *gqlParser) skipType() error {
+// parseType consumes a type reference and returns its source text for
+// faithful re-serialization: Named, [List], with ! modifiers.
+func (p *gqlParser) parseType() (string, error) {
 	t, err := p.next()
 	if err != nil {
-		return err
+		return "", err
 	}
+	var b strings.Builder
 	switch {
 	case t.kind == 'w':
+		b.WriteString(t.val)
 	case t.kind == '[':
-		if err := p.skipType(); err != nil {
-			return err
+		inner, err := p.parseType()
+		if err != nil {
+			return "", err
 		}
+		b.WriteString("[" + inner + "]")
 		if err := p.expectPunct(']'); err != nil {
-			return err
+			return "", err
 		}
 	default:
-		return fmt.Errorf("expected type, got %q", t.val)
+		return "", fmt.Errorf("expected type, got %q", t.val)
 	}
 	if t, _ := p.peek(); t.kind == '!' {
 		p.pos++
+		b.WriteString("!")
 	}
-	return nil
+	return b.String(), nil
 }
 
 func (p *gqlParser) skipDirectives() error {
@@ -383,6 +407,7 @@ func (p *gqlParser) skipDirectives() error {
 		if t.kind != '@' {
 			return nil
 		}
+		p.hasDirectives = true
 		p.pos++
 		if _, err := p.expectWord(); err != nil {
 			return err
@@ -410,7 +435,8 @@ func (p *gqlParser) parseFragment() (*GQLFragment, error) {
 	if on != "on" {
 		return nil, fmt.Errorf("expected \"on\" in fragment %q", name)
 	}
-	if _, err := p.expectWord(); err != nil { // type condition
+	typeCond, err := p.expectWord()
+	if err != nil {
 		return nil, err
 	}
 	if err := p.skipDirectives(); err != nil {
@@ -420,7 +446,7 @@ func (p *gqlParser) parseFragment() (*GQLFragment, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &GQLFragment{Name: name, Selections: sel}, nil
+	return &GQLFragment{Name: name, TypeCondition: typeCond, Selections: sel}, nil
 }
 
 func (p *gqlParser) parseSelectionSet() ([]GQLSelection, error) {
@@ -462,7 +488,8 @@ func (p *gqlParser) parseSelection() (GQLSelection, error) {
 		}
 		switch {
 		case nt.kind == 'w' && nt.val == "on":
-			if _, err := p.expectWord(); err != nil { // type condition
+			typeCond, err := p.expectWord()
+			if err != nil {
 				return GQLSelection{}, err
 			}
 			if err := p.skipDirectives(); err != nil {
@@ -472,7 +499,7 @@ func (p *gqlParser) parseSelection() (GQLSelection, error) {
 			if err != nil {
 				return GQLSelection{}, err
 			}
-			return GQLSelection{Inline: &GQLInlineFragment{Selections: sel}}, nil
+			return GQLSelection{Inline: &GQLInlineFragment{TypeCondition: typeCond, Selections: sel}}, nil
 		case nt.kind == '@':
 			// Inline fragment without type condition: ... @dir { ... }
 			p.pos-- // let skipDirectives see '@'
@@ -688,5 +715,150 @@ func ResolveString(v GQLValue, vars map[string]any, defaults map[string]GQLValue
 		return "", false
 	default:
 		return "", false
+	}
+}
+
+// String re-serializes a parsed document. It is used to forward a
+// rewritten (pruned) query upstream. Directives are not preserved;
+// callers must reject documents that carry directives when rewriting.
+func (d *GQLDocument) String() string {
+	var b strings.Builder
+	names := make([]string, 0, len(d.Fragments))
+	for name := range d.Fragments {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		frag := d.Fragments[name]
+		b.WriteString("fragment " + frag.Name + " on " + frag.TypeCondition + " ")
+		writeSelections(&b, frag.Selections)
+		b.WriteString("\n")
+	}
+	for _, op := range d.Operations {
+		writeOperation(&b, op)
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
+func writeOperation(b *strings.Builder, op *GQLOperation) {
+	if !op.Anonymous {
+		b.WriteString(op.Type)
+		if op.Name != "" {
+			b.WriteString(" " + op.Name)
+		}
+	}
+	if len(op.VarOrder) > 0 {
+		b.WriteString("(")
+		for i, name := range op.VarOrder {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString("$" + name + ": " + op.VarTypes[name])
+			if d, ok := op.VarDefaults[name]; ok {
+				b.WriteString(" = ")
+				writeValue(b, d)
+			}
+		}
+		b.WriteString(")")
+	}
+	if !op.Anonymous || len(op.VarOrder) > 0 {
+		b.WriteString(" ")
+	}
+	writeSelections(b, op.Selections)
+}
+
+func writeSelections(b *strings.Builder, sels []GQLSelection) {
+	b.WriteString("{ ")
+	for i, sel := range sels {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		switch {
+		case sel.Field != nil:
+			f := sel.Field
+			if f.Alias != "" {
+				b.WriteString(f.Alias + ": ")
+			}
+			b.WriteString(f.Name)
+			writeArgs(b, f.Args)
+			if len(f.Selections) > 0 {
+				b.WriteString(" ")
+				writeSelections(b, f.Selections)
+			}
+		case sel.Inline != nil:
+			b.WriteString("...")
+			if sel.Inline.TypeCondition != "" {
+				b.WriteString(" on " + sel.Inline.TypeCondition)
+			}
+			b.WriteString(" ")
+			writeSelections(b, sel.Inline.Selections)
+		default:
+			b.WriteString("..." + sel.FragmentSpread)
+		}
+	}
+	b.WriteString(" }")
+}
+
+func writeArgs(b *strings.Builder, args map[string]GQLValue) {
+	if len(args) == 0 {
+		return
+	}
+	names := make([]string, 0, len(args))
+	for name := range args {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	b.WriteString("(")
+	for i, name := range names {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(name + ": ")
+		writeValue(b, args[name])
+	}
+	b.WriteString(")")
+}
+
+func writeValue(b *strings.Builder, v GQLValue) {
+	switch v.Kind {
+	case vVariable:
+		b.WriteString("$" + v.Str)
+	case vString:
+		b.WriteString(strconv.Quote(v.Str))
+	case vInt, vFloat, vEnum:
+		b.WriteString(v.Str)
+	case vBool:
+		if v.Bool {
+			b.WriteString("true")
+		} else {
+			b.WriteString("false")
+		}
+	case vNull:
+		b.WriteString("null")
+	case vList:
+		b.WriteString("[")
+		for i, item := range v.List {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			writeValue(b, item)
+		}
+		b.WriteString("]")
+	case vObject:
+		b.WriteString("{ ")
+		names := make([]string, 0, len(v.Object))
+		for name := range v.Object {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for i, name := range names {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(name + ": ")
+			writeValue(b, v.Object[name])
+		}
+		b.WriteString(" }")
 	}
 }

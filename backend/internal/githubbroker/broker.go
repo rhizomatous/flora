@@ -291,28 +291,32 @@ func (b *Broker) serveREST(w http.ResponseWriter, r *http.Request, cap Capabilit
 	b.forward(w, r, b.apiUpstream, "/"+rest, r.URL.RawQuery)
 }
 
+// graphQLRequest is the JSON envelope gh and other clients post.
 type graphQLRequest struct {
-	Query     string          `json:"query"`
-	Variables json.RawMessage `json:"variables"`
+	Query         string          `json:"query"`
+	Variables     json.RawMessage `json:"variables"`
+	OperationName string          `json:"operationName"`
 }
 
 // serveGraphQL authorizes GraphQL requests structurally. Every document
-// is parsed; authorization is deny-by-default over root field shapes:
+// is parsed and validated deny-by-default, first by root field shape and
+// repository attribution, then by a full selection-tree schema policy
+// (see gqlauthz.go), before anything is forwarded upstream:
 //
-//   - query: __schema/__type introspection (schema only, no data)
-//   - query: repository(owner:, name:) with both arguments resolvable to
-//     strings (literal, variable, or variable default) naming an
-//     allowlisted repository
+//   - query: __schema/__type introspection (schema metadata only)
+//   - query: repository(owner:, name:) naming an allowlisted repository
+//   - query: viewer, constrained by the User policy to identity fields
 //   - query: node(id:) whose ID the broker resolves upstream to an
 //     allowlisted repository (or an issue/PR belonging to one)
-//   - mutation: createPullRequest(input:{repositoryId:...}) whose
-//     repository ID resolves the same way; requires a write capability
+//   - mutation: createPullRequest whose input.repositoryId resolves the
+//     same way; requires a write capability
 //
-// Everything else (viewer, organization, search, other mutations,
-// multiple operations per document, subscriptions, unparseable
-// documents, fragment cycles) is denied. There is no claim of secure
-// generic GraphQL proxying; only the shapes gh's pull-request workflow
-// needs are supported.
+// Traversal fields stock gh requests itself (Repository.parent,
+// PullRequest.headRepository) are pruned from the forwarded document so
+// gh treats the repository as a non-fork. Everything else — multiple
+// operations, subscriptions, unknown root fields, unknown nested fields
+// or types, fragment cycles, unresolvable references — is denied. There
+// is no claim of secure generic GraphQL proxying.
 func (b *Broker) serveGraphQL(w http.ResponseWriter, r *http.Request, cap Capability) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -328,111 +332,157 @@ func (b *Broker) serveGraphQL(w http.ResponseWriter, r *http.Request, cap Capabi
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	if err := b.authorizeGraphQL(r.Context(), cap, gql); err != nil {
+	forward, err := b.authorizeGraphQL(r.Context(), cap, gql)
+	if err != nil {
 		b.forbid(w, cap, "", "api-graphql: "+err.Error())
 		return
 	}
 	b.logger.Info("proxy", "chat", cap.ChatID, "op", "api-graphql")
-	r.Body = io.NopCloser(strings.NewReader(string(body)))
-	r.ContentLength = int64(len(body))
+	r.Body = io.NopCloser(strings.NewReader(string(forward)))
+	r.ContentLength = int64(len(forward))
 	b.forward(w, r, b.apiUpstream, "/graphql", "")
 }
 
-// authorizeGraphQL returns nil when the document is within the
-// capability's scope, or an error describing the denial.
-func (b *Broker) authorizeGraphQL(ctx context.Context, cap Capability, gql graphQLRequest) error {
+// authorizeGraphQL returns the body to forward (the original, or a
+// rewritten document with traversal fields pruned) when the request is
+// within the capability's scope, or an error describing the denial.
+func (b *Broker) authorizeGraphQL(ctx context.Context, cap Capability, gql graphQLRequest) ([]byte, error) {
 	doc, err := ParseGraphQL(gql.Query)
 	if err != nil {
-		return fmt.Errorf("unparseable document")
+		return nil, fmt.Errorf("unparseable document")
 	}
 	if len(doc.Operations) != 1 {
-		return fmt.Errorf("exactly one operation per document is allowed")
+		return nil, fmt.Errorf("exactly one operation per document is allowed")
 	}
 	op := doc.Operations[0]
 	if op.Type == "subscription" {
-		return fmt.Errorf("subscriptions are not supported")
+		return nil, fmt.Errorf("subscriptions are not supported")
 	}
 	vars := map[string]any{}
 	if len(gql.Variables) > 0 {
 		if err := json.Unmarshal(gql.Variables, &vars); err != nil {
-			return fmt.Errorf("invalid variables")
+			return nil, fmt.Errorf("invalid variables")
 		}
 	}
 	fields, err := doc.RootFields(op)
 	if err != nil {
-		return fmt.Errorf("invalid selection structure")
+		return nil, fmt.Errorf("invalid selection structure")
 	}
 	if len(fields) == 0 {
-		return fmt.Errorf("no root fields")
+		return nil, fmt.Errorf("no root fields")
 	}
 	needWrite := false
+	// rootTypes records the policy type beneath each root field for the
+	// full-tree check. Introspection roots are skipped: they expose only
+	// schema metadata.
+	rootTypes := map[*GQLField]string{}
 	for _, f := range fields {
 		switch f.Name {
 		case "__schema", "__type":
-			// Schema introspection only; exposes no repository data.
 			if op.Type != "query" {
-				return fmt.Errorf("introspection outside query")
+				return nil, fmt.Errorf("introspection outside query")
 			}
 		case "viewer":
-			// gh resolves the token owner's login while building its
-			// repository network. Narrowly allow exactly viewer{login}:
-			// this discloses the administrator account name (not the
-			// token) to the chat, recorded in ADR 0001.
-			if op.Type != "query" || len(f.Args) != 0 || len(f.Selections) != 1 ||
-				f.Selections[0].Field == nil || f.Selections[0].Field.Name != "login" ||
-				len(f.Selections[0].Field.Selections) != 0 {
-				return fmt.Errorf("viewer beyond {login} is not supported")
+			// Constrained by the User policy (identity fields only).
+			if op.Type != "query" {
+				return nil, fmt.Errorf("viewer outside query")
 			}
+			rootTypes[f] = "User"
 		case "repository":
 			if op.Type != "query" {
-				return fmt.Errorf("repository field outside query")
+				return nil, fmt.Errorf("repository field outside query")
 			}
 			repo, err := repoFromArgs(f.Args, vars, op.VarDefaults)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if !cap.AllowsRepo(repo) {
-				return fmt.Errorf("repository %s not authorized", repo)
+				return nil, fmt.Errorf("repository %s not authorized", repo)
 			}
+			rootTypes[f] = "Repository"
 		case "node":
 			if op.Type != "query" {
-				return fmt.Errorf("node field outside query")
+				return nil, fmt.Errorf("node field outside query")
 			}
 			id, ok := ResolveString(f.Args["id"], vars, op.VarDefaults)
 			if !ok || id == "" {
-				return fmt.Errorf("node id not resolvable")
+				return nil, fmt.Errorf("node id not resolvable")
 			}
 			repo, err := b.resolveNodeRepo(ctx, id)
 			if err != nil {
-				return fmt.Errorf("node id not attributable to an authorized repository")
+				return nil, fmt.Errorf("node id not attributable to an authorized repository")
 			}
 			if !cap.AllowsRepo(repo) {
-				return fmt.Errorf("node resolves to unauthorized repository %s", repo)
+				return nil, fmt.Errorf("node resolves to unauthorized repository %s", repo)
 			}
+			rootTypes[f] = "Node"
 		case "createPullRequest":
 			if op.Type != "mutation" {
-				return fmt.Errorf("createPullRequest outside mutation")
+				return nil, fmt.Errorf("createPullRequest outside mutation")
 			}
 			id, ok := resolveInputRepoID(f.Args["input"], vars, op.VarDefaults)
 			if !ok || id == "" {
-				return fmt.Errorf("repositoryId not resolvable")
+				return nil, fmt.Errorf("repositoryId not resolvable")
 			}
 			repo, err := b.resolveNodeRepo(ctx, id)
 			if err != nil {
-				return fmt.Errorf("repositoryId not attributable to an authorized repository")
+				return nil, fmt.Errorf("repositoryId not attributable to an authorized repository")
 			}
 			if !cap.AllowsRepo(repo) {
-				return fmt.Errorf("pull request targets unauthorized repository %s", repo)
+				return nil, fmt.Errorf("pull request targets unauthorized repository %s", repo)
 			}
 			needWrite = true
+			rootTypes[f] = "CreatePullRequestPayload"
 		default:
-			return fmt.Errorf("root field %q is not supported", f.Name)
+			return nil, fmt.Errorf("root field %q is not supported", f.Name)
 		}
 	}
 	if needWrite && !cap.Write {
-		return fmt.Errorf("write capability required")
+		return nil, fmt.Errorf("write capability required")
 	}
-	return nil
+
+	// Deep check: the entire selection tree beneath every root field must
+	// stay within the schema policy, so no nested traversal can reach a
+	// repository outside the authorized set. Traversal fields stock gh
+	// requests itself (Repository.parent, PullRequest.headRepository) are
+	// pruned rather than denied.
+	st := &gqlWalk{fragStack: map[string]bool{}}
+	for _, f := range fields {
+		child, ok := rootTypes[f]
+		if !ok {
+			continue // introspection root
+		}
+		if len(f.Selections) == 0 {
+			return nil, fmt.Errorf("root field %q requires selections", f.Name)
+		}
+		sub, err := doc.authorizeSelections(f.Selections, child, st)
+		if err != nil {
+			return nil, err
+		}
+		f.Selections = sub
+	}
+	if st.pruned {
+		// Rewriting changes the document, so it must not carry
+		// directives whose semantics the serializer cannot preserve.
+		if doc.HasDirectives {
+			return nil, fmt.Errorf("document requires pruning but uses directives")
+		}
+		out, err := json.Marshal(map[string]any{
+			"query":         doc.String(),
+			"variables":     vars,
+			"operationName": gql.OperationName,
+		})
+		if err != nil {
+			return nil, err
+		}
+		b.logger.Info("graphql traversal fields pruned", "chat", cap.ChatID)
+		return out, nil
+	}
+	return json.Marshal(map[string]any{
+		"query":         gql.Query,
+		"variables":     vars,
+		"operationName": gql.OperationName,
+	})
 }
 
 // repoFromArgs extracts the owner/name pair from a repository field's
@@ -547,6 +597,11 @@ func (b *Broker) resolveNodeRepo(ctx context.Context, id string) (string, error)
 		return "", err
 	}
 	b.nodeMu.Lock()
+	// Bound the cache so a container cannot grow it without limit; on
+	// overflow, drop it and rebuild (resolutions are cheap and rare).
+	if len(b.nodeCache) >= 1024 {
+		b.nodeCache = map[string]string{}
+	}
 	b.nodeCache[id] = repo
 	b.nodeMu.Unlock()
 	return repo, nil

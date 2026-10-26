@@ -30,7 +30,11 @@ scoping, cross-chat/cross-repository denial, revoked and expired
 capabilities, REST scoping with pull-request-only write bounds, path
 normalization rejection (dot segments, percent-encoded forms),
 structural GraphQL authorization (allowed gh shapes plus adversarial
-decoy/alias/fragment/multi-operation/node-ID documents), redirect
+decoy/alias/fragment/multi-operation/node-ID documents, and R1 nested
+traversal: `owner.repositories` enumeration, fork/parent routes,
+mutation-result traversal, unknown nested fields at any depth, all
+denied before forwarding; gh-requested `parent`/`headRepository`
+verified pruned from the forwarded document), redirect
 protection, and credential-boundary checks (token never in responses,
 git config, or error output; admin token never accepted as a container
 credential).

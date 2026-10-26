@@ -2,7 +2,8 @@
 
 - Status: Proposed (spike evidence gathered; live container run pending environment)
 - Date: 2026-10-25; hardened 2026-10-26 after review (structural GraphQL
-  authorization, REST write bounds, path normalization, gh port topology)
+  authorization, REST write bounds, path normalization, gh port topology,
+  full selection-tree policy with traversal pruning)
 - Issue: #3. Requirements: PRD §2.1, §4.2–4.4, §4.8, §6.2.
 
 ## Context
@@ -87,18 +88,31 @@ capability tokens**:
      Destructive and unrelated mutating endpoints are denied even for
      write capabilities.
    - GraphQL: every document is parsed structurally (operations,
-     fragments, aliases, variables, directives) and authorized by root
-     field shape. Allowed: query introspection (`__schema`, `__type`),
-     `repository(owner:, name:)` for allowlisted repositories, a narrow
-     `viewer{login}` (gh's repository-network resolution; discloses the
-     administrator account name, not the token), `node(id:)` whose ID the
-     broker resolves upstream to an allowlisted repository or an
-     issue/PR of one, and mutation `createPullRequest` whose
-     `input.repositoryId` resolves the same way (write flag required).
-     Everything else — multiple operations, subscriptions, other root
-     fields (`organization`, `search`, `viewer` beyond `{login}`), other
-     mutations, unresolvable references, fragment cycles — is denied.
-     There is no claim of secure generic GraphQL proxying.
+     fragments with type conditions, aliases, variables, defaults,
+     directives) and authorized at two levels, both deny-by-default:
+     (1) root field shapes — query introspection (`__schema`, `__type`),
+     `repository(owner:, name:)` naming an allowlisted repository,
+     `viewer`, `node(id:)` whose ID the broker resolves upstream to an
+     allowlisted repository or an issue/PR of one, and mutation
+     `createPullRequest` whose `input.repositoryId` resolves the same
+     way (write flag required); (2) the **entire nested selection tree**
+     against an explicit type/field allowlist (`gqlTypePolicy` in
+     `gqlauthz.go`) containing only repo-local scalar fields and safe
+     object/connection structures for the pull-request workflow. No
+     policy field can traverse to a repository outside the authorized
+     set: there is no `parent`, no `forks`, no `owner.repositories`
+     enumeration, no `headRepository`. Two traversal fields stock gh
+     requests itself — `Repository.parent` (RepoNetwork) and
+     `PullRequest.headRepository` (some views) — are **pruned** from the
+     forwarded document, so gh sees null and proceeds as if the
+     repository were not a fork; a document needing pruning that also
+     carries directives is denied (the rewriter does not preserve
+     directive semantics). Unknown nested fields, unknown types, scalar
+     fields with selections, aliases/fragments/directives used to hide
+     traversal, and oversized documents all fail closed before any
+     container document is forwarded. Node resolutions are cached in
+     memory (bounded at 1024 entries) and re-checked against the
+     allowlist on every use; a renamed repository fails closed.
    - Revocation and expiry are enforced per request.
 
 ## Supported operations
@@ -127,17 +141,26 @@ capability tokens**:
 
 ## Limitations and uncertainties
 
-- **GraphQL is a narrow structural allowlist, not generic proxying.**
-  Read scope is "the GitHub graph reachable from authorized repositories,
-  plus schema introspection and the administrator's login": GraphQL
-  traversal from an authorized repository can surface metadata that
-  references other repositories. Mutation scope is strictly
-  `createPullRequest` on allowlisted repositories. Node IDs are resolved
-  broker-side against the upstream before authorization. gh commands
-  needing other root fields fail closed.
-- **`viewer{login}` discloses the administrator account name** to chats.
-  Accepted as benign metadata required by stock gh; revisit if the
-  account identity itself is sensitive.
+- **GraphQL is a narrow structural allowlist at every depth, not generic
+  proxying.** Read scope is exactly the policy's repo-local fields:
+  repository identity/feature metadata, refs, pull requests and issues of
+  authorized repositories (scalar fields plus author/labels/assignees/
+  milestone/reviews identity structures), schema introspection, and the
+  administrator's identity fields (`viewer` id/login/name). Cross-repo
+  traversal (`parent`, `forks`, `owner.repositories`, `headRepository`,
+  or any unlisted field at any depth) is pruned when gh needs it or
+  denied otherwise; neither route forwards the administrator credential
+  along an unauthorized path. Mutation scope is strictly
+  `createPullRequest` on allowlisted repositories with the same deep
+  output policy. Node IDs are resolved broker-side upstream before
+  authorization. gh commands needing other fields fail closed.
+- **Fork semantics:** because `parent`/`headRepository` are pruned, gh
+  treats repositories as non-forks. The same-repository PR workflow
+  (Flora's PRD scope) is unaffected; cross-fork PR creation is not
+  supported and would need explicit policy work.
+- **`viewer` identity fields disclose the administrator's account
+  id/login/name** to chats. Accepted as benign metadata required by
+  stock gh; revisit if the account identity itself is sensitive.
 - **REST write scope is pull requests only.** Creating issues, comments,
   reviews, or merges is denied; those need explicit ADR extension if
   required later.
