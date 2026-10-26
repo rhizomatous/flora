@@ -22,11 +22,14 @@ import "fmt"
 // gqlTypePolicy maps a GraphQL object/interface type to the fields the
 // broker allows beneath it. A field maps to the child type for
 // recursion, or "" for scalar/enum leaves (which must not carry
-// selection sets).
+// selection sets). The table covers the shapes stock gh uses for the
+// pull-request workflow (verified against gh 2.63.0 and 2.103.2); a gh
+// upgrade requires reviewing this policy against the new version's
+// queries.
 var gqlTypePolicy = map[string]map[string]string{
 	"Repository": {
 		"id": "", "databaseId": "", "name": "", "nameWithOwner": "",
-		"isPrivate": "", "url": "", "viewerPermission": "", "isFork": "",
+		"isPrivate": "", "url": "", "sshUrl": "", "viewerPermission": "", "isFork": "",
 		"description": "", "visibility": "",
 		"hasIssuesEnabled": "", "hasProjectsEnabled": "",
 		"hasDiscussionsEnabled": "", "hasWikiEnabled": "",

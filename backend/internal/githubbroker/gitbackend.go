@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -80,9 +81,11 @@ func (g *GitBackend) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // /api/v3 and GraphQL under /api/graphql. Every route requires the
 // administrator-style bearer token, so a passing integration run proves
 // the broker injects credentials upstream. API responses are canned JSON;
-// it is a transport fixture, not a GitHub emulator.
+// it is a transport fixture, not a GitHub emulator. DebugLog, when set,
+// receives GraphQL request bodies for fixture development.
 type FakeGitHub struct {
-	Git *GitBackend
+	Git      *GitBackend
+	DebugLog *slog.Logger
 }
 
 func (f *FakeGitHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -100,6 +103,9 @@ func (f *FakeGitHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		if path == "/graphql" {
 			body, _ := io.ReadAll(io.LimitReader(r.Body, maxGraphQLBody))
+			if f.DebugLog != nil {
+				f.DebugLog.Info("graphql", "body", string(body))
+			}
 			_, _ = io.WriteString(w, FakeGraphQL(body))
 			return
 		}
@@ -178,15 +184,28 @@ func FakeGraphQL(body []byte) string {
 		return `{"data":{"__schema":{"queryType":{"name":"Query"},"mutationType":{"name":"Mutation"}}}}`
 	case strings.Contains(q, "__type"):
 		// gh's *_fields introspection; a plausible field list keeps the
-		// stock binary moving.
-		return `{"data":{"__type":{"name":"Issue","kind":"OBJECT","fields":[` +
-			`{"name":"id"},{"name":"number"},{"name":"title"},{"name":"body"},` +
+		// stock binary moving. Answer under whatever alias the query
+		// uses (gh 2.103 aliases it, e.g. `Issue: __type(...)`).
+		fields := `{"name":"id"},{"name":"number"},{"name":"title"},{"name":"body"},` +
 			`{"name":"state"},{"name":"url"},{"name":"author"},{"name":"labels"},` +
 			`{"name":"assignees"},{"name":"milestone"},{"name":"projectCards"},` +
 			`{"name":"createdAt"},{"name":"updatedAt"},{"name":"isDraft"},` +
 			`{"name":"baseRefName"},{"name":"headRefName"},{"name":"headRepository"},` +
 			`{"name":"headRepositoryOwner"},{"name":"isCrossRepository"},` +
-			`{"name":"maintainerCanModify"}]}}}`
+			`{"name":"maintainerCanModify"}`
+		typ := `{"fields":[` + fields + `]}`
+		var data strings.Builder
+		aliases := regexp.MustCompile(`(\w+)\s*:\s*__type`).FindAllStringSubmatch(q, -1)
+		if len(aliases) == 0 {
+			data.WriteString(`"__type":` + typ)
+		}
+		for i, m := range aliases {
+			if i > 0 {
+				data.WriteString(",")
+			}
+			data.WriteString(`"` + m[1] + `":` + typ)
+		}
+		return `{"data":{` + data.String() + `}}`
 	case strings.Contains(q, "repository"):
 		// Answer plain and aliased repository root fields with a rich
 		// repository object covering what gh's repository-network and

@@ -235,6 +235,7 @@ func fakeUpstream(args []string) error {
 	listen := fs.String("listen", "127.0.0.1:8080", "listen address")
 	root := fs.String("root", "", "directory containing bare owner/name.git repositories (required)")
 	token := fs.String("token", "", "administrator-style bearer token to require (required)")
+	debug := fs.Bool("debug", false, "log GraphQL request bodies (fixture development)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -243,6 +244,9 @@ func fakeUpstream(args []string) error {
 	}
 	fake := &githubbroker.FakeGitHub{
 		Git: &githubbroker.GitBackend{ProjectRoot: *root, RequireToken: *token},
+	}
+	if *debug {
+		fake.DebugLog = slog.Default()
 	}
 	srv := &http.Server{
 		Addr:              *listen,

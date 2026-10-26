@@ -28,9 +28,10 @@ a smart-HTTP upstream that demands the administrator token; structural
 GraphQL authorization including adversarial documents; REST write-scope
 and path-normalization tests) and the offline Docker integration run
 (`agent/probes/github/run-local.sh`, 2026-10-26), in which an
-unprivileged container cloned, pushed, fetched, and ran **stock gh 2.63.0
-`gh pr create --draft` and `gh pr view`** through the TLS broker against
-a token-demanding fake upstream, with cross-repository denial, path and
+unprivileged container cloned, pushed, fetched, and ran **stock gh
+2.103.2 (and earlier 2.63.0) `gh pr create --draft` and `gh pr view`**
+through the TLS broker against a token-demanding fake upstream, with
+cross-repository denial, nested-traversal denial and pruning, path and
 credential-boundary checks, and revocation verified. The remaining
 uncertainty is confined to live-GitHub behavior (real api.github.com
 GraphQL shapes beyond the fixture, pushing to a real private repository);
@@ -108,11 +109,12 @@ capability tokens**:
      repository were not a fork; a document needing pruning that also
      carries directives is denied (the rewriter does not preserve
      directive semantics). Unknown nested fields, unknown types, scalar
-     fields with selections, aliases/fragments/directives used to hide
+     fields with selections, aliases/fragments/     directives used to hide
      traversal, and oversized documents all fail closed before any
-     container document is forwarded. Node resolutions are cached in
-     memory (bounded at 1024 entries) and re-checked against the
-     allowlist on every use; a renamed repository fails closed.
+     container document is forwarded. Node IDs are re-resolved upstream
+     on every use — deliberately uncached, so a repository rename or
+     transfer can never leave a stale mapping that bypasses the
+     allowlist.
    - Revocation and expiry are enforced per request.
 
 ## Supported operations
@@ -121,7 +123,12 @@ capability tokens**:
 - gh repository-scoped REST reads (`gh api`, `gh repo view` style) and
   pull-request writes (`POST`/`PATCH /pulls`).
 - Stock `gh pr create --draft` and `gh pr view` (GraphQL): verified
-  end-to-end with gh 2.63.0 in the offline Docker integration run.
+  end-to-end with gh 2.63.0 and 2.103.2 in the offline Docker
+  integration run. gh's enterprise `GET /meta` probe is denied and
+  tolerated; its aliased feature-detection introspection is answered.
+  **A gh upgrade requires reviewing `gqlTypePolicy` against the new
+  version's queries** — the policy is allowlist-based, so new gh fields
+  fail closed until added.
 
 ## Constraints honored
 
@@ -181,9 +188,8 @@ capability tokens**:
   capability until revoked, which is the intended blast radius
   (per-chat, repo-scoped, expiring).
 - **Untested live**: the offline Docker integration passes with stock gh
-  2.63.0, but real GitHub behavior is unconfirmed because no designated
-  test repository/token was available. gh 2.103.2 remote matching was
-  verified equivalent (default-port requirement). Remaining unknowns:
+  2.103.2, but real GitHub behavior is unconfirmed because no designated
+  test repository/token was available. Remaining unknowns:
   real api.github.com GraphQL shapes for `gh pr` beyond the fixture,
   and pushing to a real private repository.
   `agent/probes/github/run-probe.sh` plus the opt-in `TestLiveGitHub`

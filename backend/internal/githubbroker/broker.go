@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -46,9 +45,6 @@ type Broker struct {
 	logger      *slog.Logger
 	now         func() time.Time
 	client      *http.Client
-
-	nodeMu    sync.Mutex
-	nodeCache map[string]string
 }
 
 var (
@@ -108,7 +104,6 @@ func New(cfg Config) (*Broker, error) {
 		store:       cfg.Store,
 		logger:      logger,
 		now:         now,
-		nodeCache:   map[string]string{},
 	}
 	b.client = &http.Client{
 		Transport: &authTransport{
@@ -536,15 +531,12 @@ const nodeResolutionQuery = `query($id:ID!){node(id:$id){__typename ` +
 	`... on PullRequest{repository{nameWithOwner}}}}`
 
 // resolveNodeRepo maps an opaque GitHub node ID to its owning repository
-// via an upstream GraphQL query. Results are cached in memory.
+// via an upstream GraphQL query. There is deliberately no cache: every
+// use re-resolves upstream, so a repository rename or transfer can never
+// leave a stale mapping that bypasses the allowlist. Resolutions are
+// rare (node/createPullRequest flows only), so the extra round trip is
+// acceptable for the spike.
 func (b *Broker) resolveNodeRepo(ctx context.Context, id string) (string, error) {
-	b.nodeMu.Lock()
-	if repo, ok := b.nodeCache[id]; ok {
-		b.nodeMu.Unlock()
-		return repo, nil
-	}
-	b.nodeMu.Unlock()
-
 	payload, err := json.Marshal(map[string]any{
 		"query":     nodeResolutionQuery,
 		"variables": map[string]string{"id": id},
@@ -596,14 +588,6 @@ func (b *Broker) resolveNodeRepo(ctx context.Context, id string) (string, error)
 	if err != nil {
 		return "", err
 	}
-	b.nodeMu.Lock()
-	// Bound the cache so a container cannot grow it without limit; on
-	// overflow, drop it and rebuild (resolutions are cheap and rare).
-	if len(b.nodeCache) >= 1024 {
-		b.nodeCache = map[string]string{}
-	}
-	b.nodeCache[id] = repo
-	b.nodeMu.Unlock()
 	return repo, nil
 }
 

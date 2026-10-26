@@ -52,15 +52,19 @@ a raw-TCP sidecar relay presenting the broker as `flora-broker:443`
 inside the container network (stock gh only matches remotes to GH_HOST
 on the default HTTPS port), and an unprivileged probe container
 (`--cap-drop ALL`, `no-new-privileges`, no Docker socket) with a per-chat
-capability. Verified on 2026-10-26 with OrbStack (Docker 29.8.2):
+capability. Verified on 2026-10-26 with OrbStack (Docker 29.8.2) and
+**stock gh 2.103.2** (pinned in the probe image):
 
 - fake upstream rejects tokenless requests (401) and serves the fixture
   with the bearer token (200)
 - container git clone, commit, push, and fetch through the broker over
   TLS succeed; broker logs show the per-chat capability scope
-- **stock gh 2.63.0 `gh pr create --draft` and `gh pr view` succeed
-  through the broker**, including gh's introspection and
-  repository-network GraphQL queries; `gh api` REST reads work too
+- **stock gh 2.103.2 `gh pr create --draft` and `gh pr view` succeed
+  through the broker**, including gh's `RepositoryInfo`/`RepoNetwork`
+  queries (with `parent` pruned, visible in broker logs) and its aliased
+  `Issue: __type(...)` feature-detection introspection; gh's
+  `GET /api/v3/meta` probe is denied and tolerated. `gh api` REST reads
+  work too
 - cross-repository access denied inside the container for both git and
   the API; the upstream token itself is rejected as a container
   credential; the environment boundary check rejects unexpected

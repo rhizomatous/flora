@@ -8,7 +8,16 @@
 
 FROM alpine:3.21
 
-RUN apk add --no-cache git github-cli ca-certificates curl
+# Pinned gh CLI (matches the version the broker's GraphQL policy is
+# verified against). Upgrading GH_VERSION requires reviewing the policy
+# in backend/internal/githubbroker/gqlauthz.go.
+ARG TARGETARCH
+ARG GH_VERSION=2.103.2
+RUN apk add --no-cache git ca-certificates curl \
+	&& curl -sSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${TARGETARCH}.tar.gz" \
+		| tar xz -C /tmp \
+	&& install -m 755 "/tmp/gh_${GH_VERSION}_linux_${TARGETARCH}/bin/gh" /usr/local/bin/gh \
+	&& rm -rf "/tmp/gh_${GH_VERSION}_linux_${TARGETARCH}"
 
 # Broker CA certificate, copied in at build time from the host-side PKI
 # directory (see run-probe.sh). Only the public certificate enters the

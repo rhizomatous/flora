@@ -375,9 +375,10 @@ func TestGraphQLTraversalPruning(t *testing.T) {
 		return string(out)
 	}
 
-	// RepoNetwork shape: parent must be pruned from the forwarded query.
+	// RepoNetwork shape from gh 2.103.2 (fragment repo): parent must be
+	// pruned from the forwarded query.
 	rig.gqlBodies = nil
-	post(`{"query":"fragment repo on Repository { id, databaseId, name, owner { login }, viewerPermission, defaultBranchRef { name }, isPrivate } query RepositoryNetwork { viewer { login }, repo_000: repository(owner:\"octo\", name:\"demo\") { ...repo, parent { ...repo } } }"}`)
+	post(`{"query":"fragment repo on Repository { id, databaseId, name, sshUrl, owner { login }, viewerPermission, defaultBranchRef { name }, isPrivate } query RepositoryNetwork { viewer { login }, repo_000: repository(owner:\"octo\", name:\"demo\") { ...repo, parent { ...repo } } }"}`)
 	forwarded := rig.gqlBodies[len(rig.gqlBodies)-1]
 	if strings.Contains(forwarded, "parent") {
 		t.Fatalf("parent was forwarded upstream: %s", forwarded)

@@ -22,6 +22,7 @@ RELAY_NAME=flora-probe-relay
 TEST_TOKEN=local-test-admin-token
 
 cleanup() {
+	[ -n "${FAKE_DEBUG:-}" ] && docker logs "$FAKE_NAME" 2>&1 | tail -60 || true
 	docker rm -f "$FAKE_NAME" "$RELAY_NAME" >/dev/null 2>&1 || true
 	docker network rm "$NET" >/dev/null 2>&1 || true
 	[ -n "${BROKER_PID:-}" ] && kill "$BROKER_PID" 2>/dev/null || true
@@ -65,7 +66,8 @@ docker run -d --name "$FAKE_NAME" --network "$NET" \
 	-p 127.0.0.1:$FAKE_PORT:8080 \
 	-v "$WORK/gitroot:/srv/git" \
 	flora-probe-fake-github \
-	-listen 0.0.0.0:8080 -root /srv/git -token "$TEST_TOKEN" >/dev/null
+	-listen 0.0.0.0:8080 -root /srv/git -token "$TEST_TOKEN" \
+	${FAKE_DEBUG:+-debug} >/dev/null
 sleep 1
 curl -s -o /dev/null -w 'fake upstream direct, no token: %{http_code}\n' \
 	"http://127.0.0.1:$FAKE_PORT/octo/demo.git/info/refs?service=git-upload-pack"
