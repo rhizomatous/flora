@@ -11,8 +11,13 @@ and [product requirements](specs/PRD.md).
 ## Develop
 
 Install [Nix](https://nixos.org/download/) with flakes and `nix-command` enabled.
-The committed `flake.lock` pins the development environment on Linux and macOS
-(x86-64 and ARM64): Go 1.26, Node.js 24 with npm, Make, and Git.
+The committed `flake.lock` pins the development environment on Linux (x86-64 and
+ARM64) and macOS (ARM64): Go 1.26, Node.js 24 with npm, Make, Git, curl, jq, and
+ripgrep. The flake also declares Intel macOS, but the current nixpkgs pin has
+dropped support for it, so that shell cannot currently be evaluated.
+Make and Git support the build and source workflows; curl and jq are useful for
+calling the backend and inspecting JSON responses, and ripgrep searches the
+Go/TypeScript source tree. The scripts do not require these last three tools.
 
 ```sh
 nix develop
@@ -41,6 +46,38 @@ change, rebuild the Go binary to update its embedded production assets.
 The same commands run in GitHub Actions on Linux. One-shot commands work too:
 `nix develop --command make check smoke build-linux`. Before newly created Nix
 files are tracked by Git, use `nix develop path:.` so Nix includes them.
+
+### Automatic shell activation with direnv (optional)
+
+Install [direnv](https://direnv.net/) and
+[nix-direnv](https://github.com/nix-community/nix-direnv) on your host, outside
+the development shell. For example, using Nix's default user profile:
+
+```sh
+nix profile add nixpkgs#direnv nixpkgs#nix-direnv
+```
+
+Add `eval "$(direnv hook zsh)"` to `~/.zshrc` (or
+`eval "$(direnv hook bash)"` to `~/.bashrc`). Add this line to
+`~/.config/direnv/direnvrc`, creating the directory and file if needed:
+
+```sh
+source "$HOME/.nix-profile/share/nix-direnv/direnvrc"
+```
+
+If you install nix-direnv another way, use its installed `direnvrc` path instead;
+skip this line if your host configuration already enables nix-direnv. Restart
+your shell, then run this once from the repository root after reviewing `.envrc`:
+
+```sh
+direnv allow
+```
+
+The committed `.envrc` uses `use flake` to load the same locked environment as
+`nix develop`. Direnv activates it when you enter the repository and restores
+your environment when you leave; nix-direnv caches it for faster re-entry.
+Local `.direnv/` state is ignored. Re-run `direnv allow` after approving changes
+to `.envrc`. Manual `nix develop` and CI do not need direnv or any host hook.
 
 ## Repository layout
 

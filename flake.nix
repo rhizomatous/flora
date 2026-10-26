@@ -12,7 +12,7 @@
         let pkgs = import nixpkgs { inherit system; };
         in {
           default = pkgs.mkShell {
-            packages = with pkgs; [ go_1_26 nodejs_24 gnumake git ];
+            packages = with pkgs; [ go_1_26 nodejs_24 gnumake git curl jq ripgrep ];
           };
         });
     };
