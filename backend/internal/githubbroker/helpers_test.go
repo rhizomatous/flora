@@ -103,6 +103,11 @@ func newRig(t *testing.T) *probeRig {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/graphql" {
+			body, _ := io.ReadAll(r.Body)
+			io.WriteString(w, FakeGraphQL(body))
+			return
+		}
 		fmt.Fprintf(w, `{"ok":true,"path":%q,"method":%q}`, r.URL.Path, r.Method)
 	}
 	rig.apiUp = httptest.NewServer(rig.apiHandler)

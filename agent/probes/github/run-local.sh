@@ -18,10 +18,11 @@ BROKER_PORT=18443
 FAKE_PORT=18080
 NET=flora-probe-local-net
 FAKE_NAME=flora-probe-fake-upstream
+RELAY_NAME=flora-probe-relay
 TEST_TOKEN=local-test-admin-token
 
 cleanup() {
-	docker rm -f "$FAKE_NAME" >/dev/null 2>&1 || true
+	docker rm -f "$FAKE_NAME" "$RELAY_NAME" >/dev/null 2>&1 || true
 	docker network rm "$NET" >/dev/null 2>&1 || true
 	[ -n "${BROKER_PID:-}" ] && kill "$BROKER_PID" 2>/dev/null || true
 	rm -rf "$WORK" "$HERE/ca.pem" "$HERE/probe-github-broker-linux"
@@ -73,20 +74,36 @@ curl -s -o /dev/null -H "Authorization: Bearer $TEST_TOKEN" \
 	"http://127.0.0.1:$FAKE_PORT/octo/demo.git/info/refs?service=git-upload-pack"
 
 echo "== start host-side broker (token in host process environment only)"
+# Bound to host loopback only: containers reach it through host-gateway,
+# and nothing on the LAN can. Verified reachable from OrbStack
+# containers; on Linux production, bind the container bridge gateway
+# address instead (see ADR 0001).
 FLORA_BROKER_GH_TOKEN="$TEST_TOKEN" "$WORK/probe-github-broker" serve \
-	-listen 0.0.0.0:$BROKER_PORT -caps "$WORK/capabilities.json" \
+	-listen 127.0.0.1:$BROKER_PORT -caps "$WORK/capabilities.json" \
 	-pki "$WORK/pki" -hosts flora-broker \
 	-git-upstream "http://127.0.0.1:$FAKE_PORT" \
 	-api-upstream "http://127.0.0.1:$FAKE_PORT" &
 BROKER_PID=$!
 sleep 1
 
+echo "== start sidecar relay (containers see the broker as flora-broker:443)"
+# Stock gh only matches git remotes to GH_HOST on the default HTTPS port,
+# so a raw-TCP sidecar presents the loopback-bound broker inside the
+# container network at flora-broker:443. The relay never terminates TLS
+# and never sees credentials.
+docker run -d --name "$RELAY_NAME" --network "$NET" \
+	--network-alias flora-broker \
+	--add-host hostgw:host-gateway \
+	--entrypoint /usr/local/bin/probe-github-broker \
+	flora-probe-fake-github \
+	tcp-relay -listen 0.0.0.0:443 -to hostgw:$BROKER_PORT >/dev/null
+sleep 1
+
 echo "== run unprivileged probe container"
 docker run --rm \
 	--network "$NET" \
-	--add-host flora-broker:host-gateway \
 	--cap-drop ALL --security-opt no-new-privileges \
-	-e BROKER_HOST=flora-broker:$BROKER_PORT \
+	-e BROKER_HOST=flora-broker \
 	-e CAPABILITY="$CAPABILITY" \
 	-e REPO=octo/demo \
 	-e OTHER_REPO=octo/other \
@@ -108,9 +125,8 @@ echo "revoked capability denied (401)"
 echo "== run revoked capability inside the container"
 if docker run --rm \
 	--network "$NET" \
-	--add-host flora-broker:host-gateway \
 	--cap-drop ALL --security-opt no-new-privileges \
-	-e BROKER_HOST=flora-broker:$BROKER_PORT \
+	-e BROKER_HOST=flora-broker \
 	-e CAPABILITY="$CAPABILITY" \
 	-e REPO=octo/demo \
 	-e OTHER_REPO=octo/other \

@@ -2,10 +2,12 @@ package githubbroker
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -96,6 +98,11 @@ func (f *FakeGitHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		f.Git.SawToken = true
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		if path == "/graphql" {
+			body, _ := io.ReadAll(io.LimitReader(r.Body, maxGraphQLBody))
+			_, _ = io.WriteString(w, FakeGraphQL(body))
+			return
+		}
 		_, _ = io.WriteString(w, cannedAPIResponse(path))
 		return
 	}
@@ -114,9 +121,98 @@ func cannedAPIResponse(path string) string {
 	switch {
 	case strings.Contains(path, "/pulls"):
 		return `{"number":1,"draft":true,"html_url":"https://example.test/` + fullName + `/pull/1","title":"probe"}`
-	case path == "/graphql":
-		return `{"data":{"repository":{"id":"fake"}}}`
 	default:
 		return `{"full_name":"` + fullName + `","private":true,"default_branch":"main"}`
+	}
+}
+
+// Fixture node IDs used by the fake GraphQL responder.
+const (
+	FakeRepoNodeID    = "repo-node-octo-demo"
+	FakeForeignNodeID = "repo-node-octo-other"
+)
+
+// fakePullRequest is a superset of the fields gh pr view asks for, so the
+// stock gh binary can render a draft PR from the fixture.
+const fakePullRequest = `"id":"pr-node-1","number":1,"title":"Flora probe draft PR",` +
+	`"state":"OPEN","isDraft":true,"url":"https://example.test/octo/demo/pull/1",` +
+	`"body":"probe","author":{"login":"probe"},"baseRefName":"main",` +
+	`"headRefName":"probe/change","headRepository":{"name":"demo"},` +
+	`"headRepositoryOwner":{"login":"octo"},"isCrossRepository":false,` +
+	`"maintainerCanModify":true,"createdAt":"2026-01-01T00:00:00Z",` +
+	`"updatedAt":"2026-01-01T00:00:00Z","labels":{"nodes":[]},` +
+	`"assignees":{"nodes":[]},"milestone":null,"projectCards":{"nodes":[]}`
+
+// FakeGraphQL answers the GraphQL shapes the broker and the stock gh
+// binary send, using only the request body. It is a test fixture: pattern
+// matching is acceptable here because no security decision relies on it.
+func FakeGraphQL(body []byte) string {
+	var req struct {
+		Query     string         `json:"query"`
+		Variables map[string]any `json:"variables"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		return `{"errors":[{"message":"bad request"}]}`
+	}
+	q := req.Query
+	switch {
+	case strings.Contains(q, "node(id:"):
+		// Broker-side node resolution. Only the fixture IDs resolve.
+		id, _ := req.Variables["id"].(string)
+		if id == "" {
+			if m := regexp.MustCompile(`node\(\s*id\s*:\s*"([^"]+)"`).FindStringSubmatch(q); m != nil {
+				id = m[1]
+			}
+		}
+		switch id {
+		case FakeRepoNodeID:
+			return `{"data":{"node":{"__typename":"Repository","nameWithOwner":"octo/demo"}}}`
+		case FakeForeignNodeID:
+			return `{"data":{"node":{"__typename":"Repository","nameWithOwner":"octo/other"}}}`
+		default:
+			return `{"data":{"node":null}}`
+		}
+	case strings.Contains(q, "createPullRequest"):
+		return `{"data":{"createPullRequest":{"pullRequest":{` + fakePullRequest + `}}}}`
+	case strings.Contains(q, "__schema"):
+		return `{"data":{"__schema":{"queryType":{"name":"Query"},"mutationType":{"name":"Mutation"}}}}`
+	case strings.Contains(q, "__type"):
+		// gh's *_fields introspection; a plausible field list keeps the
+		// stock binary moving.
+		return `{"data":{"__type":{"name":"Issue","kind":"OBJECT","fields":[` +
+			`{"name":"id"},{"name":"number"},{"name":"title"},{"name":"body"},` +
+			`{"name":"state"},{"name":"url"},{"name":"author"},{"name":"labels"},` +
+			`{"name":"assignees"},{"name":"milestone"},{"name":"projectCards"},` +
+			`{"name":"createdAt"},{"name":"updatedAt"},{"name":"isDraft"},` +
+			`{"name":"baseRefName"},{"name":"headRefName"},{"name":"headRepository"},` +
+			`{"name":"headRepositoryOwner"},{"name":"isCrossRepository"},` +
+			`{"name":"maintainerCanModify"}]}}}`
+	case strings.Contains(q, "repository"):
+		// Answer plain and aliased repository root fields with a rich
+		// repository object covering what gh's repository-network and
+		// pull-request queries read.
+		repo := `"id":"` + FakeRepoNodeID + `","name":"demo","nameWithOwner":"octo/demo",` +
+			`"owner":{"login":"octo"},"isPrivate":true,"viewerPermission":"ADMIN",` +
+			`"defaultBranchRef":{"name":"main"},"parent":null,` +
+			`"url":"https://example.test/octo/demo"`
+		if strings.Contains(q, "pullRequests(") {
+			repo += `,"pullRequests":{"nodes":[]}`
+		}
+		if strings.Contains(q, "pullRequest(") {
+			repo += `,"pullRequest":{` + fakePullRequest + `}`
+		}
+		var data strings.Builder
+		data.WriteString(`"repository":{` + repo + `}`)
+		for _, m := range regexp.MustCompile(`(\w+)\s*:\s*repository\(`).FindAllStringSubmatch(q, -1) {
+			data.WriteString(`,"` + m[1] + `":{` + repo + `}`)
+		}
+		if strings.Contains(q, "viewer") {
+			data.WriteString(`,"viewer":{"login":"probe-admin"}`)
+		}
+		return `{"data":{` + data.String() + `}}`
+	case strings.Contains(q, "viewer"):
+		return `{"data":{"viewer":{"login":"probe-admin"}}}`
+	default:
+		return `{"data":{}}`
 	}
 }

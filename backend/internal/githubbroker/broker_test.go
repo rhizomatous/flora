@@ -175,14 +175,17 @@ func TestRESTAPIScoping(t *testing.T) {
 	check("read-only read", "GET", "/api/v3/repos/octo/demo/pulls", authRO, http.StatusOK)
 }
 
-// TestGraphQLScoping checks the conservative repository-attribution
-// heuristic used for gh pr view/create traffic.
-func TestGraphQLScoping(t *testing.T) {
+// TestGraphQLStructuralAuthorization exercises the deny-by-default
+// GraphQL authorization: supported gh shapes pass, and adversarial
+// documents (decoy fields, node ID smuggling, aliases, fragments,
+// multiple operations) are denied instead of forwarding the
+// administrator credential.
+func TestGraphQLStructuralAuthorization(t *testing.T) {
 	rig := newRig(t)
-	cap := mintCap(t, rig.Store, "chat-1", []string{"octo/demo"}, true)
-	auth := "token " + cap.ID
+	writeCap := mintCap(t, rig.Store, "chat-1", []string{"octo/demo"}, true)
+	readCap := mintCap(t, rig.Store, "chat-ro", []string{"octo/demo"}, false)
 
-	check := func(name, body string, want int) {
+	check := func(name, body, auth string, want int) {
 		t.Helper()
 		resp := doReq(t, http.MethodPost, rig.front.URL+"/api/graphql", auth, strings.NewReader(body))
 		defer resp.Body.Close()
@@ -194,19 +197,139 @@ func TestGraphQLScoping(t *testing.T) {
 			t.Errorf("%s: response leaked the administrator token", name)
 		}
 	}
+	auth := "token " + writeCap.ID
+	authRO := "token " + readCap.ID
 
-	check("attributed query allowed",
-		`{"query":"query($owner:String!,$name:String!){ repository(owner:$owner,name:$name){ id } }","variables":{"owner":"octo","name":"demo"}}`,
-		http.StatusOK)
-	check("mutation allowed for write capability",
-		`{"query":"mutation($owner:String!,$name:String!){ createPullRequest(input:{repositoryId:\"x\"}){ pullRequest { url } } } repository(owner:$owner,name:$name)","variables":{"owner":"octo","name":"demo"}}`,
-		http.StatusOK)
-	check("foreign repository denied",
-		`{"query":"query($owner:String!,$name:String!){ repository(owner:$owner,name:$name){ id } }","variables":{"owner":"octo","name":"other"}}`,
-		http.StatusForbidden)
-	check("unattributed query denied",
-		`{"query":"query { viewer { login } }"}`,
-		http.StatusForbidden)
+	// Supported shapes.
+	check("repository literal",
+		`{"query":"query { repository(owner:\"octo\", name:\"demo\") { id } }"}`, auth, http.StatusOK)
+	check("repository variables",
+		`{"query":"query($owner:String!,$repo:String!){ repository(owner:$owner,name:$repo){ id } }","variables":{"owner":"octo","repo":"demo"}}`,
+		auth, http.StatusOK)
+	check("repository variable defaults",
+		`{"query":"query($owner:String = \"octo\", $name:String = \"demo\"){ repository(owner:$owner,name:$name){ id } }"}`,
+		auth, http.StatusOK)
+	check("repository alias",
+		`{"query":"query { decoy: repository(owner:\"octo\", name:\"demo\") { id } }"}`, auth, http.StatusOK)
+	check("repository via named fragment",
+		`{"query":"query { ...F } fragment F on Query { repository(owner:\"octo\", name:\"demo\") { id } }"}`, auth, http.StatusOK)
+	check("repository via inline fragment",
+		`{"query":"query { ... on Query { repository(owner:\"octo\", name:\"demo\") { id } } }"}`, auth, http.StatusOK)
+	check("introspection __type",
+		`{"query":"query Issue_fields { __type(name:\"Issue\") { fields { name } } }"}`, auth, http.StatusOK)
+	check("introspection __schema",
+		`{"query":"query { __schema { queryType { name } } }"}`, auth, http.StatusOK)
+	check("node id of authorized repository",
+		`{"query":"query($id:ID!){ node(id:$id){ __typename } }","variables":{"id":"`+FakeRepoNodeID+`"}}`,
+		auth, http.StatusOK)
+	check("createPullRequest on authorized repository",
+		`{"query":"mutation($id:ID!){ createPullRequest(input:{repositoryId:$id, baseRefName:\"main\", headRefName:\"x\", title:\"t\", draft:true}){ pullRequest { url } } }","variables":{"id":"`+FakeRepoNodeID+`"}}`,
+		auth, http.StatusOK)
+	check("createPullRequest with input variable (stock gh shape)",
+		`{"query":"mutation CreatePullRequest($input: CreatePullRequestInput!) { createPullRequest(input: $input) { pullRequest { url } } }","variables":{"input":{"repositoryId":"`+FakeRepoNodeID+`","baseRefName":"main","headRefName":"x","title":"t","draft":true}}}`,
+		auth, http.StatusOK)
+	check("createPullRequest foreign repo via input variable",
+		`{"query":"mutation CreatePullRequest($input: CreatePullRequestInput!) { createPullRequest(input: $input) { pullRequest { url } } }","variables":{"input":{"repositoryId":"`+FakeForeignNodeID+`","baseRefName":"main","headRefName":"x","title":"t"}}}`,
+		auth, http.StatusForbidden)
+	check("read-only repository query",
+		`{"query":"query { repository(owner:\"octo\", name:\"demo\") { id } }"}`, authRO, http.StatusOK)
+	check("narrow viewer login for gh repo network",
+		`{"query":"query { viewer { login } }"}`, auth, http.StatusOK)
+
+	// Adversarial and unsupported shapes: all denied.
+	check("viewer beyond login",
+		`{"query":"query { viewer { login email } }"}`, auth, http.StatusForbidden)
+	check("viewer with arguments",
+		`{"query":"query { viewer { login } repository(owner:\"octo\", name:\"demo\") { databaseId } } query2:viewer { id }"}`,
+		auth, http.StatusForbidden)
+	check("decoy repository plus organization",
+		`{"query":"query { repository(owner:\"octo\", name:\"demo\") { id } organization(login:\"evilcorp\") { repository(name:\"demo\") { id } } }"}`,
+		auth, http.StatusForbidden)
+	check("node id of foreign repository",
+		`{"query":"query($id:ID!){ node(id:$id){ __typename } }","variables":{"id":"`+FakeForeignNodeID+`"}}`,
+		auth, http.StatusForbidden)
+	check("node id unknown",
+		`{"query":"query($id:ID!){ node(id:$id){ __typename } }","variables":{"id":"bogus"}}`,
+		auth, http.StatusForbidden)
+	check("createPullRequest on foreign repository",
+		`{"query":"mutation($id:ID!){ createPullRequest(input:{repositoryId:$id, baseRefName:\"main\", headRefName:\"x\", title:\"t\"}){ pullRequest { url } } }","variables":{"id":"`+FakeForeignNodeID+`"}}`,
+		auth, http.StatusForbidden)
+	check("createPullRequest with read-only capability",
+		`{"query":"mutation($id:ID!){ createPullRequest(input:{repositoryId:$id, baseRefName:\"main\", headRefName:\"x\", title:\"t\"}){ pullRequest { url } } }","variables":{"id":"`+FakeRepoNodeID+`"}}`,
+		authRO, http.StatusForbidden)
+	check("repository of foreign owner via variables",
+		`{"query":"query($owner:String!,$repo:String!){ repository(owner:$owner,name:$repo){ id } }","variables":{"owner":"octo","repo":"other"}}`,
+		auth, http.StatusForbidden)
+	check("repository with unresolvable owner",
+		`{"query":"query($owner:String!){ repository(owner:$owner,name:\"demo\"){ id } }"}`,
+		auth, http.StatusForbidden)
+	check("viewer id field",
+		`{"query":"query { viewer { id } }"}`, auth, http.StatusForbidden)
+	check("search field",
+		`{"query":"query { search(query:\"x\", type:REPOSITORY, first:1){ nodes { __typename } } }"}`, auth, http.StatusForbidden)
+	check("multiple operations",
+		`{"query":"query A { repository(owner:\"octo\", name:\"demo\") { id } } query B { viewer { login } }","operationName":"A"}`,
+		auth, http.StatusForbidden)
+	check("fragment cycle",
+		`{"query":"query { ...A } fragment A on Query { ...B } fragment B on Query { ...A }"}`,
+		auth, http.StatusForbidden)
+	check("undefined fragment",
+		`{"query":"query { ...Nope }"}`, auth, http.StatusForbidden)
+	check("other mutation",
+		`{"query":"mutation { deleteIssue(input:{issueId:\"x\"}){ clientMutationId } }"}`, auth, http.StatusForbidden)
+	check("repository root field inside mutation",
+		`{"query":"mutation { repository(owner:\"octo\", name:\"demo\") { id } }"}`, auth, http.StatusForbidden)
+	check("unparseable document",
+		`{"query":"query { repository("}`, auth, http.StatusForbidden)
+}
+
+// TestAmbiguousPathsRejected covers path normalization attacks: dot
+// segments and percent-encoded path forms must be rejected before any
+// authorization or forwarding decision.
+func TestAmbiguousPathsRejected(t *testing.T) {
+	rig := newRig(t)
+	cap := mintCap(t, rig.Store, "chat-1", []string{"octo/demo"}, true)
+	auth := "token " + cap.ID
+
+	paths := []string{
+		"/api/v3/repos/octo/demo/../other/pulls",
+		"/api/v3/repos/octo/./demo/pulls",
+		"/api/v3/repos/octo/demo/%2e%2e/other/pulls",
+		"/api/v3/repos/octo/demo/%2E%2E/other",
+		"/api/v3/repos/octo%2fother/pulls",
+		"/octo/demo.git/info/refs/../../etc",
+	}
+	for _, p := range paths {
+		t.Run(p, func(t *testing.T) {
+			resp := doReq(t, http.MethodGet, rig.front.URL+p, auth, nil)
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("got %d, want 400", resp.StatusCode)
+			}
+		})
+	}
+}
+
+// TestRESTWriteScopeBounded verifies the effective REST write scope is
+// pull-request operations only, even for write capabilities.
+func TestRESTWriteScopeBounded(t *testing.T) {
+	rig := newRig(t)
+	cap := mintCap(t, rig.Store, "chat-1", []string{"octo/demo"}, true)
+	auth := "token " + cap.ID
+
+	check := func(name, method, path string, want int) {
+		t.Helper()
+		resp := doReq(t, method, rig.front.URL+path, auth, strings.NewReader(`{}`))
+		defer resp.Body.Close()
+		if resp.StatusCode != want {
+			t.Errorf("%s: got %d, want %d", name, resp.StatusCode, want)
+		}
+	}
+	check("create PR", "POST", "/api/v3/repos/octo/demo/pulls", http.StatusOK)
+	check("update PR", "PATCH", "/api/v3/repos/octo/demo/pulls/1", http.StatusOK)
+	check("delete repository denied", "DELETE", "/api/v3/repos/octo/demo", http.StatusForbidden)
+	check("create issue denied", "POST", "/api/v3/repos/octo/demo/issues", http.StatusForbidden)
+	check("merge PUT denied", "PUT", "/api/v3/repos/octo/demo/pulls/1/merge", http.StatusForbidden)
 }
 
 // TestRedirectProtection proves the broker never follows upstream redirects

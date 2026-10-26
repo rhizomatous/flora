@@ -39,10 +39,14 @@ cp "$WORK/pki/ca.pem" "$HERE/ca.pem"
 trap 'rm -rf "$WORK" "$HERE/ca.pem"' EXIT
 docker build -f "$HERE/Containerfile" -t flora-probe-github "$HERE"
 
-echo "== start broker on the container bridge only"
+echo "== start broker"
 docker network create flora-probe-net >/dev/null 2>&1 || true
+# Loopback bind is reachable from containers via host-gateway on Docker
+# Desktop / OrbStack. On a Linux production host, bind the docker bridge
+# gateway address instead so the broker is reachable only from the
+# container bridge (see ADR 0001).
 "$WORK/probe-github-broker" serve \
-	-listen 0.0.0.0:8443 -caps "$WORK/capabilities.json" -pki "$WORK/pki" \
+	-listen 127.0.0.1:8443 -caps "$WORK/capabilities.json" -pki "$WORK/pki" \
 	-hosts flora-broker &
 BROKER_PID=$!
 trap 'kill $BROKER_PID 2>/dev/null || true; rm -rf "$WORK" "$HERE/ca.pem"' EXIT

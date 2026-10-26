@@ -1,6 +1,7 @@
 package githubbroker
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -44,12 +46,31 @@ type Broker struct {
 	logger      *slog.Logger
 	now         func() time.Time
 	client      *http.Client
+
+	nodeMu    sync.Mutex
+	nodeCache map[string]string
 }
 
 var (
 	gitPathRE = regexp.MustCompile(`^/([A-Za-z0-9][A-Za-z0-9._-]*)/([A-Za-z0-9][A-Za-z0-9._-]*)\.git(/info/refs|/git-upload-pack|/git-receive-pack)$`)
 	repoAPIRE = regexp.MustCompile(`^repos/([A-Za-z0-9][A-Za-z0-9._-]*)/([A-Za-z0-9][A-Za-z0-9._-]*)(/.*)?$`)
+	// restWriteRE bounds the effective REST write scope to pull-request
+	// operations. All other mutating endpoints (including destructive
+	// ones like repository deletion) are denied even for write
+	// capabilities; see ADR 0001.
+	restWriteRE = regexp.MustCompile(`^repos/[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*/pulls(/[0-9]+)?$`)
 )
+
+// hasDotSegments reports whether a decoded URL path contains "." or ".."
+// segments.
+func hasDotSegments(path string) bool {
+	for _, seg := range strings.Split(path, "/") {
+		if seg == "." || seg == ".." {
+			return true
+		}
+	}
+	return false
+}
 
 const maxGraphQLBody = 4 << 20
 
@@ -87,6 +108,7 @@ func New(cfg Config) (*Broker, error) {
 		store:       cfg.Store,
 		logger:      logger,
 		now:         now,
+		nodeCache:   map[string]string{},
 	}
 	b.client = &http.Client{
 		Transport: &authTransport{
@@ -125,6 +147,14 @@ func (t *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Reject ambiguous paths before any authorization or forwarding
+	// decision: percent-encoded paths and dot segments could otherwise
+	// reach the upstream under a different shape than the scope check
+	// evaluated.
+	if r.URL.RawPath != "" || hasDotSegments(r.URL.Path) {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
 	cap, ok := b.authenticate(w, r)
 	if !ok {
 		return
@@ -249,29 +279,40 @@ func (b *Broker) serveREST(w http.ResponseWriter, r *http.Request, cap Capabilit
 	if !b.allow(w, cap, full, op) {
 		return
 	}
-	if op == "api-write" && !cap.Write {
-		b.forbid(w, cap, full, op)
-		return
+	if op == "api-write" {
+		// The effective write scope is pull-request operations only.
+		if !cap.Write || (r.Method != http.MethodPost && r.Method != http.MethodPatch) ||
+			!restWriteRE.MatchString(rest) {
+			b.forbid(w, cap, full, op)
+			return
+		}
 	}
 	b.logger.Info("proxy", "chat", cap.ChatID, "repo", strings.ToLower(full), "op", op)
 	b.forward(w, r, b.apiUpstream, "/"+rest, r.URL.RawQuery)
 }
-
-var (
-	gqlOwnerRE = regexp.MustCompile(`owner:\s*"([^"]+)"`)
-	gqlNameRE  = regexp.MustCompile(`name:\s*"([^"]+)"`)
-)
 
 type graphQLRequest struct {
 	Query     string          `json:"query"`
 	Variables json.RawMessage `json:"variables"`
 }
 
-// serveGraphQL proxies GraphQL only when every repository referenced by the
-// query is authorized for this capability. gh uses GraphQL for `gh pr view`
-// and `gh pr create`. The check is a conservative heuristic: it collects
-// owner/name pairs from variables and inline literals, requires at least one
-// reference, and denies anything it cannot attribute.
+// serveGraphQL authorizes GraphQL requests structurally. Every document
+// is parsed; authorization is deny-by-default over root field shapes:
+//
+//   - query: __schema/__type introspection (schema only, no data)
+//   - query: repository(owner:, name:) with both arguments resolvable to
+//     strings (literal, variable, or variable default) naming an
+//     allowlisted repository
+//   - query: node(id:) whose ID the broker resolves upstream to an
+//     allowlisted repository (or an issue/PR belonging to one)
+//   - mutation: createPullRequest(input:{repositoryId:...}) whose
+//     repository ID resolves the same way; requires a write capability
+//
+// Everything else (viewer, organization, search, other mutations,
+// multiple operations per document, subscriptions, unparseable
+// documents, fragment cycles) is denied. There is no claim of secure
+// generic GraphQL proxying; only the shapes gh's pull-request workflow
+// needs are supported.
 func (b *Broker) serveGraphQL(w http.ResponseWriter, r *http.Request, cap Capability) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -287,44 +328,228 @@ func (b *Broker) serveGraphQL(w http.ResponseWriter, r *http.Request, cap Capabi
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	owners := map[string]bool{}
-	names := map[string]bool{}
-	for _, m := range gqlOwnerRE.FindAllStringSubmatch(gql.Query, -1) {
-		owners[strings.ToLower(m[1])] = true
-	}
-	for _, m := range gqlNameRE.FindAllStringSubmatch(gql.Query, -1) {
-		names[strings.ToLower(m[1])] = true
-	}
-	var vars map[string]any
-	if len(gql.Variables) > 0 && json.Unmarshal(gql.Variables, &vars) == nil {
-		if v, ok := vars["owner"].(string); ok {
-			owners[strings.ToLower(v)] = true
-		}
-		if v, ok := vars["name"].(string); ok {
-			names[strings.ToLower(v)] = true
-		}
-	}
-	if len(owners) == 0 || len(names) == 0 {
-		b.forbid(w, cap, "", "api-graphql")
+	if err := b.authorizeGraphQL(r.Context(), cap, gql); err != nil {
+		b.forbid(w, cap, "", "api-graphql: "+err.Error())
 		return
-	}
-	for owner := range owners {
-		for name := range names {
-			repo := owner + "/" + name
-			op := "api-read"
-			if strings.Contains(gql.Query, "mutation") {
-				op = "api-write"
-			}
-			if !cap.AllowsRepo(repo) || (op == "api-write" && !cap.Write) {
-				b.forbid(w, cap, repo, op)
-				return
-			}
-		}
 	}
 	b.logger.Info("proxy", "chat", cap.ChatID, "op", "api-graphql")
 	r.Body = io.NopCloser(strings.NewReader(string(body)))
 	r.ContentLength = int64(len(body))
 	b.forward(w, r, b.apiUpstream, "/graphql", "")
+}
+
+// authorizeGraphQL returns nil when the document is within the
+// capability's scope, or an error describing the denial.
+func (b *Broker) authorizeGraphQL(ctx context.Context, cap Capability, gql graphQLRequest) error {
+	doc, err := ParseGraphQL(gql.Query)
+	if err != nil {
+		return fmt.Errorf("unparseable document")
+	}
+	if len(doc.Operations) != 1 {
+		return fmt.Errorf("exactly one operation per document is allowed")
+	}
+	op := doc.Operations[0]
+	if op.Type == "subscription" {
+		return fmt.Errorf("subscriptions are not supported")
+	}
+	vars := map[string]any{}
+	if len(gql.Variables) > 0 {
+		if err := json.Unmarshal(gql.Variables, &vars); err != nil {
+			return fmt.Errorf("invalid variables")
+		}
+	}
+	fields, err := doc.RootFields(op)
+	if err != nil {
+		return fmt.Errorf("invalid selection structure")
+	}
+	if len(fields) == 0 {
+		return fmt.Errorf("no root fields")
+	}
+	needWrite := false
+	for _, f := range fields {
+		switch f.Name {
+		case "__schema", "__type":
+			// Schema introspection only; exposes no repository data.
+			if op.Type != "query" {
+				return fmt.Errorf("introspection outside query")
+			}
+		case "viewer":
+			// gh resolves the token owner's login while building its
+			// repository network. Narrowly allow exactly viewer{login}:
+			// this discloses the administrator account name (not the
+			// token) to the chat, recorded in ADR 0001.
+			if op.Type != "query" || len(f.Args) != 0 || len(f.Selections) != 1 ||
+				f.Selections[0].Field == nil || f.Selections[0].Field.Name != "login" ||
+				len(f.Selections[0].Field.Selections) != 0 {
+				return fmt.Errorf("viewer beyond {login} is not supported")
+			}
+		case "repository":
+			if op.Type != "query" {
+				return fmt.Errorf("repository field outside query")
+			}
+			repo, err := repoFromArgs(f.Args, vars, op.VarDefaults)
+			if err != nil {
+				return err
+			}
+			if !cap.AllowsRepo(repo) {
+				return fmt.Errorf("repository %s not authorized", repo)
+			}
+		case "node":
+			if op.Type != "query" {
+				return fmt.Errorf("node field outside query")
+			}
+			id, ok := ResolveString(f.Args["id"], vars, op.VarDefaults)
+			if !ok || id == "" {
+				return fmt.Errorf("node id not resolvable")
+			}
+			repo, err := b.resolveNodeRepo(ctx, id)
+			if err != nil {
+				return fmt.Errorf("node id not attributable to an authorized repository")
+			}
+			if !cap.AllowsRepo(repo) {
+				return fmt.Errorf("node resolves to unauthorized repository %s", repo)
+			}
+		case "createPullRequest":
+			if op.Type != "mutation" {
+				return fmt.Errorf("createPullRequest outside mutation")
+			}
+			id, ok := resolveInputRepoID(f.Args["input"], vars, op.VarDefaults)
+			if !ok || id == "" {
+				return fmt.Errorf("repositoryId not resolvable")
+			}
+			repo, err := b.resolveNodeRepo(ctx, id)
+			if err != nil {
+				return fmt.Errorf("repositoryId not attributable to an authorized repository")
+			}
+			if !cap.AllowsRepo(repo) {
+				return fmt.Errorf("pull request targets unauthorized repository %s", repo)
+			}
+			needWrite = true
+		default:
+			return fmt.Errorf("root field %q is not supported", f.Name)
+		}
+	}
+	if needWrite && !cap.Write {
+		return fmt.Errorf("write capability required")
+	}
+	return nil
+}
+
+// repoFromArgs extracts the owner/name pair from a repository field's
+// arguments, resolving variables and defaults.
+func repoFromArgs(args map[string]GQLValue, vars map[string]any, defaults map[string]GQLValue) (string, error) {
+	owner, ok := ResolveString(args["owner"], vars, defaults)
+	if !ok || owner == "" {
+		return "", fmt.Errorf("repository owner not resolvable")
+	}
+	name, ok := ResolveString(args["name"], vars, defaults)
+	if !ok || name == "" {
+		return "", fmt.Errorf("repository name not resolvable")
+	}
+	repo, err := normalizeRepo(owner + "/" + name)
+	if err != nil {
+		return "", fmt.Errorf("invalid repository reference")
+	}
+	return repo, nil
+}
+
+// resolveInputRepoID extracts the repositoryId from a mutation input
+// argument, whether the input is an inline object or a variable holding
+// a JSON object (the shape stock gh uses).
+func resolveInputRepoID(input GQLValue, vars map[string]any, defaults map[string]GQLValue) (string, bool) {
+	switch input.Kind {
+	case vObject:
+		return ResolveString(input.Object["repositoryId"], vars, defaults)
+	case vVariable:
+		if vars != nil {
+			if obj, ok := vars[input.Str].(map[string]any); ok {
+				if id, ok := obj["repositoryId"].(string); ok && id != "" {
+					return id, true
+				}
+			}
+		}
+		if d, ok := defaults[input.Str]; ok {
+			return resolveInputRepoID(d, nil, nil)
+		}
+		return "", false
+	default:
+		return "", false
+	}
+}
+
+// nodeResolutionQuery asks GitHub which repository a node ID belongs to.
+// The broker resolves IDs with its own upstream request (administrator
+// token, host-side) before authorizing the container's request.
+const nodeResolutionQuery = `query($id:ID!){node(id:$id){__typename ` +
+	`... on Repository{nameWithOwner} ` +
+	`... on Issue{repository{nameWithOwner}} ` +
+	`... on PullRequest{repository{nameWithOwner}}}}`
+
+// resolveNodeRepo maps an opaque GitHub node ID to its owning repository
+// via an upstream GraphQL query. Results are cached in memory.
+func (b *Broker) resolveNodeRepo(ctx context.Context, id string) (string, error) {
+	b.nodeMu.Lock()
+	if repo, ok := b.nodeCache[id]; ok {
+		b.nodeMu.Unlock()
+		return repo, nil
+	}
+	b.nodeMu.Unlock()
+
+	payload, err := json.Marshal(map[string]any{
+		"query":     nodeResolutionQuery,
+		"variables": map[string]string{"id": id},
+	})
+	if err != nil {
+		return "", err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		b.apiUpstream.ResolveReference(&url.URL{Path: "/graphql"}).String(),
+		strings.NewReader(string(payload)))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := b.client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("node resolution failed: %s", resp.Status)
+	}
+	var out struct {
+		Data struct {
+			Node *struct {
+				Typename      string `json:"__typename"`
+				NameWithOwner string `json:"nameWithOwner"`
+				Repository    *struct {
+					NameWithOwner string `json:"nameWithOwner"`
+				} `json:"repository"`
+			} `json:"node"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxGraphQLBody)).Decode(&out); err != nil {
+		return "", err
+	}
+	node := out.Data.Node
+	if node == nil {
+		return "", fmt.Errorf("unknown node")
+	}
+	full := node.NameWithOwner
+	if full == "" && node.Repository != nil {
+		full = node.Repository.NameWithOwner
+	}
+	if full == "" {
+		return "", fmt.Errorf("node type %q is not attributable to a repository", node.Typename)
+	}
+	repo, err := normalizeRepo(full)
+	if err != nil {
+		return "", err
+	}
+	b.nodeMu.Lock()
+	b.nodeCache[id] = repo
+	b.nodeMu.Unlock()
+	return repo, nil
 }
 
 var hopHeaders = []string{

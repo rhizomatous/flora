@@ -27,9 +27,13 @@ go -C backend test ./internal/githubbroker/ -count=1
 Covers real git clone/fetch/push through the broker against a local
 smart-HTTP upstream that requires the administrator token, read-only
 scoping, cross-chat/cross-repository denial, revoked and expired
-capabilities, REST and GraphQL repository scoping, redirect protection,
-and credential-boundary checks (token never in responses, git config, or
-error output; admin token never accepted as a container credential).
+capabilities, REST scoping with pull-request-only write bounds, path
+normalization rejection (dot segments, percent-encoded forms),
+structural GraphQL authorization (allowed gh shapes plus adversarial
+decoy/alias/fragment/multi-operation/node-ID documents), redirect
+protection, and credential-boundary checks (token never in responses,
+git config, or error output; admin token never accepted as a container
+credential).
 
 ## Offline container integration (Docker, no secrets)
 
@@ -39,22 +43,30 @@ agent/probes/github/run-local.sh
 
 Runs the real topology with a token-demanding fake upstream fixture
 (`fake-upstream` subcommand serving git smart HTTP plus canned API JSON,
-from `Containerfile.fake-upstream`): host-side broker with TLS,
-unprivileged probe container (`--cap-drop ALL`, `no-new-privileges`, no
-Docker socket), per-chat capability. Verified on 2026-10-25 with OrbStack
-(Docker 29.8.2):
+from `Containerfile.fake-upstream`): host-side broker bound to loopback,
+a raw-TCP sidecar relay presenting the broker as `flora-broker:443`
+inside the container network (stock gh only matches remotes to GH_HOST
+on the default HTTPS port), and an unprivileged probe container
+(`--cap-drop ALL`, `no-new-privileges`, no Docker socket) with a per-chat
+capability. Verified on 2026-10-26 with OrbStack (Docker 29.8.2):
 
 - fake upstream rejects tokenless requests (401) and serves the fixture
   with the bearer token (200)
 - container git clone, commit, push, and fetch through the broker over
   TLS succeed; broker logs show the per-chat capability scope
-- `gh api` repository view, draft PR create (`POST /pulls`), and PR view
-  through the broker succeed
+- **stock gh 2.63.0 `gh pr create --draft` and `gh pr view` succeed
+  through the broker**, including gh's introspection and
+  repository-network GraphQL queries; `gh api` REST reads work too
 - cross-repository access denied inside the container for both git and
   the API; the upstream token itself is rejected as a container
-  credential
+  credential; the environment boundary check rejects unexpected
+  credential-shaped variables (and no longer false-matches `GH_HOST`)
 - after `revoke`, the capability is denied from the host (401) and inside
-  the container
+  a fresh container run
+
+The GraphQL authorization is structural and deny-by-default (see ADR
+0001); the fake upstream's response shaping is fixture-only and makes no
+security decisions.
 
 ## Opt-in live checks (real GitHub, no mutations)
 
@@ -80,11 +92,11 @@ revoked capability is denied.
 
 ## Status
 
-The offline container integration run (`run-local.sh`) and the automated
-suite pass in full. Remaining gap: a run against **real GitHub** with a
-designated private test repository and restricted token
-(`run-probe.sh` + `TestLiveGitHub`), which needs environment inputs that
-were not available at implementation time. Main uncertainties to confirm
-there: gh's GH_HOST behavior against api.github.com-shaped endpoints,
-including the GraphQL routes `gh pr create/view` use, and end-to-end push
-to a real private repository.
+The offline container integration run (`run-local.sh`, including stock
+gh `pr create --draft` / `pr view`) and the automated suite pass in
+full. Remaining gap: a run against **real GitHub** with a designated
+private test repository and restricted token (`run-probe.sh` +
+`TestLiveGitHub`), which needs environment inputs that were not
+available at implementation time. Main uncertainties to confirm there:
+real api.github.com GraphQL response shapes beyond the fixture, and
+end-to-end push to a real private repository.

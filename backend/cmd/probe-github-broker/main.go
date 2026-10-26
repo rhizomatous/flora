@@ -14,6 +14,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -52,6 +53,8 @@ func run(args []string) error {
 		return initPKI(args[1:])
 	case "fake-upstream":
 		return fakeUpstream(args[1:])
+	case "tcp-relay":
+		return tcpRelay(args[1:])
 	default:
 		usage()
 		return fmt.Errorf("unknown subcommand %q", args[0])
@@ -67,6 +70,7 @@ Subcommands:
   revoke        Revoke a capability.
   init-pki      Create the host-side CA and broker TLS certificate.
   fake-upstream Serve a token-demanding fake GitHub for offline testing.
+  tcp-relay     Forward raw TCP (sidecar so containers see the broker on 443).
 
 Run "<subcommand> -h" for flags.
 `, tokenEnv)
@@ -247,4 +251,46 @@ func fakeUpstream(args []string) error {
 	}
 	slog.Info("fake upstream listening", "address", "http://"+*listen, "root", *root)
 	return srv.ListenAndServe()
+}
+
+// tcpRelay forwards raw TCP, TLS untouched. Stock gh only matches git
+// remotes to GH_HOST on the default HTTPS port, so containers reach the
+// broker through a sidecar relay on 443. The relay never sees
+// credentials: the broker terminates TLS.
+func tcpRelay(args []string) error {
+	fs := flag.NewFlagSet("tcp-relay", flag.ContinueOnError)
+	listen := fs.String("listen", "0.0.0.0:443", "listen address")
+	to := fs.String("to", "", "target host:port (required)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *to == "" {
+		return errors.New("-to is required")
+	}
+	listener, err := net.Listen("tcp", *listen)
+	if err != nil {
+		return err
+	}
+	slog.Info("tcp relay listening", "address", *listen, "to", *to)
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			return err
+		}
+		go func() {
+			defer conn.Close()
+			up, err := net.DialTimeout("tcp", *to, 10*time.Second)
+			if err != nil {
+				return
+			}
+			defer up.Close()
+			done := make(chan struct{})
+			go func() {
+				_, _ = io.Copy(up, conn)
+				close(done)
+			}()
+			_, _ = io.Copy(conn, up)
+			<-done
+		}()
+	}
 }

@@ -16,9 +16,13 @@ export GH_ENTERPRISE_TOKEN="$CAPABILITY"
 REMOTE="https://$CAPABILITY@$BROKER_HOST/$REPO.git"
 
 step "environment boundary"
-# The administrator token must not be present anywhere in this container.
-if env | grep -i -E 'github|gh_|token' | grep -v GH_ENTERPRISE_TOKEN | grep -q .; then
-	fail "unexpected credential material in container environment"
+# The only credential-shaped variables allowed in this container are the
+# broker endpoint and the capability. Anything else (for example a real
+# GH_TOKEN or GITHUB_TOKEN) fails the run.
+BAD=$(env | grep -E '^(GH_|GITHUB_)' \
+	| grep -vE '^(GH_HOST|GH_ENTERPRISE_TOKEN|GH_PROMPT_DISABLED)=' || true)
+if [ -n "$BAD" ]; then
+	fail "unexpected credential material in container environment: $(echo "$BAD" | cut -d= -f1)"
 fi
 id | grep -q 'agent' || fail "not running as the unprivileged agent user"
 
