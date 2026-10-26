@@ -1,0 +1,29 @@
+# Probe agent container for issue #3 (brokered GitHub access).
+#
+# Mirrors the PRD §4.2 constraints: unprivileged user, no host Docker
+# socket, no privileged mode, ordinary outbound network only. The image
+# carries git and the GitHub CLI plus the probe broker's CA certificate so
+# gh can trust the broker's TLS identity. The administrator token is never
+# in this image; the container receives a per-chat capability at start time.
+
+FROM alpine:3.21
+
+RUN apk add --no-cache git github-cli ca-certificates
+
+# Broker CA certificate, copied in at build time from the host-side PKI
+# directory (see run-probe.sh). Only the public certificate enters the
+# image; the CA key stays on the host.
+COPY ca.pem /usr/local/share/ca-certificates/flora-broker.crt
+RUN update-ca-certificates
+
+RUN adduser -D -h /home/agent agent
+USER agent
+WORKDIR /home/agent
+
+# Fail closed instead of prompting for credentials the container must
+# never have.
+ENV GIT_TERMINAL_PROMPT=0 \
+    GH_PROMPT_DISABLED=1
+
+COPY container-probe.sh /home/agent/container-probe.sh
+ENTRYPOINT ["/bin/sh", "/home/agent/container-probe.sh"]
