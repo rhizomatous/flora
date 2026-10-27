@@ -295,6 +295,9 @@ type ContainerInfo struct {
 	HostConfig struct {
 		Binds      []string `json:"Binds"`
 		Privileged bool     `json:"Privileged"`
+		NanoCPUs   int64    `json:"NanoCPUs"`
+		Memory     int64    `json:"Memory"`
+		PidsLimit  int64    `json:"PidsLimit"`
 	} `json:"HostConfig"`
 	NetworkSettings struct {
 		Ports map[string][]struct {
