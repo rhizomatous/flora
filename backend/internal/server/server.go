@@ -5,11 +5,17 @@ import (
 	"net/http"
 	"path"
 	"strings"
+
+	"github.com/rhizomatous/flora/backend/internal/auth"
+	"github.com/rhizomatous/flora/backend/internal/settings"
 )
 
-// New serves the embedded SPA and the initial liveness endpoint.
-func New(assets fs.FS) http.Handler {
+// New serves public static assets and protects every API except the explicit
+// health/onboarding/login allowlist. Register future data routes on this mux.
+func New(assets fs.FS, authentication *auth.Service, credentials *settings.Service, origin string) http.Handler {
 	mux := http.NewServeMux()
+	api := &api{auth: authentication, settings: credentials, origin: origin, passwordSlots: make(chan struct{}, 2)}
+	api.routes(mux)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
@@ -47,7 +53,7 @@ func New(assets fs.FS) http.Handler {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write(index)
 	})
-	return mux
+	return api.protect(mux)
 }
 
 // Only known static extensions on the final segment suppress the SPA fallback;
