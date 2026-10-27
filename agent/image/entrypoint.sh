@@ -1,6 +1,6 @@
 #!/bin/sh
 # Flora agent container entrypoint. Runs setup once per container before
-# OpenCode starts (PRD 2.3), then starts the private authenticated runtime.
+# OpenCode starts, then starts the private authenticated runtime.
 set -eu
 : "${OPENCODE_SERVER_PASSWORD:?a private endpoint password is required}"
 : "${FLORA_UID:?the storage owner uid is required}"

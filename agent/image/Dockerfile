@@ -6,8 +6,8 @@
 FROM ghcr.io/anomalyco/opencode:1.2.27@sha256:f2bbfa29335cade41bf6928673582b42c56acbaaa75c0020dba34650adb7ce0a
 USER root
 # git and github-cli give the agent authenticated repository access without
-# interactive login (PRD 4.3); sudo gives passwordless package installation
-# inside the sandbox (PRD 2.2); coreutils provides timeout(1) for setup;
+# interactive login; sudo gives passwordless package installation inside the
+# sandbox; coreutils provides timeout(1) for setup;
 # shadow provides usermod/groupmod so the entrypoint can map the agent user
 # onto the storage owner's uid/gid.
 RUN apk add --no-cache git github-cli sudo coreutils shadow && \

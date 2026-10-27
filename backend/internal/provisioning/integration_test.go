@@ -34,7 +34,11 @@ func TestProvisioningDocker(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel()
-	engine := docker.New("")
+	engine, err := docker.New("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = engine.Close() })
 	if err := engine.Ping(ctx); err != nil {
 		t.Skipf("docker daemon unavailable: %v", err)
 	}

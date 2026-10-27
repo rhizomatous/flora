@@ -24,7 +24,7 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
-// PRD Defaults and Limits.
+// Default container resources, capacity, and lifecycle timeouts.
 const (
 	DefaultMaxRunning      = 10
 	DefaultSetupTimeout    = 10 * time.Minute
@@ -455,7 +455,7 @@ func (m *Manager) resolveImage(ctx context.Context) (string, error) {
 }
 
 // checkCapacity enforces the running-container limit. Idle running containers
-// count toward the limit (PRD 2.6). Callers hold m.mu across the check and
+// count toward the limit. Callers hold m.mu across the check and
 // the subsequent create or start.
 func (m *Manager) checkCapacity(ctx context.Context) error {
 	running, err := m.engine.ContainerList(ctx, true, map[string]string{labelManaged: "true"})
@@ -572,7 +572,7 @@ func (m *Manager) containerExited(ctx context.Context, chatID string, paths stor
 }
 
 // Stop stops a chat's container while preserving its workspace, runtime
-// state, and recorded identity (PRD 4.5). Stopping a chat with no container
+// state, and recorded identity. Stopping a chat with no container
 // is a no-op. The container is kept for an explicit later start; it is never
 // transparently restarted.
 //
@@ -620,7 +620,7 @@ func (m *Manager) Endpoint(ctx context.Context, chatID string) (Endpoint, error)
 
 // BeginActivity marks continuous agent activity on a container. Repeated
 // calls while active do not extend the window: the continuous-activity limit
-// (PRD 4.7) measures from the beginning of the active period. The chat
+// measures from the beginning of the active period. The chat
 // lifecycle must call this when agent work starts and EndActivity when it
 // finishes; without those calls no container is ever swept. Active periods
 // are process-local: after a Flora restart they restart from zero, so a

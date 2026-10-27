@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/rhizomatous/flora/backend/internal/docker"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
@@ -60,7 +61,7 @@ func (f *fakeEngine) ImageInspect(_ context.Context, ref string) (docker.Image, 
 	if f.images[ref] {
 		return docker.Image{ID: f.imageID}, nil
 	}
-	return docker.Image{}, &docker.Error{StatusCode: 404, Message: "no such image"}
+	return docker.Image{}, fmt.Errorf("no such image: %w", errdefs.ErrNotFound)
 }
 
 func (f *fakeEngine) ImagePull(_ context.Context, ref string) error {
@@ -76,7 +77,7 @@ func (f *fakeEngine) ContainerCreate(_ context.Context, spec docker.ContainerSpe
 	defer f.mu.Unlock()
 	for _, c := range f.containers {
 		if c.name == spec.Name {
-			return "", &docker.Error{StatusCode: 409, Message: "name in use"}
+			return "", fmt.Errorf("name in use: %w", errdefs.ErrConflict)
 		}
 	}
 	f.nextID++
@@ -98,7 +99,7 @@ func (f *fakeEngine) lookup(idOrName string) (*fakeContainer, error) {
 			return c, nil
 		}
 	}
-	return nil, &docker.Error{StatusCode: 404, Message: "no such container"}
+	return nil, fmt.Errorf("no such container: %w", errdefs.ErrNotFound)
 }
 
 func (f *fakeEngine) ContainerStart(_ context.Context, id string) error {
@@ -150,10 +151,7 @@ func (f *fakeEngine) ContainerInspect(_ context.Context, idOrName string) (docke
 	info.Config.Labels = c.labels
 	info.HostConfig.Binds = c.binds
 	if c.port != "" {
-		info.NetworkSettings.Ports = map[string][]struct {
-			HostIP   string `json:"HostIp"`
-			HostPort string `json:"HostPort"`
-		}{"4096/tcp": {{HostIP: "127.0.0.1", HostPort: c.port}}}
+		info.NetworkSettings.Ports = map[string][]docker.PortBinding{"4096/tcp": {{HostIP: "127.0.0.1", HostPort: c.port}}}
 	}
 	return info, nil
 }
@@ -242,13 +240,13 @@ func TestConfigDefaultsAndValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	if m.cfg.MaxRunning != 10 || m.cfg.SetupTimeout != 10*time.Minute || m.cfg.ActivityTimeout != time.Hour {
-		t.Fatalf("PRD defaults not applied: %+v", m.cfg)
+		t.Fatalf("lifecycle defaults not applied: %+v", m.cfg)
 	}
 	if m.cfg.ReadyTimeout != 11*time.Minute {
 		t.Fatalf("readiness bound must default to setup timeout plus margin: %s", m.cfg.ReadyTimeout)
 	}
 	if m.cfg.NanoCPUs != 2e9 || m.cfg.MemoryBytes != 8<<30 || m.cfg.PidsLimit != 512 {
-		t.Fatalf("PRD resource defaults not applied: %+v", m.cfg)
+		t.Fatalf("resource defaults not applied: %+v", m.cfg)
 	}
 	digest, harness := m.Identity()
 	if digest != testDigest || harness != "1.2.27" {
