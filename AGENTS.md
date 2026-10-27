@@ -25,10 +25,20 @@ When doing _any_ UI work, refer to [specs/DESIGN.md](specs/DESIGN.md).
 
 ### PRs
 
-All PR should have concise, informative PR descriptions. These should emphasize:
-- The problem that needed to be solved
-- What you did in this PR to solve it
-- How you know it worked (this could be any kind of evidence that's relevant: written reasoning, benchmarks, tests, visual screenshots or video recordings, whatever happens to be relevant for this PR)
+- Write concise, direct PR descriptions in plain English. Describe the problem, the final solution, and the evidence that it works. Include only relevant limitations.
+- Include only what readers need to understand or review the final change.
+- After revisions, update the existing text to reflect the final change. Do not append review-fix sections, commit summaries, progress logs, handoffs, or a chronology of the work.
+- Do not repeat the title, diff, or history unless explaining why something matters.
+- Put replies to review comments in their review threads, not in the PR body.
+- Before submitting, check every sentence: does it help someone understand or review the final change? Remove it if not.
+
+### Code comments
+
+- Explain concrete behavior, rather than restating a name or describing vague concepts.
+- Identify where inputs come from and what important data the code saves, changes, returns, or rejects.
+- When nearby functions have related responsibilities, use their opening comments to make the differences clear.
+- Document caller obligations and non-obvious retry, ordering, and transaction rules beside the code.
+- Keep comments concise. Do not narrate obvious code or include issue numbers, history, or progress updates.
 
 ## Documentation scope
 
