@@ -66,7 +66,7 @@ nix develop --command bash agent/probes/opencode/probe.sh /absolute/private/evid
 
 For the initial validation environment, `ANTHROPIC_API_KEY` was unset and the
 standard OpenCode auth store had no Anthropic API-key entry. The user later
-supplied a local test environment and the full model probe passed on 2026-10-26
+supplied a local test environment and the full model probe passed on 2026-10-27
 UTC, along with the extended drills below. Other provider credentials were not
 copied. For another run, supply an
 Anthropic API key with access to `claude-sonnet-4-6` through the environment or
@@ -132,8 +132,8 @@ unknown fields. `turn -text '...'` fails on unexpected questions rather than
 approving actions. Only `scenario` automatically answers its requested probe
 question with the first option. No production approval UI is implemented.
 
-Extended manual acceptance, passed on 2026-10-26 UTC and needed when repeating
-the complete acceptance exercise:
+Extended manual acceptance, observed across 2026-10-26/27 UTC and needed when
+repeating the complete acceptance exercise:
 
 1. Run `turn` asking for a question. Once `questions` shows it, terminate only
    that driver process if it has not already exited reporting an unexpected
@@ -154,7 +154,7 @@ the complete acceptance exercise:
 Also exercise a **model-issued** long bash command, not only `/shell`: wait for
 its running part, abort, confirm the delayed side effect did not happen, then
 explicitly send another model turn that reads the existing marker. Repeat with
-SIGKILL/restart instead of abort. The 2026-10-26 run passed both. After kill,
+SIGKILL/restart instead of abort. The 2026-10-27 model run passed both. After kill,
 the saved tool part remained `running` despite absent runtime status; explicit
 new-turn reconciliation worked, but automatic in-flight continuation is not
 provided. See the ADR for question-restart results, schema comparison and

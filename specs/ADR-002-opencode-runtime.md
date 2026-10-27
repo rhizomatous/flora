@@ -2,7 +2,7 @@
 
 **Status:** Spike findings recorded; live provider/runtime probes pass. Production
 integration decisions remain proposed. **Date:** 2026-10-25.
-**Docker and hosted-model follow-up:** 2026-10-26 UTC.
+**Docker follow-up:** 2026-10-26 UTC. **Hosted-model follow-up:** 2026-10-27 UTC.
 **Scope:** [issue #2](https://github.com/rhizomatous/flora/issues/2),
 [roadmap #20](https://github.com/rhizomatous/flora/issues/20).
 [PRD](PRD.md) is authoritative: Agent environment 2.1–2.5, Chats 3.1–3.2,
@@ -318,7 +318,7 @@ Observed on **both** architectures:
    success, or automatic resumed execution.** A later real question drill confirmed
    pending-request loss, as recorded below.
 
-### Live hosted-model evidence, 2026-10-26 UTC
+### Live hosted-model evidence, 2026-10-27 UTC
 
 Ran the current `agent/probes/opencode/probe.sh` unchanged on native arm64 with
 the user-authorized Anthropic key and an ephemeral authenticated endpoint
