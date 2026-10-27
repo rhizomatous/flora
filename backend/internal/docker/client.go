@@ -187,10 +187,11 @@ func (c *Client) ContainerInspect(ctx context.Context, id string) (ContainerInfo
 		return ContainerInfo{}, err
 	}
 	inspected := result.Container
-	info := ContainerInfo{ID: inspected.ID, Name: inspected.Name, Image: inspected.Image}
-	if inspected.State != nil {
-		info.State = ContainerState{Status: string(inspected.State.Status), Running: inspected.State.Running, ExitCode: inspected.State.ExitCode}
+	if inspected.State == nil {
+		return ContainerInfo{}, fmt.Errorf("docker container inspect %s: missing state", id)
 	}
+	info := ContainerInfo{ID: inspected.ID, Name: inspected.Name, Image: inspected.Image}
+	info.State = ContainerState{Status: string(inspected.State.Status), Running: inspected.State.Running, ExitCode: inspected.State.ExitCode}
 	if inspected.Config != nil {
 		info.Config.Env, info.Config.Labels = inspected.Config.Env, inspected.Config.Labels
 	}
@@ -246,7 +247,8 @@ type ContainerSummary struct {
 }
 
 // ContainerList matches all supplied labels, including stopped containers unless
-// running is true. The SDK encodes filters and daemon errors.
+// running is true. Running candidates are inspected because the daemon's list
+// snapshot can still show a container as running after Stop has completed.
 func (c *Client) ContainerList(ctx context.Context, running bool, labels map[string]string) ([]ContainerSummary, error) {
 	filters := make(client.Filters)
 	for k, v := range labels {
@@ -261,6 +263,18 @@ func (c *Client) ContainerList(ctx context.Context, running bool, labels map[str
 	}
 	list := make([]ContainerSummary, 0, len(result.Items))
 	for _, item := range result.Items {
+		if running {
+			info, err := c.ContainerInspect(ctx, item.ID)
+			if IsNotFound(err) {
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+			if !info.State.Running {
+				continue
+			}
+		}
 		list = append(list, ContainerSummary{ID: item.ID, Names: item.Names, Image: item.Image, State: string(item.State), Labels: item.Labels})
 	}
 	return list, nil

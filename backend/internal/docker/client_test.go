@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -147,6 +148,10 @@ func TestStartStopIdempotent(t *testing.T) {
 
 func TestContainerListFilters(t *testing.T) {
 	client, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v"+APIVersion+"/containers/a/json" {
+			_, _ = io.WriteString(w, `{"Id":"a","State":{"Status":"running","Running":true}}`)
+			return
+		}
 		if r.URL.Path != "/v"+APIVersion+"/containers/json" {
 			t.Errorf("unexpected path %s", r.URL.Path)
 		}
@@ -162,6 +167,100 @@ func TestContainerListFilters(t *testing.T) {
 	list, err := client.ContainerList(context.Background(), true, map[string]string{"flora.managed": "true"})
 	if err != nil || len(list) != 1 || list[0].ID != "a" {
 		t.Fatalf("list: %v %v", list, err)
+	}
+}
+
+func TestStopThenList(t *testing.T) {
+	for _, timeout := range []int{0, 10} {
+		t.Run(strconv.Itoa(timeout), func(t *testing.T) {
+			running := true
+			client, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				switch r.Method + " " + r.URL.Path {
+				case "POST /v" + APIVersion + "/containers/c1/stop":
+					if got := r.URL.Query().Get("t"); got != strconv.Itoa(timeout) {
+						t.Errorf("stop timeout = %q, want %d", got, timeout)
+					}
+					running = false
+					w.WriteHeader(http.StatusNoContent)
+				case "GET /v" + APIVersion + "/containers/json":
+					var filters map[string]map[string]bool
+					if err := json.Unmarshal([]byte(r.URL.Query().Get("filters")), &filters); err != nil {
+						t.Error(err)
+					}
+					if !filters["label"]["flora.managed=true"] || !filters["label"]["flora.chat=c1"] {
+						t.Errorf("missing ownership filters: %v", filters)
+					}
+					if running {
+						_, _ = io.WriteString(w, `[{"Id":"c1","State":"running"}]`)
+					} else if filters["status"]["running"] {
+						// The daemon's list snapshot still shows the old state.
+						_, _ = io.WriteString(w, `[{"Id":"c1","State":"running"}]`)
+					} else {
+						if r.URL.Query().Get("all") != "1" {
+							t.Error("listing stopped containers must request all containers")
+						}
+						_, _ = io.WriteString(w, `[{"Id":"c1","State":"exited"}]`)
+					}
+				case "GET /v" + APIVersion + "/containers/c1/json":
+					_, _ = io.WriteString(w, `{"Id":"c1","State":{"Status":"exited","Running":false}}`)
+				default:
+					t.Errorf("unexpected request: %s %s", r.Method, r.URL)
+					w.WriteHeader(http.StatusBadRequest)
+				}
+			})
+			ctx := context.Background()
+			labels := map[string]string{"flora.managed": "true", "flora.chat": "c1"}
+			if err := client.ContainerStop(ctx, "c1", timeout); err != nil {
+				t.Fatal(err)
+			}
+			list, err := client.ContainerList(ctx, true, labels)
+			if err != nil || len(list) != 0 {
+				t.Fatalf("running list after stop: %v %v", list, err)
+			}
+			list, err = client.ContainerList(ctx, false, labels)
+			if err != nil || len(list) != 1 || list[0].ID != "c1" || list[0].State != "exited" {
+				t.Fatalf("all containers after stop: %v %v", list, err)
+			}
+		})
+	}
+}
+
+func TestContainerListRechecksState(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		status    int
+		body      string
+		wantCount int
+		wantError bool
+	}{
+		{name: "running", status: http.StatusOK, body: `{"Id":"c1","State":{"Status":"running","Running":true}}`, wantCount: 1},
+		{name: "stopped", status: http.StatusOK, body: `{"Id":"c1","State":{"Status":"exited","Running":false}}`},
+		{name: "removed", status: http.StatusNotFound, body: `{"message":"No such container"}`},
+		{name: "unavailable", status: http.StatusInternalServerError, body: `{"message":"inspect failed"}`, wantError: true},
+		{name: "forbidden", status: http.StatusForbidden, body: `{"message":"permission denied"}`, wantError: true},
+		{name: "missing state", status: http.StatusOK, body: `{"Id":"c1"}`, wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client, fake := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/v" + APIVersion + "/containers/json":
+					_, _ = io.WriteString(w, `[{"Id":"c1","State":"running","Labels":{"flora.managed":"true"}}]`)
+				case "/v" + APIVersion + "/containers/c1/json":
+					w.WriteHeader(tc.status)
+					_, _ = io.WriteString(w, tc.body)
+				default:
+					t.Errorf("unexpected request: %s", r.URL)
+					w.WriteHeader(http.StatusBadRequest)
+				}
+			})
+			list, err := client.ContainerList(context.Background(), true, map[string]string{"flora.managed": "true"})
+			if (err != nil) != tc.wantError || len(list) != tc.wantCount {
+				t.Fatalf("list=%v err=%v, want count=%d error=%t", list, err, tc.wantCount, tc.wantError)
+			}
+			if len(fake.requests) != 2 {
+				t.Fatalf("expected list then inspect without retries: %v", fake.requests)
+			}
+		})
 	}
 }
 
