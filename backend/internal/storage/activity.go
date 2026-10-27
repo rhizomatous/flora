@@ -111,8 +111,10 @@ func (s *Store) Messages(ctx context.Context, chatID string) ([]Message, error) 
 	return result, rows.Err()
 }
 
-// SaveRuntimeMessage saves a complete runtime message snapshot and its activity
-// atomically. Runtime messages can grow as parts arrive. eventID identifies this
+// SaveRuntimeMessage inserts or updates an assistant or system message received
+// from OpenCode and atomically records the corresponding activity.
+// It does not start work or change the chat's status or active turn.
+// Runtime messages can grow as parts arrive. eventID identifies this
 // observed update, while RuntimeMessageID identifies the message across updates.
 // Callers capture updates serially per chat; an old event retry cannot overwrite
 // newer text. Payload preserves full parts, tool output, and model metadata.
