@@ -16,6 +16,33 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
+// observedEngine records state transitions without logging container environments
+// or endpoint credentials. It forwards each request without retries or delays.
+type observedEngine struct {
+	Engine
+	t *testing.T
+}
+
+func (e observedEngine) ContainerList(ctx context.Context, running bool, labels map[string]string) ([]docker.ContainerSummary, error) {
+	list, err := e.Engine.ContainerList(ctx, running, labels)
+	for _, c := range list {
+		e.t.Logf("list running=%t: id=%s state=%s", running, c.ID, c.State)
+	}
+	return list, err
+}
+
+func (e observedEngine) ContainerStop(ctx context.Context, id string, timeoutSeconds int) error {
+	err := e.Engine.ContainerStop(ctx, id, timeoutSeconds)
+	e.t.Logf("stop id=%s: %v", id, err)
+	return err
+}
+
+func (e observedEngine) ContainerInspect(ctx context.Context, id string) (docker.ContainerInfo, error) {
+	info, err := e.Engine.ContainerInspect(ctx, id)
+	e.t.Logf("inspect id=%s: running=%t status=%s err=%v", id, info.State.Running, info.State.Status, err)
+	return info, err
+}
+
 // This opt-in test runs the real pinned agent image against a real Docker
 // daemon, entirely through the Engine API client. It never requests model
 // generation. Build the image first:
@@ -67,7 +94,7 @@ func TestProvisioningDocker(t *testing.T) {
 		return os.WriteFile(filepath.Join(workspaceDir, "checked-out.txt"), []byte("checkout\n"), 0644)
 	}
 	cfg := Config{ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", MaxRunning: 2}
-	m, err := New(engine, store, cfg, checkout)
+	m, err := New(observedEngine{Engine: engine, t: t}, store, cfg, checkout)
 	if err != nil {
 		t.Fatal(err)
 	}
