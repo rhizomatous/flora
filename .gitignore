@@ -5,3 +5,4 @@
 /bin/
 /backend/internal/webassets/dist/
 env.test.sh
+flora-data/

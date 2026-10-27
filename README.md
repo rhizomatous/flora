@@ -3,8 +3,9 @@
 A self-hosted autonomous coding agent. Describe a task, let the agent work, then
 return to review its changes and open a draft pull request.
 
-**Status:** application bootstrap (M0). The binary serves a minimal React shell
-and `GET /api/health`. Agent execution, onboarding, and project management are
+**Status:** application bootstrap plus durable storage foundation. The binary
+initializes private local storage and serves a minimal React shell and
+`GET /api/health`. Agent execution, onboarding, and project management are
 subsequent milestones. See the [roadmap](https://github.com/rhizomatous/flora/issues/20)
 and [product requirements](specs/PRD.md).
 
@@ -28,7 +29,12 @@ make check smoke build-linux
 
 Open <http://127.0.0.1:8080>. The server binds to loopback by default; override with
 `./bin/flora -listen 127.0.0.1:9000`. It handles SIGINT/SIGTERM gracefully.
-Neither Docker nor a model-provider credential is needed for this bootstrap.
+Storage defaults to `./flora-data`; set `-data-dir /absolute/path/to/private/data`
+for a stable service location. Keep this directory on persistent local storage,
+owned by the application user, outside any agent mount. Unusable storage or an
+unsupported newer schema prevents startup before HTTP begins listening.
+Neither Docker nor a model-provider credential is needed for these checks.
+See [the storage contract](specs/STORAGE.md) for the layout, APIs, and boundaries.
 
 For fast frontend iteration, run `npm run dev` inside the development shell.
 Vite serves the web app and proxies `/api` to a backend on port 8080. After a web
@@ -102,9 +108,11 @@ a Linux host is sufficient to run the bootstrap. No Node.js, source tree, extern
 asset directory, C runtime, or SQLite shared library is needed at runtime.
 
 SQLite uses [`modernc.org/sqlite`](https://pkg.go.dev/modernc.org/sqlite), a pure-Go
-`database/sql` driver. All builds and tests use `CGO_ENABLED=0`; a test writes a
-database, closes it, reopens it, and checks persistence. Product schemas and data
-directories belong to issue #4. The health route is process liveness only.
+`database/sql` driver. All production builds and checks use `CGO_ENABLED=0`.
+Embedded SQL migrations initialize the product schema at startup. Storage tests
+cover reopen persistence, immutable chat configuration, request deduplication,
+concurrent submissions, rollback, and migration failures. The health route is
+process liveness only; it does not claim runtime or container readiness.
 
 `flake.lock`, `package-lock.json`, and `backend/go.mod`/`go.sum` pin tooling and
 dependencies. Builds use `GOTOOLCHAIN=local` and readonly Go modules. To update,

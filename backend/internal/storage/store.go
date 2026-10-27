@@ -41,6 +41,9 @@ type Paths struct{ Workspace, RuntimeState, Logs, Artifacts string }
 // Open initializes private application-owned storage. The root must be on a
 // local filesystem, owned by the application user, and not shared with agents.
 func Open(ctx context.Context, root string) (*Store, error) {
+	if root == "" {
+		return nil, ErrInvalid
+	}
 	root, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
@@ -241,7 +244,8 @@ func (s *Store) UpdateProject(ctx context.Context, projectID, name string, c Con
 }
 
 func (s *Store) CreateChat(ctx context.Context, projectID, title, imageDigest, harnessVersion string) (Chat, error) {
-	if title == "" || !strings.Contains(imageDigest, "@sha256:") || harnessVersion == "" {
+	imageName, digest, pinned := strings.Cut(imageDigest, "@sha256:")
+	if title == "" || imageName == "" || !pinned || !hexHash(digest, 64) || harnessVersion == "" {
 		return Chat{}, ErrInvalid
 	}
 	chatID := id()
@@ -312,10 +316,11 @@ func (s *Store) Paths(ctx context.Context, chatID string) (Paths, error) {
 	return p, nil
 }
 
-// BindRuntime records the container and OpenCode session once. An identical
-// retry succeeds; replacing either identity needs a future explicit policy.
+// BindRuntime records the container and OpenCode session once. The session may
+// be empty until OpenCode starts, so provisioning can save the container first.
+// An identical retry succeeds; replacing either identity needs an explicit policy.
 func (s *Store) BindRuntime(ctx context.Context, chatID, containerID, sessionID string) error {
-	if containerID == "" || sessionID == "" {
+	if containerID == "" {
 		return ErrInvalid
 	}
 	return s.write(ctx, func(tx *sql.Tx) error {
@@ -323,8 +328,11 @@ func (s *Store) BindRuntime(ctx context.Context, chatID, containerID, sessionID 
 		if err := tx.QueryRowContext(ctx, "SELECT coalesce(container_id,''),coalesce(session_id,'') FROM chats WHERE id=?", chatID).Scan(&container, &session); err != nil {
 			return found(err)
 		}
-		if container != "" && (container != containerID || session != sessionID) {
+		if (container != "" && container != containerID) || (session != "" && sessionID != "" && session != sessionID) {
 			return ErrConflict
+		}
+		if sessionID == "" {
+			sessionID = session
 		}
 		_, err := tx.ExecContext(ctx, "UPDATE chats SET container_id=?,session_id=? WHERE id=?", containerID, sessionID, chatID)
 		return err
@@ -334,13 +342,8 @@ func (s *Store) BindRuntime(ctx context.Context, chatID, containerID, sessionID 
 // RecordStartingCommit is called after resolving checkout, not from a branch
 // name. Extra repositories may be resolved later. A starting commit cannot move.
 func (s *Store) RecordStartingCommit(ctx context.Context, chatID, repository, sha string) error {
-	if len(sha) != 40 && len(sha) != 64 {
+	if !hexHash(sha, 40) && !hexHash(sha, 64) {
 		return ErrInvalid
-	}
-	for _, c := range sha {
-		if !strings.ContainsRune("0123456789abcdef", c) {
-			return ErrInvalid
-		}
 	}
 	return s.write(ctx, func(tx *sql.Tx) error {
 		var config string
@@ -374,4 +377,16 @@ func (s *Store) RecordStartingCommit(ctx context.Context, chatID, repository, sh
 		_, err = tx.ExecContext(ctx, "INSERT INTO starting_commits VALUES (?,?,?)", chatID, repository, sha)
 		return err
 	})
+}
+
+func hexHash(value string, length int) bool {
+	if len(value) != length {
+		return false
+	}
+	for _, c := range value {
+		if !strings.ContainsRune("0123456789abcdef", c) {
+			return false
+		}
+	}
+	return true
 }

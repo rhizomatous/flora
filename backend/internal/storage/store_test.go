@@ -62,6 +62,7 @@ func TestDurableRecordsAndImmutableSnapshot(t *testing.T) {
 		if info.Mode().Perm() != 0700 {
 			t.Fatalf("directory mode %o", info.Mode().Perm())
 		}
+		must(t, os.WriteFile(filepath.Join(path, "saved-context"), []byte("preserved"), 0600))
 	}
 	// Distinct chats have independent writable locations.
 	other, err := s.CreateChat(ctx, p.ID, "Other", image, "opencode/1.2.27")
@@ -81,9 +82,17 @@ func TestDurableRecordsAndImmutableSnapshot(t *testing.T) {
 	if later.Configuration.Repositories[0].BaseBranch != "next" {
 		t.Fatal("new chat did not snapshot new settings")
 	}
+	must(t, s.BindRuntime(ctx, c.ID, "container-1", ""))
+	preSession, err := s.Chat(ctx, c.ID)
+	must(t, err)
+	if preSession.ContainerID != "container-1" || preSession.SessionID != "" {
+		t.Fatal("container identity cannot be saved before runtime startup")
+	}
 	must(t, s.BindRuntime(ctx, c.ID, "container-1", "session-1"))
 	must(t, s.BindRuntime(ctx, c.ID, "container-1", "session-1"))
+	must(t, s.BindRuntime(ctx, c.ID, "container-1", "")) // cannot erase a bound session
 	wantError(t, s.BindRuntime(ctx, c.ID, "container-2", "session-1"), ErrConflict)
+	wantError(t, s.BindRuntime(ctx, c.ID, "container-1", "session-2"), ErrConflict)
 	sha := strings.Repeat("b", 40)
 	must(t, s.RecordStartingCommit(ctx, c.ID, "flora", sha))
 	must(t, s.RecordStartingCommit(ctx, c.ID, "flora", sha))
@@ -129,6 +138,13 @@ func TestDurableRecordsAndImmutableSnapshot(t *testing.T) {
 	must(t, err)
 	if savedPaths != paths {
 		t.Fatal("paths changed across reopen")
+	}
+	for _, path := range []string{savedPaths.Workspace, savedPaths.RuntimeState, savedPaths.Logs, savedPaths.Artifacts} {
+		data, err := os.ReadFile(filepath.Join(path, "saved-context"))
+		must(t, err)
+		if string(data) != "preserved" {
+			t.Fatal("saved files changed across reopen")
+		}
 	}
 	// SQL also protects the immutable snapshot from accidental future updates.
 	_, err = s.db.ExecContext(ctx, "UPDATE chats SET config='{}' WHERE id=?", c.ID)
@@ -382,6 +398,10 @@ func TestMigrationSafety(t *testing.T) {
 }
 
 func TestUnwritableAndUnsafeStorage(t *testing.T) {
+	if s, err := Open(ctx, ""); err == nil {
+		s.Close()
+		t.Fatal("accepted empty storage root")
+	}
 	root := t.TempDir()
 	must(t, os.WriteFile(filepath.Join(root, "not-directory"), []byte("x"), 0600))
 	if s, err := Open(ctx, filepath.Join(root, "not-directory", "child")); err == nil {
@@ -393,5 +413,59 @@ func TestUnwritableAndUnsafeStorage(t *testing.T) {
 	if s, err := Open(ctx, root); err == nil {
 		s.Close()
 		t.Fatal("accepted symlink storage directory")
+	}
+}
+
+func TestChatScopedRequestsAndLifecycleWork(t *testing.T) {
+	s := openTest(t, t.TempDir())
+	p, one := fixture(t, s)
+	two, err := s.CreateChat(ctx, p.ID, "Independent chat", image, "opencode/1.2.27")
+	must(t, err)
+	a, err := s.AcceptMessage(ctx, one.ID, "request-1", "hello")
+	must(t, err)
+	b, err := s.AcceptMessage(ctx, two.ID, "request-1", "hello")
+	must(t, err)
+	if a.Duplicate || b.Duplicate || a.Message.ID == b.Message.ID {
+		t.Fatal("requests were deduplicated across independent chats")
+	}
+	// The database itself must reject assigning another chat's turn.
+	_, err = s.db.ExecContext(ctx, "UPDATE chats SET active_message_id=? WHERE id=?", b.Message.ID, one.ID)
+	if err == nil {
+		t.Fatal("cross-chat active message reference was allowed")
+	}
+	must(t, s.Transition(ctx, one.ID, a.Message.ID, Idle, "Complete"))
+	must(t, s.Transition(ctx, one.ID, "", Working, "Stopping container"))
+	_, err = s.AcceptMessage(ctx, one.ID, "request-2", "follow-up")
+	wantError(t, err, ErrActive)
+	must(t, s.Transition(ctx, one.ID, "", Stopped, "Stop confirmed"))
+	_, err = s.AcceptMessage(ctx, one.ID, "request-2", "follow-up")
+	must(t, err)
+}
+
+func TestCanceledAcceptanceDoesNotConsumeIdentity(t *testing.T) {
+	s := openTest(t, t.TempDir())
+	_, c := fixture(t, s)
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+	_, err := s.AcceptMessage(canceled, c.ID, "request", "hello")
+	wantError(t, err, context.Canceled)
+	a, err := s.AcceptMessage(ctx, c.ID, "request", "hello")
+	must(t, err)
+	if a.Duplicate {
+		t.Fatal("canceled acceptance consumed identity")
+	}
+}
+
+func TestInvalidPinnedIdentityAndCredentialURL(t *testing.T) {
+	s := openTest(t, t.TempDir())
+	p, _ := fixture(t, s)
+	for _, digest := range []string{"image:latest", "image@sha256:", "@sha256:" + strings.Repeat("a", 64), "image@sha256:" + strings.Repeat("z", 64)} {
+		_, err := s.CreateChat(ctx, p.ID, "Invalid image", digest, "opencode/1.2.27")
+		wantError(t, err, ErrInvalid)
+	}
+	for _, repoURL := range []string{"https://user:password@github.com/owner/repo", "https://github.com/owner/repo?token=example", "https://github.com/owner/repo#credential", "https://elsewhere.example/owner/repo"} {
+		config := Configuration{Repositories: []Repository{{Name: "repo", URL: repoURL, BaseBranch: "main", Role: "core"}}}
+		_, err := s.CreateProject(ctx, "Invalid repository", config)
+		wantError(t, err, ErrInvalid)
 	}
 }

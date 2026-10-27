@@ -13,15 +13,26 @@ import (
 	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/server"
+	"github.com/rhizomatous/flora/backend/internal/storage"
 	"github.com/rhizomatous/flora/backend/internal/webassets"
-	_ "modernc.org/sqlite" // Pure-Go driver, also available in CGO_ENABLED=0 builds.
 )
 
 func main() {
 	addr := flag.String("listen", "127.0.0.1:8080", "HTTP listen address")
+	dataDir := flag.String("data-dir", "./flora-data", "private persistent storage directory (local filesystem)")
 	flag.Parse()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	store, err := storage.Open(ctx, *dataDir)
+	if err != nil {
+		slog.Error("Storage initialization failed; check -data-dir ownership, permissions, free space, and schema version", "error", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := store.Close(); err != nil {
+			slog.Error("Storage close failed", "error", err)
+		}
+	}()
 	srv := &http.Server{
 		Addr:              *addr,
 		Handler:           server.New(webassets.FS()),
