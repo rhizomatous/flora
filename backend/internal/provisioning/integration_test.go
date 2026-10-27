@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +25,8 @@ import (
 //	  go -C backend test -race -count=1 -v -run TestProvisioningDocker ./internal/provisioning
 //
 // The test removes only the containers it created, including after failure.
+// On native Linux it also proves the agent runs as the backend's own uid, so
+// backend-owned storage and checkout files stay writable by both sides.
 func TestProvisioningDocker(t *testing.T) {
 	image := os.Getenv("FLORA_PROVISIONING_TEST_IMAGE")
 	if image == "" {
@@ -34,6 +37,10 @@ func TestProvisioningDocker(t *testing.T) {
 	engine := docker.New("")
 	if err := engine.Ping(ctx); err != nil {
 		t.Skipf("docker daemon unavailable: %v", err)
+	}
+	img, err := engine.ImageInspect(ctx, image)
+	if err != nil {
+		t.Fatalf("test image must be built locally first: %v", err)
 	}
 	var containers []string
 	t.Cleanup(func() {
@@ -49,8 +56,14 @@ func TestProvisioningDocker(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	cfg := Config{ImageRef: image, ImageDigest: testDigest, HarnessVersion: "1.2.27", MaxRunning: 2}
-	m, err := New(engine, store, cfg, nil)
+	// The checkout callback stands in for the chat lifecycle's repository
+	// download: it writes real files into the workspace before the first
+	// container start.
+	checkout := func(_ context.Context, workspaceDir string, _ []storage.Repository) error {
+		return os.WriteFile(filepath.Join(workspaceDir, "checked-out.txt"), []byte("checkout\n"), 0644)
+	}
+	cfg := Config{ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", MaxRunning: 2}
+	m, err := New(engine, store, cfg, checkout)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +117,7 @@ func TestProvisioningDocker(t *testing.T) {
 	}
 
 	t.Run("lifecycle isolation and limits", func(t *testing.T) {
-		setup := "sudo -n apk add --no-cache jq && git init /workspace && printf 'setup\\n' >> /home/flora/setup/runs && printf marker > /workspace/marker.txt"
+		setup := "printf 'agent-edit\\n' >> /workspace/checked-out.txt && id -u > /home/flora/setup/agent-uid && sudo -n apk add --no-cache jq && git init /workspace && printf 'setup\\n' >> /home/flora/setup/runs && printf marker > /workspace/marker.txt"
 		chat := newChatWithSetup("lifecycle", setup)
 		endpoint, err := m.Start(ctx, chat.ID)
 		if err != nil {
@@ -152,6 +165,20 @@ func TestProvisioningDocker(t *testing.T) {
 			t.Fatalf("setup workspace output missing: %v %q", err, raw)
 		}
 
+		// The agent runs as the backend's uid: it edited the checkout's file,
+		// and everything it wrote stays owned by the service account.
+		raw, err := os.ReadFile(filepath.Join(paths.Workspace, "checked-out.txt"))
+		if err != nil || string(raw) != "checkout\nagent-edit\n" {
+			t.Fatalf("agent must edit checkout files in place: %v %q", err, raw)
+		}
+		agentUID, err := os.ReadFile(filepath.Join(paths.RuntimeState, "setup", "agent-uid"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.TrimSpace(string(agentUID)) != strconv.Itoa(os.Getuid()) {
+			t.Fatalf("agent uid %q must equal the backend uid %d", agentUID, os.Getuid())
+		}
+
 		// Stop/start the same container: setup runs once per container.
 		if err := m.Stop(ctx, chat.ID); err != nil {
 			t.Fatal(err)
@@ -165,6 +192,49 @@ func TestProvisioningDocker(t *testing.T) {
 		}
 		if setupRuns(chat.ID) != "setup" {
 			t.Fatal("setup must not rerun on stop/start of the same container")
+		}
+	})
+
+	t.Run("orphan adoption", func(t *testing.T) {
+		// A container created but never bound (process death in the window)
+		// is adopted by name after ownership validation on the next start.
+		chat := newChatWithSetup("adoption", "git init /workspace")
+		paths, err := store.Paths(ctx, chat.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		orphanID, err := engine.ContainerCreate(ctx, docker.ContainerSpec{
+			Name:  containerName(chat.ID),
+			Image: image,
+			Env: []string{
+				"OPENCODE_SERVER_PASSWORD=orphan-secret",
+				"FLORA_UID=" + strconv.Itoa(os.Getuid()),
+				"FLORA_GID=" + strconv.Itoa(os.Getgid()),
+				"SETUP_TIMEOUT_SECONDS=600",
+			},
+			Labels: map[string]string{labelManaged: "true", labelChatID: chat.ID},
+			Binds: []string{
+				paths.Workspace + ":/workspace",
+				paths.RuntimeState + ":/home/flora",
+			},
+			LoopbackPort: 4096,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		containers = append(containers, orphanID)
+		endpoint, err := m.Start(ctx, chat.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if endpoint.ContainerID != orphanID || endpoint.Password != "orphan-secret" {
+			t.Fatalf("must adopt the orphan, not replace it: %+v", endpoint)
+		}
+		if code, _ := get(endpoint, true); code != http.StatusOK {
+			t.Fatal("adopted container must become ready")
+		}
+		if err := m.Stop(ctx, chat.ID); err != nil {
+			t.Fatal(err)
 		}
 	})
 
@@ -198,7 +268,7 @@ func TestProvisioningDocker(t *testing.T) {
 	})
 
 	t.Run("setup timeout", func(t *testing.T) {
-		short, err := New(engine, store, Config{ImageRef: image, ImageDigest: testDigest, HarnessVersion: "1.2.27", SetupTimeout: 3 * time.Second}, nil)
+		short, err := New(engine, store, Config{ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", SetupTimeout: 3 * time.Second}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

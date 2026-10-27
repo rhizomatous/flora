@@ -287,6 +287,7 @@ type ContainerState struct {
 type ContainerInfo struct {
 	ID     string         `json:"Id"`
 	Name   string         `json:"Name"`
+	Image  string         `json:"Image"` // image content ID, not the mutable reference
 	State  ContainerState `json:"State"`
 	Config struct {
 		Env    []string          `json:"Env"`

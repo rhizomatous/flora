@@ -3,9 +3,11 @@ package provisioning
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,84 +15,130 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
-const testDigest = "flora/agent@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+const (
+	testDigest  = "flora/agent@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	testImageID = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+)
 
 type fakeContainer struct {
-	running     bool
-	exitCode    int
-	exitOnStart bool
-	env         []string
-	port        string
+	id, name, imageID string
+	labels            map[string]string
+	binds             []string
+	env               []string
+	running           bool
+	exitCode          int
+	// startExitCode makes the next start leave the container exited with
+	// this code, simulating a setup failure or an external stop.
+	startExitCode int
+	port          string
 }
 
+// fakeEngine is a thread-safe in-memory Engine. ContainerList derives the
+// running set from actual container state so capacity accounting is honest.
 type fakeEngine struct {
+	mu         sync.Mutex
+	imageID    string
 	images     map[string]bool
 	containers map[string]*fakeContainer
-	runningIDs []string
-	created    []docker.ContainerSpec
 	pulled     []string
+	created    []docker.ContainerSpec
 	stopped    []string
 	nextID     int
-	failCreate error
 }
 
 func newFakeEngine() *fakeEngine {
 	return &fakeEngine{
+		imageID:    testImageID,
 		images:     map[string]bool{testDigest: true},
 		containers: map[string]*fakeContainer{},
 	}
 }
 
 func (f *fakeEngine) ImageInspect(_ context.Context, ref string) (docker.Image, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.images[ref] {
-		return docker.Image{ID: "sha256:img"}, nil
+		return docker.Image{ID: f.imageID}, nil
 	}
 	return docker.Image{}, &docker.Error{StatusCode: 404, Message: "no such image"}
 }
 
 func (f *fakeEngine) ImagePull(_ context.Context, ref string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.pulled = append(f.pulled, ref)
 	f.images[ref] = true
 	return nil
 }
 
 func (f *fakeEngine) ContainerCreate(_ context.Context, spec docker.ContainerSpec) (string, error) {
-	if f.failCreate != nil {
-		return "", f.failCreate
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, c := range f.containers {
+		if c.name == spec.Name {
+			return "", &docker.Error{StatusCode: 409, Message: "name in use"}
+		}
 	}
 	f.nextID++
-	id := "container-" + string(rune('0'+f.nextID))
+	id := fmt.Sprintf("container-%d", f.nextID)
 	f.created = append(f.created, spec)
-	f.containers[id] = &fakeContainer{env: spec.Env, port: "49152"}
+	f.containers[id] = &fakeContainer{
+		id: id, name: spec.Name, imageID: f.imageID, labels: spec.Labels,
+		binds: spec.Binds, env: spec.Env, port: "49152",
+	}
 	return id, nil
 }
 
+func (f *fakeEngine) lookup(idOrName string) (*fakeContainer, error) {
+	if c, ok := f.containers[idOrName]; ok {
+		return c, nil
+	}
+	for _, c := range f.containers {
+		if c.name == idOrName {
+			return c, nil
+		}
+	}
+	return nil, &docker.Error{StatusCode: 404, Message: "no such container"}
+}
+
 func (f *fakeEngine) ContainerStart(_ context.Context, id string) error {
-	c := f.containers[id]
-	if c.exitOnStart {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	c, err := f.lookup(id)
+	if err != nil {
+		return err
+	}
+	if c.startExitCode != 0 {
 		c.running = false
-		c.exitCode = 23
+		c.exitCode = c.startExitCode
 		return nil
 	}
 	c.running = true
+	c.exitCode = 0
 	return nil
 }
 
 func (f *fakeEngine) ContainerStop(_ context.Context, id string, _ int) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.stopped = append(f.stopped, id)
-	if c, ok := f.containers[id]; ok {
+	if c, err := f.lookup(id); err == nil {
 		c.running = false
 	}
 	return nil
 }
 
-func (f *fakeEngine) ContainerInspect(_ context.Context, id string) (docker.ContainerInfo, error) {
-	c, ok := f.containers[id]
-	if !ok {
-		return docker.ContainerInfo{}, &docker.Error{StatusCode: 404, Message: "no such container"}
+func (f *fakeEngine) ContainerInspect(_ context.Context, idOrName string) (docker.ContainerInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	c, err := f.lookup(idOrName)
+	if err != nil {
+		return docker.ContainerInfo{}, err
 	}
 	var info docker.ContainerInfo
-	info.ID = id
+	info.ID = c.id
+	info.Name = "/" + c.name
+	info.Image = c.imageID
 	info.State.Running = c.running
 	info.State.ExitCode = c.exitCode
 	if c.running {
@@ -99,6 +147,8 @@ func (f *fakeEngine) ContainerInspect(_ context.Context, id string) (docker.Cont
 		info.State.Status = "exited"
 	}
 	info.Config.Env = c.env
+	info.Config.Labels = c.labels
+	info.HostConfig.Binds = c.binds
 	if c.port != "" {
 		info.NetworkSettings.Ports = map[string][]struct {
 			HostIP   string `json:"HostIp"`
@@ -109,12 +159,20 @@ func (f *fakeEngine) ContainerInspect(_ context.Context, id string) (docker.Cont
 }
 
 func (f *fakeEngine) ContainerList(_ context.Context, running bool, labels map[string]string) ([]docker.ContainerSummary, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if labels[labelManaged] != "true" {
 		return nil, errors.New("capacity listing must filter to managed containers")
 	}
 	var list []docker.ContainerSummary
-	for _, id := range f.runningIDs {
-		list = append(list, docker.ContainerSummary{ID: id, State: "running"})
+	for _, c := range f.containers {
+		if c.labels[labelManaged] != "true" {
+			continue
+		}
+		if running && !c.running {
+			continue
+		}
+		list = append(list, docker.ContainerSummary{ID: c.id, State: "running", Labels: c.labels})
 	}
 	return list, nil
 }
@@ -168,8 +226,16 @@ func TestConfigDefaultsAndValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	if _, err := New(newFakeEngine(), store, Config{ImageRef: "flora/agent:latest", HarnessVersion: "1.2.27"}, nil); err == nil {
-		t.Fatal("unpinned image identity must fail")
+	for name, cfg := range map[string]Config{
+		"unpinned identity":        {ImageRef: "flora/agent:latest", ImageDigest: "flora/agent:latest", HarnessVersion: "1.2.27"},
+		"digest without reference": {ImageRef: "flora/agent:latest", ImageDigest: testDigest, HarnessVersion: "1.2.27"},
+		"tag without image ID":     {ImageRef: "flora/agent:dev", HarnessVersion: "1.2.27"},
+		"tag with bad image ID":    {ImageRef: "flora/agent:dev", ImageID: "not-a-sha", HarnessVersion: "1.2.27"},
+		"identity mismatch":        {ImageRef: testDigest, ImageDigest: "flora/agent@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", HarnessVersion: "1.2.27"},
+	} {
+		if _, err := New(newFakeEngine(), store, cfg, nil); err == nil {
+			t.Errorf("%s: config must be rejected", name)
+		}
 	}
 	m, err := New(newFakeEngine(), store, Config{ImageRef: testDigest, HarnessVersion: "1.2.27"}, nil)
 	if err != nil {
@@ -177,6 +243,9 @@ func TestConfigDefaultsAndValidation(t *testing.T) {
 	}
 	if m.cfg.MaxRunning != 10 || m.cfg.SetupTimeout != 10*time.Minute || m.cfg.ActivityTimeout != time.Hour {
 		t.Fatalf("PRD defaults not applied: %+v", m.cfg)
+	}
+	if m.cfg.ReadyTimeout != 11*time.Minute {
+		t.Fatalf("readiness bound must default to setup timeout plus margin: %s", m.cfg.ReadyTimeout)
 	}
 	if m.cfg.NanoCPUs != 2e9 || m.cfg.MemoryBytes != 8<<30 || m.cfg.PidsLimit != 512 {
 		t.Fatalf("PRD resource defaults not applied: %+v", m.cfg)
@@ -231,7 +300,20 @@ func TestStartCreatesIsolatedContainer(t *testing.T) {
 		}
 	}
 	env := strings.Join(spec.Env, "\n")
-	for _, want := range []string{"OPENCODE_SERVER_PASSWORD=", "ANTHROPIC_API_KEY=test-key", "SETUP_COMMAND=git init /workspace", "SETUP_TIMEOUT_SECONDS=600"} {
+	// The mapped identity comes from the storage directory's owner, with a
+	// root group (macOS wheel) replaced by a user-private group.
+	uid, gid, err := storageOwner(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gid == 0 {
+		gid = uid
+	}
+	for _, want := range []string{
+		"OPENCODE_SERVER_PASSWORD=", "ANTHROPIC_API_KEY=test-key",
+		"SETUP_COMMAND=git init /workspace", "SETUP_TIMEOUT_SECONDS=600",
+		fmt.Sprintf("FLORA_UID=%d", uid), fmt.Sprintf("FLORA_GID=%d", gid),
+	} {
 		if !strings.Contains(env, want) {
 			t.Fatalf("env missing %q in %q", want, env)
 		}
@@ -260,7 +342,36 @@ func TestStartCreatesIsolatedContainer(t *testing.T) {
 	}
 }
 
-func TestStartPullsMissingImage(t *testing.T) {
+func TestStartRejectsRootOwnedStorage(t *testing.T) {
+	engine := newFakeEngine()
+	m, store := newTestManager(t, engine, Config{}, nil)
+	m.ownerOf = func(string) (int, int, error) { return 0, 0, nil }
+	chat := newChat(t, store)
+	if _, err := m.Start(context.Background(), chat.ID); err == nil || !strings.Contains(err.Error(), "non-root") {
+		t.Fatalf("root-owned storage must be rejected: %v", err)
+	}
+	if len(engine.created) != 0 {
+		t.Fatal("no container may be created for root-owned storage")
+	}
+}
+
+// A root-owned group (like macOS wheel) falls back to a user-private group
+// matching the uid; only a root uid is rejected.
+func TestRootGroupFallsBackToUserPrivateGroup(t *testing.T) {
+	engine := newFakeEngine()
+	m, store := newTestManager(t, engine, Config{}, nil)
+	m.ownerOf = func(string) (int, int, error) { return 10501, 0, nil }
+	chat := newChat(t, store)
+	if _, err := m.Start(context.Background(), chat.ID); err != nil {
+		t.Fatal(err)
+	}
+	env := strings.Join(engine.created[0].Env, "\n")
+	if !strings.Contains(env, "FLORA_UID=10501") || !strings.Contains(env, "FLORA_GID=10501") {
+		t.Fatalf("gid 0 must fall back to the uid: %q", env)
+	}
+}
+
+func TestStartPullsOnlyPinnedImages(t *testing.T) {
 	engine := newFakeEngine()
 	delete(engine.images, testDigest)
 	m, store := newTestManager(t, engine, Config{}, nil)
@@ -271,23 +382,163 @@ func TestStartPullsMissingImage(t *testing.T) {
 	if len(engine.pulled) != 1 || engine.pulled[0] != testDigest {
 		t.Fatalf("pulls: %v", engine.pulled)
 	}
+
+	// A mutable tag is never pulled; it must exist and match the expected ID.
+	engine2 := newFakeEngine()
+	m2, store2 := newTestManager(t, engine2, Config{ImageRef: "flora/agent:dev", ImageDigest: testDigest, ImageID: testImageID}, nil)
+	chat2 := newChat(t, store2)
+	if _, err := m2.Start(context.Background(), chat2.ID); err == nil || !strings.Contains(err.Error(), "mutable tag") {
+		t.Fatalf("missing local tag must fail without pulling: %v", err)
+	}
+	if len(engine2.pulled) != 0 {
+		t.Fatalf("mutable tag pulled: %v", engine2.pulled)
+	}
+
+	// A present tag whose content ID drifts from the expected ID fails.
+	engine3 := newFakeEngine()
+	engine3.images["flora/agent:dev"] = true
+	engine3.imageID = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+	m3, store3 := newTestManager(t, engine3, Config{ImageRef: "flora/agent:dev", ImageDigest: testDigest, ImageID: testImageID}, nil)
+	chat3 := newChat(t, store3)
+	if _, err := m3.Start(context.Background(), chat3.ID); err == nil || !strings.Contains(err.Error(), "expected") {
+		t.Fatalf("image ID drift must fail: %v", err)
+	}
 }
 
-func TestCapacityCountsIdleRunningContainers(t *testing.T) {
+// A container created but never bound (BindRuntime failure or process death
+// in the window) is found by its deterministic name on retry, validated as
+// owned by this chat, and adopted. No second container is created.
+func TestStartAdoptsOwnedOrphan(t *testing.T) {
 	engine := newFakeEngine()
-	m, store := newTestManager(t, engine, Config{MaxRunning: 2}, nil)
-	engine.runningIDs = []string{"other-1", "other-2"}
+	m, store := newTestManager(t, engine, Config{}, nil)
 	chat := newChat(t, store)
-	_, err := m.Start(context.Background(), chat.ID)
+	paths, err := store.Paths(context.Background(), chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orphan := docker.ContainerSpec{
+		Name:   containerName(chat.ID),
+		Image:  testDigest,
+		Env:    []string{"OPENCODE_SERVER_PASSWORD=orphan-secret"},
+		Labels: map[string]string{labelManaged: "true", labelChatID: chat.ID},
+		Binds:  []string{paths.Workspace + ":/workspace", paths.RuntimeState + ":/home/flora"},
+	}
+	if _, err := engine.ContainerCreate(context.Background(), orphan); err != nil {
+		t.Fatal(err)
+	}
+	endpoint, err := m.Start(context.Background(), chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(engine.created) != 1 {
+		t.Fatalf("the orphan must be adopted, not recreated: %d created", len(engine.created))
+	}
+	if endpoint.Password != "orphan-secret" {
+		t.Fatal("the adopted container keeps its own endpoint password")
+	}
+	saved, err := store.Chat(context.Background(), chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.ContainerID != endpoint.ContainerID {
+		t.Fatal("adoption must bind the existing container")
+	}
+}
+
+// A container occupying the chat's name without the chat's exact identity is
+// never adopted or removed; the start fails with an explanation.
+func TestStartRejectsForeignNameCollision(t *testing.T) {
+	for name, mutate := range map[string]func(*fakeEngine, string){
+		"wrong chat label": func(e *fakeEngine, id string) { e.containers[id].labels[labelChatID] = "other" },
+		"wrong image": func(e *fakeEngine, _ string) {
+			e.imageID = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+		},
+		"extra mount": func(e *fakeEngine, id string) {
+			e.containers[id].binds = append(e.containers[id].binds, "/etc:/host-etc")
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			engine := newFakeEngine()
+			m, store := newTestManager(t, engine, Config{}, nil)
+			chat := newChat(t, store)
+			paths, err := store.Paths(context.Background(), chat.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			spec := docker.ContainerSpec{
+				Name:   containerName(chat.ID),
+				Image:  testDigest,
+				Labels: map[string]string{labelManaged: "true", labelChatID: chat.ID},
+				Binds:  []string{paths.Workspace + ":/workspace", paths.RuntimeState + ":/home/flora"},
+			}
+			id, err := engine.ContainerCreate(context.Background(), spec)
+			if err != nil {
+				t.Fatal(err)
+			}
+			mutate(engine, id)
+			if _, err := m.Start(context.Background(), chat.ID); err == nil || !strings.Contains(err.Error(), "refusing to adopt") {
+				t.Fatalf("foreign container must be rejected: %v", err)
+			}
+			if len(engine.created) != 1 {
+				t.Fatal("no replacement container may be created")
+			}
+		})
+	}
+}
+
+func TestConcurrentStartsCreateOneContainer(t *testing.T) {
+	engine := newFakeEngine()
+	m, store := newTestManager(t, engine, Config{}, nil)
+	chat := newChat(t, store)
+	var wg sync.WaitGroup
+	errs := make([]error, 4)
+	for i := range errs {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, errs[i] = m.Start(context.Background(), chat.ID)
+		}(i)
+	}
+	wg.Wait()
+	for _, err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(engine.created) != 1 {
+		t.Fatalf("concurrent same-chat starts must create exactly one container: %d", len(engine.created))
+	}
+}
+
+func TestConcurrentStartsRespectCapacity(t *testing.T) {
+	engine := newFakeEngine()
+	m, store := newTestManager(t, engine, Config{MaxRunning: 1}, nil)
+	first := newChat(t, store)
+	second := newChat(t, store)
+	var wg sync.WaitGroup
+	results := make([]error, 2)
+	chats := []string{first.ID, second.ID}
+	for i := range results {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, results[i] = m.Start(context.Background(), chats[i])
+		}(i)
+	}
+	wg.Wait()
 	var capacity *CapacityError
-	if !errors.As(err, &capacity) {
-		t.Fatalf("want capacity error, got %v", err)
+	succeeded, rejected := 0, 0
+	for _, err := range results {
+		if err == nil {
+			succeeded++
+		} else if errors.As(err, &capacity) {
+			rejected++
+		} else {
+			t.Fatalf("unexpected error: %v", err)
+		}
 	}
-	if capacity.Limit != 2 || capacity.Running != 2 || !strings.Contains(capacity.Error(), "stop a chat") {
-		t.Fatalf("explanation: %v", capacity)
-	}
-	if len(engine.created) != 0 {
-		t.Fatal("no container may be created over the limit")
+	if succeeded != 1 || rejected != 1 {
+		t.Fatalf("capacity 1 across two chats: %d succeeded, %d rejected", succeeded, rejected)
 	}
 }
 
@@ -301,7 +552,10 @@ func TestCapacityRejectsRestartOfStoppedContainer(t *testing.T) {
 	if err := m.Stop(context.Background(), chat.ID); err != nil {
 		t.Fatal(err)
 	}
-	engine.runningIDs = []string{"other-chat"}
+	other := newChat(t, store)
+	if _, err := m.Start(context.Background(), other.ID); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := m.Start(context.Background(), chat.ID); err == nil {
 		t.Fatal("restarting into a full limit must be rejected")
 	}
@@ -316,7 +570,9 @@ func TestSetupFailureBlocksStartupAndRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Make the next start exit during setup.
-	engine.containers[endpoint.ContainerID].exitOnStart = true
+	engine.mu.Lock()
+	engine.containers[endpoint.ContainerID].startExitCode = 23
+	engine.mu.Unlock()
 	if err := m.Stop(context.Background(), chat.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -356,9 +612,60 @@ func TestSetupFailureBlocksStartupAndRetry(t *testing.T) {
 		t.Fatal("setup failure was not recorded as activity")
 	}
 	// Explicit retry: the entrypoint reran setup and succeeded.
-	engine.containers[endpoint.ContainerID].exitOnStart = false
+	engine.mu.Lock()
+	engine.containers[endpoint.ContainerID].startExitCode = 0
+	engine.mu.Unlock()
 	if _, err := m.Start(context.Background(), chat.ID); err != nil {
 		t.Fatalf("explicit retry must succeed: %v", err)
+	}
+}
+
+// An externally stopped or killed container without a recorded setup result
+// is not a setup failure and persists no setup activity.
+func TestStoppedContainerIsNotSetupFailure(t *testing.T) {
+	engine := newFakeEngine()
+	m, store := newTestManager(t, engine, Config{}, nil)
+	chat := newChat(t, store)
+	endpoint, err := m.Start(context.Background(), chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine.mu.Lock()
+	engine.containers[endpoint.ContainerID].running = false
+	engine.containers[endpoint.ContainerID].startExitCode = 143
+	engine.mu.Unlock()
+	_, err = m.Start(context.Background(), chat.ID)
+	var stoppedErr *StoppedError
+	if !errors.As(err, &stoppedErr) {
+		t.Fatalf("want stopped error, got %v", err)
+	}
+	var setupErr *SetupError
+	if errors.As(err, &setupErr) {
+		t.Fatal("a stopped container must not be reported as setup failure")
+	}
+	activities, err := store.Activities(context.Background(), chat.ID, 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range activities {
+		if a.Kind == "setup" {
+			t.Fatal("no setup activity may be recorded for an external stop")
+		}
+	}
+}
+
+func TestReadinessIsBounded(t *testing.T) {
+	engine := newFakeEngine()
+	m, store := newTestManager(t, engine, Config{ReadyTimeout: 300 * time.Millisecond}, nil)
+	m.health = func(context.Context, string, string) bool { return false }
+	chat := newChat(t, store)
+	start := time.Now()
+	_, err := m.Start(context.Background(), chat.ID)
+	if err == nil || !strings.Contains(err.Error(), "did not become ready") {
+		t.Fatalf("hung endpoint must fail within the readiness bound: %v", err)
+	}
+	if time.Since(start) > 5*time.Second {
+		t.Fatal("readiness bound was not enforced")
 	}
 }
 
@@ -416,6 +723,38 @@ func TestActivitySweepStopsOverLimitContainers(t *testing.T) {
 	stopped, err = m.SweepActivity(context.Background())
 	if err != nil || len(stopped) != 0 {
 		t.Fatalf("new activity period must not be swept: %v %v", stopped, err)
+	}
+}
+
+func TestRunActivityEnforcementSweepsOnInterval(t *testing.T) {
+	engine := newFakeEngine()
+	m, store := newTestManager(t, engine, Config{ActivityTimeout: time.Millisecond}, nil)
+	chat := newChat(t, store)
+	endpoint, err := m.Start(context.Background(), chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.BeginActivity(endpoint.ContainerID)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- m.RunActivityEnforcement(ctx, 10*time.Millisecond) }()
+	deadline := time.After(5 * time.Second)
+	for {
+		engine.mu.Lock()
+		running := engine.containers[endpoint.ContainerID].running
+		engine.mu.Unlock()
+		if !running {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("enforcement loop did not stop the over-limit container")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }
 
