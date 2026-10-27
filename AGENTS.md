@@ -23,14 +23,33 @@ When doing _any_ UI work, refer to [specs/DESIGN.md](specs/DESIGN.md).
 - When the work is done, push your branch and open or update a PR. Complete this workflow end to end rather than leaving work uncommitted, unless the user explicitly requests otherwise.
 - Include only task-related files in your changes and preserve unrelated user work.
 
-### PRs
+### PR descriptions
 
-- Write concise, direct PR descriptions in plain English. Describe the problem, the final solution, and the evidence that it works. Include only relevant limitations.
-- Include only what readers need to understand or review the final change.
-- After revisions, update the existing text to reflect the final change. Do not append review-fix sections, commit summaries, progress logs, handoffs, or a chronology of the work.
-- Do not repeat the title, diff, or history unless explaining why something matters.
-- Put replies to review comments in their review threads, not in the PR body.
-- Before submitting, check every sentence: does it help someone understand or review the final change? Remove it if not.
+Write concise, direct descriptions in plain English. Use separate Problem and Change sections by default. Add other sections only when they help the reader. Editing below is writing guidance, not a required PR section.
+
+#### Problem
+
+- Explain what needs to change and why.
+
+#### Change
+
+- Explain what the PR changes to address the problem.
+- Include evidence that the solution addresses the problem correctly when relevant. A short explanation may be enough.
+
+#### Evidence
+
+- Do not add an Evidence section by default. Add one only when it helps the reader.
+- Describe relevant behavior or results, such as a concrete example, observed outcome, screenshot, or correctness explanation.
+- Do not list routine tests, builds, linting, type checks, or other verification already covered by CI. Readers can inspect the checks.
+- Mention additional testing when it demonstrates something important that normal CI does not cover. Explain what it showed, not merely which command ran.
+
+#### Editing
+
+- Include only information needed to understand or review the change, including relevant limitations.
+- After revisions, update the existing description. Do not append review-fix sections, commit summaries, progress logs, handoffs, or a chronology of the work.
+- Reply to review comments in their threads, not in the PR description.
+- Do not repeat the title, diff, or history unless explaining why it matters.
+- Before submitting, remove sentences that do not help readers understand or review the change.
 
 ### Code comments
 
