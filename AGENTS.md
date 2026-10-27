@@ -54,10 +54,12 @@ Write concise, direct descriptions in plain English. Use separate Problem and Ch
 ### Code comments
 
 - Explain concrete behavior, rather than restating a name or describing vague concepts.
+- NEVER reference process documents or development tracking in code comments: PRDs, product specs, tickets or issue numbers, PRs or reviews, milestones, roadmaps, planning, development history, or progress updates.
+- State the relevant behavior, rationale, invariants, and caller obligations directly so the comment stands on its own. Keep references to technical APIs, upstream documentation, or standards only when they help explain the code.
 - Identify where inputs come from and what important data the code saves, changes, returns, or rejects.
 - When nearby functions have related responsibilities, use their opening comments to make the differences clear.
 - Document caller obligations and non-obvious retry, ordering, and transaction rules beside the code.
-- Keep comments concise. Do not narrate obvious code or include issue numbers, history, or progress updates.
+- Keep comments concise. Do not narrate obvious code.
 
 ## Documentation scope
 
