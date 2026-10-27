@@ -5,7 +5,7 @@
 #   BROKER_HOST   broker address reachable from the container (flora-broker:443)
 #   CAPABILITY    per-chat, revocable capability token
 #   REPO          authorized repository, owner/name
-#   OTHER_REPO    a repository the capability must NOT reach
+#   OTHER_REPO    optional repository denied by the upstream token
 set -eu
 
 fail() { echo "PROBE FAIL: $*" >&2; exit 1; }
@@ -32,7 +32,8 @@ cd work
 echo "probe $(date -u +%s)" > probe.txt
 git add probe.txt
 git -c user.name='Flora Probe' -c user.email='probe@rhizomato.us' commit -m 'probe: container change'
-BRANCH="probe/$(date +%s)"
+BRANCH="probe/flora-broker-$(date -u +%Y%m%dT%H%M%SZ)-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
+echo "probe branch: $BRANCH"
 git push origin "HEAD:$BRANCH"
 git fetch origin
 # Persisted git config may hold the container-side capability but must
@@ -48,12 +49,16 @@ echo "created: $PR_URL"
 PR_NUMBER=${PR_URL##*/}
 GH_HOST="$BROKER_HOST" gh pr view "$PR_NUMBER" --repo "$REPO" --json number,isDraft,url
 
-step "upstream GitHub permission denial"
-if GH_HOST="$BROKER_HOST" gh api "repos/$OTHER_REPO" >/dev/null 2>&1; then
-	fail "capability reached an unauthorized repository (API)"
-fi
-if git ls-remote "https://$CAPABILITY@$BROKER_HOST/$OTHER_REPO.git" >/dev/null 2>&1; then
-	fail "capability reached an unauthorized repository (git)"
+if [ -n "${OTHER_REPO:-}" ]; then
+	step "upstream GitHub permission denial"
+	if GH_HOST="$BROKER_HOST" gh api "repos/$OTHER_REPO" >/dev/null 2>&1; then
+		fail "upstream token unexpectedly reached negative-test repository (API)"
+	fi
+	if git ls-remote "https://$CAPABILITY@$BROKER_HOST/$OTHER_REPO.git" >/dev/null 2>&1; then
+		fail "upstream token unexpectedly reached negative-test repository (git)"
+	fi
+else
+	step "no second repository designated; live negative check skipped (unit/local checks remain)"
 fi
 
 echo "PROBE OK"

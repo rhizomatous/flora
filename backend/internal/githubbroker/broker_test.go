@@ -311,13 +311,18 @@ func TestProductionTokenDestinations(t *testing.T) {
 	hits := 0
 	transport.base = roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		hits++
-		if r.Header.Get("Authorization") != "Bearer test-secret-never-sent-to-network" {
-			t.Fatal("missing upstream token")
+		if r.URL.Host == "github.com" {
+			user, password, ok := r.BasicAuth()
+			if !ok || user != "x-access-token" || password != "test-secret-never-sent-to-network" {
+				t.Fatal("missing git Basic token authentication")
+			}
+		} else if r.Header.Get("Authorization") != "Bearer test-secret-never-sent-to-network" {
+			t.Fatal("missing API Bearer token")
 		}
 		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("ok"))}, nil
 	})
 	for _, origin := range []string{"https://github.com", "https://api.github.com"} {
-		req, _ := http.NewRequest("GET", origin+"/path", nil)
+		req, _ := http.NewRequest("GET", origin+"/owner/repo.git/info/refs", nil)
 		resp, err := b.transport.RoundTrip(req)
 		if err != nil {
 			t.Fatal(err)

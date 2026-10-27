@@ -1,10 +1,10 @@
 # ADR 0001: Host-side credential broker for container git and gh
 
-- Status: Proposed. Offline feasibility demonstrated; real private-GitHub evidence pending.
+- Status: Proposed. Offline and real private-GitHub feasibility demonstrated; review pending.
 - Date: 2026-10-25; authorization model simplified by explicit user decision 2026-10-26.
 - Issue: [#3](https://github.com/rhizomatous/flora/issues/3)
 - Superseding decision: [issue #3 comment](https://github.com/rhizomatous/flora/issues/3#issuecomment-6409227472)
-- PR: [#23](https://github.com/rhizomatous/flora/pull/23), draft until live evidence is authorized and collected.
+- PR: [#23](https://github.com/rhizomatous/flora/pull/23), remains draft for review.
 - Requirements: PRD Projects §2.1, Execution §4.2–4.4 and §4.8, Review §6.2.
 
 ## Context and user decision
@@ -30,12 +30,11 @@ its capability expires or is revoked. Workspace isolation remains separate.
 
 ## Feasibility decision
 
-**Feasible for the demonstrated offline workflow.** A host-side HTTPS reverse
+**Feasible for the demonstrated offline and private-GitHub workflows.** A host-side HTTPS reverse
 proxy can keep the real token outside containers while stock git and gh work
-through separate container credentials. Real private-GitHub acceptance is still
-pending a designated test repository, token and explicit test authorization.
-No real-GitHub probe has been run for this revision. If the live run reveals a
-blocker, revise this decision instead of injecting the real token into containers.
+through separate container credentials. The operator-authorized live run against
+private `rhizomatous/flora` passed on 2026-10-27 UTC, including git push and stock
+gh draft-PR create/view. The temporary PR and branch were cleaned up without merge.
 
 ## Decision and exact boundary
 
@@ -49,7 +48,10 @@ blocker, revise this decision instead of injecting the real token into container
    GHES-style REST `/api/v3/...` and GraphQL `/api/graphql` over TLS.
 3. The broker replaces capability authentication with the real token only on
    fixed `https://github.com` git smart-HTTP and `https://api.github.com` API
-   requests. Upstream origins cannot be set to arbitrary destinations. The
+   requests (Basic `x-access-token` for git, Bearer for API). GitHub smart HTTP
+   rejects Bearer authentication; the first live read-only check exposed this
+   mismatch and both broker and fixture were corrected before the passing run.
+   Upstream origins cannot be set to arbitrary destinations. The
    injecting transport checks scheme, host and port; environment HTTP proxies
    are disabled. Inbound Host, absolute URLs, query data and request bodies
    cannot select another upstream. Forward-proxy requests and CONNECT are denied.
@@ -106,12 +108,23 @@ second-repository access, fake-upstream permission denials and revoked
 capability denial from both host and a fresh container. The fake API is a
 canned transport fixture, not evidence of real GitHub authorization behavior.
 
+Live evidence on 2026-10-27 UTC:
+
+- `TestLiveGitHub` passed API metadata (`private=true`), git ls-remote and
+  revoked-capability denial using the operator-provided host-only token.
+- Docker `run-probe.sh` passed TLS git clone/commit/push/fetch and actual stock
+  gh 2.103.2 draft-PR create/view, then exact 401 after revocation.
+- [Test PR #24](https://github.com/rhizomatous/flora/pull/24) used branch
+  `probe/flora-broker-20261027T004825Z-5feaa2c3`, based on `main`. It was closed
+  without merge; only that exact branch was deleted. Main was not mutated.
+- No second repository was designated. That live negative check is optional;
+  upstream-denial unit/offline tests still run. This is not evidence of live
+  cross-repository denial or independent auditing of every token permission.
+
 Remaining limits:
 
-- No authorized real private-GitHub run yet. `run-probe.sh` mutates a designated
-  test repository; opt-in `TestLiveGitHub` checks API metadata and ls-remote
-  without mutations. Real response shapes, private push and PR behavior still
-  need evidence. The PR stays draft.
+- Real private-GitHub evidence covers the tested same-repository workflow, not
+  all GitHub operations. The PR stays draft for review.
 - Fork requests are no longer altered, but cross-fork PR behavior is not yet
   verified. SSH, git archive, LFS, release asset download hosts and arbitrary
   GitHub web paths are not proxied. External redirects need unauthenticated

@@ -16,7 +16,7 @@ import (
 // GitBackend serves git smart HTTP for the bare repositories under
 // projectRoot by wrapping `git http-backend`. The broker targets it as its
 // git upstream. When RequireToken is non-empty, requests must carry
-// `Authorization: Bearer <RequireToken>`, emulating GitHub's
+// Basic authentication with x-access-token and RequireToken, emulating GitHub's
 // private-repository behavior. It powers the fake upstream used by tests
 // and by the local container integration run.
 type GitBackend struct {
@@ -31,7 +31,8 @@ type GitBackend struct {
 func (g *GitBackend) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	g.Requests++
 	if g.RequireToken != "" {
-		if r.Header.Get("Authorization") != "Bearer "+g.RequireToken {
+		user, password, ok := r.BasicAuth()
+		if !ok || user != "x-access-token" || password != g.RequireToken {
 			http.Error(w, "upstream auth required", http.StatusUnauthorized)
 			return
 		}
@@ -79,8 +80,8 @@ func (g *GitBackend) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // FakeGitHub is a self-contained fake of the GitHub endpoints the broker
 // proxies: git smart HTTP under /owner/repo.git plus minimal REST under
 // /api/v3 and GraphQL under /api/graphql. Every route requires the
-// administrator-style bearer token, so a passing integration run proves
-// the broker injects credentials upstream. API responses are canned JSON;
+// administrator-style token (Basic for git, Bearer for API), so a passing
+// integration run proves the broker injects credentials upstream. API responses are canned JSON;
 // it is a transport fixture, not a GitHub emulator. DebugLog, when set,
 // receives GraphQL request bodies for fixture development.
 type FakeGitHub struct {

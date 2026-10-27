@@ -19,10 +19,9 @@ trap cleanup EXIT
 : "${FLORA_PROBE_LIVE:?set FLORA_PROBE_LIVE=1 after authorizing this live mutation probe}"
 [ "$FLORA_PROBE_LIVE" = 1 ] || exit 1
 : "${FLORA_BROKER_GH_TOKEN:?set the fine-grained token in the host environment}"
-: "${FLORA_PROBE_REPO:?set the authorized private test repository}"
-: "${FLORA_PROBE_OTHER_REPO:?set a private repository denied by the upstream token}"
-REPO=$FLORA_PROBE_REPO
-OTHER_REPO=$FLORA_PROBE_OTHER_REPO
+: "${FLORA_PROBE_REPO:?set the authorized test repository}"
+REPO=${FLORA_PROBE_REPO%/}
+OTHER_REPO=${FLORA_PROBE_OTHER_REPO:-}
 
 echo "== build broker (host and relay image)"
 case "$(uname -m)" in arm64|aarch64) GOARCH=arm64 ;; *) GOARCH=amd64 ;; esac

@@ -84,14 +84,15 @@ func New(cfg Config) (*Broker, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 	b := &Broker{token: cfg.Token, store: cfg.Store, logger: logger, now: now, gitUpstream: gitURL, apiUpstream: apiURL}
-	b.transport = &authTransport{base: transport, token: cfg.Token, origins: map[string]bool{gitURL.Scheme + "://" + gitURL.Host: true, apiURL.Scheme + "://" + apiURL.Host: true}}
+	b.transport = &authTransport{base: transport, token: cfg.Token, gitOrigin: gitURL.Scheme + "://" + gitURL.Host, origins: map[string]bool{gitURL.Scheme + "://" + gitURL.Host: true, apiURL.Scheme + "://" + apiURL.Host: true}}
 	return b, nil
 }
 
 type authTransport struct {
-	base    http.RoundTripper
-	token   string
-	origins map[string]bool
+	base      http.RoundTripper
+	token     string
+	origins   map[string]bool
+	gitOrigin string
 }
 
 func (t *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -99,7 +100,12 @@ func (t *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, errors.New("upstream destination denied")
 	}
 	out := req.Clone(req.Context())
-	out.Header.Set("Authorization", "Bearer "+t.token)
+	if req.URL.Scheme+"://"+req.URL.Host == t.gitOrigin && gitPathRE.MatchString(req.URL.Path) {
+		// GitHub smart HTTP requires Basic token authentication, unlike its API.
+		out.SetBasicAuth("x-access-token", t.token)
+	} else {
+		out.Header.Set("Authorization", "Bearer "+t.token)
+	}
 	return t.base.RoundTrip(out)
 }
 

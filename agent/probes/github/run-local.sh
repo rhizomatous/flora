@@ -2,7 +2,7 @@
 # Offline container integration run for issue #3. Proves the full topology
 # with Docker but without any real GitHub credentials:
 #
-#   probe container --TLS/capability--> host broker --bearer--> fake upstream
+#   probe container --TLS/capability--> host broker --token--> fake upstream
 #
 # The fake upstream is a token-demanding fixture (git smart HTTP plus
 # canned API JSON), so a passing run demonstrates that ordinary container
@@ -72,7 +72,7 @@ docker run -d --name "$FAKE_NAME" --network "$NET" \
 sleep 1
 curl -s -o /dev/null -w 'fake upstream direct, no token: %{http_code}\n' \
 	"http://127.0.0.1:$FAKE_PORT/octo/demo.git/info/refs?service=git-upload-pack"
-curl -s -o /dev/null -H "Authorization: Bearer $TEST_TOKEN" \
+curl -s -o /dev/null -u "x-access-token:$TEST_TOKEN" \
 	-w 'fake upstream direct, with token: %{http_code}\n' \
 	"http://127.0.0.1:$FAKE_PORT/octo/demo.git/info/refs?service=git-upload-pack"
 
