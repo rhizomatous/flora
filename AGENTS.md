@@ -25,7 +25,7 @@ When doing _any_ UI work, refer to [specs/DESIGN.md](specs/DESIGN.md).
 
 ### PR descriptions
 
-Write concise, direct descriptions in plain English. Use separate Problem and Change sections by default. Add other sections only when they help the reader. Editing below is writing guidance, not a required PR section.
+Write concise, direct descriptions in plain English. Use separate Problem and Change sections by default. Add other sections only when they help the reader. Readability and Editing below are writing guidance, not required PR sections.
 
 #### Problem
 
@@ -42,6 +42,16 @@ Write concise, direct descriptions in plain English. Use separate Problem and Ch
 - Describe relevant behavior or results, such as a concrete example, observed outcome, screenshot, or correctness explanation.
 - Do not list routine tests, builds, linting, type checks, or other verification already covered by CI. Readers can inspect the checks.
 - Mention additional testing when it demonstrates something important that normal CI does not cover. Explain what it showed, not merely which command ran.
+
+#### Readability
+
+- Summarize the change; do not inventory every function, setting, safeguard, error case, or implementation detail.
+- Lead with behavior that matters to the reader. Use file paths and symbol names only when they help explain it.
+- Keep each paragraph or bullet focused on one point.
+- Prefer short paragraphs and a few focused bullets. Do not turn a dense paragraph into an equally dense list.
+- Include technical details only when they explain an important design choice, correctness property, limitation, or tradeoff.
+- Leave exact defaults and API mechanics in code or existing documentation unless central to this change.
+- Remove repetition and parenthetical asides. If a qualification matters give it a clear sentence.
 
 #### Editing
 
