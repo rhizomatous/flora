@@ -63,8 +63,12 @@ type Config struct {
 	// tests; model calls then fail inside the container until replaced.
 	ProviderAPIKey string
 
-	MaxRunning      int
-	SetupTimeout    time.Duration
+	MaxRunning   int
+	SetupTimeout time.Duration
+	// SetupKillGrace bounds how long setup may ignore the timeout's SIGTERM
+	// before it is SIGKILLed, so a stuck command cannot hold a capacity slot
+	// forever without a result.
+	SetupKillGrace  time.Duration
 	ActivityTimeout time.Duration
 	// ReadyTimeout bounds one Start call's wait for the runtime to become
 	// healthy. It defaults to SetupTimeout plus one minute, since readiness
@@ -104,6 +108,9 @@ func (c Config) withDefaults() (Config, error) {
 	}
 	if c.SetupTimeout <= 0 {
 		c.SetupTimeout = DefaultSetupTimeout
+	}
+	if c.SetupKillGrace <= 0 {
+		c.SetupKillGrace = 30 * time.Second
 	}
 	if c.ActivityTimeout <= 0 {
 		c.ActivityTimeout = DefaultActivityTimeout
@@ -197,6 +204,19 @@ type StoppedError struct {
 
 func (e *StoppedError) Error() string {
 	return fmt.Sprintf("container exited (code %d) before the runtime became ready, without a setup result; it was stopped or killed outside setup", e.ExitCode)
+}
+
+// RuntimeStartError reports that a container exited with a nonzero code
+// before the runtime became ready even though setup did not fail. The OpenCode
+// server or entrypoint itself failed; the saved setup output is unrelated to
+// this exit.
+type RuntimeStartError struct {
+	ChatID   string
+	ExitCode int
+}
+
+func (e *RuntimeStartError) Error() string {
+	return fmt.Sprintf("runtime exited (code %d) before becoming ready; setup did not fail, so inspect the container logs", e.ExitCode)
 }
 
 type Manager struct {
@@ -461,6 +481,7 @@ func (m *Manager) containerSpec(chat storage.Chat, paths storage.Paths, password
 		env = append(env, "SETUP_COMMAND="+chat.Configuration.SetupCommand)
 	}
 	env = append(env, "SETUP_TIMEOUT_SECONDS="+strconv.Itoa(int(m.cfg.SetupTimeout.Seconds())))
+	env = append(env, "SETUP_KILL_GRACE_SECONDS="+strconv.Itoa(int(m.cfg.SetupKillGrace.Seconds())))
 	return docker.ContainerSpec{
 		Name:  containerName(chat.ID),
 		Image: m.cfg.ImageRef,
@@ -512,22 +533,27 @@ func (m *Manager) awaitReady(ctx context.Context, chatID string, paths storage.P
 	}
 }
 
-// containerExited classifies an exited container. A recorded setup exit
-// status (or any other nonzero exit) is a SetupError and persists the saved
-// output as activity. A clean exit or a stop/kill signal without a setup
-// result is a StoppedError, not a setup failure.
+// containerExited classifies an exited container. Only a recorded nonzero
+// setup exit status is a SetupError; just then is the saved output persisted
+// as setup activity. A clean exit or a stop/kill signal is a StoppedError.
+// Any other nonzero exit with no recorded setup failure is a RuntimeStartError:
+// a leftover success status from an earlier setup must not turn a later
+// runtime exit into a bogus "setup failed with exit 0".
 func (m *Manager) containerExited(ctx context.Context, chatID string, paths storage.Paths, info docker.ContainerInfo) error {
 	dir := filepath.Join(paths.RuntimeState, "setup")
 	exitCode := info.State.ExitCode
-	setupRecorded := false
+	setupFailed := false
 	if raw, err := os.ReadFile(filepath.Join(dir, "exit-status")); err == nil {
-		if parsed, err := strconv.Atoi(strings.TrimSpace(string(raw))); err == nil {
+		if parsed, err := strconv.Atoi(strings.TrimSpace(string(raw))); err == nil && parsed != 0 {
 			exitCode = parsed
-			setupRecorded = true
+			setupFailed = true
 		}
 	}
-	if !setupRecorded && (exitCode == 0 || exitCode == 137 || exitCode == 143) {
-		return &StoppedError{ChatID: chatID, ExitCode: exitCode}
+	if !setupFailed {
+		if exitCode == 0 || exitCode == 137 || exitCode == 143 {
+			return &StoppedError{ChatID: chatID, ExitCode: exitCode}
+		}
+		return &RuntimeStartError{ChatID: chatID, ExitCode: exitCode}
 	}
 	var tail string
 	if raw, err := os.ReadFile(filepath.Join(dir, "output.log")); err == nil {
@@ -549,6 +575,11 @@ func (m *Manager) containerExited(ctx context.Context, chatID string, paths stor
 // state, and recorded identity (PRD 4.5). Stopping a chat with no container
 // is a no-op. The container is kept for an explicit later start; it is never
 // transparently restarted.
+//
+// Stop serializes with Start per chat, so it can wait behind an in-progress
+// Start for up to the readiness bound. A caller that needs a prompt stop
+// while a Start is still waiting for readiness must first cancel that Start's
+// context; user-facing interrupt wiring is a later layer's job.
 func (m *Manager) Stop(ctx context.Context, chatID string) error {
 	unlock := m.lockChat(chatID)
 	defer unlock()

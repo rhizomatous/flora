@@ -297,6 +297,32 @@ func TestProvisioningDocker(t *testing.T) {
 		}
 	})
 
+	t.Run("setup ignoring SIGTERM is killed", func(t *testing.T) {
+		bounded, err := New(engine, store, Config{ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", SetupTimeout: 2 * time.Second, SetupKillGrace: time.Second}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bounded.health = healthy
+		chat := newChatWithSetup("setup-stubborn", `trap '' TERM; printf 'attempt\n' >> /home/flora/setup/attempts; while true; do sleep 1; done`)
+		start := time.Now()
+		_, err = bounded.Start(ctx, chat.ID)
+		saved, serr := store.Chat(ctx, chat.ID)
+		if serr == nil && saved.ContainerID != "" {
+			containers = append(containers, saved.ContainerID)
+		}
+		var setupErr *SetupError
+		if !errors.As(err, &setupErr) {
+			t.Fatalf("want setup failure, got %v", err)
+		}
+		// 124 is the plain timeout; 137 means the kill grace had to SIGKILL.
+		if setupErr.ExitCode != 124 && setupErr.ExitCode != 137 {
+			t.Fatalf("want timeout/kill exit, got %+v", setupErr)
+		}
+		if elapsed := time.Since(start); elapsed > 30*time.Second {
+			t.Fatalf("a SIGTERM-ignoring setup must be killed in bounded time, took %s", elapsed)
+		}
+	})
+
 	t.Run("capacity rejects excess starts", func(t *testing.T) {
 		first := newChatWithSetup("capacity-1", "")
 		second := newChatWithSetup("capacity-2", "")

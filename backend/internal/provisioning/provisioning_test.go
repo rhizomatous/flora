@@ -311,7 +311,7 @@ func TestStartCreatesIsolatedContainer(t *testing.T) {
 	}
 	for _, want := range []string{
 		"OPENCODE_SERVER_PASSWORD=", "ANTHROPIC_API_KEY=test-key",
-		"SETUP_COMMAND=git init /workspace", "SETUP_TIMEOUT_SECONDS=600",
+		"SETUP_COMMAND=git init /workspace", "SETUP_TIMEOUT_SECONDS=600", "SETUP_KILL_GRACE_SECONDS=30",
 		fmt.Sprintf("FLORA_UID=%d", uid), fmt.Sprintf("FLORA_GID=%d", gid),
 	} {
 		if !strings.Contains(env, want) {
@@ -651,6 +651,70 @@ func TestStoppedContainerIsNotSetupFailure(t *testing.T) {
 		if a.Kind == "setup" {
 			t.Fatal("no setup activity may be recorded for an external stop")
 		}
+	}
+}
+
+// A leftover exit status of 0 from an earlier successful setup must not turn
+// a later runtime exit into a bogus setup failure.
+func TestStaleSetupSuccessIsNotSetupFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		exitCode int
+		want     string
+	}{
+		{"runtime crash", 1, "runtime"},
+		{"external stop", 143, "stopped"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			engine := newFakeEngine()
+			m, store := newTestManager(t, engine, Config{}, nil)
+			chat := newChat(t, store)
+			endpoint, err := m.Start(context.Background(), chat.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Record the earlier successful setup, then make the next start's
+			// runtime exit immediately.
+			paths, err := store.Paths(context.Background(), chat.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.MkdirAll(filepath.Join(paths.RuntimeState, "setup"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(paths.RuntimeState, "setup", "exit-status"), []byte("0\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			engine.mu.Lock()
+			engine.containers[endpoint.ContainerID].running = false
+			engine.containers[endpoint.ContainerID].startExitCode = tc.exitCode
+			engine.mu.Unlock()
+			_, err = m.Start(context.Background(), chat.ID)
+			var setupErr *SetupError
+			if errors.As(err, &setupErr) {
+				t.Fatalf("stale setup success must not classify as setup failure: %+v", setupErr)
+			}
+			if tc.want == "runtime" {
+				var startErr *RuntimeStartError
+				if !errors.As(err, &startErr) || startErr.ExitCode != 1 {
+					t.Fatalf("want runtime-start error exit 1, got %v", err)
+				}
+			} else {
+				var stoppedErr *StoppedError
+				if !errors.As(err, &stoppedErr) {
+					t.Fatalf("want stopped error, got %v", err)
+				}
+			}
+			activities, err := store.Activities(context.Background(), chat.ID, 0, 100)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, a := range activities {
+				if a.Kind == "setup" {
+					t.Fatal("no setup activity may be recorded when setup did not fail")
+				}
+			}
+		})
 	}
 }
 

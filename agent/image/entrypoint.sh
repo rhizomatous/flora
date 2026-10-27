@@ -31,7 +31,9 @@ if [ ! -f /var/lib/flora-setup.done ]; then
     chown "$FLORA_UID:$FLORA_GID" /home/flora/setup
     set +e
     if [ -n "${SETUP_COMMAND:-}" ]; then
-        sudo -E -u flora timeout "${SETUP_TIMEOUT_SECONDS:-600}" sh -c "$SETUP_COMMAND" >> /home/flora/setup/output.log 2>&1
+        # The kill-after bound stops a command that ignores SIGTERM from
+        # running forever and holding its capacity slot without a result.
+        sudo -E -u flora timeout -k "${SETUP_KILL_GRACE_SECONDS:-30}" "${SETUP_TIMEOUT_SECONDS:-600}" sh -c "$SETUP_COMMAND" >> /home/flora/setup/output.log 2>&1
         status=$?
     else
         status=0
