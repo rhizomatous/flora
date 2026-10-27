@@ -34,7 +34,6 @@ for a stable service location. Keep this directory on persistent local storage,
 owned by the application user, outside any agent mount. Unusable storage or an
 unsupported newer schema prevents startup before HTTP begins listening.
 Neither Docker nor a model-provider credential is needed for these checks.
-See [the storage contract](specs/STORAGE.md) for the layout, APIs, and boundaries.
 
 For fast frontend iteration, run `npm run dev` inside the development shell.
 Vite serves the web app and proxies `/api` to a backend on port 8080. After a web

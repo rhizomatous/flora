@@ -23,11 +23,12 @@ type Activity struct {
 	Payload                          json.RawMessage
 }
 
-// AcceptMessage commits the user message, active-turn ownership, Working status,
-// and activity together. A duplicate is returned before checking current status.
-// Only a NEW acceptance may be submitted to a runtime by the caller. On an
-// uncertain delivery outcome, preserve this record and reconcile; never resend
-// just because a browser retries. This is not exactly-once tool execution.
+// AcceptMessage atomically saves a user message, marks it active, sets the chat to
+// Working, and records message and status activity. Retrying the same request ID
+// and text returns the saved message with Duplicate=true, even after completion;
+// different text returns ErrConflict. New requests return ErrActive while the
+// chat has active work. Callers must submit only new acceptances to the runtime
+// and reconcile uncertain delivery without automatically resending the message.
 func (s *Store) AcceptMessage(ctx context.Context, chatID, requestID, text string) (Acceptance, error) {
 	if requestID == "" || !utf8.ValidString(text) || len(text) > MaxMessageBytes {
 		return Acceptance{}, ErrInvalid
@@ -147,9 +148,10 @@ func (s *Store) SaveRuntimeMessage(ctx context.Context, eventID string, m Messag
 	})
 }
 
-// Transition compares the expected active message ID, so stale completion cannot
-// release a later turn. Working and Waiting retain ownership. Terminal states
-// release it, only when the caller has confirmed completion, failure, or stop.
+// Transition atomically updates the chat's status and reason and records status
+// activity. It returns ErrStale if expectedMessageID no longer matches the active
+// message. Working and Waiting keep that message active; Idle, Failed, and Stopped
+// clear it. Callers must confirm completion, failure, or stop before clearing it.
 func (s *Store) Transition(ctx context.Context, chatID, expectedMessageID string, status Status, reason string) error {
 	switch status {
 	case Working, Waiting, Failed, Idle, Stopped:
@@ -219,8 +221,9 @@ func (s *Store) AppendActivity(ctx context.Context, chatID, eventID, kind string
 	})
 }
 
-// Activities returns a bounded page in durable commit order. Sequence numbers
-// are global, stable, and may have gaps within one chat. SSE belongs to issue #9.
+// Activities returns up to limit saved events for chatID with sequence numbers
+// greater than after, in ascending sequence order. Sequence numbers are global
+// and stable, so gaps within a chat are normal. The limit must be 1 through 1000.
 func (s *Store) Activities(ctx context.Context, chatID string, after int64, limit int) ([]Activity, error) {
 	if after < 0 || limit < 1 || limit > 1000 {
 		return nil, ErrInvalid
