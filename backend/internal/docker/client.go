@@ -247,15 +247,13 @@ type ContainerSummary struct {
 }
 
 // ContainerList matches all supplied labels, including stopped containers unless
-// running is true. Running candidates are inspected because the daemon's list
-// snapshot can still show a container as running after Stop has completed.
+// running is true. In running mode every matching container is inspected because
+// the daemon's list snapshot can lag behind both Start and Stop. Filtering that
+// snapshot by status would omit containers that have just started.
 func (c *Client) ContainerList(ctx context.Context, running bool, labels map[string]string) ([]ContainerSummary, error) {
 	filters := make(client.Filters)
 	for k, v := range labels {
 		filters.Add("label", k+"="+v)
-	}
-	if running {
-		filters.Add("status", "running")
 	}
 	result, err := c.sdk.ContainerList(ctx, client.ContainerListOptions{All: true, Filters: filters})
 	if err != nil {
@@ -274,6 +272,7 @@ func (c *Client) ContainerList(ctx context.Context, running bool, labels map[str
 			if !info.State.Running {
 				continue
 			}
+			item.State = container.ContainerState(info.State.Status)
 		}
 		list = append(list, ContainerSummary{ID: item.ID, Names: item.Names, Image: item.Image, State: string(item.State), Labels: item.Labels})
 	}

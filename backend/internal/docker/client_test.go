@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -159,7 +160,7 @@ func TestContainerListFilters(t *testing.T) {
 		if err := json.Unmarshal([]byte(r.URL.Query().Get("filters")), &filters); err != nil {
 			t.Errorf("filters not JSON: %v", err)
 		}
-		if len(filters["label"]) != 1 || !filters["label"]["flora.managed=true"] || len(filters["status"]) != 1 || !filters["status"]["running"] {
+		if len(filters["label"]) != 1 || !filters["label"]["flora.managed=true"] || len(filters["status"]) != 0 || r.URL.Query().Get("all") != "1" {
 			t.Errorf("filters: %v", filters)
 		}
 		_, _ = w.Write([]byte(`[{"Id":"a","State":"running","Labels":{"flora.managed":"true"}}]`))
@@ -174,6 +175,7 @@ func TestStopThenList(t *testing.T) {
 	for _, timeout := range []int{0, 10} {
 		t.Run(strconv.Itoa(timeout), func(t *testing.T) {
 			running := true
+			lists := 0
 			client, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				switch r.Method + " " + r.URL.Path {
 				case "POST /v" + APIVersion + "/containers/c1/stop":
@@ -183,6 +185,7 @@ func TestStopThenList(t *testing.T) {
 					running = false
 					w.WriteHeader(http.StatusNoContent)
 				case "GET /v" + APIVersion + "/containers/json":
+					lists++
 					var filters map[string]map[string]bool
 					if err := json.Unmarshal([]byte(r.URL.Query().Get("filters")), &filters); err != nil {
 						t.Error(err)
@@ -192,7 +195,7 @@ func TestStopThenList(t *testing.T) {
 					}
 					if running {
 						_, _ = io.WriteString(w, `[{"Id":"c1","State":"running"}]`)
-					} else if filters["status"]["running"] {
+					} else if lists == 1 {
 						// The daemon's list snapshot still shows the old state.
 						_, _ = io.WriteString(w, `[{"Id":"c1","State":"running"}]`)
 					} else {
@@ -227,13 +230,15 @@ func TestStopThenList(t *testing.T) {
 
 func TestContainerListRechecksState(t *testing.T) {
 	for _, tc := range []struct {
-		name      string
-		status    int
-		body      string
-		wantCount int
-		wantError bool
+		name          string
+		status        int
+		body          string
+		snapshotState string
+		wantCount     int
+		wantError     bool
 	}{
 		{name: "running", status: http.StatusOK, body: `{"Id":"c1","State":{"Status":"running","Running":true}}`, wantCount: 1},
+		{name: "newly started", status: http.StatusOK, snapshotState: "exited", body: `{"Id":"c1","State":{"Status":"running","Running":true}}`, wantCount: 1},
 		{name: "stopped", status: http.StatusOK, body: `{"Id":"c1","State":{"Status":"exited","Running":false}}`},
 		{name: "removed", status: http.StatusNotFound, body: `{"message":"No such container"}`},
 		{name: "unavailable", status: http.StatusInternalServerError, body: `{"message":"inspect failed"}`, wantError: true},
@@ -244,7 +249,20 @@ func TestContainerListRechecksState(t *testing.T) {
 			client, fake := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
 				case "/v" + APIVersion + "/containers/json":
-					_, _ = io.WriteString(w, `[{"Id":"c1","State":"running","Labels":{"flora.managed":"true"}}]`)
+					var filters map[string]map[string]bool
+					if err := json.Unmarshal([]byte(r.URL.Query().Get("filters")), &filters); err != nil {
+						t.Error(err)
+					}
+					state := tc.snapshotState
+					if state == "" {
+						state = "running"
+					}
+					if r.URL.Query().Get("all") != "1" || len(filters["status"]) != 0 {
+						t.Error("running candidates must include stopped snapshots")
+						_, _ = io.WriteString(w, `[]`)
+						return
+					}
+					_, _ = fmt.Fprintf(w, `[{"Id":"c1","State":%q,"Labels":{"flora.managed":"true"}}]`, state)
 				case "/v" + APIVersion + "/containers/c1/json":
 					w.WriteHeader(tc.status)
 					_, _ = io.WriteString(w, tc.body)
@@ -256,6 +274,9 @@ func TestContainerListRechecksState(t *testing.T) {
 			list, err := client.ContainerList(context.Background(), true, map[string]string{"flora.managed": "true"})
 			if (err != nil) != tc.wantError || len(list) != tc.wantCount {
 				t.Fatalf("list=%v err=%v, want count=%d error=%t", list, err, tc.wantCount, tc.wantError)
+			}
+			if len(list) == 1 && list[0].State != "running" {
+				t.Fatalf("returned snapshot state instead of inspected state: %+v", list[0])
 			}
 			if len(fake.requests) != 2 {
 				t.Fatalf("expected list then inspect without retries: %v", fake.requests)
