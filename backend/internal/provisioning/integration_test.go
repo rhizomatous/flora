@@ -169,21 +169,20 @@ func TestProvisioningDocker(t *testing.T) {
 	})
 
 	t.Run("setup failure timeout and explicit retry", func(t *testing.T) {
-		setup := "printf 'attempt\\n' >> /home/flora/setup/attempts; if [ ! -f /home/flora/setup/retry ]; then touch /home/flora/setup/retry; exit 23; fi"
+		setup := "printf 'setup attempt running\\n'; printf 'attempt\\n' >> /home/flora/setup/attempts; if [ ! -f /home/flora/setup/retry ]; then touch /home/flora/setup/retry; exit 23; fi"
 		chat := newChatWithSetup("setup-failure", setup)
 		_, err := m.Start(ctx, chat.ID)
+		saved, serr := store.Chat(ctx, chat.ID)
+		if serr == nil && saved.ContainerID != "" {
+			containers = append(containers, saved.ContainerID)
+		}
 		var setupErr *SetupError
 		if !errors.As(err, &setupErr) {
 			t.Fatalf("want setup failure, got %v", err)
 		}
-		if setupErr.ExitCode != 23 || !strings.Contains(setupErr.OutputTail, "attempt") {
+		if setupErr.ExitCode != 23 || !strings.Contains(setupErr.OutputTail, "setup attempt") {
 			t.Fatalf("setup error must carry exit status and output: %+v", setupErr)
 		}
-		saved, err := store.Chat(ctx, chat.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		containers = append(containers, saved.ContainerID)
 		// Explicit retry: the same failed setup now succeeds.
 		endpoint, err := m.Start(ctx, chat.ID)
 		if err != nil {
@@ -191,6 +190,10 @@ func TestProvisioningDocker(t *testing.T) {
 		}
 		if code, _ := get(endpoint, true); code != http.StatusOK {
 			t.Fatal("runtime must become ready after retried setup")
+		}
+		// Free the slot for the capacity subtest.
+		if err := m.Stop(ctx, chat.ID); err != nil {
+			t.Fatal(err)
 		}
 	})
 
@@ -202,15 +205,14 @@ func TestProvisioningDocker(t *testing.T) {
 		short.health = healthy
 		chat := newChatWithSetup("setup-timeout", "printf 'attempt\\n' >> /home/flora/setup/attempts; sleep 30")
 		_, err = short.Start(ctx, chat.ID)
+		saved, serr := store.Chat(ctx, chat.ID)
+		if serr == nil && saved.ContainerID != "" {
+			containers = append(containers, saved.ContainerID)
+		}
 		var setupErr *SetupError
 		if !errors.As(err, &setupErr) || setupErr.ExitCode != 124 {
 			t.Fatalf("want timeout exit 124, got %+v (%v)", setupErr, err)
 		}
-		saved, err := store.Chat(ctx, chat.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		containers = append(containers, saved.ContainerID)
 		// A retry runs setup again and times out again; both attempts persist.
 		if _, err := short.Start(ctx, chat.ID); !errors.As(err, &setupErr) {
 			t.Fatalf("retry must attempt setup again: %v", err)

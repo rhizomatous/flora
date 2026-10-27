@@ -107,8 +107,8 @@ type Engine interface {
 
 // CheckoutFunc prepares a chat workspace before its first container start,
 // typically by downloading the project's core repositories. Implementations
-// must be idempotent against an existing workspace. Issue #8 wires the real
-// implementation; a nil callback leaves the workspace empty.
+// must be idempotent against an existing workspace. A nil callback leaves the
+// workspace empty; core repository download is wired in by the chat lifecycle.
 type CheckoutFunc func(ctx context.Context, workspaceDir string, coreRepos []storage.Repository) error
 
 // Endpoint is a chat container's private authenticated runtime address. The
