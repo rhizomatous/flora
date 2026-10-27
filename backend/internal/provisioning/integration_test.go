@@ -378,5 +378,17 @@ func TestProvisioningDocker(t *testing.T) {
 		if endpoint2.Password == endpoint.Password {
 			t.Fatal("endpoint passwords must be per-container")
 		}
+		// Alternate the occupied slot without a delay between Stop and Start.
+		// Every stopped container must leave capacity for the other chat.
+		active, waiting := second, first
+		for i := 0; i < 20; i++ {
+			if err := m.Stop(ctx, active.ID); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := m.Start(ctx, waiting.ID); err != nil {
+				t.Fatalf("slot handoff %d: %v", i, err)
+			}
+			active, waiting = waiting, active
+		}
 	})
 }
