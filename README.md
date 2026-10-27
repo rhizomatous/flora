@@ -3,9 +3,9 @@
 A self-hosted autonomous coding agent. Describe a task, let the agent work, then
 return to review its changes and open a draft pull request.
 
-**Status:** application bootstrap plus durable storage foundation. The binary
-initializes private local storage and serves a minimal React shell and
-`GET /api/health`. Agent execution, onboarding, and project management are
+**Status:** administrator onboarding, protected settings, and durable storage.
+The binary serves first-time account creation, login/logout, and hosted-model
+and GitHub credential settings. Agent execution and project management are
 subsequent milestones. See the [roadmap](https://github.com/rhizomatous/flora/issues/20)
 and [product requirements](specs/PRD.md).
 
@@ -24,19 +24,38 @@ Go/TypeScript source tree. The scripts do not require these last three tools.
 nix develop
 make deps
 make check smoke build-linux
-./bin/flora
+./bin/flora -public-url https://flora.example.com
 ```
 
-Open <http://127.0.0.1:8080>. The server binds to loopback by default; override with
-`./bin/flora -listen 127.0.0.1:9000`. It handles SIGINT/SIGTERM gracefully.
+Put an HTTPS reverse proxy in front of <http://127.0.0.1:8080> and open the
+`-public-url` address. This required flag is the browser origin used to reject
+cross-site changes. Forwarded headers are not trusted. Secure session cookies
+require HTTPS, including during browser development. The server binds to loopback
+by default; override with `-listen 127.0.0.1:9000`. It handles SIGINT/SIGTERM gracefully.
 Storage defaults to `./flora-data`; set `-data-dir /absolute/path/to/private/data`
 for a stable service location. Keep this directory on persistent local storage,
 owned by the application user, outside any agent mount. Unusable storage or an
 unsupported newer schema prevents startup before HTTP begins listening.
 Neither Docker nor a model-provider credential is needed for these checks.
 
+Create the administrator before exposing a new installation to other people.
+Only the first account creation succeeds. Sessions expire seven days after login;
+logout immediately revokes that session on the server. All API data routes require
+authentication, except health and account status. Login and setup require the
+configured same-origin HTTPS address.
+
+Settings accept a fine-grained GitHub token and an OpenAI, Anthropic, or Google
+API key. Save validates the GitHub account and access to the chosen model through
+the provider's model metadata endpoint. This initial account check does not
+validate repository permissions. Provider and model
+are fixed on first save; keys can be replaced later. Blank keys keep saved values.
+HTTP responses expose only the provider, model, and whether each key is saved.
+Credentials are stored in the private SQLite database, not encrypted separately.
+Protect the storage directory and backups, and never mount them into agents.
+
 For fast frontend iteration, run `npm run dev` inside the development shell.
-Vite serves the web app and proxies `/api` to a backend on port 8080. After a web
+Vite serves the web app and proxies `/api` to a backend on port 8080. For interactive
+login, proxy Vite through HTTPS and use that origin as `-public-url`. After a web
 change, rebuild the Go binary to update its embedded production assets.
 
 | Command | Purpose |

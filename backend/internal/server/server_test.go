@@ -1,18 +1,28 @@
 package server
 
 import (
+	"context"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/rhizomatous/flora/backend/internal/auth"
+	"github.com/rhizomatous/flora/backend/internal/settings"
+	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
 func TestRoutes(t *testing.T) {
+	store, err := storage.Open(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
 	handler := New(fstest.MapFS{
 		"index.html":    {Data: []byte("<!doctype html><title>Flora</title>")},
 		"assets/app.js": {Data: []byte("console.log('flora')")},
 		"docs/help.txt": {Data: []byte("Flora help")},
-	})
+	}, auth.New(store), settings.New(store), "https://flora.test")
 	for _, tc := range []struct {
 		method, path      string
 		status            int
@@ -39,11 +49,11 @@ func TestRoutes(t *testing.T) {
 		{"GET", "/images/missing.svg", 404, "text/plain", "404"},
 		{"GET", "/fonts/missing.woff2", 404, "text/plain", "404"},
 		{"GET", "/manifest.webmanifest", 404, "text/plain", "404"},
-		{"GET", "/api/missing", 404, "text/plain", "404"},
-		{"GET", "/api/john.doe", 404, "text/plain", "404"},
-		{"GET", "/api/", 404, "text/plain", "404"},
-		{"GET", "/api", 404, "text/plain", "404"},
-		{"POST", "/", 405, "text/plain", "Method Not Allowed"},
+		{"GET", "/api/missing", 401, "application/json", "Log in"},
+		{"GET", "/api/john.doe", 401, "application/json", "Log in"},
+		{"GET", "/api/", 401, "application/json", "Log in"},
+		{"GET", "/api", 401, "application/json", "Log in"},
+		{"POST", "/", 403, "application/json", "HTTPS"},
 	} {
 		t.Run(tc.method+" "+tc.path, func(t *testing.T) {
 			response := httptest.NewRecorder()
