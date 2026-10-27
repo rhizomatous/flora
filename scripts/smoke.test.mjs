@@ -11,7 +11,7 @@ import { setTimeout as delay } from "node:timers/promises";
 test("standalone binary serves embedded web assets and shuts down cleanly", { timeout: 15000 }, async () => {
   const binary = fileURLToPath(new URL("../bin/flora", import.meta.url));
   const dataDir = await mkdtemp(join(tmpdir(), "flora-smoke-"));
-  const child = spawn(binary, ["-listen", "127.0.0.1:0", "-data-dir", dataDir, "-public-url", "https://flora.test"], {
+  const child = spawn(binary, ["-listen", "127.0.0.1:0", "-data-dir", dataDir, "-public-url", "https://FLORA.test:443/"], {
     // No source files or dist directory are available in the working directory.
     cwd: tmpdir(),
     stdio: ["ignore", "pipe", "pipe"],

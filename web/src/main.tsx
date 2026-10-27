@@ -1,20 +1,11 @@
-import { StrictMode, useEffect, useState, type FormEvent } from "react";
+import { StrictMode, useEffect, useRef, useState, type FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import { FlowerMark } from "@flora/florets";
+import { request } from "./request";
 import "@flora/florets/styles.css";
 
 type Status = { setupRequired: boolean; authenticated: boolean };
 type Settings = { provider: string; model: string; githubConfigured: boolean; providerConfigured: boolean };
-
-async function request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
-  const response = await fetch(`/api/${path}`, {
-    method, credentials: "same-origin", headers: { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error ?? "Request failed. Try again.");
-  return result as T;
-}
 
 const control = "mt-2 w-full rounded-md border border-foreground/30 bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-foreground disabled:opacity-60";
 const button = "rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50";
@@ -25,6 +16,10 @@ function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const screen = !status ? "loading" : status.authenticated ? (settings ? "settings" : "loading") : status.setupRequired ? "setup" : "login";
+
+  useEffect(() => { heading.current?.focus(); }, [screen]);
 
   async function refresh() {
     const next = await request<Status>("auth/status");
@@ -51,7 +46,7 @@ function App() {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed. Try again.");
-      // Refresh session state after expiry without discarding unsaved form values.
+      // Show login after session expiry. Unsaved settings are cleared on unmount.
       request<Status>("auth/status").then(setStatus).catch(() => {});
     } finally { setBusy(false); }
   }
@@ -73,7 +68,7 @@ function App() {
       {notice && <p role="status" className="mb-6 rounded-md border p-3 text-sm">{notice}</p>}
       {!status && <p role="status" className="text-muted-foreground">Loading…</p>}
       {status && !status.authenticated && <section aria-labelledby="account-heading">
-        <h1 id="account-heading" className="text-2xl font-semibold tracking-tight">{status.setupRequired ? "Create administrator" : "Log in"}</h1>
+        <h1 ref={heading} tabIndex={-1} id="account-heading" className="text-2xl font-semibold tracking-tight">{status.setupRequired ? "Create administrator" : "Log in"}</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">{status.setupRequired ? "Create the single administrator account for this installation. Use a unique password of at least 12 characters." : "Enter your administrator password. Your session lasts seven days."}</p>
         <form className="mt-8 space-y-6" onSubmit={e => submit(e, "password")}>
           <label className="block text-sm font-medium">Password
@@ -83,7 +78,7 @@ function App() {
         </form>
       </section>}
       {status?.authenticated && settings && <section aria-labelledby="settings-heading">
-        <h1 id="settings-heading" className="text-2xl font-semibold tracking-tight">Installation settings</h1>
+        <h1 ref={heading} tabIndex={-1} id="settings-heading" className="text-2xl font-semibold tracking-tight">Installation settings</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">Choose one hosted provider and model for all chats. Once saved, the provider and model cannot be changed.</p>
         <form className="mt-8 space-y-6" onSubmit={e => submit(e, "settings")}>
           <fieldset disabled={busy} className="space-y-6">
