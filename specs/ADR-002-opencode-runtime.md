@@ -1,7 +1,8 @@
 # ADR 002: Pinned OpenCode execution boundary probe
 
-**Status:** Proposed; live non-provider checks pass, model acceptance blocked.
-**Date:** 2026-10-25. **Docker follow-up:** 2026-10-26 UTC.
+**Status:** Spike findings recorded; live provider/runtime probes pass. Production
+integration decisions remain proposed. **Date:** 2026-10-25.
+**Docker and hosted-model follow-up:** 2026-10-26 UTC.
 **Scope:** [issue #2](https://github.com/rhizomatous/flora/issues/2),
 [roadmap #20](https://github.com/rhizomatous/flora/issues/20).
 [PRD](PRD.md) is authoritative: Agent environment 2.1–2.5, Chats 3.1–3.2,
@@ -40,8 +41,11 @@ and live non-provider tests passed on both Linux architectures, as detailed belo
 No host service was started or installed by the agent. The environment did not
 have `ANTHROPIC_API_KEY`; a metadata-only check of the standard OpenCode auth store
 found no Anthropic API-key entry. No secret values were printed or copied, and no
-unrelated provider credential was used. Actual hosted-model responses and question
-interactions remain unverified.
+unrelated provider credential was used. The user subsequently supplied a local
+test environment with the required Anthropic key and authorized model API use.
+The full hosted-model probe and extended failure drills then passed, as recorded
+below. The local secret file is excluded through Git's common `info/exclude` and
+is not part of this change.
 
 ## Exact API contract
 
@@ -266,10 +270,11 @@ gap** for unrecoverable intervals. The probe prints that warning on recovery.
 These are incompatible with any assumption that OpenCode alone provides full
 durable activity replay or automatic in-flight recovery. They are not grounds
 to relax PRD 5.3: the application needs its own durable activity and reconciliation
-logic. Live failure drills must confirm that persisted snapshots are usable and
-that interrupted tools do not run twice.
+logic. The live failure drills below confirmed usable persisted snapshots and
+explicit continuation without replaying the tested interrupted commands. This
+does not establish exactly-once execution for arbitrary tools.
 
-## Acceptance still outstanding
+## Verification evidence and remaining integration work
 
 ### Live non-provider evidence, 2026-10-26 UTC
 
@@ -310,10 +315,63 @@ Observed on **both** architectures:
   (none was generated in this test). The shell's delayed side-effect file is
   absent at reconciliation. Existing history/workspace and a new explicit shell
   call remain usable. **Stale running parts must not be interpreted as live work,
-  success, or automatic resumed execution.** Pending-question loss still needs a
-  real question drill.
+   success, or automatic resumed execution.** A later real question drill confirmed
+   pending-request loss, as recorded below.
 
-### Remaining hosted-model acceptance
+### Live hosted-model evidence, 2026-10-26 UTC
+
+Ran the current `agent/probes/opencode/probe.sh` unchanged on native arm64 with
+the user-authorized Anthropic key and an ephemeral authenticated endpoint
+password. It exited zero. The full script verified two successive hosted-model
+turns in one workspace, actual bash output, question asked/replied events and
+answers, interruption followed by another model turn, driver reconnect, same-
+container stop/start, and replacement using the same state/workspace. Continued
+turns recovered the marker via bash, and persisted message IDs, part identities,
+tool output and model metadata survived. Setup counts were one after stop/start
+and two after replacement. No per-action approval requests were required.
+
+Extended probes used the same persisted session and separate fresh client
+processes. These also passed:
+
+- A **model-issued** long bash command was observed running, aborted, and confirmed
+  torn down before another hosted-model turn. Its delayed side-effect file was
+  absent; the next turn read the existing workspace marker successfully.
+- A submitting client process exited while the runtime continued a model/tool
+  turn. SSE was disconnected during the running bash tool. A fresh process
+  observed completion and the resulting workspace file; a new SSE connection
+  succeeded. No turn was resubmitted.
+- A real question remained pending after the submitting process exited. A fresh
+  process listed the request, answered its ordered option labels, and observed
+  the same hosted-model turn finish.
+- SIGKILL/restart while a real question was pending removed that request from
+  `/question`, but retained its tool part as `running`. The old request ID was not
+  answered or replayed. An explicit new user turn supplied the choice and recovered
+  the workspace marker through a successful hosted-model response.
+- SIGKILL/restart during a model-issued bash command left runtime status absent
+  and its persisted tool part `running`. The delayed side effect was absent at
+  reconciliation and after explicit new-turn continuation. The new model response
+  read the existing marker without replaying the interrupted command.
+
+The live `/doc` paths match the pinned upstream OpenAPI after ignoring generated
+`x-codeSamples`. All component schemas match too after ignoring `Event` union
+member order. Both declarations still contain the observed `/shell` response
+envelope discrepancy documented above; matching declarations do not override
+actual runtime behavior.
+
+Across the retained main-session assistant records from the full and extended
+probes, all provider/model pairs were `anthropic/claude-sonnet-4-6`. Their summed
+OpenCode-reported `cost` was **0.1689474 USD** (29 assistant records, including
+shell/interrupted records). This is runtime accounting, not a verified provider
+invoice or a complete account charge; ancillary/unrecorded work may not be
+represented. No billing total was guessed.
+
+Raw histories, event streams, schemas and failure snapshots remain in a private
+directory outside the repository. Only redacted findings are published. All
+containers, volumes and the image created by this hosted-model run were stopped
+and removed. The supplied secret file was sourced without displaying or changing
+it; credentials and raw provider output were not committed.
+
+### Local automated checks and remaining production decisions
 
 Local verification on 2026-10-25 passed:
 `nix develop --command make deps`,
@@ -325,20 +383,25 @@ checks/build, standalone-binary smoke test, and Linux amd64/arm64 builds.
 `fsevents` install script not being allowlisted. No dependency files changed.
 
 - [x] Build/run both pinned architecture images and non-provider lifecycle checks.
-- [ ] Run the full hosted-model script with a suitable explicit provider key.
-- [ ] Observe two real successive turns, complete parts/tool output/model metadata
+- [x] Run the full hosted-model script with a suitable explicit provider key.
+- [x] Observe two real successive turns, complete parts/tool output/model metadata
   and live event schemas; compare saved `/doc` with the pinned upstream schema.
-- [ ] Observe question asked/replied and interrupt a real model-driven tool, then
-  continue without per-action approvals. The scripted deterministic shell covers
-  the cancellation path but does not prove every model/tool cancellation behavior.
+- [x] Observe question asked/replied and interrupt a real model-driven tool, then
+  continue without per-action approvals. This establishes the tested bash path,
+  not every possible tool's cancellation behavior.
 - [x] Observe caller/SSE disconnect during shell execution and reconnect/completion.
-- [ ] Observe driver disconnect during model/question work, then answer/finish.
+- [x] Observe driver disconnect during model/question work, then answer/finish.
 - [x] Observe stop/start/replacement preserving stored message IDs, tool outputs,
   workspace and setup counts; verify new explicit shell continuation.
 - [x] Drill active shell restart and setup failure, timeout, retry and sudo.
-- [ ] Verify actual model-context continuation after stop/start/replacement and
-  model-tool restart behavior; drill real pending-question loss and visible gaps.
+- [x] Verify actual model-context continuation after stop/start/replacement and
+  model-tool restart behavior; drill real pending-question loss and explicit
+  reconciliation/gap decisions. The Go recovery probe prints the activity gap;
+  production browser presentation is future application work.
 - [ ] Lock final utility-image inputs before production; review the runtime pin's
   security suitability and provide application-owned durable activity storage.
 
-Until this evidence is attached, issue #2 remains open and this PR is draft.
+Issue #2 and this draft PR remain open pending the user's disposition of the spike.
+Passing probes do not implement the required production activity store,
+reconciliation, stale-question handling or browser gap display. No merge or issue
+closure is part of this evidence update.

@@ -64,9 +64,11 @@ empty private evidence directory outside the checkout, then run:
 nix develop --command bash agent/probes/opencode/probe.sh /absolute/private/evidence-directory
 ```
 
-For the validation environment, `ANTHROPIC_API_KEY` was unset and the standard
-OpenCode auth store had no Anthropic API-key entry. Other provider credentials
-are not suitable for this fixed Anthropic model and were not copied. Supply an
+For the initial validation environment, `ANTHROPIC_API_KEY` was unset and the
+standard OpenCode auth store had no Anthropic API-key entry. The user later
+supplied a local test environment and the full model probe passed on 2026-10-26
+UTC, along with the extended drills below. Other provider credentials were not
+copied. For another run, supply an
 Anthropic API key with access to `claude-sonnet-4-6` through the environment or
 your secret manager, and generate a fresh random runtime password. Do not paste
 either secret into an issue, PR, terminal command argument or committed file.
@@ -130,7 +132,8 @@ unknown fields. `turn -text '...'` fails on unexpected questions rather than
 approving actions. Only `scenario` automatically answers its requested probe
 question with the first option. No production approval UI is implemented.
 
-Additional manual acceptance, still required even after a successful scripted run:
+Extended manual acceptance, passed on 2026-10-26 UTC and needed when repeating
+the complete acceptance exercise:
 
 1. Run `turn` asking for a question. Once `questions` shows it, terminate only
    that driver process if it has not already exited reporting an unexpected
@@ -147,6 +150,17 @@ Additional manual acceptance, still required even after a successful scripted ru
    logs survive and a failed setup is retried on the next start. Verify setup can
    install a package using sudo. Never reuse a successful container marker for
    the failure tests.
+
+Also exercise a **model-issued** long bash command, not only `/shell`: wait for
+its running part, abort, confirm the delayed side effect did not happen, then
+explicitly send another model turn that reads the existing marker. Repeat with
+SIGKILL/restart instead of abort. The 2026-10-26 run passed both. After kill,
+the saved tool part remained `running` despite absent runtime status; explicit
+new-turn reconciliation worked, but automatic in-flight continuation is not
+provided. See the ADR for question-restart results, schema comparison and
+runtime-reported cost. Keep raw evidence private and stop/remove the test
+resources after inspection. Do not interpret these results as production UI or
+durable activity-store implementation.
 
 Changing the bundled OpenCode configuration requires restarting the runtime.
 Existing host OpenCode installations and config are untouched.
