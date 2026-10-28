@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { request } from "./request";
+import { request, RequestError } from "./request";
 
 type Repository = { name: string; url: string; baseBranch: string; role: "core" | "extra" };
 type Project = { id: string; name: string; configuration: { repositories: Repository[]; setupCommand: string } };
@@ -19,9 +19,10 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
   useEffect(() => {
     let active = true;
     setError(""); setNotice(""); setProject(undefined); setList(undefined);
-    const load = id && !creating ? request<Project>(`projects/${encodeURIComponent(id)}`).then(p => { if (active) setProject(p); }) : request<Project[]>("projects").then(p => { if (active) setList(p); });
-    load.catch(e => { if (active) { setError(e.message); onExpired(); } });
     heading.current?.focus();
+    if (creating) return;
+    const load = id ? request<Project>(`projects/${encodeURIComponent(id)}`).then(p => { if (active) setProject(p); }) : request<Project[]>("projects").then(p => { if (active) setList(p); });
+    load.catch(e => { if (active) { setError(e.message); if (e instanceof RequestError && e.status === 401) onExpired(); } });
     return () => { active = false; };
   }, [id, creating]);
 
@@ -38,7 +39,7 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
       setRevision(value => value + 1);
       if (creating) window.location.hash = `projects/${saved.id}`;
       else setNotice("Project saved. Existing chats keep their original settings.");
-    } catch (e) { setError(e instanceof Error ? e.message : "Could not save project. Try again."); onExpired(); }
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not save project. Try again."); if (e instanceof RequestError && e.status === 401) onExpired(); }
     finally { setBusy(false); }
   }
 

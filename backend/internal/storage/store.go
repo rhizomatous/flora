@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -228,12 +229,13 @@ func (s *Store) Project(ctx context.Context, projectID string) (Project, error) 
 }
 
 func (s *Store) Projects(ctx context.Context) ([]Project, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT id,name,config,created_at FROM projects ORDER BY created_at DESC,id")
+	rows, err := s.db.QueryContext(ctx, "SELECT id,name,config,created_at FROM projects")
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	projects := []Project{}
+	created := map[string]time.Time{}
 	for rows.Next() {
 		var p Project
 		var config string
@@ -243,9 +245,26 @@ func (s *Store) Projects(ctx context.Context) ([]Project, error) {
 		if err := json.Unmarshal([]byte(config), &p.Configuration); err != nil {
 			return nil, err
 		}
+		stamp, err := time.Parse(time.RFC3339Nano, p.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("parse project creation time: %w", err)
+		}
+		created[p.ID] = stamp
 		projects = append(projects, p)
 	}
-	return projects, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// RFC3339Nano omits trailing fractional zeros, so string order is not time
+	// order. Compare parsed instants to retain nanosecond precision and offsets.
+	sort.Slice(projects, func(i, j int) bool {
+		a, b := created[projects[i].ID], created[projects[j].ID]
+		if a.Equal(b) {
+			return projects[i].ID < projects[j].ID
+		}
+		return a.After(b)
+	})
+	return projects, nil
 }
 
 // UpdateProject only affects snapshots taken by later CreateChat calls.

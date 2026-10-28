@@ -171,6 +171,40 @@ func TestLegacyProjectConfigurationJSON(t *testing.T) {
 	}
 }
 
+func TestProjectsOrderedByCreationInstant(t *testing.T) {
+	s := openTest(t, t.TempDir())
+	config, err := configJSON(Configuration{Repositories: []Repository{{Name: "flora", URL: "https://github.com/rhizomatous/flora", BaseBranch: "main", Role: "core"}}})
+	must(t, err)
+	stamps := map[string]string{
+		"whole-second":         "2026-10-27T12:00:00Z",
+		"one-tenth":            "2026-10-27T12:00:00.1Z",
+		"fifteen-hundredths":   "2026-10-27T12:00:00.15Z",
+		"one-nanosecond-later": "2026-10-27T12:00:00.150000001Z",
+		"next-second-a":        "2026-10-27T12:00:01Z",
+		"next-second-b":        "2026-10-27T13:00:01+01:00",
+		"previous-day":         "2026-10-26T23:59:59.999999999Z",
+	}
+	for id, stamp := range stamps {
+		_, err := s.db.ExecContext(ctx, "INSERT INTO projects VALUES (?,?,?,?)", id, id, string(config), stamp)
+		must(t, err)
+	}
+	want := []string{"next-second-a", "next-second-b", "one-nanosecond-later", "fifteen-hundredths", "one-tenth", "whole-second", "previous-day"}
+	for range 3 {
+		projects, err := s.Projects(ctx)
+		must(t, err)
+		var got []string
+		for _, project := range projects {
+			got = append(got, project.ID)
+			if project.CreatedAt != stamps[project.ID] {
+				t.Fatal("listing rewrote a timestamp")
+			}
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("project order = %v, want %v", got, want)
+		}
+	}
+}
+
 func TestAcceptanceRollbackAndTurnOwnership(t *testing.T) {
 	s := openTest(t, t.TempDir())
 	_, c := fixture(t, s)
