@@ -19,3 +19,17 @@ jobs:
         run: nix develop --command make deps
       - name: Check Go and TypeScript; build and exercise the standalone binary
         run: nix develop --command make check smoke build-linux
+
+  agent-image:
+    # Native Linux with the runner's uid (1001) differing from the image's
+    # default agent uid (1000), so the storage-ownership mapping is genuinely
+    # exercised; desktop Docker masks it.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # v34
+      - name: Build the pinned agent image
+        run: docker build -t flora-agent-test:ci agent/image
+      - name: Run live provisioning lifecycle tests against the daemon
+        run: FLORA_PROVISIONING_TEST_IMAGE=flora-agent-test:ci nix develop --command go -C backend test -race -count=1 -v -run TestProvisioningDocker ./internal/provisioning

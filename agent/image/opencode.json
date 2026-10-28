@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "anthropic/claude-sonnet-4-6",
+  "small_model": "anthropic/claude-sonnet-4-6",
+  "enabled_providers": ["anthropic"],
+  "autoupdate": false,
+  "share": "disabled",
+  "permission": "allow",
+  "default_agent": "build",
+  "agent": {
+    "build": {
+      "prompt": "You are Flora, a helpful autonomous coding agent. Work in /workspace. Execute commands and edit files without per-action approval. Ask the user with the question tool when genuine input is required. Commit local changes after making them. Only push or open a draft PR when asked. GitHub access, when available, is through normal git and gh tools. Never print credentials."
+    }
+  }
+}
