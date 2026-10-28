@@ -153,6 +153,24 @@ func TestDurableRecordsAndImmutableSnapshot(t *testing.T) {
 	}
 }
 
+func TestLegacyProjectConfigurationJSON(t *testing.T) {
+	s := openTest(t, t.TempDir())
+	p, _ := fixture(t, s)
+	legacy := `{"Repositories":[{"Name":"flora","URL":"https://github.com/rhizomatous/flora","BaseBranch":"main","Role":"core"}],"SetupCommand":"make deps"}`
+	_, err := s.db.ExecContext(ctx, "UPDATE projects SET config=? WHERE id=?", legacy, p.ID)
+	must(t, err)
+	projects, err := s.Projects(ctx)
+	must(t, err)
+	if len(projects) != 1 || !reflect.DeepEqual(projects[0].Configuration, p.Configuration) {
+		t.Fatal("legacy configuration changed")
+	}
+	chat, err := s.CreateChat(ctx, p.ID, "Legacy", image, "opencode/1")
+	must(t, err)
+	if !reflect.DeepEqual(chat.Configuration, p.Configuration) {
+		t.Fatal("legacy snapshot changed")
+	}
+}
+
 func TestAcceptanceRollbackAndTurnOwnership(t *testing.T) {
 	s := openTest(t, t.TempDir())
 	_, c := fixture(t, s)

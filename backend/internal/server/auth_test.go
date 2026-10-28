@@ -70,7 +70,7 @@ func TestAuthenticationBoundaries(t *testing.T) {
 	cookie := c.Name + "=" + c.Value
 	expect(call("POST", "/api/auth/bootstrap", password, "https://flora.test", "", cookie), 409)
 	expect(call("GET", "/api/settings", "", "", "", cookie), 200)
-	expect(call("GET", "/api/projects", "", "", "", cookie), 404)
+	expect(call("GET", "/api/projects", "", "", "", cookie), 200)
 	input := `{"provider":"openai","model":"gpt-test","githubToken":"github_pat_PRIVATE","providerKey":"PROVIDER_PRIVATE"}`
 	for _, origin := range []string{"", "https://evil.test", "null"} {
 		expect(call("PUT", "/api/settings", input, origin, "", cookie), 403)

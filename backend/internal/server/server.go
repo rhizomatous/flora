@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/rhizomatous/flora/backend/internal/auth"
+	"github.com/rhizomatous/flora/backend/internal/projects"
 	"github.com/rhizomatous/flora/backend/internal/settings"
 )
 
@@ -15,7 +16,9 @@ import (
 func New(assets fs.FS, authentication *auth.Service, credentials *settings.Service, origin string) http.Handler {
 	mux := http.NewServeMux()
 	api := &api{auth: authentication, settings: credentials, origin: origin, passwordSlots: make(chan struct{}, 2)}
+	api.projects = projects.New(credentials.Store)
 	api.routes(mux)
+	api.projectRoutes(mux)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/auth"
+	"github.com/rhizomatous/flora/backend/internal/projects"
 	"github.com/rhizomatous/flora/backend/internal/settings"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
@@ -19,6 +20,7 @@ const cookieName = "__Host-flora"
 type api struct {
 	auth          *auth.Service
 	settings      *settings.Service
+	projects      *projects.Service
 	origin        string
 	passwordSlots chan struct{}
 	attemptMu     sync.Mutex

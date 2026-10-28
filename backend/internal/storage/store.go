@@ -157,19 +157,20 @@ func found(err error) error {
 }
 
 type Repository struct {
-	Name       string
-	URL        string
-	BaseBranch string
-	Role       string
+	Name       string `json:"name"`
+	URL        string `json:"url"`
+	BaseBranch string `json:"baseBranch"`
+	Role       string `json:"role"`
 }
 type Configuration struct {
-	Repositories []Repository
-	SetupCommand string
+	Repositories []Repository `json:"repositories"`
+	SetupCommand string       `json:"setupCommand"`
 }
 type Project struct {
-	ID, Name      string
-	Configuration Configuration
-	CreatedAt     string
+	ID            string        `json:"id"`
+	Name          string        `json:"name"`
+	Configuration Configuration `json:"configuration"`
+	CreatedAt     string        `json:"createdAt"`
 }
 type Status string
 
@@ -224,6 +225,27 @@ func (s *Store) Project(ctx context.Context, projectID string) (Project, error) 
 	}
 	err = json.Unmarshal([]byte(b), &p.Configuration)
 	return p, err
+}
+
+func (s *Store) Projects(ctx context.Context) ([]Project, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT id,name,config,created_at FROM projects ORDER BY created_at DESC,id")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	projects := []Project{}
+	for rows.Next() {
+		var p Project
+		var config string
+		if err := rows.Scan(&p.ID, &p.Name, &config, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(config), &p.Configuration); err != nil {
+			return nil, err
+		}
+		projects = append(projects, p)
+	}
+	return projects, rows.Err()
 }
 
 // UpdateProject only affects snapshots taken by later CreateChat calls.
