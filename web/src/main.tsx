@@ -2,6 +2,7 @@ import { StrictMode, useEffect, useRef, useState, type FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import { FlowerMark } from "@flora/florets";
 import { request } from "./request";
+import { Projects } from "./projects";
 import "@flora/florets/styles.css";
 
 type Status = { setupRequired: boolean; authenticated: boolean };
@@ -16,8 +17,14 @@ function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [path, setPath] = useState(window.location.hash.slice(1) || "projects");
+  useEffect(() => {
+    const changed = () => { setPath(window.location.hash.slice(1) || "projects"); setError(""); setNotice(""); };
+    window.addEventListener("hashchange", changed);
+    return () => window.removeEventListener("hashchange", changed);
+  }, []);
   const heading = useRef<HTMLHeadingElement>(null);
-  const screen = !status ? "loading" : status.authenticated ? (settings ? "settings" : "loading") : status.setupRequired ? "setup" : "login";
+  const screen = !status ? "loading" : status.authenticated ? (settings ? path : "loading") : status.setupRequired ? "setup" : "login";
 
   useEffect(() => { heading.current?.focus(); }, [screen]);
 
@@ -64,6 +71,7 @@ function App() {
         <div className="flex items-center gap-2 text-lg font-semibold"><FlowerMark /><span>Flora</span></div>
         {status?.authenticated && <button type="button" className="text-sm text-muted-foreground underline underline-offset-4" disabled={busy} onClick={logout}>Log out</button>}
       </header>
+      {status?.authenticated && <nav aria-label="Main" className="mb-8 flex gap-6 text-sm"><a href="#projects" aria-current={path !== "settings" ? "page" : undefined} className="underline underline-offset-4">Projects</a><a href="#settings" aria-current={path === "settings" ? "page" : undefined} className="underline underline-offset-4">Installation settings</a></nav>}
       {error && <p role="alert" className="mb-6 rounded-md border border-foreground/50 p-3 text-sm">{error}</p>}
       {notice && <p role="status" className="mb-6 rounded-md border p-3 text-sm">{notice}</p>}
       {!status && <p role="status" className="text-muted-foreground">Loading…</p>}
@@ -77,7 +85,8 @@ function App() {
           <button className={button} disabled={busy}>{busy ? "Please wait…" : status.setupRequired ? "Create administrator" : "Log in"}</button>
         </form>
       </section>}
-      {status?.authenticated && settings && <section aria-labelledby="settings-heading">
+      {status?.authenticated && settings && path !== "settings" && <Projects key={path} path={path} onExpired={() => { request<Status>("auth/status").then(setStatus).catch(() => {}); }} />}
+      {status?.authenticated && settings && path === "settings" && <section aria-labelledby="settings-heading">
         <h1 ref={heading} tabIndex={-1} id="settings-heading" className="text-2xl font-semibold tracking-tight">Installation settings</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">Choose one hosted provider and model for all chats. Once saved, the provider and model cannot be changed.</p>
         <form className="mt-8 space-y-6" onSubmit={e => submit(e, "settings")}>

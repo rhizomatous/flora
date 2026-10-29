@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { request } from "../web/src/request.ts";
+import { request, RequestError } from "../web/src/request.ts";
 
 test("API requests preserve method, credentials, and JSON body", async (t) => {
   t.mock.method(globalThis, "fetch", async (url, options) => {
@@ -16,7 +16,18 @@ test("API requests preserve method, credentials, and JSON body", async (t) => {
 
 test("API failures keep safe JSON diagnostics", async (t) => {
   t.mock.method(globalThis, "fetch", async () => Response.json({ error: "Password is incorrect." }, { status: 401 }));
-  await assert.rejects(request("auth/login"), { message: "Password is incorrect." });
+  await assert.rejects(request("auth/login"), { name: "RequestError", message: "Password is incorrect.", status: 401 });
+});
+
+test("validation failures expose their HTTP status as an Error", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => Response.json({ error: "Base branch was not found." }, { status: 400 }));
+  await assert.rejects(request("projects", "POST", {}), error => {
+    assert.ok(error instanceof Error);
+    assert.ok(error instanceof RequestError);
+    assert.equal(error.status, 400);
+    assert.equal(error.message, "Base branch was not found.");
+    return true;
+  });
 });
 
 for (const [name, body, contentType, status] of [
@@ -30,7 +41,9 @@ for (const [name, body, contentType, status] of [
   test(name + " returns a useful status error without the response body", async (t) => {
     t.mock.method(globalThis, "fetch", async () => new Response(body, { status, headers: { "Content-Type": contentType } }));
     await assert.rejects(request("settings"), {
+      name: "RequestError",
       message: `Request failed (HTTP ${status}). Check the server or reverse proxy and try again.`,
+      status,
     });
   });
 }
