@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/auth"
+	"github.com/rhizomatous/flora/backend/internal/chat"
 	"github.com/rhizomatous/flora/backend/internal/projects"
 	"github.com/rhizomatous/flora/backend/internal/settings"
 	"github.com/rhizomatous/flora/backend/internal/storage"
@@ -21,6 +22,7 @@ type api struct {
 	auth          *auth.Service
 	settings      *settings.Service
 	projects      *projects.Service
+	chats         *chat.Service
 	origin        string
 	passwordSlots chan struct{}
 	attemptMu     sync.Mutex
@@ -92,11 +94,15 @@ func (a *api) protect(next http.Handler) http.Handler {
 }
 
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
+	return decodeLimit(w, r, v, 16*1024)
+}
+
+func decodeLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) bool {
 	if strings.Split(r.Header.Get("Content-Type"), ";")[0] != "application/json" {
 		failure(w, 415, "Send application/json.")
 		return false
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	d := json.NewDecoder(r.Body)
 	d.DisallowUnknownFields()
 	if err := d.Decode(v); err != nil {

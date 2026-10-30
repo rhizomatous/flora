@@ -49,11 +49,13 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
       <h1 id="projects-heading" ref={heading} tabIndex={-1} className="min-w-0 break-words text-2xl font-semibold tracking-tight">{creating ? "Connect project" : id ? project?.name || "Project" : "Projects"}</h1>
       {id ? <a href="#projects" className="shrink-0 text-sm underline underline-offset-4">All projects</a> : <a href="#projects/new" className={`${button} shrink-0`}>Connect project</a>}
     </div>
+    {project && <a className="mt-5 inline-block text-sm underline underline-offset-4" href={`#chats/new?project=${encodeURIComponent(project.id)}`}>Start chat</a>}
     {error && <p role="alert" className="mt-6 rounded-md border border-foreground/50 p-3 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-6 rounded-md border p-3 text-sm">{notice}</p>}
     {!id && list && (list.length ? <ul className="mt-8 divide-y divide-foreground/20">{list.map(p => <li key={p.id} className="py-5">
       <a className="font-medium underline underline-offset-4" href={`#projects/${p.id}`}>{p.name}</a>
       <p className="mt-2 break-words text-sm text-muted-foreground">{p.configuration.repositories[0]?.name} · {p.configuration.repositories[0]?.baseBranch}</p>
+      <a className="mt-3 inline-block text-sm underline underline-offset-4" href={`#chats/new?project=${encodeURIComponent(p.id)}`}>Start chat</a>
     </li>)}</ul> : <p className="mt-8 text-sm text-muted-foreground">No projects yet. Connect a GitHub repository to get started.</p>)}
     {!creating && !project && !list && !error && <p role="status" className="mt-8 text-sm text-muted-foreground">Loading…</p>}
     {(creating || project) && <form key={`${project?.id || "new"}-${revision}`} className="mt-8 space-y-6" onSubmit={save}>

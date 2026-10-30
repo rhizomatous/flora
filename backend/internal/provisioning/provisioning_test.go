@@ -2,6 +2,7 @@ package provisioning
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -15,6 +16,48 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/docker"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
+
+func TestInstalledProviderEnvironmentAndEndpointRecovery(t *testing.T) {
+	for provider, key := range map[string]string{"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "google": "GOOGLE_GENERATIVE_AI_API_KEY"} {
+		t.Run(provider, func(t *testing.T) {
+			engine := newFakeEngine()
+			manager, store := newTestManager(t, engine, Config{ProviderAPIKey: "old-test-key"}, nil)
+			chat := newChat(t, store)
+			ctx := context.Background()
+			if err := store.SaveCredentials(ctx, storage.Credentials{Provider: provider, Model: "installed-model", ProviderKey: "installed-test-secret", GitHubToken: "github_pat_host-only"}); err != nil {
+				t.Fatal(err)
+			}
+			endpoint, err := manager.Start(ctx, chat.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			info, err := engine.ContainerInspect(ctx, endpoint.ContainerID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if info.EnvValue(key) != "installed-test-secret" {
+				t.Fatal("provider key not installed")
+			}
+			for _, value := range info.Config.Env {
+				if strings.Contains(value, "host-only") || strings.Contains(value, "old-test-key") {
+					t.Fatal("wrong credential entered container")
+				}
+			}
+			var config struct {
+				Model      string   `json:"model"`
+				SmallModel string   `json:"small_model"`
+				Enabled    []string `json:"enabled_providers"`
+			}
+			if json.Unmarshal([]byte(info.EnvValue("OPENCODE_CONFIG_CONTENT")), &config) != nil || config.Model != provider+"/installed-model" || config.SmallModel != config.Model || len(config.Enabled) != 1 || config.Enabled[0] != provider {
+				t.Fatal("installation model config missing")
+			}
+			recovered, err := manager.Endpoint(ctx, chat.ID)
+			if err != nil || recovered != endpoint || len(engine.created) != 1 {
+				t.Fatal("endpoint recovery changed runtime")
+			}
+		})
+	}
+}
 
 const (
 	testDigest  = "flora/agent@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

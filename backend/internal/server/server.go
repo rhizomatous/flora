@@ -7,18 +7,23 @@ import (
 	"strings"
 
 	"github.com/rhizomatous/flora/backend/internal/auth"
+	"github.com/rhizomatous/flora/backend/internal/chat"
 	"github.com/rhizomatous/flora/backend/internal/projects"
 	"github.com/rhizomatous/flora/backend/internal/settings"
 )
 
 // New serves public static assets and protects every API except the explicit
 // health/onboarding/login allowlist. Register future data routes on this mux.
-func New(assets fs.FS, authentication *auth.Service, credentials *settings.Service, origin string) http.Handler {
+func New(assets fs.FS, authentication *auth.Service, credentials *settings.Service, origin string, chats ...*chat.Service) http.Handler {
 	mux := http.NewServeMux()
 	api := &api{auth: authentication, settings: credentials, origin: origin, passwordSlots: make(chan struct{}, 2)}
 	api.projects = projects.New(credentials.Store)
 	api.routes(mux)
 	api.projectRoutes(mux)
+	if len(chats) > 0 {
+		api.chats = chats[0]
+	}
+	api.chatRoutes(mux)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")

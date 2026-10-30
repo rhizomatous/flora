@@ -19,6 +19,8 @@ jobs:
         run: nix develop --command make deps
       - name: Check Go and TypeScript; build and exercise the standalone binary
         run: nix develop --command make check smoke build-linux
+      - name: Install Chromium and check the browser chat workflow
+        run: nix develop --command npx playwright install --with-deps chromium && nix develop --command make browser
 
   agent-image:
     # Native Linux with the runner's uid (1001) differing from the image's
@@ -38,3 +40,5 @@ jobs:
           FLORA_GITHUB_TEST_IMAGE: flora-agent-test:ci
           FLORA_BROKER_GH_TOKEN: ""
         run: nix develop --command go -C backend test -race -count=1 -v -run '^TestCheckoutDocker$' ./internal/githubbroker
+      - name: Check persistent turns against pinned OpenCode and a local provider fixture
+        run: FLORA_CHAT_TEST_IMAGE=flora-agent-test:ci FLORA_CHAT_PROVIDER_HOST="$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')" nix develop --command go -C backend test -race -count=1 -v -run '^TestChatDocker$' ./internal/chat

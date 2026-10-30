@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	_ "modernc.org/sqlite"
 )
@@ -285,12 +286,38 @@ func (s *Store) UpdateProject(ctx context.Context, projectID, name string, c Con
 }
 
 func (s *Store) CreateChat(ctx context.Context, projectID, title, imageDigest, harnessVersion string) (Chat, error) {
+	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, "", "")
+}
+
+// CreateChatRequest reserves a creation identity with the immutable first input.
+// A retry returns the same chat even if project settings have since changed.
+func (s *Store) CreateChatRequest(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string) (Chat, error) {
+	if requestID == "" || len(requestID) > 200 || strings.TrimSpace(text) == "" || !utf8.ValidString(text) || len(text) > MaxMessageBytes {
+		return Chat{}, ErrInvalid
+	}
+	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, requestID, text)
+}
+
+func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string) (Chat, error) {
 	imageName, digest, pinned := strings.Cut(imageDigest, "@sha256:")
 	if title == "" || imageName == "" || !pinned || !hexHash(digest, 64) || harnessVersion == "" {
 		return Chat{}, ErrInvalid
 	}
 	chatID := id()
 	err := s.write(ctx, func(tx *sql.Tx) error {
+		if requestID != "" {
+			var savedTitle, savedText string
+			err := tx.QueryRowContext(ctx, "SELECT chat_id,title,text FROM chat_requests WHERE project_id=? AND request_id=?", projectID, requestID).Scan(&chatID, &savedTitle, &savedText)
+			if err == nil {
+				if title != savedTitle || text != savedText {
+					return ErrConflict
+				}
+				return nil
+			}
+			if !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+		}
 		var config string
 		if err := tx.QueryRowContext(ctx, "SELECT config FROM projects WHERE id=?", projectID).Scan(&config); err != nil {
 			return found(err)
@@ -299,6 +326,11 @@ func (s *Store) CreateChat(ctx context.Context, projectID, title, imageDigest, h
 		_, err := tx.ExecContext(ctx, `INSERT INTO chats (id,project_id,title,config,image_digest,harness_version,status,status_reason,created_at,updated_at) VALUES (?,?,?,?,?,?,'stopped','Not started',?,?)`, chatID, projectID, title, config, imageDigest, harnessVersion, stamp, stamp)
 		if err != nil {
 			return err
+		}
+		if requestID != "" {
+			if _, err := tx.ExecContext(ctx, "INSERT INTO chat_requests VALUES (?,?,?,?,?)", projectID, requestID, chatID, title, text); err != nil {
+				return err
+			}
 		}
 		return addActivity(ctx, tx, chatID, id(), "status", json.RawMessage(`{"status":"stopped","reason":"Not started"}`))
 	})

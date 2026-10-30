@@ -1,0 +1,405 @@
+package chat
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/rhizomatous/flora/backend/internal/provisioning"
+	"github.com/rhizomatous/flora/backend/internal/storage"
+)
+
+const testImage = "flora@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+type testProvisioner struct {
+	store      *storage.Store
+	url        string
+	starts     atomic.Int32
+	endpoints  atomic.Int32
+	startError bool
+}
+
+func (p *testProvisioner) Identity() (string, string) { return testImage, "1.2.27" }
+func (p *testProvisioner) Start(ctx context.Context, id string) (provisioning.Endpoint, error) {
+	p.starts.Add(1)
+	if p.startError {
+		return provisioning.Endpoint{}, errors.New("secret setup diagnostics")
+	}
+	if err := p.store.BindRuntime(ctx, id, "container", ""); err != nil {
+		return provisioning.Endpoint{}, err
+	}
+	return provisioning.Endpoint{URL: p.url, Username: "opencode", Password: "runtime_SECRET", ContainerID: "container"}, nil
+}
+func (p *testProvisioner) Endpoint(context.Context, string) (provisioning.Endpoint, error) {
+	p.endpoints.Add(1)
+	return provisioning.Endpoint{URL: p.url, Username: "opencode", Password: "runtime_SECRET", ContainerID: "container"}, nil
+}
+func (*testProvisioner) BeginActivity(string) {}
+func (*testProvisioner) EndActivity(string)   {}
+
+// The HTTP fixture exercises the same authenticated streaming and synchronous
+// prompt contract as OpenCode. Turn delivery remains blocked until released.
+type runtimeFixture struct {
+	server        *httptest.Server
+	mu            sync.Mutex
+	history       []json.RawMessage
+	events        chan string
+	started       chan string
+	release       chan bool
+	prompts       atomic.Int32
+	sessions      atomic.Int32
+	question      bool
+	transportLoss bool
+	promptStatus  int
+	streamStop    chan struct{}
+}
+
+func newFixture(t *testing.T) *runtimeFixture {
+	f := &runtimeFixture{events: make(chan string, 50), started: make(chan string, 10), release: make(chan bool, 10), streamStop: make(chan struct{})}
+	f.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, password, _ := r.BasicAuth()
+		if user != "opencode" || password != "runtime_SECRET" {
+			w.WriteHeader(401)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.URL.Path == "/config":
+			fmt.Fprint(w, `{"model":"anthropic/model","permission":"allow"}`)
+		case r.URL.Path == "/session":
+			f.sessions.Add(1)
+			fmt.Fprint(w, `{"id":"ses_one"}`)
+		case r.URL.Path == "/event":
+			w.Header().Set("Content-Type", "text/event-stream")
+			fmt.Fprint(w, ": connected\n\n")
+			w.(http.Flusher).Flush()
+			for {
+				select {
+				case <-r.Context().Done():
+					return
+				case <-f.streamStop:
+					return
+				case event := <-f.events:
+					fmt.Fprintf(w, "data: %s\n\n", event)
+					w.(http.Flusher).Flush()
+				}
+			}
+		case r.URL.Path == "/question":
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			if f.question {
+				fmt.Fprint(w, `[{"id":"que_one","sessionID":"ses_one","questions":[{"question":"Continue?","header":"Choice","options":[{"label":"Yes","description":"Proceed"}]}]}]`)
+			} else {
+				fmt.Fprint(w, `[]`)
+			}
+		case r.URL.Path == "/question/que_one/reply":
+			f.mu.Lock()
+			f.question = false
+			f.mu.Unlock()
+			f.events <- `{"type":"question.replied","properties":{"sessionID":"ses_one","requestID":"que_one"}}`
+			fmt.Fprint(w, `true`)
+		case r.Method == "GET" && r.URL.Path == "/session/ses_one/message":
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			json.NewEncoder(w).Encode(f.history)
+		case r.Method == "POST" && r.URL.Path == "/session/ses_one/message":
+			if f.promptStatus != 0 {
+				w.WriteHeader(f.promptStatus)
+				fmt.Fprint(w, `{"error":"provider_SECRET unavailable model"}`)
+				return
+			}
+			var in struct {
+				MessageID string `json:"messageID"`
+				System    string `json:"system"`
+				Parts     []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+				t.Error(err)
+			}
+			if !strings.Contains(in.System, "commit") && !strings.Contains(in.System, "Commit") {
+				t.Error("missing local commit guidance")
+			}
+			n := f.prompts.Add(1)
+			in.MessageID = fmt.Sprintf("msg_runtime_%d", n)
+			user, _ := json.Marshal(map[string]any{"info": map[string]string{"id": in.MessageID, "role": "user"}, "parts": in.Parts})
+			f.mu.Lock()
+			f.history = append(f.history, user)
+			f.mu.Unlock()
+			f.started <- in.MessageID
+			var fail bool
+			select {
+			case <-r.Context().Done():
+				return
+			case fail = <-f.release:
+			}
+			if f.transportLoss {
+				conn, _, _ := w.(http.Hijacker).Hijack()
+				conn.Close()
+				return
+			}
+			errorField := ""
+			if fail {
+				errorField = `,"error":{"name":"APIError","data":{"message":"provider_SECRET failed"}}`
+			}
+			m := json.RawMessage(fmt.Sprintf(`{"info":{"id":%q,"parentID":%q,"role":"assistant","providerID":"anthropic","modelID":"model"%s},"parts":[{"type":"text","text":"Done provider_SECRET runtime_SECRET github_pat_SECRET"},{"type":"tool","tool":"bash","state":{"status":"completed","input":{"command":"pwd"},"output":"/workspace\n"}}]}`, "assistant_"+in.MessageID, in.MessageID, errorField))
+			f.mu.Lock()
+			f.history = append(f.history, m)
+			f.mu.Unlock()
+			w.Write(m)
+		default:
+			t.Errorf("unexpected runtime route %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(404)
+		}
+	}))
+	t.Cleanup(f.server.Close)
+	return f
+}
+
+func testService(t *testing.T, f *runtimeFixture) (*Service, *testProvisioner, storage.Project) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	store, err := storage.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { cancel(); store.Close() })
+	if err := store.SaveCredentials(ctx, storage.Credentials{Provider: "anthropic", Model: "model", ProviderKey: "provider_SECRET", GitHubToken: "github_pat_SECRET"}); err != nil {
+		t.Fatal(err)
+	}
+	p, err := store.CreateProject(ctx, "Project", storage.Configuration{Repositories: []storage.Repository{{Name: "core", URL: "https://github.com/example/core", BaseBranch: "main", Role: "core"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provisioner := &testProvisioner{store: store, url: f.server.URL}
+	return New(ctx, store, provisioner), provisioner, p
+}
+
+func waitStatus(t *testing.T, s *Service, id string, status storage.Status) storage.Chat {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	var c storage.Chat
+	for time.Now().Before(deadline) {
+		var err error
+		c, err = s.Store.Chat(context.Background(), id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.Status == status {
+			return c
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("status %s, wanted %s: %s", c.Status, status, c.StatusReason)
+	return c
+}
+
+func TestPersistentTurnsQuestionsAndDeduplication(t *testing.T) {
+	f := newFixture(t)
+	s, p, project := testService(t, f)
+	ctx := context.Background()
+	c, err := s.Create(ctx, project.ID, "A chat", "create-one", "First message ✿")
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-f.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("prompt did not start")
+	}
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			retry, err := s.Create(ctx, project.ID, "A chat", "create-one", "First message ✿")
+			if err != nil || retry.ID != c.ID {
+				t.Errorf("creation retry: %v", err)
+			}
+			if _, err := s.Submit(ctx, c.ID, "new", "not queued"); !errors.Is(err, storage.ErrActive) {
+				t.Errorf("active submit: %v", err)
+			}
+		})
+	}
+	wg.Wait()
+	if _, err := s.Create(ctx, project.ID, "Changed", "create-one", "different"); !errors.Is(err, storage.ErrConflict) {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	f.question = true
+	f.mu.Unlock()
+	largeOutput := strings.Repeat("output line\n", 12000)
+	largeEvent, _ := json.Marshal(map[string]any{"type": "command.output", "properties": map[string]string{"sessionID": "ses_one", "output": largeOutput}})
+	f.events <- string(largeEvent)
+	f.events <- `{"type":"question.asked","properties":{"sessionID":"ses_one","id":"que_one","secret":"provider_SECRET"}}`
+	waitStatus(t, s, c.ID, storage.Waiting)
+	questions, err := s.Questions(ctx, c.ID)
+	if err != nil || len(questions) != 1 {
+		t.Fatalf("questions: %v %v", questions, err)
+	}
+	if err := s.Reply(ctx, c.ID, "another-chat-question", [][]string{{"Yes"}}); !errors.Is(err, storage.ErrStale) {
+		t.Fatal(err)
+	}
+	if err := s.Reply(ctx, c.ID, "que_one", [][]string{{"Yes"}}); err != nil {
+		t.Fatal(err)
+	}
+	waitStatus(t, s, c.ID, storage.Working)
+	f.release <- false
+	waitStatus(t, s, c.ID, storage.Idle)
+	a, err := s.Submit(ctx, c.ID, "create-one", "First message ✿")
+	if err != nil || !a.Duplicate {
+		t.Fatal("completed acceptance retry", err)
+	}
+	if _, err := s.Submit(ctx, c.ID, "followup", "Continue the same workspace"); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-f.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("follow-up did not start")
+	}
+	f.release <- false
+	waitStatus(t, s, c.ID, storage.Idle)
+	if p.starts.Load() != 1 || p.endpoints.Load() < 1 || f.sessions.Load() != 1 || f.prompts.Load() != 2 {
+		t.Fatalf("starts=%d endpoints=%d sessions=%d prompts=%d", p.starts.Load(), p.endpoints.Load(), f.sessions.Load(), f.prompts.Load())
+	}
+	messages, err := s.Store.Messages(ctx, c.ID)
+	if err != nil || len(messages) != 4 {
+		t.Fatalf("messages %d: %v", len(messages), err)
+	}
+	if messages[0].RuntimeMessageID == "" || messages[2].RuntimeMessageID == "" {
+		t.Fatal("missing durable user links")
+	}
+	rows, _ := s.Store.Activities(ctx, c.ID, 0, 1000)
+	foundLarge := false
+	for _, row := range rows {
+		if strings.Contains(string(row.Payload), "SECRET") {
+			t.Fatalf("secret in %s", row.Kind)
+		}
+		if row.Kind == "runtime.command.output" {
+			var event struct {
+				Properties struct {
+					Output string `json:"output"`
+				} `json:"properties"`
+			}
+			json.Unmarshal(row.Payload, &event)
+			foundLarge = event.Properties.Output == largeOutput
+		}
+	}
+	if !foundLarge {
+		t.Fatal("large command output was not retained in full")
+	}
+	if messages[1].Model != "model" || messages[1].Provider != "anthropic" || !strings.Contains(string(messages[1].Payload), "/workspace") {
+		t.Fatal("lost full activity/model metadata")
+	}
+}
+
+func TestProviderFailureDoesNotPoisonNextTurn(t *testing.T) {
+	f := newFixture(t)
+	s, _, project := testService(t, f)
+	c, err := s.Create(context.Background(), project.ID, "Chat", "first", "Try")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-f.started
+	f.release <- true
+	waitStatus(t, s, c.ID, storage.Failed)
+	if _, err := s.Submit(context.Background(), c.ID, "second", "Try again"); err != nil {
+		t.Fatal(err)
+	}
+	<-f.started
+	f.release <- false
+	waitStatus(t, s, c.ID, storage.Idle)
+}
+
+func TestUncertainDeliveryNeverResends(t *testing.T) {
+	f := newFixture(t)
+	f.transportLoss = true
+	s, _, project := testService(t, f)
+	c, err := s.Create(context.Background(), project.ID, "Chat", "first", "Do work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-f.started
+	f.release <- false
+	waitStatus(t, s, c.ID, storage.Waiting)
+	a, err := s.Submit(context.Background(), c.ID, "first", "Do work")
+	if err != nil || !a.Duplicate || f.prompts.Load() != 1 {
+		t.Fatal("uncertain turn resent")
+	}
+	if _, err := s.Submit(context.Background(), c.ID, "next", "Unsafe new work"); !errors.Is(err, storage.ErrActive) {
+		t.Fatal(err)
+	}
+}
+
+func TestPreparationFailureDoesNotDeliver(t *testing.T) {
+	f := newFixture(t)
+	s, p, project := testService(t, f)
+	p.startError = true
+	c, err := s.Create(context.Background(), project.ID, "Chat", "first", "Do work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c = waitStatus(t, s, c.ID, storage.Failed)
+	if strings.Contains(c.StatusReason, "secret") || f.prompts.Load() != 0 {
+		t.Fatal("unsafe preparation failure")
+	}
+}
+
+func TestRuntimeRejectionIsVisibleFailure(t *testing.T) {
+	f := newFixture(t)
+	f.promptStatus = 400
+	s, _, p := testService(t, f)
+	c, err := s.Create(context.Background(), p.ID, "Chat", "first", "Unavailable model")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c = waitStatus(t, s, c.ID, storage.Failed)
+	if !strings.Contains(c.StatusReason, "HTTP 400") || strings.Contains(c.StatusReason, "SECRET") {
+		t.Fatal("missing safe runtime rejection explanation")
+	}
+}
+
+func TestRuntimeStreamGapRetainsFinalHistory(t *testing.T) {
+	f := newFixture(t)
+	s, _, p := testService(t, f)
+	c, err := s.Create(context.Background(), p.ID, "Chat", "first", "Work through disconnect")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-f.started
+	close(f.streamStop)
+	deadline := time.Now().Add(3 * time.Second)
+	found := false
+	for time.Now().Before(deadline) {
+		rows, err := s.Store.Activities(context.Background(), c.ID, 0, 1000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range rows {
+			if row.Kind == "capture.gap" {
+				found = true
+			}
+		}
+		if found {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !found {
+		t.Fatal("runtime disconnect was not recorded")
+	}
+	f.release <- false
+	waitStatus(t, s, c.ID, storage.Idle)
+	messages, err := s.Store.Messages(context.Background(), c.ID)
+	if err != nil || len(messages) != 2 || f.prompts.Load() != 1 {
+		t.Fatal("lost history or resent message after gap")
+	}
+}

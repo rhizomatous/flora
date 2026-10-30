@@ -14,7 +14,10 @@ import (
 	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/auth"
+	"github.com/rhizomatous/flora/backend/internal/chat"
+	"github.com/rhizomatous/flora/backend/internal/docker"
 	"github.com/rhizomatous/flora/backend/internal/githubbroker"
+	"github.com/rhizomatous/flora/backend/internal/provisioning"
 	"github.com/rhizomatous/flora/backend/internal/server"
 	"github.com/rhizomatous/flora/backend/internal/settings"
 	"github.com/rhizomatous/flora/backend/internal/storage"
@@ -28,6 +31,12 @@ func main() {
 	githubListen := flag.String("github-listen", "", "optional private IP:port for container GitHub TLS transport")
 	githubCert := flag.String("github-tls-cert", "", "GitHub transport TLS certificate PEM file")
 	githubKey := flag.String("github-tls-key", "", "host-only GitHub transport TLS private key PEM file")
+	agentImage := flag.String("agent-image", "", "pinned Flora agent image reference; enables chat execution")
+	agentDigest := flag.String("agent-image-digest", "", "recorded name@sha256 image identity (defaults to agent-image)")
+	agentID := flag.String("agent-image-id", "", "expected sha256 content ID, required for a local image tag")
+	dockerSocket := flag.String("docker-socket", docker.DefaultSocket, "Docker Engine socket on this host")
+	githubHost := flag.String("github-host", "", "private TLS hostname on port 443 reachable from agent containers")
+	githubCA := flag.String("github-ca", "", "CA PEM file trusted by agent git/gh for the private GitHub transport")
 	flag.Parse()
 	origin, err := publicOrigin(*publicURL)
 	if err != nil {
@@ -52,9 +61,68 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	var chats *chat.Service
+	if *agentImage != "" {
+		if *githubListen == "" {
+			slog.Error("Chat execution requires -github-listen and private TLS transport settings")
+			os.Exit(1)
+		}
+		ca, err := os.ReadFile(*githubCA)
+		if err != nil {
+			slog.Error("Cannot read -github-ca")
+			os.Exit(1)
+		}
+		engine, err := docker.New(*dockerSocket)
+		if err != nil {
+			slog.Error("Cannot initialize Docker client")
+			os.Exit(1)
+		}
+		defer engine.Close()
+		access, err := githubbroker.NewAccess(githubbroker.New(store), engine, githubbroker.CheckoutConfig{Host: *githubHost, CACert: string(ca)})
+		if err != nil {
+			slog.Error("Cannot configure container GitHub access", "error", err)
+			os.Exit(1)
+		}
+		manager, err := provisioning.New(engine, store, provisioning.Config{ImageRef: *agentImage, ImageDigest: *agentDigest, ImageID: *agentID, HarnessVersion: "1.2.27"}, access)
+		if err != nil {
+			slog.Error("Cannot configure pinned agent runtime", "error", err)
+			os.Exit(1)
+		}
+		chats = chat.New(ctx, store, manager)
+		go func() {
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+				}
+				stopped, err := manager.SweepActivity(ctx)
+				if err != nil {
+					slog.Error("Activity timeout enforcement unavailable; check Docker")
+				}
+				if len(stopped) == 0 {
+					continue
+				}
+				chats, err := store.Chats(ctx)
+				if err != nil {
+					slog.Error("Cannot save stopped chat status")
+					continue
+				}
+				for _, c := range chats {
+					for _, id := range stopped {
+						if c.ContainerID == id {
+							_ = store.Transition(ctx, c.ID, c.ActiveMessageID, storage.Stopped, "Continuous activity limit reached; container stopped")
+						}
+					}
+				}
+			}
+		}()
+	}
 	srv := &http.Server{
 		Addr:              *addr,
-		Handler:           server.New(webassets.FS(), auth.New(store), settings.New(store), origin),
+		Handler:           server.New(webassets.FS(), auth.New(store), settings.New(store), origin, chats),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
