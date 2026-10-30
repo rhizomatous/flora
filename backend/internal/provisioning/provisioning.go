@@ -154,11 +154,14 @@ type Engine interface {
 	ContainerList(ctx context.Context, running bool, labels map[string]string) ([]docker.ContainerSummary, error)
 }
 
-// CheckoutFunc prepares a chat workspace before its first container start,
-// typically by downloading the project's core repositories. Implementations
-// must be idempotent against an existing workspace. A nil callback leaves the
-// workspace empty; core repository download is wired in by the chat lifecycle.
-type CheckoutFunc func(ctx context.Context, workspaceDir string, coreRepos []storage.Repository) error
+// WorkspaceAccess performs container-side checkout and credential delivery.
+// Checkout must release /var/lib/flora-checkout.ready only after saving the
+// starting commit, and preserve existing work when called again for the same
+// container. Revoke rejects future requests, not already accepted work.
+type WorkspaceAccess interface {
+	Checkout(context.Context, storage.Chat, storage.Paths, string) error
+	Revoke(context.Context, string) error
+}
 
 // Endpoint is a chat container's private authenticated runtime address. The
 // password is per-container and is recovered from the container's own
@@ -220,11 +223,11 @@ func (e *RuntimeStartError) Error() string {
 }
 
 type Manager struct {
-	engine   Engine
-	store    *storage.Store
-	cfg      Config
-	checkout CheckoutFunc
-	health   func(ctx context.Context, url, password string) bool
+	engine Engine
+	store  *storage.Store
+	cfg    Config
+	access WorkspaceAccess
+	health func(ctx context.Context, url, password string) bool
 	// ownerOf reports the uid/gid owning a storage path. Tests override it;
 	// production stats the real directory.
 	ownerOf func(path string) (uid, gid int, err error)
@@ -235,7 +238,7 @@ type Manager struct {
 	now         func() time.Time
 }
 
-func New(engine Engine, store *storage.Store, cfg Config, checkout CheckoutFunc) (*Manager, error) {
+func New(engine Engine, store *storage.Store, cfg Config, access WorkspaceAccess) (*Manager, error) {
 	if engine == nil || store == nil {
 		return nil, errors.New("provisioning: engine and store are required")
 	}
@@ -247,7 +250,7 @@ func New(engine Engine, store *storage.Store, cfg Config, checkout CheckoutFunc)
 		engine:      engine,
 		store:       store,
 		cfg:         cfg,
-		checkout:    checkout,
+		access:      access,
 		health:      healthy,
 		ownerOf:     storageOwner,
 		locks:       map[string]*sync.Mutex{},
@@ -293,14 +296,18 @@ func (m *Manager) lockChat(chatID string) func() {
 }
 
 // Start makes a chat's container running and its runtime endpoint reachable.
-// On the first start it checks out the workspace, creates the container, and
-// binds it. If an earlier attempt created the container but died before
+// On the first start it creates and binds the container, then checks out its
+// workspace before setup can run. If an earlier attempt died before
 // binding it, Start adopts that container after validating it is exactly the
 // one this chat owns; it never creates a second container for one chat. A
 // failed or timed-out setup blocks startup with a SetupError; calling Start
 // again is the explicit retry. Starting beyond the running-container limit
 // fails with a CapacityError. The wait for runtime readiness is bounded by
 // the configured ReadyTimeout.
+//
+// Start also prepares access on an already running container, which may replace
+// its GitHub credential. Callers must quiesce git/gh work before calling Start;
+// use Endpoint to locate a running container without changing its credentials.
 func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 	unlock := m.lockChat(chatID)
 	defer unlock()
@@ -337,22 +344,14 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 			if err := validateOwned(info, chat, paths, imageID); err != nil {
 				return Endpoint{}, err
 			}
+			if m.access != nil && info.EnvValue("FLORA_CHECKOUT_REQUIRED") != "1" {
+				return Endpoint{}, errors.New("provisioning: existing container lacks the pre-setup checkout barrier; refusing to adopt it")
+			}
 			if err := m.store.BindRuntime(ctx, chatID, info.ID, ""); err != nil {
 				return Endpoint{}, err
 			}
 			containerID = info.ID
 		case docker.IsNotFound(err):
-			if m.checkout != nil {
-				var core []storage.Repository
-				for _, r := range chat.Configuration.Repositories {
-					if r.Role == "core" {
-						core = append(core, r)
-					}
-				}
-				if err := m.checkout(ctx, paths.Workspace, core); err != nil {
-					return Endpoint{}, fmt.Errorf("checkout: %w", err)
-				}
-			}
 			password, err := docker.NewPassword()
 			if err != nil {
 				return Endpoint{}, err
@@ -383,6 +382,9 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 	if err != nil {
 		return Endpoint{}, err
 	}
+	if m.access != nil && info.EnvValue("FLORA_CHECKOUT_REQUIRED") != "1" {
+		return Endpoint{}, errors.New("provisioning: container lacks the pre-setup checkout barrier; refusing to start it")
+	}
 	if !info.State.Running {
 		m.mu.Lock()
 		err = m.checkCapacity(ctx)
@@ -392,6 +394,15 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 		m.mu.Unlock()
 		if err != nil {
 			return Endpoint{}, err
+		}
+	}
+	if m.access != nil {
+		if err := m.access.Checkout(ctx, chat, paths, containerID); err != nil {
+			cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+			defer cancel()
+			stopErr := m.engine.ContainerStop(cleanup, containerID, stopTimeout)
+			revokeErr := m.access.Revoke(cleanup, chatID)
+			return Endpoint{}, errors.Join(fmt.Errorf("checkout: %w", err), stopErr, revokeErr)
 		}
 	}
 	return m.awaitReady(ctx, chatID, paths, containerID)
@@ -473,6 +484,9 @@ func (m *Manager) containerSpec(chat storage.Chat, paths storage.Paths, password
 		"OPENCODE_SERVER_PASSWORD=" + password,
 		"FLORA_UID=" + strconv.Itoa(uid),
 		"FLORA_GID=" + strconv.Itoa(gid),
+	}
+	if m.access != nil {
+		env = append(env, "FLORA_CHECKOUT_REQUIRED=1")
 	}
 	if m.cfg.ProviderAPIKey != "" {
 		env = append(env, "ANTHROPIC_API_KEY="+m.cfg.ProviderAPIKey)
@@ -591,7 +605,11 @@ func (m *Manager) Stop(ctx context.Context, chatID string) error {
 		return nil
 	}
 	m.EndActivity(chat.ContainerID)
-	return m.engine.ContainerStop(ctx, chat.ContainerID, stopTimeout)
+	var revokeErr error
+	if m.access != nil {
+		revokeErr = m.access.Revoke(ctx, chatID)
+	}
+	return errors.Join(revokeErr, m.engine.ContainerStop(ctx, chat.ContainerID, stopTimeout))
 }
 
 // Endpoint recovers the private runtime address of a running chat container,
@@ -654,6 +672,15 @@ func (m *Manager) SweepActivity(ctx context.Context) ([]string, error) {
 	m.mu.Unlock()
 	var stopped []string
 	for _, id := range overdue {
+		if m.access != nil {
+			info, err := m.engine.ContainerInspect(ctx, id)
+			if err != nil {
+				return stopped, err
+			}
+			if err := m.access.Revoke(ctx, info.Config.Labels[labelChatID]); err != nil {
+				return stopped, err
+			}
+		}
 		if err := m.engine.ContainerStop(ctx, id, stopTimeout); err != nil {
 			return stopped, fmt.Errorf("stop over-limit container %s: %w", id, err)
 		}

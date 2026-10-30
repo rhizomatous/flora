@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"flag"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/auth"
+	"github.com/rhizomatous/flora/backend/internal/githubbroker"
 	"github.com/rhizomatous/flora/backend/internal/server"
 	"github.com/rhizomatous/flora/backend/internal/settings"
 	"github.com/rhizomatous/flora/backend/internal/storage"
@@ -23,6 +25,9 @@ func main() {
 	addr := flag.String("listen", "127.0.0.1:8080", "HTTP listen address")
 	dataDir := flag.String("data-dir", "./flora-data", "private persistent storage directory (local filesystem)")
 	publicURL := flag.String("public-url", "", "required public HTTPS origin, for example https://flora.example.com")
+	githubListen := flag.String("github-listen", "", "optional private IP:port for container GitHub TLS transport")
+	githubCert := flag.String("github-tls-cert", "", "GitHub transport TLS certificate PEM file")
+	githubKey := flag.String("github-tls-key", "", "host-only GitHub transport TLS private key PEM file")
 	flag.Parse()
 	origin, err := publicOrigin(*publicURL)
 	if err != nil {
@@ -41,6 +46,12 @@ func main() {
 			slog.Error("Storage close failed", "error", err)
 		}
 	}()
+	if *githubListen != "" {
+		if err := serveGitHub(ctx, store, *githubListen, *githubCert, *githubKey); err != nil {
+			slog.Error("GitHub transport startup failed; check private listen IP and TLS files", "error", err)
+			os.Exit(1)
+		}
+	}
 	srv := &http.Server{
 		Addr:              *addr,
 		Handler:           server.New(webassets.FS(), auth.New(store), settings.New(store), origin),
@@ -68,4 +79,37 @@ func main() {
 		os.Exit(1)
 	}
 	<-done
+}
+
+func serveGitHub(ctx context.Context, store *storage.Store, addr, certFile, keyFile string) error {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return errors.New("GitHub listen address must be a private IP:port")
+	}
+	ip := net.ParseIP(host)
+	if ip == nil || (!ip.IsPrivate() && !ip.IsLoopback()) {
+		return errors.New("GitHub listener must bind a private or loopback IP")
+	}
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return errors.New("cannot load GitHub TLS certificate and key")
+	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	srv := &http.Server{Handler: githubbroker.New(store), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: time.Minute,
+		TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}}}
+	go func() {
+		<-ctx.Done()
+		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutdown)
+	}()
+	go func() {
+		if err := srv.Serve(tls.NewListener(listener, srv.TLSConfig)); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("GitHub transport stopped; container GitHub access is unavailable")
+		}
+	}()
+	return nil
 }

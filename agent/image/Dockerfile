@@ -13,7 +13,9 @@ USER root
 RUN apk add --no-cache git github-cli sudo coreutils shadow && \
     adduser -D -u 1000 flora && \
     printf 'flora ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/flora && \
-    chmod 0440 /etc/sudoers.d/flora
+    chmod 0440 /etc/sudoers.d/flora && \
+    git config --system user.name Flora && \
+    git config --system user.email flora@rhizomato.us
 COPY entrypoint.sh /usr/local/bin/flora-entrypoint
 COPY opencode.json /etc/flora/opencode.json
 # Project config is disabled so the baked installation config is the only
@@ -22,8 +24,6 @@ COPY opencode.json /etc/flora/opencode.json
 ENV HOME=/home/flora XDG_DATA_HOME=/home/flora/.local/share \
     XDG_STATE_HOME=/home/flora/.local/state XDG_CONFIG_HOME=/home/flora/.config \
     OPENCODE_CONFIG=/etc/flora/opencode.json OPENCODE_DISABLE_PROJECT_CONFIG=true \
-    OPENCODE_DISABLE_DEFAULT_PLUGINS=true OPENCODE_ENABLE_QUESTION_TOOL=true \
-    GIT_AUTHOR_NAME=Flora GIT_AUTHOR_EMAIL=flora@rhizomato.us \
-    GIT_COMMITTER_NAME=Flora GIT_COMMITTER_EMAIL=flora@rhizomato.us
+    OPENCODE_DISABLE_DEFAULT_PLUGINS=true OPENCODE_ENABLE_QUESTION_TOOL=true
 WORKDIR /workspace
 ENTRYPOINT ["sh", "/usr/local/bin/flora-entrypoint"]

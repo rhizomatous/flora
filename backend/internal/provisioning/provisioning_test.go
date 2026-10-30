@@ -175,7 +175,68 @@ func (f *fakeEngine) ContainerList(_ context.Context, running bool, labels map[s
 	return list, nil
 }
 
-func newTestManager(t *testing.T, engine *fakeEngine, cfg Config, checkout CheckoutFunc) (*Manager, *storage.Store) {
+type checkoutFunc func(context.Context, storage.Chat, storage.Paths, string) error
+
+func (f checkoutFunc) Checkout(ctx context.Context, chat storage.Chat, paths storage.Paths, id string) error {
+	return f(ctx, chat, paths, id)
+}
+func (f checkoutFunc) Revoke(context.Context, string) error { return nil }
+
+type observedAccess struct {
+	checkoutFunc
+	revoked int
+}
+
+func (a *observedAccess) Revoke(context.Context, string) error { a.revoked++; return nil }
+
+func TestFailedCheckoutStopsBeforeReadinessAndRetries(t *testing.T) {
+	engine := newFakeEngine()
+	m, store := newTestManager(t, engine, Config{}, nil)
+	chat := newChat(t, store)
+	fail := true
+	checks := 0
+	a := &observedAccess{checkoutFunc: func(ctx context.Context, chat storage.Chat, paths storage.Paths, id string) error {
+		info, err := engine.ContainerInspect(ctx, id)
+		if err != nil || !info.State.Running {
+			t.Fatal("checkout must run inside the started container")
+		}
+		if fail {
+			return errors.New("repository checkout failed")
+		}
+		return nil
+	}}
+	m.access = a
+	m.health = func(context.Context, string, string) bool { checks++; return true }
+	if _, err := m.Start(context.Background(), chat.ID); err == nil {
+		t.Fatal("checkout failure allowed startup")
+	}
+	if checks != 0 || a.revoked != 1 {
+		t.Fatal("checkout failure reached readiness or retained credentials")
+	}
+	saved, err := store.Chat(context.Background(), chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := engine.ContainerInspect(context.Background(), saved.ContainerID)
+	if err != nil || info.State.Running {
+		t.Fatal("failed checkout left container running")
+	}
+	fail = false
+	if _, err := m.Start(context.Background(), chat.ID); err != nil {
+		t.Fatal(err)
+	}
+	if len(engine.created) != 1 || checks != 1 {
+		t.Fatal("retry created a new container")
+	}
+	if err := m.Stop(context.Background(), chat.ID); err != nil {
+		t.Fatal(err)
+	}
+	if a.revoked != 2 {
+		t.Fatal("stop did not revoke")
+	}
+}
+
+func newTestManager(t *testing.T, engine *fakeEngine, cfg Config, checkout WorkspaceAccess) (*Manager, *storage.Store) {
 	t.Helper()
 	store, err := storage.Open(context.Background(), filepath.Join(t.TempDir(), "data"))
 	if err != nil {
@@ -258,11 +319,16 @@ func TestStartCreatesIsolatedContainer(t *testing.T) {
 	engine := newFakeEngine()
 	var checkedOut []storage.Repository
 	var workspace string
-	checkout := func(_ context.Context, dir string, repos []storage.Repository) error {
-		workspace = dir
-		checkedOut = repos
+	checkout := checkoutFunc(func(_ context.Context, chat storage.Chat, paths storage.Paths, id string) error {
+		workspace = paths.Workspace
+		checkedOut = nil
+		for _, r := range chat.Configuration.Repositories {
+			if r.Role == "core" {
+				checkedOut = append(checkedOut, r)
+			}
+		}
 		return nil
-	}
+	})
 	m, store := newTestManager(t, engine, Config{ProviderAPIKey: "test-key"}, checkout)
 	chat := newChat(t, store)
 	endpoint, err := m.Start(context.Background(), chat.ID)
@@ -316,7 +382,7 @@ func TestStartCreatesIsolatedContainer(t *testing.T) {
 			t.Fatalf("env missing %q in %q", want, env)
 		}
 	}
-	// Checkout ran before creation and received only the core repository.
+	// Checkout prepared this container's workspace before runtime readiness.
 	if workspace == "" || len(checkedOut) != 1 || checkedOut[0].Name != "core" {
 		t.Fatalf("checkout: %q %+v", workspace, checkedOut)
 	}
@@ -331,7 +397,7 @@ func TestStartCreatesIsolatedContainer(t *testing.T) {
 	if endpoint.URL != "http://127.0.0.1:49152" || endpoint.Username != "opencode" || endpoint.Password == "" {
 		t.Fatalf("endpoint: %+v", endpoint)
 	}
-	// A second start reuses the container and skips checkout.
+	// A second start reuses the container and idempotently prepares its access.
 	if _, err := m.Start(context.Background(), chat.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -822,7 +888,12 @@ func TestRunActivityEnforcementSweepsOnInterval(t *testing.T) {
 
 func TestEndpointRecovery(t *testing.T) {
 	engine := newFakeEngine()
-	m, store := newTestManager(t, engine, Config{}, nil)
+	preparations := 0
+	access := checkoutFunc(func(context.Context, storage.Chat, storage.Paths, string) error {
+		preparations++
+		return nil
+	})
+	m, store := newTestManager(t, engine, Config{}, access)
 	chat := newChat(t, store)
 	endpoint, err := m.Start(context.Background(), chat.ID)
 	if err != nil {
@@ -834,6 +905,15 @@ func TestEndpointRecovery(t *testing.T) {
 	}
 	if recovered != endpoint {
 		t.Fatalf("recovery must rebuild the endpoint: %+v vs %+v", recovered, endpoint)
+	}
+	if preparations != 1 {
+		t.Fatal("endpoint lookup prepared access again")
+	}
+	if _, err := m.Start(context.Background(), chat.ID); err != nil {
+		t.Fatal(err)
+	}
+	if preparations != 2 {
+		t.Fatal("explicit start did not prepare access again")
 	}
 	if err := m.Stop(context.Background(), chat.ID); err != nil {
 		t.Fatal(err)

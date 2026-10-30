@@ -33,3 +33,8 @@ jobs:
         run: docker build -t flora-agent-test:ci agent/image
       - name: Run live provisioning lifecycle tests against the daemon
         run: FLORA_PROVISIONING_TEST_IMAGE=flora-agent-test:ci nix develop --command go -C backend test -race -count=1 -v -run TestProvisioningDocker ./internal/provisioning
+      - name: Check container checkout against the local GitHub fixture
+        env:
+          FLORA_GITHUB_TEST_IMAGE: flora-agent-test:ci
+          FLORA_BROKER_GH_TOKEN: ""
+        run: nix develop --command go -C backend test -race -count=1 -v -run '^TestCheckoutDocker$' ./internal/githubbroker

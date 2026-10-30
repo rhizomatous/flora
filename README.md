@@ -3,10 +3,11 @@
 A self-hosted autonomous coding agent. Describe a task, let the agent work, then
 return to review its changes and open a draft pull request.
 
-**Status:** administrator onboarding, protected settings, and durable storage.
+**Status:** administrator onboarding, protected settings, projects, and durable storage.
 The binary serves first-time account creation, login/logout, and hosted-model
-and GitHub credential settings. Agent execution and project management are
-subsequent milestones. See the [roadmap](https://github.com/rhizomatous/flora/issues/20)
+and GitHub credential settings. Container provisioning and host-side GitHub
+transport are available as backend services; browser chat execution is not wired
+yet. See [agent setup](agent/README.md), the [roadmap](https://github.com/rhizomatous/flora/issues/20)
 and [product requirements](specs/PRD.md).
 
 ## Develop
@@ -108,7 +109,7 @@ to `.envrc`. Manual `nix develop` and CI do not need direnv or any host hook.
 - `backend/`: Go module, HTTP server, executable, and embedded web assets.
 - `web/`: React/TypeScript application, built with Vite and Tailwind.
 - `florets/`: shared React components and shadcn-compatible semantic CSS tokens.
-- `agent/`: home for the upcoming pinned agent image and runtime probes.
+- `agent/`: pinned agent image and container integration checks.
 - `specs/`: authoritative product requirements and visual direction.
 - `scripts/`: standalone-binary smoke test.
 
