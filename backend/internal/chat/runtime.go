@@ -90,7 +90,7 @@ type runtimeMessage struct {
 }
 
 // stream uses a standards-compliant SSE decoder. Upstream has no replay cursor;
-// every disconnection is reported as a capture gap before any reconnect.
+// the caller records a capture gap if this stream ends unexpectedly.
 func (c *runtime) stream(ctx context.Context, session string, ready chan<- error, capture func(string, json.RawMessage) error) error {
 	streamClient := newRuntime(c.endpoint)
 	streamClient.client.Transport.(*http.Transport).ResponseHeaderTimeout = 10 * time.Second

@@ -4,6 +4,7 @@
 package redaction
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -67,7 +68,9 @@ func Text(text string, secrets ...string) string {
 // JSON decodes strings before redacting so escaped credentials are also removed.
 func JSON(raw json.RawMessage, secrets ...string) json.RawMessage {
 	var value any
-	if json.Unmarshal(raw, &value) != nil {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	if decoder.Decode(&value) != nil {
 		return json.RawMessage(`{"error":"invalid runtime payload"}`)
 	}
 	var clean func(any) any

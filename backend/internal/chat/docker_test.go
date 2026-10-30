@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -30,7 +31,17 @@ func (a localCheckout) Checkout(ctx context.Context, chat storage.Chat, paths st
 	// No remote GitHub writes or real credentials. The ordinary container tools
 	// still initialize a workspace and commit before releasing the setup barrier.
 	var out strings.Builder
-	exit, err := a.engine.Exec(ctx, id, "flora", []string{"sh", "-c", "git init -q /workspace && cd /workspace && git config user.email flora@example.test && git config user.name Flora && touch sample && git add sample && git commit -qm initial && git rev-parse HEAD"}, nil, &out, io.Discard)
+	info, err := os.Stat(paths.Workspace)
+	if err != nil {
+		return err
+	}
+	owner := info.Sys().(*syscall.Stat_t)
+	gid := owner.Gid
+	if gid == 0 {
+		gid = owner.Uid
+	}
+	user := fmt.Sprintf("%d:%d", owner.Uid, gid)
+	exit, err := a.engine.Exec(ctx, id, user, []string{"sh", "-c", "git init -q /workspace && cd /workspace && git config user.email flora@example.test && git config user.name Flora && touch sample && git add sample && git commit -qm initial && git rev-parse HEAD"}, nil, &out, io.Discard)
 	if err != nil || exit != 0 {
 		return fmt.Errorf("local checkout failed")
 	}
@@ -86,14 +97,6 @@ func TestChatDocker(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	var containerID string
-	defer func() {
-		if containerID != "" {
-			cleanup, stop := context.WithTimeout(context.Background(), 30*time.Second)
-			defer stop()
-			_ = engine.ContainerRemove(cleanup, containerID, true)
-		}
-	}()
 	var calls atomic.Int32
 	var followupContext atomic.Bool
 	provider := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -159,12 +162,12 @@ func TestChatDocker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Save the bound ID even when startup or a model response fails, so cleanup
-	// removes only this test's container and never unrelated daemon resources.
+	// The deterministic name permits cleanup even if startup fails before the
+	// container is bound. It belongs only to this newly created test chat.
 	defer func() {
-		if c, err := store.Chat(context.Background(), c.ID); err == nil && c.ContainerID != "" {
-			_ = engine.ContainerRemove(context.Background(), c.ContainerID, true)
-		}
+		cleanup, stop := context.WithTimeout(context.Background(), 30*time.Second)
+		defer stop()
+		_ = engine.ContainerRemove(cleanup, "flora-chat-"+c.ID, true)
 	}()
 	wait := func() storage.Chat {
 		deadline := time.Now().Add(90 * time.Second)
@@ -173,7 +176,6 @@ func TestChatDocker(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			containerID = current.ContainerID
 			if current.Status == storage.Idle {
 				return current
 			}

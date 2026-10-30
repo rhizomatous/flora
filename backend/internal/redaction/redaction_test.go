@@ -22,6 +22,14 @@ func TestJSONRedactsEscapesAndCredentialRepresentations(t *testing.T) {
 	}
 }
 
+func TestJSONPreservesLargeMetadataNumbers(t *testing.T) {
+	input := json.RawMessage(`{"identifier":9007199254740993,"value":"secret-value"}`)
+	clean := JSON(input, "secret-value")
+	if !strings.Contains(string(clean), "9007199254740993") {
+		t.Fatal("metadata lost numeric precision")
+	}
+}
+
 func TestCapabilityFileCannotEscapeRuntimeRoot(t *testing.T) {
 	ctx := context.Background()
 	store, err := storage.Open(ctx, t.TempDir())
