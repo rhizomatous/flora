@@ -6,14 +6,13 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/rhizomatous/flora/backend/internal/agentfiles"
 	"github.com/rhizomatous/flora/backend/internal/provisioning"
 	"github.com/rhizomatous/flora/backend/internal/redaction"
 	"github.com/rhizomatous/flora/backend/internal/storage"
@@ -28,13 +27,17 @@ type Provisioner interface {
 }
 
 type Service struct {
-	Store       *storage.Store
-	provisioner Provisioner
-	ctx         context.Context
+	Store                   *storage.Store
+	provisioner             Provisioner
+	ctx                     context.Context
+	turnMu                  sync.Mutex
+	turns                   map[string]*turnActivity
+	promptAdmissionTimeout  time.Duration
+	promptCompletionTimeout time.Duration
 }
 
 func New(ctx context.Context, store *storage.Store, p Provisioner) *Service {
-	return &Service{Store: store, provisioner: p, ctx: ctx}
+	return &Service{Store: store, provisioner: p, ctx: ctx, turns: map[string]*turnActivity{}, promptAdmissionTimeout: 30 * time.Second, promptCompletionTimeout: 30 * time.Second}
 }
 
 func (s *Service) Create(ctx context.Context, project, title, requestID, text string) (storage.Chat, error) {
@@ -112,8 +115,12 @@ func (s *Service) run(chatID string, message storage.Message) {
 		}
 		return
 	}
+	activity := &turnActivity{provisioner: s.provisioner, containerID: endpoint.ContainerID, messageID: message.ID, questions: map[string]bool{}}
+	s.turnMu.Lock()
 	s.provisioner.BeginActivity(endpoint.ContainerID)
-	defer s.provisioner.EndActivity(endpoint.ContainerID)
+	s.turns[chatID] = activity
+	s.turnMu.Unlock()
+	defer s.endTurnActivity(chatID, activity)
 	rt := newRuntime(endpoint)
 	defer rt.client.CloseIdleConnections()
 	setupCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -148,6 +155,7 @@ func (s *Service) run(chatID string, message storage.Message) {
 	// Do not substitute Flora's random request IDs. Link the newly observed user
 	// record during capture; a missing link never authorizes automatic redelivery.
 	knownUsers := map[string]bool{}
+	seen := map[string][32]byte{}
 	savedMessages, err := s.Store.Messages(ctx, chatID)
 	if err != nil {
 		fail("Could not read saved message links. No message was delivered.")
@@ -156,6 +164,8 @@ func (s *Service) run(chatID string, message storage.Message) {
 	for _, saved := range savedMessages {
 		if saved.Role == "user" {
 			knownUsers[saved.RuntimeMessageID] = true
+		} else if saved.RuntimeMessageID != "" {
+			seen[saved.RuntimeMessageID] = sha256.Sum256(saved.Payload)
 		}
 	}
 	var runtimeID string
@@ -164,6 +174,8 @@ func (s *Service) run(chatID string, message storage.Message) {
 	ready := make(chan error, 1)
 	captureErrors := make(chan error, 1)
 	var runtimeFailure atomic.Bool
+	var runtimeAccepted atomic.Bool
+	priorUsers := maps.Clone(knownUsers)
 	secrets := redaction.Values(ctx, s.Store, chatID, endpoint.Password, endpoint.ProviderKey)
 	go func() {
 		captureErrors <- rt.stream(turnCtx, c.SessionID, ready, func(kind string, payload json.RawMessage) error {
@@ -176,32 +188,15 @@ func (s *Service) run(chatID string, message storage.Message) {
 			if err := s.Store.AppendActivity(turnCtx, chatID, rand.Text(), "runtime."+kind, clean); err != nil {
 				return err
 			}
-			if kind == "question.asked" {
-				return s.transition(chatID, message.ID, storage.Waiting, "Flora needs your answer")
-			}
 			if kind == "session.error" {
 				runtimeFailure.Store(true)
 			}
-			if kind == "session.status" {
-				var event struct {
-					Properties struct {
-						Status struct {
-							Type string `json:"type"`
-						} `json:"status"`
-					} `json:"properties"`
-				}
-				_ = json.Unmarshal(payload, &event)
-				if event.Properties.Status.Type == "retry" {
-					return s.transition(chatID, message.ID, storage.Waiting, "Waiting for the model provider to retry")
-				}
-				if event.Properties.Status.Type == "busy" {
-					return s.transition(chatID, message.ID, storage.Working, "Flora is working")
-				}
+			var event runtimeEvent
+			_ = json.Unmarshal(payload, &event)
+			if kind == "question.asked" && event.Properties.ID != "" || kind == "message.updated" && event.Properties.Info.Role == "user" && !priorUsers[event.Properties.Info.ID] {
+				runtimeAccepted.Store(true)
 			}
-			if kind == "question.replied" || kind == "question.rejected" {
-				return s.transition(chatID, message.ID, storage.Working, "Continuing after question")
-			}
-			return nil
+			return s.runtimeActivity(chatID, activity, kind, payload)
 		})
 	}()
 	if err := <-ready; err != nil {
@@ -210,9 +205,21 @@ func (s *Service) run(chatID string, message storage.Message) {
 	}
 	_ = s.transition(chatID, message.ID, storage.Working, "Delivering message to OpenCode")
 	result := make(chan error, 1)
+	promptCtx, cancelPrompt := context.WithCancel(turnCtx)
+	defer cancelPrompt()
+	admission := time.NewTimer(s.promptAdmissionTimeout)
+	defer admission.Stop()
+	admissionDeadline := admission.C
+	completion := time.NewTimer(time.Hour)
+	completion.Stop()
+	defer completion.Stop()
+	var completionDeadline <-chan time.Time
+	var completed bool
+	transportCanceled := false
+	var unreadableSince time.Time
 	go func() {
 		var response runtimeMessage
-		err := rt.call(turnCtx, "POST", sessionPath(c.SessionID)+"/message", map[string]any{
+		err := rt.call(promptCtx, "POST", sessionPath(c.SessionID)+"/message", map[string]any{
 			"model":  map[string]string{"providerID": credentials.Provider, "modelID": credentials.Model},
 			"system": SystemPrompt, "parts": []map[string]string{{"type": "text", "text": message.Text}},
 		}, &response)
@@ -223,16 +230,61 @@ func (s *Service) run(chatID string, message storage.Message) {
 	}()
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
-	seen := map[string][32]byte{}
 	capture := func() (bool, error) {
 		snapshotCtx, cancel := context.WithTimeout(turnCtx, 10*time.Second)
 		defer cancel()
-		return s.captureHistory(snapshotCtx, rt, c, secrets, message.ID, &runtimeID, knownUsers, seen)
+		failure, err := s.captureHistory(snapshotCtx, rt, c, secrets, message.ID, &runtimeID, &completed, knownUsers, seen)
+		if err != nil {
+			if unreadableSince.IsZero() {
+				unreadableSince = time.Now()
+			}
+			// A live question may wait indefinitely, but unavailable history capture
+			// must not keep its HTTP worker forever. This cancels no runtime tools.
+			if time.Since(unreadableSince) >= s.promptAdmissionTimeout {
+				cancelPrompt()
+				transportCanceled = true
+			}
+		} else {
+			unreadableSince = time.Time{}
+		}
+		if err == nil && !transportCanceled {
+			if runtimeID != "" {
+				runtimeAccepted.Store(true)
+			}
+			if runtimeAccepted.Load() && admissionDeadline != nil {
+				admission.Stop()
+				admissionDeadline = nil
+			}
+			if completed && completionDeadline == nil {
+				completion.Reset(s.promptCompletionTimeout)
+				completionDeadline = completion.C
+			}
+			if !completed && completionDeadline != nil {
+				completion.Stop()
+				completionDeadline = nil
+			}
+		}
+		return failure, err
 	}
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-admissionDeadline:
+			// The pinned server can buffer headers until a question/turn ends.
+			// Bound admission only until a new user record proves acceptance.
+			_, _ = capture()
+			if !runtimeAccepted.Load() {
+				cancelPrompt()
+				transportCanceled = true
+			}
+			admissionDeadline = nil
+		case <-completionDeadline:
+			// Execution has a saved terminal response but the HTTP exchange has
+			// not ended. Cancel only this transport and report uncertainty.
+			cancelPrompt()
+			transportCanceled = true
+			completionDeadline = nil
 		case <-captureErrors:
 			if turnCtx.Err() != nil {
 				return
@@ -243,6 +295,7 @@ func (s *Service) run(chatID string, message storage.Message) {
 			captureErrors = nil
 		case err := <-result:
 			providerFailure, captureErr := capture()
+			s.endTurnActivity(chatID, activity)
 			var rejected *responseError
 			if errors.As(err, &rejected) && rejected.status >= 400 && rejected.status < 500 && rejected.status != 409 {
 				fail(rejected.Error() + ". Check the installation model and runtime configuration.")
@@ -260,12 +313,13 @@ func (s *Service) run(chatID string, message storage.Message) {
 	}
 }
 
-func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Chat, secrets []string, messageID string, runtimeID *string, knownUsers map[string]bool, seen map[string][32]byte) (bool, error) {
+func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Chat, secrets []string, messageID string, runtimeID *string, completed *bool, knownUsers map[string]bool, seen map[string][32]byte) (bool, error) {
 	var history []json.RawMessage
 	if err := rt.call(ctx, "GET", sessionPath(c.SessionID)+"/message", nil, &history); err != nil {
 		return false, err
 	}
 	providerFailure := false
+	*completed = false
 	for _, raw := range history {
 		raw = redaction.JSON(raw, secrets...)
 		var m runtimeMessage
@@ -288,6 +342,9 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 		if m.Info.ParentID == *runtimeID && len(m.Info.Error) > 0 && string(m.Info.Error) != "null" {
 			providerFailure = true
 		}
+		if m.Info.ParentID == *runtimeID {
+			*completed = m.Info.Time.Completed > 0 && (m.Info.Finish != "" && m.Info.Finish != "tool-calls" || len(m.Info.Error) > 0 && string(m.Info.Error) != "null")
+		}
 		hash := sha256.Sum256(raw)
 		if seen[m.Info.ID] == hash {
 			continue
@@ -304,46 +361,6 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 		seen[m.Info.ID] = hash
 	}
 	return providerFailure, nil
-}
-
-// captureSetup saves complete changed setup snapshots, including the final exit
-// code, while provisioning runs. Browser disconnection does not affect capture.
-func (s *Service) captureSetup(ctx context.Context, chatID, providerKey string) {
-	paths, err := s.Store.Paths(ctx, chatID)
-	if err != nil {
-		return
-	}
-	root, err := os.OpenRoot(paths.RuntimeState)
-	if err != nil {
-		return
-	}
-	defer root.Close()
-	ticker := time.NewTicker(250 * time.Millisecond)
-	defer ticker.Stop()
-	var last [32]byte
-	save := func() {
-		values := redaction.Values(context.WithoutCancel(ctx), s.Store, chatID, providerKey)
-		output, outputErr := agentfiles.Read(root, filepath.Join("setup", "output.log"), 0)
-		exit, exitErr := agentfiles.Read(root, filepath.Join("setup", "exit-status"), 4096)
-		if outputErr == nil || exitErr == nil {
-			payload, _ := json.Marshal(map[string]string{"output": redaction.Text(string(output), values...), "exit_status": redaction.Text(strings.TrimSpace(string(exit)), values...)})
-			hash := sha256.Sum256(payload)
-			if hash != last {
-				if s.Store.AppendActivity(context.WithoutCancel(ctx), chatID, rand.Text(), "setup.output", payload) == nil {
-					last = hash
-				}
-			}
-		}
-	}
-	defer save()
-	for {
-		save()
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-		}
-	}
 }
 
 type Question struct {
@@ -388,6 +405,7 @@ func (s *Service) Questions(ctx context.Context, chatID string) ([]Question, err
 			b, _ := json.Marshal(q)
 			_ = json.Unmarshal(redaction.JSON(b, secrets...), &q)
 			result = append(result, q)
+			s.questionActivity(chatID, c.ActiveMessageID, q.ID, false)
 		}
 	}
 	return result, nil
@@ -462,9 +480,6 @@ func (s *Service) Reply(ctx context.Context, chatID, questionID string, answers 
 		_ = s.transition(chatID, c.ActiveMessageID, storage.Waiting, "Question reply delivery is uncertain. Refresh the live questions before continuing.")
 		return errors.New("question reply uncertain; refresh before continuing")
 	}
-	err = s.transition(chatID, c.ActiveMessageID, storage.Working, "Question answered; continuing work")
-	if errors.Is(err, storage.ErrStale) {
-		return nil
-	}
-	return err
+	s.questionActivity(chatID, c.ActiveMessageID, questionID, true)
+	return nil
 }

@@ -48,18 +48,22 @@ func (*testProvisioner) EndActivity(string)   {}
 // The HTTP fixture exercises the same authenticated streaming and synchronous
 // prompt contract as OpenCode. Turn delivery remains blocked until released.
 type runtimeFixture struct {
-	server        *httptest.Server
-	mu            sync.Mutex
-	history       []json.RawMessage
-	events        chan string
-	started       chan string
-	release       chan bool
-	prompts       atomic.Int32
-	sessions      atomic.Int32
-	question      bool
-	transportLoss bool
-	promptStatus  int
-	streamStop    chan struct{}
+	server              *httptest.Server
+	mu                  sync.Mutex
+	history             []json.RawMessage
+	events              chan string
+	started             chan string
+	release             chan bool
+	prompts             atomic.Int32
+	sessions            atomic.Int32
+	question            bool
+	transportLoss       bool
+	promptStatus        int
+	streamStop          chan struct{}
+	noPromptHeaders     bool
+	noRuntimeAcceptance bool
+	hangAfterCompletion bool
+	historyUnavailable  bool
 }
 
 func newFixture(t *testing.T) *runtimeFixture {
@@ -107,6 +111,10 @@ func newFixture(t *testing.T) *runtimeFixture {
 			f.events <- `{"type":"question.replied","properties":{"sessionID":"ses_one","requestID":"que_one"}}`
 			fmt.Fprint(w, `true`)
 		case r.Method == "GET" && r.URL.Path == "/session/ses_one/message":
+			if f.historyUnavailable {
+				w.WriteHeader(503)
+				return
+			}
 			f.mu.Lock()
 			defer f.mu.Unlock()
 			json.NewEncoder(w).Encode(f.history)
@@ -133,9 +141,15 @@ func newFixture(t *testing.T) *runtimeFixture {
 			in.MessageID = fmt.Sprintf("msg_runtime_%d", n)
 			user, _ := json.Marshal(map[string]any{"info": map[string]string{"id": in.MessageID, "role": "user"}, "parts": in.Parts})
 			f.mu.Lock()
-			f.history = append(f.history, user)
+			if !f.noRuntimeAcceptance {
+				f.history = append(f.history, user)
+			}
 			f.mu.Unlock()
 			f.started <- in.MessageID
+			if !f.noPromptHeaders {
+				w.WriteHeader(200)
+				w.(http.Flusher).Flush()
+			}
 			var fail bool
 			select {
 			case <-r.Context().Done():
@@ -151,10 +165,14 @@ func newFixture(t *testing.T) *runtimeFixture {
 			if fail {
 				errorField = `,"error":{"name":"APIError","data":{"message":"provider_SECRET failed"}}`
 			}
-			m := json.RawMessage(fmt.Sprintf(`{"info":{"id":%q,"parentID":%q,"role":"assistant","providerID":"anthropic","modelID":"model"%s},"parts":[{"type":"text","text":"Done provider_SECRET runtime_SECRET github_pat_SECRET"},{"type":"tool","tool":"bash","state":{"status":"completed","input":{"command":"pwd"},"output":"/workspace\n"}}]}`, "assistant_"+in.MessageID, in.MessageID, errorField))
+			m := json.RawMessage(fmt.Sprintf(`{"info":{"id":%q,"parentID":%q,"role":"assistant","providerID":"anthropic","modelID":"model","finish":"stop","time":{"completed":1}%s},"parts":[{"type":"text","text":"Done provider_SECRET runtime_SECRET github_pat_SECRET"},{"type":"tool","tool":"bash","state":{"status":"completed","input":{"command":"pwd"},"output":"/workspace\n"}}]}`, "assistant_"+in.MessageID, in.MessageID, errorField))
 			f.mu.Lock()
 			f.history = append(f.history, m)
 			f.mu.Unlock()
+			if f.hangAfterCompletion {
+				<-r.Context().Done()
+				return
+			}
 			w.Write(m)
 		default:
 			t.Errorf("unexpected runtime route %s %s", r.Method, r.URL.Path)
@@ -279,9 +297,13 @@ func TestPersistentTurnsQuestionsAndDeduplication(t *testing.T) {
 	}
 	rows, _ := s.Store.Activities(ctx, c.ID, 0, 1000)
 	foundLarge := false
+	firstSnapshots := 0
 	for _, row := range rows {
 		if strings.Contains(string(row.Payload), "SECRET") {
 			t.Fatalf("secret in %s", row.Kind)
+		}
+		if row.Kind == "message.runtime" && strings.Contains(string(row.Payload), "assistant_msg_runtime_1") {
+			firstSnapshots++
 		}
 		if row.Kind == "runtime.command.output" {
 			var event struct {
@@ -296,8 +318,113 @@ func TestPersistentTurnsQuestionsAndDeduplication(t *testing.T) {
 	if !foundLarge {
 		t.Fatal("large command output was not retained in full")
 	}
+	if firstSnapshots != 1 {
+		t.Fatalf("follow-up rewrote the unchanged first response %d times", firstSnapshots)
+	}
 	if messages[1].Model != "model" || messages[1].Provider != "anthropic" || !strings.Contains(string(messages[1].Payload), "/workspace") {
 		t.Fatal("lost full activity/model metadata")
+	}
+}
+
+func TestPromptNonresponseKeepsDeliveryUncertain(t *testing.T) {
+	f := newFixture(t)
+	f.noPromptHeaders = true
+	f.noRuntimeAcceptance = true
+	s, _, p := testService(t, f)
+	s.promptAdmissionTimeout = 40 * time.Millisecond
+	c, err := s.Create(context.Background(), p.ID, "Chat", "first", "Do work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-f.started
+	c = waitStatus(t, s, c.ID, storage.Waiting)
+	if !strings.Contains(c.StatusReason, "uncertain") || c.ActiveMessageID == "" {
+		t.Fatal("timeout cleared accepted work")
+	}
+	a, err := s.Submit(context.Background(), c.ID, "first", "Do work")
+	if err != nil || !a.Duplicate || f.prompts.Load() != 1 {
+		t.Fatal("timeout resent the accepted prompt")
+	}
+	if _, err := s.Submit(context.Background(), c.ID, "next", "New work"); !errors.Is(err, storage.ErrActive) {
+		t.Fatal(err)
+	}
+}
+
+func TestCompletedHistoryDoesNotLeavePromptTransportHanging(t *testing.T) {
+	f := newFixture(t)
+	f.noPromptHeaders = true
+	f.hangAfterCompletion = true
+	s, _, p := testService(t, f)
+	s.promptCompletionTimeout = 40 * time.Millisecond
+	c, err := s.Create(context.Background(), p.ID, "Chat", "first", "Do work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-f.started
+	f.release <- false
+	c = waitStatus(t, s, c.ID, storage.Waiting)
+	if c.ActiveMessageID == "" || !strings.Contains(c.StatusReason, "uncertain") || f.prompts.Load() != 1 {
+		t.Fatal("hung completion was resent or treated as confirmed idle")
+	}
+	messages, _ := s.Store.Messages(context.Background(), c.ID)
+	if len(messages) != 2 {
+		t.Fatal("lost the saved final snapshot on transport timeout")
+	}
+}
+
+func TestUnavailableCaptureDoesNotLeaveQuestionTransportHanging(t *testing.T) {
+	f := newFixture(t)
+	f.historyUnavailable = true
+	f.noPromptHeaders = true
+	s, _, p := testService(t, f)
+	s.promptAdmissionTimeout = 300 * time.Millisecond
+	c, err := s.Create(context.Background(), p.ID, "Chat", "first", "Inspect")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-f.started
+	f.events <- `{"type":"question.asked","properties":{"sessionID":"ses_one","id":"que_one","questions":[]}}`
+	waitStatus(t, s, c.ID, storage.Waiting)
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		current, _ := s.Store.Chat(context.Background(), c.ID)
+		if strings.Contains(current.StatusReason, "uncertain") {
+			if current.ActiveMessageID == "" || f.prompts.Load() != 1 {
+				t.Fatal("lost accepted identity or resent work")
+			}
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("unavailable capture left the question HTTP worker hanging")
+}
+
+func TestPinnedSessionErrorAttribution(t *testing.T) {
+	for _, identified := range []bool{false, true} {
+		t.Run(fmt.Sprint(identified), func(t *testing.T) {
+			f := newFixture(t)
+			s, _, p := testService(t, f)
+			c, err := s.Create(context.Background(), p.ID, "Chat", "first", "Inspect")
+			if err != nil {
+				t.Fatal(err)
+			}
+			<-f.started
+			properties := map[string]any{"error": map[string]any{"name": "APIError", "data": map[string]any{"message": "provider rejected", "isRetryable": false, "statusCode": 401}}}
+			if identified {
+				properties["sessionID"] = "ses_one"
+			}
+			b, _ := json.Marshal(map[string]any{"type": "session.error", "properties": properties})
+			f.events <- string(b)
+			// A subsequent same-session marker proves the earlier event was consumed.
+			f.events <- `{"type":"session.status","properties":{"sessionID":"ses_one","status":{"type":"retry","attempt":1,"message":"retrying","next":123}}}`
+			waitStatus(t, s, c.ID, storage.Waiting)
+			f.release <- false
+			want := storage.Idle
+			if identified {
+				want = storage.Failed
+			}
+			waitStatus(t, s, c.ID, want)
+		})
 	}
 }
 

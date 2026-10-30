@@ -106,6 +106,12 @@ func TestChatDocker(t *testing.T) {
 			return
 		}
 		body, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(body), "error marker") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(401)
+			fmt.Fprint(w, `{"type":"error","error":{"type":"authentication_error","message":"offline provider denied"}}`)
+			return
+		}
 		if strings.Contains(string(body), "followup marker") && strings.Contains(string(body), "initial marker") {
 			followupContext.Store(true)
 		}
@@ -158,6 +164,7 @@ func TestChatDocker(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc := New(ctx, store, manager)
+	svc.promptAdmissionTimeout = time.Second
 	c, err := svc.Create(ctx, project.ID, "Real runtime", "initial", "initial marker: inspect the workspace without editing")
 	if err != nil {
 		t.Fatal(err)
@@ -180,6 +187,9 @@ func TestChatDocker(t *testing.T) {
 				return current
 			}
 			if current.Status == storage.Waiting && current.StatusReason == "Flora needs your answer" {
+				// The pinned server may buffer headers until the answer arrives.
+				// Saved admission evidence must allow a longer question wait.
+				time.Sleep(2 * svc.promptAdmissionTimeout)
 				questions, err := svc.Questions(ctx, c.ID)
 				if err != nil || len(questions) != 1 {
 					t.Fatal("real question unavailable")
@@ -234,6 +244,55 @@ func TestChatDocker(t *testing.T) {
 	}
 	if !foundSetup {
 		t.Fatal("setup output not retained")
+	}
+	foundBusy, foundAsked, foundReplied := false, false, false
+	for _, row := range rows {
+		var event runtimeEvent
+		_ = json.Unmarshal(row.Payload, &event)
+		if event.Properties.SessionID != second.SessionID {
+			continue
+		}
+		if event.Type == "session.status" && event.Properties.Status.Type == "busy" {
+			foundBusy = true
+		}
+		if event.Type == "question.asked" && event.Properties.ID != "" {
+			foundAsked = true
+		}
+		if event.Type == "question.replied" && event.Properties.RequestID != "" {
+			foundReplied = true
+		}
+	}
+	if !foundBusy || !foundAsked || !foundReplied {
+		t.Fatal("pinned runtime status/question event shapes were not captured")
+	}
+	if _, err := svc.Submit(ctx, c.ID, "provider-failure", "error marker: read-only provider failure"); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		current, _ := store.Chat(ctx, c.ID)
+		if current.Status == storage.Failed {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	current, _ := store.Chat(ctx, c.ID)
+	if current.Status != storage.Failed {
+		t.Fatal("real runtime provider rejection was not visible")
+	}
+	rows, _ = store.Activities(ctx, c.ID, 0, 1000)
+	foundError := false
+	for _, row := range rows {
+		if row.Kind == "runtime.session.error" {
+			var event runtimeEvent
+			_ = json.Unmarshal(row.Payload, &event)
+			if event.Properties.SessionID == second.SessionID && strings.Contains(string(event.Properties.Error), `"name":"APIError"`) {
+				foundError = true
+			}
+		}
+	}
+	if !foundError {
+		t.Fatal("pinned session.error schema was not captured")
 	}
 	t.Logf("Pinned OpenCode: %d provider fixture calls, %d saved messages, %d saved events; same session/workspace on follow-up", calls.Load(), len(messages), len(rows))
 }

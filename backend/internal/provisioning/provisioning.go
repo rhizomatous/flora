@@ -599,13 +599,13 @@ func (m *Manager) containerExited(ctx context.Context, chatID string, paths stor
 		return &RuntimeStartError{ChatID: chatID, ExitCode: exitCode}
 	}
 	var tail string
-	if raw, err := agentfiles.Read(root, "setup/output.log", 0); err == nil {
-		if len(raw) > setupTailMax {
-			raw = raw[len(raw)-setupTailMax:]
-		}
+	if raw, err := agentfiles.Tail(root, "setup/output.log", 32<<10); err == nil {
 		tail = string(raw)
 	}
 	tail = redaction.Text(tail, redaction.Values(ctx, m.store, chatID, m.cfg.ProviderAPIKey, containerProviderKey(info))...)
+	if len(tail) > setupTailMax {
+		tail = tail[len(tail)-setupTailMax:]
+	}
 	payload, _ := json.Marshal(map[string]any{
 		"exit_code":   exitCode,
 		"output_tail": tail,
@@ -711,19 +711,31 @@ func (m *Manager) SweepActivity(ctx context.Context) ([]string, error) {
 	m.mu.Unlock()
 	var stopped []string
 	for _, id := range overdue {
+		// A question or resumed active period may have changed this entry since
+		// the first scan. Serialize the stop decision with Begin/EndActivity.
+		m.mu.Lock()
+		since, active := m.activeSince[id]
+		if !active || m.now().Sub(since) <= m.cfg.ActivityTimeout {
+			m.mu.Unlock()
+			continue
+		}
 		if m.access != nil {
 			info, err := m.engine.ContainerInspect(ctx, id)
 			if err != nil {
+				m.mu.Unlock()
 				return stopped, err
 			}
 			if err := m.access.Revoke(ctx, info.Config.Labels[labelChatID]); err != nil {
+				m.mu.Unlock()
 				return stopped, err
 			}
 		}
 		if err := m.engine.ContainerStop(ctx, id, stopTimeout); err != nil {
+			m.mu.Unlock()
 			return stopped, fmt.Errorf("stop over-limit container %s: %w", id, err)
 		}
-		m.EndActivity(id)
+		delete(m.activeSince, id)
+		m.mu.Unlock()
 		stopped = append(stopped, id)
 	}
 	return stopped, nil

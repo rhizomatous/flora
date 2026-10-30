@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 	"unicode/utf8"
 
+	"github.com/rhizomatous/flora/backend/internal/agentfiles"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
@@ -46,6 +48,34 @@ func decodeChat(w http.ResponseWriter, r *http.Request, v any) bool {
 
 func (a *api) chatRoutes(mux *http.ServeMux) {
 	store := a.settings.Store
+	mux.HandleFunc("GET /api/chats/{id}/setup-log", func(w http.ResponseWriter, r *http.Request) {
+		paths, err := store.Paths(r.Context(), r.PathValue("id"))
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		root, err := os.OpenRoot(paths.Logs)
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		defer root.Close()
+		file, err := agentfiles.Open(root, "setup.log")
+		if err != nil {
+			failure(w, 404, "Full setup log is not available yet. Check the final setup activity for capture errors.")
+			return
+		}
+		defer file.Close()
+		info, err := file.Stat()
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Content-Disposition", `attachment; filename="setup.log"`)
+		w.Header().Set("Cache-Control", "no-store")
+		http.ServeContent(w, r, "setup.log", info.ModTime(), file)
+	})
 	mux.HandleFunc("GET /api/chats", func(w http.ResponseWriter, r *http.Request) {
 		list, err := store.Chats(r.Context())
 		if err != nil {

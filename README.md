@@ -84,6 +84,18 @@ delivery remains blocked and is never automatically resent. Saved status alone
 does not prove runtime liveness after an application restart. Stop/resume and
 restart reconciliation are not provided by this slice.
 
+Setup progress uses bounded previews, capped at 1 MiB of saved progress plus a
+final preview. When setup ends, Flora retains the complete redacted output once
+as an authenticated log download. Preview omissions and full-log capture failures
+are explicit in the saved activity. Waiting for a user question pauses the
+continuous-activity timer; provider retries still count as active work.
+
+The pinned runtime may buffer prompt response headers until a turn ends. Flora
+bounds the wait for acceptance evidence and for a response after saved completion,
+rather than imposing a short header deadline on valid work or question waits.
+An unresponsive history/capture path also ends the HTTP worker with delivery
+marked uncertain. These bounds never authorize resending an accepted message.
+
 For a no-paid-provider runtime integration check, build a uniquely named local
 agent image and run `FLORA_CHAT_TEST_IMAGE=<local-tag> go -C backend test -v
 -run TestChatDocker ./internal/chat` inside the Nix shell. It uses a local

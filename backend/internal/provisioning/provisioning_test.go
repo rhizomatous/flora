@@ -64,6 +64,38 @@ const (
 	testImageID = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 )
 
+func TestPausedActivityDoesNotStopContainer(t *testing.T) {
+	engine := newFakeEngine()
+	manager, store := newTestManager(t, engine, Config{ActivityTimeout: time.Hour}, nil)
+	chat := newChat(t, store)
+	ctx := context.Background()
+	endpoint, err := manager.Start(ctx, chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	manager.now = func() time.Time { return now }
+	manager.BeginActivity(endpoint.ContainerID)
+	now = now.Add(30 * time.Minute)
+	manager.EndActivity(endpoint.ContainerID)
+	now = now.Add(3 * time.Hour)
+	stopped, err := manager.SweepActivity(ctx)
+	if err != nil || len(stopped) != 0 || len(engine.stopped) != 0 {
+		t.Fatal("paused user question stopped its container")
+	}
+	manager.BeginActivity(endpoint.ContainerID)
+	now = now.Add(59 * time.Minute)
+	stopped, err = manager.SweepActivity(ctx)
+	if err != nil || len(stopped) != 0 {
+		t.Fatal("resumed clock did not start fresh")
+	}
+	now = now.Add(2 * time.Minute)
+	stopped, err = manager.SweepActivity(ctx)
+	if err != nil || len(stopped) != 1 {
+		t.Fatal("resumed execution never timed out")
+	}
+}
+
 type fakeContainer struct {
 	id, name, imageID string
 	labels            map[string]string

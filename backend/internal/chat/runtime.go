@@ -82,11 +82,42 @@ type runtimeMessage struct {
 		Provider string          `json:"providerID"`
 		Model    string          `json:"modelID"`
 		Error    json.RawMessage `json:"error"`
+		Finish   string          `json:"finish"`
+		Time     struct {
+			Completed int64 `json:"completed"`
+		} `json:"time"`
 	} `json:"info"`
 	Parts []struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
 	} `json:"parts"`
+}
+
+// OpenCode 1.2.27 emits status as properties.status, and question request IDs as
+// properties.id (asked) or properties.requestID (replied/rejected). Session errors
+// without a sessionID cannot be attributed to a particular chat.
+type runtimeEvent struct {
+	Type       string `json:"type"`
+	Properties struct {
+		SessionID string `json:"sessionID"`
+		ID        string `json:"id"`
+		RequestID string `json:"requestID"`
+		Status    struct {
+			Type    string `json:"type"`
+			Attempt int    `json:"attempt"`
+			Message string `json:"message"`
+			Next    int64  `json:"next"`
+		} `json:"status"`
+		Error json.RawMessage `json:"error"`
+		Info  struct {
+			SessionID string `json:"sessionID"`
+			ID        string `json:"id"`
+			Role      string `json:"role"`
+		} `json:"info"`
+		Part struct {
+			SessionID string `json:"sessionID"`
+		} `json:"part"`
+	} `json:"properties"`
 }
 
 // stream uses a standards-compliant SSE decoder. Upstream has no replay cursor;
@@ -111,18 +142,7 @@ func (c *runtime) stream(ctx context.Context, session string, ready chan<- error
 		if err != nil {
 			return err
 		}
-		var envelope struct {
-			Type       string `json:"type"`
-			Properties struct {
-				SessionID string `json:"sessionID"`
-				Info      struct {
-					SessionID string `json:"sessionID"`
-				} `json:"info"`
-				Part struct {
-					SessionID string `json:"sessionID"`
-				} `json:"part"`
-			} `json:"properties"`
-		}
+		var envelope runtimeEvent
 		if json.Unmarshal([]byte(event.Data), &envelope) != nil {
 			return errors.New("invalid runtime event")
 		}

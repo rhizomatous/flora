@@ -191,7 +191,7 @@ func TestChatAPIAuthenticationValidationAndReplay(t *testing.T) {
 		return b
 	}
 	for _, route := range []struct{ method, path string }{
-		{"GET", "/api/chats"}, {"GET", "/api/chats/missing"}, {"GET", "/api/chats/missing/events"}, {"GET", "/api/chats/missing/questions"}, {"POST", "/api/projects/" + project.ID + "/chats"}, {"POST", "/api/chats/missing/messages"}, {"POST", "/api/chats/missing/questions/question/reply"},
+		{"GET", "/api/chats"}, {"GET", "/api/chats/missing/setup-log"}, {"HEAD", "/api/chats/missing/setup-log"}, {"GET", "/api/chats/missing"}, {"GET", "/api/chats/missing/events"}, {"GET", "/api/chats/missing/questions"}, {"POST", "/api/projects/" + project.ID + "/chats"}, {"POST", "/api/chats/missing/messages"}, {"POST", "/api/chats/missing/questions/question/reply"},
 	} {
 		call(route.method, route.path, "{}", "", origin, 401)
 		if route.method == "POST" {
@@ -211,6 +211,17 @@ func TestChatAPIAuthenticationValidationAndReplay(t *testing.T) {
 	json.Unmarshal(call("POST", path, body, token, origin, 202), &duplicate)
 	if c.ID != duplicate.ID {
 		t.Fatal("creation retry created a second chat")
+	}
+	call("GET", "/api/chats/"+c.ID+"/setup-log", "", token, "", 404)
+	paths, err := store.Paths(context.Background(), c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(paths.Logs, "setup.log"), []byte("full retained setup output\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if got := call("GET", "/api/chats/"+c.ID+"/setup-log", "", token, "", 200); string(got) != "full retained setup output\n" {
+		t.Fatal("full setup log download lost output")
 	}
 	call("POST", "/api/chats/"+c.ID+"/messages", `{"requestID":"active","text":"not queued"}`, token, origin, 409)
 	call("GET", "/api/chats/"+c.ID+"/events?after=invalid", "", token, "", 400)
