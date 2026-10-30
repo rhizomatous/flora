@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/netip"
@@ -14,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/containerd/errdefs"
+	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
@@ -26,6 +28,44 @@ const APIVersion = "1.44"
 
 type Client struct {
 	sdk *client.Client
+}
+
+// Exec runs a noninteractive command in an already running container. Callers
+// must stop the container on cancellation to terminate the command as well.
+func (c *Client) Exec(ctx context.Context, id, user string, command []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+	created, err := c.sdk.ExecCreate(ctx, id, client.ExecCreateOptions{
+		User: user, Cmd: command, WorkingDir: "/workspace", Env: []string{"HOME=/home/flora", "GIT_TERMINAL_PROMPT=0"},
+		AttachStdin: stdin != nil, AttachStdout: true, AttachStderr: true,
+	})
+	if err != nil {
+		return -1, err
+	}
+	attached, err := c.sdk.ExecAttach(ctx, created.ID, client.ExecAttachOptions{})
+	if err != nil {
+		return -1, err
+	}
+	defer attached.Close()
+	stop := context.AfterFunc(ctx, attached.Close)
+	defer stop()
+	if stdin != nil {
+		if _, err := io.Copy(attached.Conn, stdin); err != nil {
+			return -1, err
+		}
+		if err := attached.CloseWrite(); err != nil {
+			return -1, err
+		}
+	}
+	if _, err := stdcopy.StdCopy(stdout, stderr, attached.Reader); err != nil {
+		return -1, err
+	}
+	result, err := c.sdk.ExecInspect(ctx, created.ID, client.ExecInspectOptions{})
+	if err != nil {
+		return -1, err
+	}
+	if result.Running {
+		return -1, fmt.Errorf("docker exec still running after output closed")
+	}
+	return result.ExitCode, nil
 }
 
 // New connects to socketPath, or DefaultSocket when empty. It does not read

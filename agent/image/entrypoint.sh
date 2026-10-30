@@ -22,6 +22,12 @@ if [ "$(id -u flora)" != "$FLORA_UID" ]; then
 fi
 mkdir -p /workspace /home/flora
 chown "$FLORA_UID:$FLORA_GID" /workspace /home/flora
+# Checkout runs through Docker exec as the storage owner. Setup cannot run
+# until the host has saved the resolved commit and released this container.
+if [ "${FLORA_CHECKOUT_REQUIRED:-}" = "1" ]; then
+    while [ ! -f /var/lib/flora-checkout.ready ]; do sleep 0.1; done
+    . /home/flora/.flora-github.env
+fi
 # The done marker lives on this container's writable layer, never on the
 # persisted home mount: starting the same stopped container skips setup, and a
 # replacement container runs it again. A failed or timed-out setup leaves no

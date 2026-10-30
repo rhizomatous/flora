@@ -423,7 +423,7 @@ func TestMigrationSafety(t *testing.T) {
 	must(t, s.Close())
 	brokenRoot := t.TempDir()
 	broken := openTest(t, brokenRoot)
-	_, err = broken.db.Exec("DROP TABLE browser_sessions; DROP TABLE administrator; DROP TABLE installation_credentials; DROP TRIGGER immutable_chat_config; DROP TABLE starting_commits; DROP TABLE activity; DROP TABLE chats; DROP TABLE messages; DROP TABLE projects; CREATE TABLE chats (conflict TEXT); PRAGMA user_version=0")
+	_, err = broken.db.Exec("DROP TABLE github_capabilities; DROP TABLE browser_sessions; DROP TABLE administrator; DROP TABLE installation_credentials; DROP TRIGGER immutable_chat_config; DROP TABLE starting_commits; DROP TABLE activity; DROP TABLE chats; DROP TABLE messages; DROP TABLE projects; CREATE TABLE chats (conflict TEXT); PRAGMA user_version=0")
 	must(t, err)
 	if err := broken.migrate(ctx); err == nil {
 		t.Fatal("expected migration conflict")
