@@ -110,3 +110,63 @@ func TestSetupCaptureGrowthIsBoundedAndFullLogRetained(t *testing.T) {
 		t.Fatal("failed full capture silently omitted output")
 	}
 }
+
+func TestSetupPreviewHidesWindowFragmentsAfterReplacementShrinkage(t *testing.T) {
+	f := newFixture(t)
+	s, _, p := testService(t, f)
+	ctx := context.Background()
+	chat, err := s.Store.CreateChat(ctx, p.ID, "Setup", testImage, "1.2.27")
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths, err := s.Store.Paths(ctx, chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(paths.RuntimeState, "setup"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	secret := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabc"
+	windowSize := setupPreviewBytes + 2*len(secret) + 32
+	repeats := strings.Repeat(secret+"\n", 800)
+	padding := strings.Repeat("z", windowSize-20-len(repeats)-20)
+	input := strings.Repeat("x", 64<<10) + secret + repeats + padding + secret[:20]
+	if len(input)-windowSize != (64<<10)+19 {
+		t.Fatal("fixture window does not start inside the credential")
+	}
+	if err := os.WriteFile(filepath.Join(paths.RuntimeState, "setup", "output.log"), []byte(input), 0600); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(paths.RuntimeState)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	capture := setupCapture{store: s.Store, chatID: chat.ID, root: root, paths: paths, secrets: []string{secret}, remaining: setupProgressBudget}
+	if err := capture.save(ctx, true); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := s.Store.Activities(ctx, chat.ID, 0, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload struct {
+		Output    string `json:"output"`
+		Available bool   `json:"full_log_available"`
+	}
+	if err := json.Unmarshal(rows[len(rows)-1].Payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	want := "[redacted]" + strings.Repeat("[redacted]\n", 800) + padding + "[redacted]"
+	if payload.Output != want || len(payload.Output) > setupPreviewBytes || !payload.Available {
+		t.Fatal("shrinking replacements exposed a preview boundary fragment")
+	}
+	full, err := os.ReadFile(filepath.Join(paths.Logs, "setup.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantFull := strings.Repeat("x", 64<<10) + "[redacted]" + strings.Repeat("[redacted]\n", 800) + padding + "[redacted]"
+	if string(full) != wantFull {
+		t.Fatal("retained log lost ordinary output or exposed an unfinished EOF credential")
+	}
+}

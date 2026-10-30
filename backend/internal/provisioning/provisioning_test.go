@@ -17,6 +17,51 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
+func TestSetupErrorTailMasksPartialSecretsAfterShrinkageAndTrim(t *testing.T) {
+	secret := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabc"
+	shrinkSecret := "another-credential-" + strings.Repeat("Q", 81)
+	engine := newFakeEngine()
+	manager, store := newTestManager(t, engine, Config{ProviderAPIKey: secret}, nil)
+	chat := newChat(t, store)
+	ctx := context.Background()
+	if err := store.SaveCredentials(ctx, storage.Credentials{Provider: "anthropic", Model: "model", ProviderKey: shrinkSecret, GitHubToken: "github_pat_test_fixture"}); err != nil {
+		t.Fatal(err)
+	}
+	paths, err := store.Paths(ctx, chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(paths.RuntimeState, "setup"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(paths.RuntimeState, "setup", "exit-status"), []byte("1"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	repeats := strings.Repeat(shrinkSecret, 300)
+	padding := strings.Repeat("z", (32<<10)-20-len(repeats)-20)
+	input := strings.Repeat("x", 64<<10) + secret + repeats + padding + secret[:20]
+	if len(input)-(32<<10) != (64<<10)+19 {
+		t.Fatal("fixture does not cut the credential at the raw window boundary")
+	}
+	for _, test := range []struct{ input, want string }{
+		{input, "[redacted]" + strings.Repeat("[redacted]", 300) + padding + "[redacted]"},
+		{strings.Repeat("x", 64<<10) + secret[19:] + strings.Repeat("z", setupTailMax-20), "[redacted]" + strings.Repeat("z", setupTailMax-20)},
+	} {
+		if err := os.WriteFile(filepath.Join(paths.RuntimeState, "setup", "output.log"), []byte(test.input), 0600); err != nil {
+			t.Fatal(err)
+		}
+		var info docker.ContainerInfo
+		info.State.ExitCode = 1
+		var setupErr *SetupError
+		if err := manager.containerExited(ctx, chat.ID, paths, info); !errors.As(err, &setupErr) {
+			t.Fatal("expected setup error")
+		}
+		if setupErr.OutputTail != test.want || len(setupErr.OutputTail) > setupTailMax {
+			t.Fatal("setup error exposed a credential boundary fragment")
+		}
+	}
+}
+
 func TestInstalledProviderEnvironmentAndEndpointRecovery(t *testing.T) {
 	for provider, key := range map[string]string{"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "google": "GOOGLE_GENERATIVE_AI_API_KEY"} {
 		t.Run(provider, func(t *testing.T) {

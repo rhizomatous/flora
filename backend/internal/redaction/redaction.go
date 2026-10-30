@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/rhizomatous/flora/backend/internal/agentfiles"
@@ -45,24 +46,99 @@ func Values(ctx context.Context, store *storage.Store, chatID string, extra ...s
 }
 
 func Text(text string, secrets ...string) string {
+	forms := credentialForms(secrets)
+	return textForms(text, forms)
+}
+
+func textForms(text string, forms []string) string {
+	return maskEdges(replaceForms(text, forms), forms, false, true)
+}
+
+// Tail redacts a bounded source window before and after selecting its last limit
+// bytes. Both cut boundaries may contain credential fragments. Matching fragments
+// of at least eight bytes are hidden; shorter coincidences retain ordinary text.
+func Tail(text string, limit int, secrets ...string) string {
+	if limit <= 0 {
+		return ""
+	}
+	forms := credentialForms(secrets)
+	text = maskEdges(replaceForms(text, forms), forms, true, true)
+	if len(text) > limit {
+		text = text[len(text)-limit:]
+	}
+	return maskEdges(text, forms, true, true)
+}
+
+func credentialForms(secrets []string) []string {
+	unique := map[string]bool{}
+	var forms []string
 	for _, secret := range secrets {
 		if secret == "" {
 			continue
 		}
-		text = strings.ReplaceAll(text, secret, "[redacted]")
-		// Cumulative snapshots may end in an unfinished credential. Hide a
-		// substantial matching prefix until the rest of the output arrives.
-		for n := len(secret) - 1; n >= 8; n-- {
-			if strings.HasSuffix(text, secret[:n]) {
-				text = strings.TrimSuffix(text, secret[:n]) + "[redacted]"
-				break
+		candidates := []string{secret}
+		for _, prefix := range []string{"opencode:", "x-access-token:", "flora:"} {
+			candidates = append(candidates, base64.StdEncoding.EncodeToString([]byte(prefix+secret)))
+		}
+		for _, value := range candidates {
+			if !unique[value] {
+				unique[value] = true
+				forms = append(forms, value)
 			}
 		}
-		for _, prefix := range []string{"opencode:", "x-access-token:", "flora:"} {
-			text = strings.ReplaceAll(text, base64.StdEncoding.EncodeToString([]byte(prefix+secret)), "[redacted]")
+	}
+	// Replace longer overlapping representations first so a shorter credential
+	// cannot leave the remainder of a longer one in the output.
+	sort.Slice(forms, func(i, j int) bool {
+		if len(forms[i]) == len(forms[j]) {
+			return forms[i] < forms[j]
 		}
+		return len(forms[i]) > len(forms[j])
+	})
+	return forms
+}
+
+func replaceForms(text string, forms []string) string {
+	for _, form := range forms {
+		text = strings.ReplaceAll(text, form, "[redacted]")
 	}
 	return text
+}
+
+func maskEdges(text string, forms []string, leading, trailing bool) string {
+	left, right := 0, 0
+	for _, form := range forms {
+		for n := min(len(text), len(form)-1); n >= 8; n-- {
+			if leading && n > left && strings.HasPrefix(text, form[len(form)-n:]) {
+				left = n
+			}
+			if trailing && n > right && strings.HasSuffix(text, form[:n]) {
+				right = n
+			}
+		}
+	}
+	if left == 0 && right == 0 {
+		return text
+	}
+	if left+right >= len(text) {
+		return fragmentMarker(len(text))
+	}
+	result := text[left : len(text)-right]
+	if left > 0 {
+		result = fragmentMarker(left) + result
+	}
+	if right > 0 {
+		result += fragmentMarker(right)
+	}
+	return result
+}
+
+// Boundary masking must not expand a bounded preview beyond its byte limit.
+func fragmentMarker(size int) string {
+	if size < len("[redacted]") {
+		return "[hidden]"
+	}
+	return "[redacted]"
 }
 
 // JSON decodes strings before redacting so escaped credentials are also removed.
@@ -73,11 +149,12 @@ func JSON(raw json.RawMessage, secrets ...string) json.RawMessage {
 	if decoder.Decode(&value) != nil {
 		return json.RawMessage(`{"error":"invalid runtime payload"}`)
 	}
+	forms := credentialForms(secrets)
 	var clean func(any) any
 	clean = func(v any) any {
 		switch x := v.(type) {
 		case string:
-			return Text(x, secrets...)
+			return textForms(x, forms)
 		case []any:
 			for i := range x {
 				x[i] = clean(x[i])
@@ -85,7 +162,7 @@ func JSON(raw json.RawMessage, secrets ...string) json.RawMessage {
 		case map[string]any:
 			result := make(map[string]any, len(x))
 			for k, v := range x {
-				result[Text(k, secrets...)] = clean(v)
+				result[textForms(k, forms)] = clean(v)
 			}
 			return result
 		}

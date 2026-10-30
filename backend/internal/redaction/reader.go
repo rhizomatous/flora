@@ -2,26 +2,17 @@ package redaction
 
 import (
 	"bufio"
-	"encoding/base64"
 	"io"
 	"strings"
 )
 
-// Reader removes complete known credential representations across arbitrary read
-// boundaries. Its lookahead is bounded by the longest credential, not log size.
+// Reader removes known credential representations across arbitrary read boundaries
+// and hides unfinished credential prefixes at EOF. Lookahead is bounded by the
+// longest credential, not log size.
 // The caller owns and closes the source.
 func Reader(source io.Reader, secrets ...string) io.Reader {
-	var forms []string
+	forms := credentialForms(secrets)
 	window := 1
-	for _, secret := range secrets {
-		if secret == "" {
-			continue
-		}
-		forms = append(forms, secret)
-		for _, prefix := range []string{"opencode:", "x-access-token:", "flora:"} {
-			forms = append(forms, base64.StdEncoding.EncodeToString([]byte(prefix+secret)))
-		}
-	}
 	for _, form := range forms {
 		window = max(window, len(form))
 	}
@@ -29,10 +20,12 @@ func Reader(source io.Reader, secrets ...string) io.Reader {
 }
 
 type reader struct {
-	source  *bufio.Reader
-	forms   []string
-	window  int
-	pending string
+	source      *bufio.Reader
+	forms       []string
+	window      int
+	pending     string
+	done        bool
+	terminalErr error
 }
 
 func (r *reader) Read(p []byte) (int, error) {
@@ -44,12 +37,18 @@ func (r *reader) Read(p []byte) (int, error) {
 			n += count
 			continue
 		}
-		peek, err := r.source.Peek(r.window)
-		if len(peek) == 0 {
+		if r.done {
 			if n > 0 {
 				return n, nil
 			}
-			return 0, err
+			return 0, r.terminalErr
+		}
+		peek, err := r.source.Peek(r.window)
+		if err != nil {
+			r.pending = maskEdges(replaceForms(string(peek), r.forms), r.forms, false, true)
+			_, _ = r.source.Discard(len(peek))
+			r.done, r.terminalErr = true, err
+			continue
 		}
 		matched := false
 		for _, form := range r.forms {

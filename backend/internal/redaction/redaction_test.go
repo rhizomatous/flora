@@ -30,6 +30,54 @@ func TestJSONPreservesLargeMetadataNumbers(t *testing.T) {
 	}
 }
 
+func TestTailMasksBothCutBoundariesBeforeAndAfterShrinkage(t *testing.T) {
+	secret := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabc"
+	if len(secret) != 39 {
+		t.Fatal("invalid fixture length")
+	}
+	for _, form := range []string{secret, base64.StdEncoding.EncodeToString([]byte("opencode:" + secret))} {
+		t.Run(form[:4], func(t *testing.T) {
+			// A raw window starts inside a credential. Redacting subsequent full
+			// copies shrinks it enough that final trimming alone cannot hide it.
+			window := form[19:] + strings.Repeat(form+"\n", 800) + "ordinary ending\n" + form[:20]
+			got := Tail(window, 32<<10, secret)
+			want := "[redacted]" + strings.Repeat("[redacted]\n", 800) + "ordinary ending\n[redacted]"
+			if got != want || len(got) > 32<<10 {
+				t.Fatal("cut-boundary credential survived shrinking replacements")
+			}
+			// Final trimming can also expose an internal credential suffix that
+			// was not at either boundary of the original window.
+			input := "ordinary beginning\n" + form[19:] + " visible"
+			got = Tail(input, len(form)-19+len(" visible"), secret)
+			if got != "[redacted] visible" {
+				t.Fatal("final trim introduced an unmasked credential suffix")
+			}
+		})
+	}
+}
+
+func TestTailPreservesOrdinaryTextAndByteBound(t *testing.T) {
+	secret := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabc"
+	for n := 1; n < len(secret); n++ {
+		for _, fragment := range []string{secret[:n], secret[len(secret)-n:]} {
+			got := Tail(fragment, len(fragment), secret)
+			if len(got) > len(fragment) {
+				t.Fatal("boundary masking expanded a bounded window")
+			}
+			if n >= 8 && got == fragment {
+				t.Fatal("substantial boundary fragment was not hidden")
+			}
+			if n < 8 && got != fragment {
+				t.Fatal("short coincidental text was removed")
+			}
+		}
+	}
+	text := "plain text with a newline\n"
+	if got := Tail(text, 17, secret); got != text[len(text)-17:] {
+		t.Fatal("ordinary output changed")
+	}
+}
+
 func TestCapabilityFileCannotEscapeRuntimeRoot(t *testing.T) {
 	ctx := context.Background()
 	store, err := storage.Open(ctx, t.TempDir())

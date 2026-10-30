@@ -57,10 +57,7 @@ func (c *setupCapture) save(ctx context.Context, final bool) error {
 		if err != nil {
 			return err
 		}
-		clean := redaction.Text(string(tail), values...)
-		if len(clean) > setupPreviewBytes {
-			clean = clean[len(clean)-setupPreviewBytes:]
-		}
+		clean := redaction.Tail(string(tail), setupPreviewBytes, values...)
 		payload["output"] = clean
 		payload["log_bytes"] = size
 		payload["omitted_bytes"] = max(int64(0), size-setupPreviewBytes)

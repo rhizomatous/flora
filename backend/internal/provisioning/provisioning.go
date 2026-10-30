@@ -602,10 +602,7 @@ func (m *Manager) containerExited(ctx context.Context, chatID string, paths stor
 	if raw, err := agentfiles.Tail(root, "setup/output.log", 32<<10); err == nil {
 		tail = string(raw)
 	}
-	tail = redaction.Text(tail, redaction.Values(ctx, m.store, chatID, m.cfg.ProviderAPIKey, containerProviderKey(info))...)
-	if len(tail) > setupTailMax {
-		tail = tail[len(tail)-setupTailMax:]
-	}
+	tail = redaction.Tail(tail, setupTailMax, redaction.Values(ctx, m.store, chatID, m.cfg.ProviderAPIKey, containerProviderKey(info))...)
 	payload, _ := json.Marshal(map[string]any{
 		"exit_code":   exitCode,
 		"output_tail": tail,
