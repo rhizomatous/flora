@@ -83,7 +83,7 @@ func (a *Access) Checkout(ctx context.Context, chat storage.Chat, paths storage.
 		}
 	}
 	if len(core) != 1 {
-		return errors.New("checkout requires exactly one initial core repository")
+		return fmt.Errorf("checkout supports exactly one core repository in /workspace; found %d; configure a project with one core repository and create a new chat", len(core))
 	}
 	r := core[0]
 	u, parseErr := url.Parse(r.URL)

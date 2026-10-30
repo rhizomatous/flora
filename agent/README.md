@@ -50,6 +50,8 @@ records the resolved starting SHA, and releases setup only after persistence
 succeeds. Checkout failure stops the container and retains bounded output in the
 chat's host-side `logs/checkout.log` and activity records. Retrying preserves a
 completed checkout, its original starting SHA, and local edits.
+Automatic checkout currently requires exactly one core repository. Multiple core
+checkouts are not supported; saved configurations still retain their collections.
 
 Git remotes and configuration contain only the broker hostname and revocable
 credential. Normal HTTPS Git and `gh` REST/GraphQL traffic goes to fixed GitHub
@@ -58,12 +60,15 @@ redirects rather than forwarding credentials to download hosts. SSH, Git LFS, an
 external asset downloads are not provided by this transport. Outbound container
 network access is otherwise unchanged.
 
-Explicitly stopping a chat or failing checkout revokes its credential. Starting renews it;
-token replacement in installation settings takes effect on the next upstream
+Explicitly stopping a chat or failing checkout revokes its credential. Starting
+renews it; token replacement in installation settings takes effect on the next upstream
 request without replacing container credentials. Saved credential digests survive
-host process restart. Expiry requires an explicit start to renew. Revocation blocks
-new requests, not already accepted upstream work. A stolen chat credential grants
-the same GitHub authority until revoked or expired.
+host process restart. There is no automatic renewal while a container runs. Expiry
+requires an explicit start to renew. Every `Start`, even for an already running
+container, replaces its credential, so callers must first quiesce git/gh work.
+Use `Endpoint` to retrieve a running container's address without rotating access.
+Revocation blocks new requests, not already accepted upstream work. A stolen chat
+credential grants the same GitHub authority until revoked or expired.
 External daemon stops are not monitored by this service and do not themselves
 revoke a credential.
 

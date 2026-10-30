@@ -888,7 +888,12 @@ func TestRunActivityEnforcementSweepsOnInterval(t *testing.T) {
 
 func TestEndpointRecovery(t *testing.T) {
 	engine := newFakeEngine()
-	m, store := newTestManager(t, engine, Config{}, nil)
+	preparations := 0
+	access := checkoutFunc(func(context.Context, storage.Chat, storage.Paths, string) error {
+		preparations++
+		return nil
+	})
+	m, store := newTestManager(t, engine, Config{}, access)
 	chat := newChat(t, store)
 	endpoint, err := m.Start(context.Background(), chat.ID)
 	if err != nil {
@@ -900,6 +905,15 @@ func TestEndpointRecovery(t *testing.T) {
 	}
 	if recovered != endpoint {
 		t.Fatalf("recovery must rebuild the endpoint: %+v vs %+v", recovered, endpoint)
+	}
+	if preparations != 1 {
+		t.Fatal("endpoint lookup prepared access again")
+	}
+	if _, err := m.Start(context.Background(), chat.ID); err != nil {
+		t.Fatal(err)
+	}
+	if preparations != 2 {
+		t.Fatal("explicit start did not prepare access again")
 	}
 	if err := m.Stop(context.Background(), chat.ID); err != nil {
 		t.Fatal(err)

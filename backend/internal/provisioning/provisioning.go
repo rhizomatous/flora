@@ -304,6 +304,10 @@ func (m *Manager) lockChat(chatID string) func() {
 // again is the explicit retry. Starting beyond the running-container limit
 // fails with a CapacityError. The wait for runtime readiness is bounded by
 // the configured ReadyTimeout.
+//
+// Start also prepares access on an already running container, which may replace
+// its GitHub credential. Callers must quiesce git/gh work before calling Start;
+// use Endpoint to locate a running container without changing its credentials.
 func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 	unlock := m.lockChat(chatID)
 	defer unlock()

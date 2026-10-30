@@ -145,7 +145,8 @@ func privateTLS(t *testing.T, handler http.Handler, image string) (string, strin
 	}
 	t.Cleanup(func() { _ = listener.Close() })
 	_, port, _ := net.SplitHostPort(listener.Addr().String())
-	name := "flora-issue8-relay-" + strings.ToLower(rand.Text())
+	name := "flora-github-test-relay-" + strings.ToLower(rand.Text())
+	t.Cleanup(func() { _ = exec.Command("docker", "rm", "-f", name).Run() })
 	args := []string{"run", "--detach", "--name", name}
 	if runtime.GOOS == "linux" {
 		args = append(args, "--add-host=host.docker.internal:host-gateway")
@@ -154,7 +155,6 @@ func privateTLS(t *testing.T, handler http.Handler, image string) (string, strin
 	if out, err := exec.Command("docker", args...).CombinedOutput(); err != nil {
 		t.Fatalf("test TCP relay: %v %s", err, out)
 	}
-	t.Cleanup(func() { _ = exec.Command("docker", "rm", "-f", name).Run() })
 	out, err := exec.Command("docker", "inspect", "--format", "{{.NetworkSettings.Networks.bridge.IPAddress}}", name).CombinedOutput()
 	if err != nil {
 		t.Fatalf("inspect TCP relay: %v %s", err, out)
@@ -261,10 +261,7 @@ func TestCheckoutDocker(t *testing.T) {
 	t.Cleanup(func() {
 		clean, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		c, _ := s.Chat(clean, chat.ID)
-		if c.ContainerID != "" {
-			_ = engine.ContainerRemove(clean, c.ContainerID, true)
-		}
+		_ = engine.ContainerRemove(clean, "flora-chat-"+chat.ID, true)
 	})
 	upstreamTransport := b.transport
 	var outage atomic.Bool

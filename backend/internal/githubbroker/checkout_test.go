@@ -3,6 +3,7 @@ package githubbroker
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"regexp"
 	"strings"
@@ -118,5 +119,52 @@ func TestCanceledCheckoutDoesNotRelease(t *testing.T) {
 	}
 	if _, err := s.GitHubCapability(context.Background(), issued, time.Now()); !errors.Is(err, storage.ErrNotFound) {
 		t.Fatal("issued credential survived cancellation")
+	}
+}
+
+func TestCheckoutRejectsUnsupportedCoreCountWithoutChangingSnapshotOrAccess(t *testing.T) {
+	s, fixtureChat, b := fixture(t)
+	ctx := context.Background()
+	a, err := NewAccess(b, execFunc(func(context.Context, string, string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
+		t.Fatal("unsupported checkout executed a container command")
+		return -1, nil
+	}), CheckoutConfig{Host: "github.internal", CACert: "fixture-ca"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, count := range []int{0, 2} {
+		t.Run(fmt.Sprintf("%d core repositories", count), func(t *testing.T) {
+			repos := []storage.Repository{{Name: "octo/extra", URL: "https://github.com/octo/extra.git", BaseBranch: "main", Role: "extra"}}
+			for i := 0; i < count; i++ {
+				name := fmt.Sprintf("octo/core-%d", i)
+				repos = append(repos, storage.Repository{Name: name, URL: "https://github.com/" + name + ".git", BaseBranch: "main", Role: "core"})
+			}
+			project, err := s.CreateProject(ctx, "collection", storage.Configuration{Repositories: repos})
+			if err != nil {
+				t.Fatal(err)
+			}
+			chat, err := s.CreateChat(ctx, project.ID, "collection", fixtureChat.ImageDigest, fixtureChat.HarnessVersion)
+			if err != nil {
+				t.Fatal(err)
+			}
+			paths, err := s.Paths(ctx, chat.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			credential := fixtureCapability + fmt.Sprint(count)
+			if err := s.ReplaceGitHubCapability(ctx, chat.ID, credential, time.Now().Add(time.Hour)); err != nil {
+				t.Fatal(err)
+			}
+			if err := a.Checkout(ctx, chat, paths, "container"); err == nil || !strings.Contains(err.Error(), fmt.Sprintf("found %d", count)) || !strings.Contains(err.Error(), "create a new chat") {
+				t.Fatalf("unsupported configuration diagnostic: %v", err)
+			}
+			saved, err := s.Chat(ctx, chat.ID)
+			if err != nil || len(saved.Configuration.Repositories) != len(repos) || len(saved.StartingCommits) != 0 {
+				t.Fatal("unsupported checkout changed the snapshot or starting commits")
+			}
+			if id, err := s.GitHubCapability(ctx, credential, time.Now()); err != nil || id != chat.ID {
+				t.Fatal("unsupported checkout replaced existing access")
+			}
+		})
 	}
 }

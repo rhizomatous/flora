@@ -18,7 +18,7 @@ func (s *Store) ReplaceGitHubCapability(ctx context.Context, chatID, secret stri
 	if len(secret) < 32 || !expires.After(time.Now()) {
 		return ErrInvalid
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO github_capabilities VALUES (?,?,?) ON CONFLICT(chat_id) DO UPDATE SET digest=excluded.digest, expires_at=excluded.expires_at`, chatID, capabilityDigest(secret), expires.Unix())
+	_, err := s.db.ExecContext(ctx, `INSERT INTO github_capabilities (chat_id,digest,expires_at) VALUES (?,?,?) ON CONFLICT(chat_id) DO UPDATE SET digest=excluded.digest, expires_at=excluded.expires_at`, chatID, capabilityDigest(secret), expires.Unix())
 	return err
 }
 
