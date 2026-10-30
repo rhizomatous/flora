@@ -34,10 +34,12 @@ type Service struct {
 	turns                   map[string]*turnActivity
 	promptAdmissionTimeout  time.Duration
 	promptCompletionTimeout time.Duration
+	questionPollInterval    time.Duration
+	questionPollTimeout     time.Duration
 }
 
 func New(ctx context.Context, store *storage.Store, p Provisioner) *Service {
-	return &Service{Store: store, provisioner: p, ctx: ctx, turns: map[string]*turnActivity{}, promptAdmissionTimeout: 30 * time.Second, promptCompletionTimeout: 30 * time.Second}
+	return &Service{Store: store, provisioner: p, ctx: ctx, turns: map[string]*turnActivity{}, promptAdmissionTimeout: 30 * time.Second, promptCompletionTimeout: 30 * time.Second, questionPollInterval: time.Second, questionPollTimeout: 3 * time.Second}
 }
 
 func (s *Service) Create(ctx context.Context, project, title, requestID, text string) (storage.Chat, error) {
@@ -230,6 +232,24 @@ func (s *Service) run(chatID string, message storage.Message) {
 	}()
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
+	questionResults := make(chan questionSnapshot, 1)
+	questionPollRunning, questionPollFailed := false, false
+	var nextQuestionPoll time.Time
+	pollQuestions := func() {
+		if questionPollRunning || time.Now().Before(nextQuestionPoll) {
+			return
+		}
+		questionPollRunning = true
+		nextQuestionPoll = time.Now().Add(s.questionPollInterval)
+		version := activity.questionVersion()
+		go func() {
+			pollCtx, cancel := context.WithTimeout(turnCtx, s.questionPollTimeout)
+			defer cancel()
+			questions, err := rt.pendingQuestions(pollCtx)
+			questionResults <- questionSnapshot{questions: questions, version: version, err: err}
+		}()
+	}
+	pollQuestions()
 	capture := func() (bool, error) {
 		snapshotCtx, cancel := context.WithTimeout(turnCtx, 10*time.Second)
 		defer cancel()
@@ -270,6 +290,19 @@ func (s *Service) run(chatID string, message storage.Message) {
 		select {
 		case <-ctx.Done():
 			return
+		case snapshot := <-questionResults:
+			questionPollRunning = false
+			if snapshot.err != nil {
+				if !questionPollFailed {
+					_ = s.Store.AppendActivity(turnCtx, chatID, rand.Text(), "question.poll.error", json.RawMessage(`{"reason":"Live questions could not be checked. Existing question waits remain paused."}`))
+				}
+				questionPollFailed = true
+				continue
+			}
+			questionPollFailed = false
+			if waiting, err := s.reconcileQuestions(turnCtx, chatID, c.SessionID, activity, snapshot, secrets); err == nil && waiting {
+				runtimeAccepted.Store(true)
+			}
 		case <-admissionDeadline:
 			// The pinned server can buffer headers until a question/turn ends.
 			// Bound admission only until a new user record proves acceptance.
@@ -308,6 +341,7 @@ func (s *Service) run(chatID string, message storage.Message) {
 			}
 			return
 		case <-ticker.C:
+			pollQuestions()
 			_, _ = capture()
 		}
 	}
@@ -394,8 +428,8 @@ func (s *Service) Questions(ctx context.Context, chatID string) ([]Question, err
 	}
 	rt := newRuntime(e)
 	defer rt.client.CloseIdleConnections()
-	var questions []Question
-	if err := rt.call(ctx, "GET", "/question", nil, &questions); err != nil {
+	questions, err := rt.pendingQuestions(ctx)
+	if err != nil {
 		return nil, err
 	}
 	result := []Question{}

@@ -89,6 +89,9 @@ final preview. When setup ends, Flora retains the complete redacted output once
 as an authenticated log download. Preview omissions and full-log capture failures
 are explicit in the saved activity. Waiting for a user question pauses the
 continuous-activity timer; provider retries still count as active work.
+The active turn checks pending questions independently of the browser and SSE.
+Failed checks preserve known waits, and stale checks cannot undo newer questions
+or confirmed answers.
 
 The pinned runtime may buffer prompt response headers until a turn ends. Flora
 bounds the wait for acceptance evidence and for a response after saved completion,

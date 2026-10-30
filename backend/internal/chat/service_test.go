@@ -64,6 +64,11 @@ type runtimeFixture struct {
 	noRuntimeAcceptance bool
 	hangAfterCompletion bool
 	historyUnavailable  bool
+	questionFailure     string
+	questionPolls       atomic.Int32
+	questionCompletions atomic.Int32
+	questionInFlight    atomic.Int32
+	questionMaxInFlight atomic.Int32
 }
 
 func newFixture(t *testing.T) *runtimeFixture {
@@ -98,8 +103,37 @@ func newFixture(t *testing.T) *runtimeFixture {
 			}
 		case r.URL.Path == "/question":
 			f.mu.Lock()
-			defer f.mu.Unlock()
-			if f.question {
+			question, failure := f.question, f.questionFailure
+			f.mu.Unlock()
+			f.questionPolls.Add(1)
+			active := f.questionInFlight.Add(1)
+			for {
+				previous := f.questionMaxInFlight.Load()
+				if previous >= active || f.questionMaxInFlight.CompareAndSwap(previous, active) {
+					break
+				}
+			}
+			defer func() { f.questionInFlight.Add(-1); f.questionCompletions.Add(1) }()
+			switch failure {
+			case "status":
+				w.WriteHeader(503)
+				return
+			case "invalid":
+				fmt.Fprint(w, `[{"id":"que_one"}]`)
+				return
+			case "null":
+				fmt.Fprint(w, `null`)
+				return
+			case "oversized":
+				fmt.Fprint(w, `[]`+strings.Repeat(" ", maxQuestionSnapshotBytes))
+				return
+			case "hang":
+				fmt.Fprint(w, `[`)
+				w.(http.Flusher).Flush()
+				<-r.Context().Done()
+				return
+			}
+			if question {
 				fmt.Fprint(w, `[{"id":"que_one","sessionID":"ses_one","questions":[{"question":"Continue?","header":"Choice","options":[{"label":"Yes","description":"Proceed"}]}]}]`)
 			} else {
 				fmt.Fprint(w, `[]`)

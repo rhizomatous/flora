@@ -16,6 +16,7 @@ type turnActivity struct {
 	questions              map[string]bool
 	resolved               map[string]bool
 	finished               bool
+	version                uint64
 }
 
 func (a *turnActivity) event(kind string, payload json.RawMessage) (storage.Status, string) {
@@ -34,12 +35,14 @@ func (a *turnActivity) event(kind string, payload json.RawMessage) (storage.Stat
 			return "", ""
 		}
 		a.questions[event.Properties.ID] = true
+		a.version++
 		a.provisioner.EndActivity(a.containerID)
 	case "question.replied", "question.rejected":
 		if !a.questions[event.Properties.RequestID] {
 			return "", ""
 		}
 		delete(a.questions, event.Properties.RequestID)
+		a.version++
 		if a.resolved == nil {
 			a.resolved = map[string]bool{}
 		}
