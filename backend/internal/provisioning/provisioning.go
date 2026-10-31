@@ -2,8 +2,7 @@
 // chat: capacity-limited creation, setup verification, private authenticated
 // endpoints, and continuous-activity enforcement. It talks to Docker only
 // through the Engine API and records facts through the storage package. It
-// does not submit runtime work, answer questions, or recover interrupted
-// turns; chat message wiring is a later layer.
+// does not submit runtime work, answer questions, or recover interrupted turns.
 package provisioning
 
 import (
@@ -613,14 +612,14 @@ func (m *Manager) containerExited(ctx context.Context, chatID string, paths stor
 }
 
 // Stop stops a chat's container while preserving its workspace, runtime
-// state, and recorded identity. Stopping a chat with no container
-// is a no-op. The container is kept for an explicit later start; it is never
+// state, and recorded identity. An unbound container is adopted only after its
+// ownership is validated. The container is kept for an explicit later start; it is never
 // transparently restarted.
 //
 // Stop serializes with Start per chat, so it can wait behind an in-progress
 // Start for up to the readiness bound. A caller that needs a prompt stop
 // while a Start is still waiting for readiness must first cancel that Start's
-// context; user-facing interrupt wiring is a later layer's job.
+// context.
 func (m *Manager) Stop(ctx context.Context, chatID string) error {
 	unlock := m.lockChat(chatID)
 	defer unlock()
@@ -629,14 +628,54 @@ func (m *Manager) Stop(ctx context.Context, chatID string) error {
 		return err
 	}
 	if chat.ContainerID == "" {
-		return nil
+		info, inspectErr := m.engine.ContainerInspect(ctx, containerName(chatID))
+		if docker.IsNotFound(inspectErr) {
+			return nil
+		}
+		if inspectErr != nil {
+			return inspectErr
+		}
+		paths, err := m.store.Paths(ctx, chatID)
+		if err != nil {
+			return err
+		}
+		imageID, err := m.resolveImage(ctx)
+		if err != nil {
+			return err
+		}
+		if err := validateOwned(info, chat, paths, imageID); err != nil {
+			return err
+		}
+		if err := m.store.BindRuntime(ctx, chatID, info.ID, ""); err != nil {
+			return err
+		}
+		chat.ContainerID = info.ID
 	}
-	m.EndActivity(chat.ContainerID)
 	var revokeErr error
 	if m.access != nil {
 		revokeErr = m.access.Revoke(ctx, chatID)
 	}
-	return errors.Join(revokeErr, m.engine.ContainerStop(ctx, chat.ContainerID, stopTimeout))
+	stopErr := m.engine.ContainerStop(ctx, chat.ContainerID, stopTimeout)
+	if stopErr == nil {
+		info, err := m.engine.ContainerInspect(ctx, chat.ContainerID)
+		stopErr = err
+		if err == nil && info.State.Running {
+			stopErr = errors.New("container stop did not confirm a stopped container")
+		}
+	}
+	if stopErr == nil {
+		m.EndActivity(chat.ContainerID)
+	}
+	return errors.Join(revokeErr, stopErr)
+}
+
+// ActivityExpired reports only observed continuous work, never idle time or
+// known question waits. Callers recheck it after serializing chat controls.
+func (m *Manager) ActivityExpired(containerID string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	since, ok := m.activeSince[containerID]
+	return ok && m.now().Sub(since) > m.cfg.ActivityTimeout
 }
 
 // Endpoint recovers the private runtime address of a running chat container,

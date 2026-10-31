@@ -25,7 +25,7 @@ func chatError(w http.ResponseWriter, err error) {
 	case errors.Is(err, storage.ErrConflict):
 		failure(w, 409, "This request identity was already used with different input.")
 	case errors.Is(err, storage.ErrStale):
-		failure(w, 409, "This runtime question is no longer pending. Refresh the chat.")
+		failure(w, 409, "This chat or question has changed. Refresh the chat before continuing.")
 	case errors.Is(err, storage.ErrInvalid):
 		failure(w, 400, "Provide a request identity and nonempty message of at most 128 KiB UTF-8. Titles must be 1 to 200 bytes.")
 	default:
@@ -48,6 +48,30 @@ func decodeChat(w http.ResponseWriter, r *http.Request, v any) bool {
 
 func (a *api) chatRoutes(mux *http.ServeMux) {
 	store := a.settings.Store
+	for _, action := range []string{"interrupt", "stop"} {
+		mux.HandleFunc("POST /api/chats/{id}/"+action, func(w http.ResponseWriter, r *http.Request) {
+			if a.chats == nil {
+				failure(w, 503, "Chat runtime is not configured.")
+				return
+			}
+			var err error
+			if action == "stop" {
+				err = a.chats.Stop(r.Context(), r.PathValue("id"))
+			} else {
+				err = a.chats.Interrupt(r.Context(), r.PathValue("id"))
+			}
+			if err != nil {
+				chatError(w, err)
+				return
+			}
+			c, err := store.Chat(r.Context(), r.PathValue("id"))
+			if err != nil {
+				chatError(w, err)
+				return
+			}
+			jsonResponse(w, 200, c)
+		})
+	}
 	mux.HandleFunc("GET /api/chats/{id}/setup-log", func(w http.ResponseWriter, r *http.Request) {
 		paths, err := store.Paths(r.Context(), r.PathValue("id"))
 		if err != nil {

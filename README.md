@@ -4,9 +4,10 @@ A self-hosted autonomous coding agent. Describe a task, let the agent work, then
 return to review its changes and open a draft pull request.
 
 **Status:** authenticated projects and persistent browser chats with full activity,
-follow-ups, runtime questions, and reconnectable saved events. Chat execution uses
-the pinned agent image and private host-side GitHub transport. Changes review,
-execution controls, and broad restart reconciliation are still separate work.
+follow-ups, runtime questions, reconnectable saved events, and separate interrupt
+and container stop controls. Chat execution uses the pinned agent image and
+private host-side GitHub transport. Changes review and broad restart
+reconciliation are still separate work.
 See [agent setup](agent/README.md), the [roadmap](https://github.com/rhizomatous/flora/issues/20)
 and [product requirements](specs/PRD.md).
 
@@ -81,8 +82,20 @@ work are rejected instead of queued. Browser disconnection does not cancel work;
 saved events replay in order on reconnect. OpenCode has no upstream replay cursor,
 so a runtime stream disconnection records a visible capture gap. Uncertain
 delivery remains blocked and is never automatically resent. Saved status alone
-does not prove runtime liveness after an application restart. Stop/resume and
-restart reconciliation are not provided by this slice.
+does not prove runtime liveness after an application restart. Before delivering a
+follow-up, Flora checks that the existing runtime session is idle. An uncertain
+or busy runtime remains blocked until an explicit interrupt or container stop.
+
+**Interrupt current work** keeps the container running. Flora waits for terminal
+runtime parts and verifies that tool processes have exited before allowing new
+work. Lingering background jobs or language servers can prevent confirmation;
+the chat remains blocked and can be stopped instead. Interrupt during preparation
+also requires a container stop because no runtime session exists to abort yet.
+**Stop container** frees capacity after Docker confirms the stop. Both controls
+preserve workspace, conversation, and saved activity. Send a new message to resume
+a stopped chat in the same container and session. Successful setup does not rerun,
+and the interrupted turn is never automatically replayed. Missing containers are
+not automatically replaced.
 
 Setup progress uses bounded previews, capped at 1 MiB of saved progress plus a
 final preview. When setup ends, Flora retains the complete redacted output once

@@ -44,13 +44,31 @@ try {
   await page.reload();
   await page.getByText("Saved response 2", { exact: true }).waitFor();
   assert.equal(await page.getByLabel("Conversation").getByText("Saved response 2", { exact: true }).count(), 1);
+  await page.getByLabel("Follow-up", { exact: true }).fill("interrupt control work");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await page.getByLabel("Conversation").getByText("interrupt control work", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Interrupt current work", exact: true }).click();
+  await page.getByText(/Current work interrupted;/).waitFor();
+  await page.getByLabel("Follow-up", { exact: true }).fill("New explicit work after interruption");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await page.getByText("Saved response 4", { exact: true }).waitFor();
+  await page.getByLabel("Follow-up", { exact: true }).fill("stop control work");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await page.getByLabel("Conversation").getByText("stop control work", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Stop container", exact: true }).click();
+  await page.getByRole("button", { name: "Resume with new message", exact: true }).waitFor();
+  await page.reload();
+  await page.getByLabel("Follow-up", { exact: true }).fill("New explicit work after stop");
+  await page.getByRole("button", { name: "Resume with new message", exact: true }).click();
+  await page.getByText("Saved response 6", { exact: true }).waitFor();
+  assert.equal(await page.getByLabel("Conversation").getByText("First browser prompt 🌸", { exact: true }).count(), 1);
   await page.setViewportSize({ width: 375, height: 812 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
   await page.getByRole("button", { name: "Log out", exact: true }).click();
   await page.goto(chatURL);
   await page.getByRole("heading", { name: "Log in", exact: true }).waitFor();
   assert.deepEqual(errors, []);
-  console.log("Chromium: login, create, reload during work, question/answer, full tool output/model, follow-up, grouped list, reconnect, mobile width, logout protection passed.");
+  console.log("Chromium: login, create, reload during work, question/answer, full tool output/model, interrupt, stop, explicit resume, saved context, grouped list, reconnect, mobile width, logout protection passed.");
 } finally {
   await browser.close();
 }
