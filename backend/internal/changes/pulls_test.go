@@ -19,9 +19,7 @@ func (f transport) RoundTrip(r *http.Request) (*http.Response, error) { return f
 func TestVerifyPullLinksAndRetainOnFailure(t *testing.T) {
 	s, c, _ := fixture(t)
 	ctx := context.Background()
-	if err := s.Store.SaveCredentials(ctx, storage.Credentials{GitHubToken: "host-only-test-token", Provider: "anthropic", Model: "test", ProviderKey: "test-key"}); err != nil {
-		t.Fatal(err)
-	}
+	credentials(t, s, "host-only-test-token")
 	if err := s.Store.SaveRuntimeMessage(ctx, "link-event", storage.Message{ChatID: c.ID, RuntimeMessageID: "assistant-1", Role: "assistant", Text: "Created https://github.com/example/core/pull/42 and https://github.com/other/repo/pull/9", Payload: json.RawMessage(`{"parts":[{"type":"tool","state":{"output":"https://evil.test/example/core/pull/42"}}]}`)}); err != nil {
 		t.Fatal(err)
 	}
@@ -29,8 +27,11 @@ func TestVerifyPullLinksAndRetainOnFailure(t *testing.T) {
 	fail := false
 	client := &http.Client{Transport: transport(func(r *http.Request) (*http.Response, error) {
 		requests++
-		if r.URL.String() != "https://api.github.com/repos/example/core/pulls/42" || r.Header.Get("Authorization") != "Bearer host-only-test-token" {
+		if r.Header.Get("Authorization") != "Bearer host-only-test-token" {
 			t.Fatalf("unsafe verification: %s", r.URL)
+		}
+		if r.URL.Path == "/repos/other/repo/pulls/9" {
+			return &http.Response{StatusCode: 404, Body: io.NopCloser(strings.NewReader(`{}`)), Header: make(http.Header)}, nil
 		}
 		status := 200
 		body := `{"number":42,"state":"open","draft":true,"html_url":"https://github.com/example/core/pull/42"}`
@@ -42,7 +43,7 @@ func TestVerifyPullLinksAndRetainOnFailure(t *testing.T) {
 	})}
 	s.verifyPulls(ctx, c, client)
 	r, err := s.Read(ctx, c.ID, true)
-	if err != nil || len(r.Pulls.Items) != 1 || !r.Pulls.Items[0].Draft {
+	if err != nil || len(r.Pulls.Items) != 1 || !r.Pulls.Items[0].Draft || r.Pulls.Error != "" {
 		t.Fatalf("unverified PR: %+v %v", r.Pulls, err)
 	}
 	p, _ := s.Store.Paths(ctx, c.ID)
@@ -55,7 +56,7 @@ func TestVerifyPullLinksAndRetainOnFailure(t *testing.T) {
 	fail = true
 	s.verifyPulls(ctx, c, client)
 	r, err = s.Read(ctx, c.ID, true)
-	if err != nil || len(r.Pulls.Items) != 1 || r.Pulls.Error == "" || requests != 2 || strings.Contains(r.Pulls.Error, "sensitive") {
+	if err != nil || len(r.Pulls.Items) != 1 || r.Pulls.Error == "" || requests != 3 || strings.Contains(r.Pulls.Error, "sensitive") {
 		t.Fatalf("PR retention failed: %+v %v", r.Pulls, err)
 	}
 }

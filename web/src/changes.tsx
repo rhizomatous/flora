@@ -31,8 +31,8 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
   const snapshot = review?.snapshot;
   return <section aria-label="Changes" className="mt-8 min-w-0 rounded-md border border-foreground/20 p-4">
     <h2 className="font-semibold">Changes</h2>
-    {!!review?.pulls.items?.length && <ul aria-label="Pull requests" className="mt-3 space-y-2 text-sm">{review.pulls.items.map(p => <li key={p.url}><a className="underline underline-offset-4" href={p.url} target="_blank" rel="noreferrer">{p.repository || p.url.split("/").slice(3, 5).join("/")} PR #{p.number}</a> · {p.draft && p.state === "open" ? "Draft" : p.state}</li>)}</ul>}
-    {!!review?.pulls.items?.length && review.pulls.checkedAt && <p className="mt-2 text-xs text-muted-foreground">PR status last checked <time dateTime={review.pulls.checkedAt}>{new Date(review.pulls.checkedAt).toLocaleString()}</time>.</p>}
+    {!!review?.pulls.items?.length && <ul aria-label="Pull requests" className="mt-3 space-y-2 text-sm">{review.pulls.items.map(p => <li key={p.url} className="break-words"><a className="underline underline-offset-4" href={p.url} target="_blank" rel="noreferrer">{p.repository || p.url.split("/").slice(3, 5).join("/")} PR #{p.number}</a> · {p.draft && p.state === "open" ? "Draft" : p.state === "merged" ? "Merged" : p.state === "closed" ? "Closed" : p.state === "open" ? "Open" : "Unknown"}</li>)}</ul>}
+    {!!review?.pulls.items?.length && review.pulls.checkedAt && <p className="mt-2 text-xs text-muted-foreground">PR discovery last attempted <time dateTime={review.pulls.checkedAt}>{new Date(review.pulls.checkedAt).toLocaleString()}</time>.</p>}
     {review?.pulls.error && <p role="status" className="mt-3 text-sm">{review.pulls.error}</p>}
     {error && <p role="alert" className="mt-3 text-sm">{error}</p>}
     {review?.error && <p role="alert" className="mt-3 text-sm">{review.error}</p>}
