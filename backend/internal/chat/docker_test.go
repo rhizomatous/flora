@@ -265,6 +265,32 @@ func TestChatDocker(t *testing.T) {
 	if !foundBusy || !foundAsked || !foundReplied {
 		t.Fatal("pinned runtime status/question event shapes were not captured")
 	}
+	// Observe the live error schema independently of the prompt worker's terminal
+	// snapshot. Its final HTTP response can race the asynchronous SSE notification.
+	endpoint, err := manager.Endpoint(ctx, c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	errorRuntime := newRuntime(endpoint)
+	defer errorRuntime.client.CloseIdleConnections()
+	errorCtx, cancelErrors := context.WithCancel(ctx)
+	errorReady, errorDone := make(chan error, 1), make(chan error, 1)
+	observedError := make(chan json.RawMessage, 1)
+	go func() {
+		errorDone <- errorRuntime.stream(errorCtx, second.SessionID, errorReady, func(kind string, payload json.RawMessage) error {
+			if kind == "session.error" {
+				select {
+				case observedError <- payload:
+				default:
+				}
+			}
+			return nil
+		})
+	}()
+	defer func() { cancelErrors(); <-errorDone }()
+	if err := <-errorReady; err != nil {
+		t.Fatal(err)
+	}
 	if _, err := svc.Submit(ctx, c.ID, "provider-failure", "error marker: read-only provider failure"); err != nil {
 		t.Fatal(err)
 	}
@@ -280,19 +306,15 @@ func TestChatDocker(t *testing.T) {
 	if current.Status != storage.Failed {
 		t.Fatal("real runtime provider rejection was not visible")
 	}
-	rows, _ = store.Activities(ctx, c.ID, 0, 1000)
-	foundError := false
-	for _, row := range rows {
-		if row.Kind == "runtime.session.error" {
-			var event runtimeEvent
-			_ = json.Unmarshal(row.Payload, &event)
-			if event.Properties.SessionID == second.SessionID && strings.Contains(string(event.Properties.Error), `"name":"APIError"`) {
-				foundError = true
-			}
+	select {
+	case raw := <-observedError:
+		var event runtimeEvent
+		if json.Unmarshal(raw, &event) != nil || event.Properties.SessionID != second.SessionID || !strings.Contains(string(event.Properties.Error), `"name":"APIError"`) {
+			t.Fatal("pinned session.error schema did not match")
 		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("pinned session.error was not observed")
 	}
-	if !foundError {
-		t.Fatal("pinned session.error schema was not captured")
-	}
+	rows, _ = store.Activities(ctx, c.ID, 0, 1000)
 	t.Logf("Pinned OpenCode: %d provider fixture calls, %d saved messages, %d saved events; same session/workspace on follow-up", calls.Load(), len(messages), len(rows))
 }
