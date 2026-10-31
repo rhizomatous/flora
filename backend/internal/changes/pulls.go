@@ -269,8 +269,10 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 		return
 	}
 	links := map[string]bool{}
+	pendingLinks := map[string]bool{}
 	for _, link := range state.Candidates {
 		links[link] = true
+		pendingLinks[link] = true
 	}
 	known := map[string]Pull{}
 	for _, p := range state.Items {
@@ -364,7 +366,12 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 		}
 		return 200
 	}
+	attempted := map[string]bool{}
 	verify := func(link string) {
+		if attempted[link] {
+			return
+		}
+		attempted[link] = true
 		match := pullLink.FindStringSubmatch(link)
 		if len(match) != 3 {
 			failure()
@@ -394,6 +401,7 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 		known[link] = Pull{Repository: strings.ToLower(match[1]), URL: link, Number: number, State: remote.State, Draft: remote.Draft}
 		delete(state.Missing, link)
 	}
+	confirmed := map[string]bool{}
 	if err == nil && len(tasks) > 0 {
 		start := state.Cursor % len(tasks)
 		for n := 0; n < len(tasks); n++ {
@@ -428,11 +436,18 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 					continue
 				}
 				link := pullURL(b.Repository, remote.Number)
-				if !links[link] {
-					state.Candidates = append(state.Candidates, link)
-					verify(link)
-					links[link] = true
+				if _, verified := known[link]; verified || confirmed[link] {
+					continue
 				}
+				confirmed[link] = true
+				// A matching GitHub head supersedes a missing message link. Keep
+				// the candidate even if this scan has no detail-request budget left.
+				delete(state.Missing, link)
+				if !pendingLinks[link] {
+					state.Candidates = append(state.Candidates, link)
+					pendingLinks[link] = true
+				}
+				verify(link)
 			}
 		}
 	}

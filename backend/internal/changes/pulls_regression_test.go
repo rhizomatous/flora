@@ -187,6 +187,70 @@ func TestUnverified404IsSuppressedWithoutOutage(t *testing.T) {
 	}
 }
 
+func TestMatchingBranchDiscoversPreannouncedMissingLink(t *testing.T) {
+	s, c, e := fixture(t)
+	ctx := context.Background()
+	credentials(t, s, t.Name())
+	linkMessage(t, s, c, "https://github.com/example/core/pull/7 https://github.com/example/core/pull/99")
+	created, inaccessible := false, false
+	sha := ""
+	details := map[string]int{}
+	lists := 0
+	client := &http.Client{Transport: transport(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path == "/repos/example/core/pulls" {
+			lists++
+			if !created || r.URL.Query().Get("head") != "example:work" {
+				t.Fatalf("unexpected branch query %s", r.URL)
+			}
+			candidate := fmt.Sprintf(`{"number":7,"html_url":"https://github.com/example/core/pull/7","head":{"ref":"work","sha":%q,"repo":{"full_name":"example/core"}}}`, sha)
+			// Repeated matching results must not trigger duplicate detail calls.
+			return reply(200, "["+candidate+","+candidate+"]"), nil
+		}
+		details[r.URL.Path]++
+		if !created || inaccessible || strings.HasSuffix(r.URL.Path, "/99") {
+			return reply(404, `{}`), nil
+		}
+		if r.URL.Path != "/repos/example/core/pulls/7" {
+			t.Fatalf("unexpected detail %s", r.URL)
+		}
+		return reply(200, `{"number":7,"state":"open","draft":true,"html_url":"https://github.com/example/core/pull/7"}`), nil
+	})}
+	s.verifyPulls(ctx, c, client)
+	missing := expirePulls(t, s, c)
+	until, err := time.Parse(time.RFC3339Nano, missing.Missing["https://github.com/example/core/pull/7"])
+	if err != nil || time.Until(until) < 23*time.Hour || missing.Error != "" {
+		t.Fatalf("preannounced link not suppressed: %+v", missing)
+	}
+	s.verifyPulls(ctx, c, client)
+	if details["/repos/example/core/pulls/7"] != 1 || details["/repos/example/core/pulls/99"] != 1 {
+		t.Fatal("saved missing links were retried")
+	}
+	git(t, e.dir, "remote", "add", "origin", "https://github.com/example/core.git")
+	git(t, e.dir, "checkout", "-b", "work")
+	write(t, e.dir, "committed", "new work\n")
+	git(t, e.dir, "commit", "-am", "work")
+	sha = git(t, e.dir, "rev-parse", "HEAD")
+	created = true
+	expirePulls(t, s, c)
+	s.verifyPulls(ctx, c, client)
+	r, err := s.Read(ctx, c.ID, true)
+	if err != nil || len(r.Pulls.Items) != 1 || r.Pulls.Items[0].Number != 7 || !r.Pulls.Items[0].Draft || r.Pulls.Error != "" || r.Pulls.Missing["https://github.com/example/core/pull/7"] != "" {
+		t.Fatalf("matching PR stayed suppressed: %+v %v", r.Pulls, err)
+	}
+	if details["/repos/example/core/pulls/7"] != 2 || details["/repos/example/core/pulls/99"] != 1 || lists != 1 {
+		t.Fatalf("duplicate or invalid detail requests: %v lists=%d", details, lists)
+	}
+	// A saved PR becoming inaccessible remains an outage, even if its branch
+	// still matches. Branch results must not erase the retained status or warning.
+	inaccessible = true
+	expirePulls(t, s, c)
+	s.verifyPulls(ctx, c, client)
+	r, err = s.Read(ctx, c.ID, true)
+	if err != nil || len(r.Pulls.Items) != 1 || r.Pulls.Error == "" || details["/repos/example/core/pulls/7"] != 3 || details["/repos/example/core/pulls/99"] != 1 {
+		t.Fatalf("known 404 retention changed: %+v details=%v %v", r.Pulls, details, err)
+	}
+}
+
 func TestGitHubBackoffSharedByTokenWithRotation(t *testing.T) {
 	s, c, _ := fixture(t)
 	ctx := context.Background()
