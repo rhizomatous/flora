@@ -78,6 +78,9 @@ func fixture(t *testing.T) (*Service, storage.Chat, *localExecutor) {
 		t.Fatal(e)
 	}
 	st.BindRuntime(ctx, c.ID, "container", "")
+	if e = st.Transition(ctx, c.ID, "", storage.Idle, "Ready"); e != nil {
+		t.Fatal(e)
+	}
 	c, _ = st.Chat(ctx, c.ID)
 	ex := &localExecutor{dir: dir}
 	return New(st, ex), c, ex

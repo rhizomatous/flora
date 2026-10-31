@@ -72,6 +72,9 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 			}
 		}
 	}
+	if len(links) == 0 {
+		return
+	}
 	creds, err := s.Store.Credentials(ctx)
 	if err != nil {
 		return

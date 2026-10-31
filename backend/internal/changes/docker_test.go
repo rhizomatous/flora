@@ -17,6 +17,10 @@ func TestDockerCaptureAndRemoval(t *testing.T) {
 	if os.Getenv("FLORA_CHANGES_DOCKER_TEST") != "1" {
 		t.Skip("set FLORA_CHANGES_DOCKER_TEST=1 with flora-agent-test:local available")
 	}
+	image := os.Getenv("FLORA_CHANGES_TEST_IMAGE")
+	if image == "" {
+		image = "flora-agent-test:local"
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	engine, err := docker.New("")
@@ -24,7 +28,7 @@ func TestDockerCaptureAndRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { engine.Close() })
-	id, err := engine.ContainerCreate(ctx, docker.ContainerSpec{Name: "flora-changes-test-" + strings.ToLower(rand.Text()), Image: "flora-agent-test:local", Env: []string{"OPENCODE_SERVER_PASSWORD=local-fixture-only", "FLORA_UID=1000", "FLORA_GID=1000", "FLORA_CHECKOUT_REQUIRED=1"}, NanoCPUs: 1e9, MemoryBytes: 512 << 20, PidsLimit: 128})
+	id, err := engine.ContainerCreate(ctx, docker.ContainerSpec{Name: "flora-changes-test-" + strings.ToLower(rand.Text()), Image: image, Env: []string{"OPENCODE_SERVER_PASSWORD=local-fixture-only", "FLORA_UID=1000", "FLORA_GID=1000", "FLORA_CHECKOUT_REQUIRED=1"}, NanoCPUs: 1e9, MemoryBytes: 512 << 20, PidsLimit: 128})
 	if err != nil {
 		t.Fatal(err)
 	}
