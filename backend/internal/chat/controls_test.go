@@ -273,6 +273,7 @@ func TestRuntimeReconnectIsBoundedAndNeverResubmits(t *testing.T) {
 		t.Fatal(err)
 	}
 	awaitPrompt(t, f)
+	f.streamUnavailable.Store(true)
 	close(f.streamStop)
 	deadline := time.Now().Add(4 * time.Second)
 	for f.streams.Load() < 4 && time.Now().Before(deadline) {
@@ -281,6 +282,19 @@ func TestRuntimeReconnectIsBoundedAndNeverResubmits(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 	if f.streams.Load() != 4 || f.prompts.Load() != 1 {
 		t.Fatal("unbounded reconnect or message resubmission")
+	}
+	rows, err := s.Store.Activities(context.Background(), c.ID, 0, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gaps := 0
+	for _, row := range rows {
+		if row.Kind == "capture.gap" {
+			gaps++
+		}
+	}
+	if gaps != 1 {
+		t.Fatalf("repeated failed stream connections saved %d gap notices", gaps)
 	}
 	f.release <- false
 	waitStatus(t, s, c.ID, storage.Idle)

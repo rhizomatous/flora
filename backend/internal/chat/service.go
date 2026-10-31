@@ -77,6 +77,18 @@ func (s *Service) Submit(ctx context.Context, chatID, requestID, text string) (s
 		if err := s.quiesce(ctx, chatID); err != nil {
 			return storage.Acceptance{}, err
 		}
+		if reason := s.ContinuationBlock(ctx, c); reason != "" {
+			messages, err := s.Store.Messages(ctx, chatID)
+			if err != nil {
+				return storage.Acceptance{}, err
+			}
+			for _, message := range messages {
+				if message.RequestID == requestID {
+					return s.Store.AcceptMessage(ctx, chatID, requestID, text)
+				}
+			}
+			return storage.Acceptance{}, &ControlError{Reason: reason}
+		}
 	}
 	a, err := s.Store.AcceptMessage(ctx, chatID, requestID, text)
 	if err != nil || a.Duplicate {
@@ -245,6 +257,8 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 	captureErrors := make(chan error, 1)
 	var runtimeFailure atomic.Bool
 	var runtimeAccepted atomic.Bool
+	var captureReady <-chan error
+	captureDisconnected := false
 	priorUsers := maps.Clone(knownUsers)
 	secrets := redaction.Values(ctx, s.Store, chatID, endpoint.Password, endpoint.ProviderKey)
 	captureEvent := func(kind string, payload json.RawMessage) error {
@@ -268,6 +282,7 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 		return s.runtimeActivity(chatID, activity, kind, payload)
 	}
 	startCapture := func(ready chan error) {
+		captureReady = ready
 		captureErrors = make(chan error, 1)
 		result := captureErrors
 		go func() { result <- rt.stream(turnCtx, c.SessionID, ready, captureEvent) }()
@@ -283,6 +298,7 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 		fail("Could not connect activity capture. No message was delivered.")
 		return
 	}
+	captureReady = nil
 	_ = s.transition(chatID, message.ID, storage.Working, "Delivering message to OpenCode")
 	result := make(chan error, 1)
 	promptDone := make(chan struct{})
@@ -401,11 +417,27 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 			cancelPrompt()
 			transportCanceled = true
 			completionDeadline = nil
+		case err := <-captureReady:
+			if err == nil {
+				captureDisconnected = false
+			}
+			captureReady = nil
 		case <-captureErrors:
 			if turnCtx.Err() != nil {
 				return
 			}
-			_ = s.Store.AppendActivity(ctx, chatID, rand.Text(), "capture.gap", json.RawMessage(`{"reason":"OpenCode activity stream disconnected. Transient events may be missing; saved message snapshots remain available."}`))
+			select {
+			case err := <-captureReady:
+				if err == nil {
+					captureDisconnected = false
+				}
+			default:
+			}
+			captureReady = nil
+			if !captureDisconnected {
+				_ = s.Store.AppendActivity(ctx, chatID, rand.Text(), "capture.gap", json.RawMessage(`{"reason":"OpenCode activity stream disconnected. Transient events may be missing; saved message snapshots remain available."}`))
+			}
+			captureDisconnected = true
 			// History cannot reconstruct transient events. Only a successful prompt
 			// response together with a saved final snapshot can confirm completion.
 			captureErrors = nil

@@ -17,6 +17,27 @@ import (
 
 const uncertainRecovery = "Execution cannot be confirmed. The accepted message will not be resent. External effects may already have happened. Interrupt current work or stop the container before sending new input."
 const pendingRecoveryControl = "A previous execution control was not confirmed. Retry interrupt or stop the container before continuing. External effects may already have happened."
+const missingContainerRecovery = "The saved container is missing. Continuation is unavailable because Flora cannot recreate this container. Workspace files and saved history are retained. Output may be missing and external effects are uncertain. Prior actions will not be replayed."
+const idleConnectionUnavailable = "The container or OpenCode connection is unavailable. No turn is active. Workspace files and saved history are retained; new input is paused until the connection is restored or the container is stopped."
+
+// ContinuationBlock reports a confirmed missing container, not a transient
+// inspection failure. Existing accepted requests remain available for lookup.
+func (s *Service) ContinuationBlock(ctx context.Context, c storage.Chat) string {
+	if c.StatusReason == missingContainerRecovery {
+		return missingContainerRecovery
+	}
+	if c.ContainerID == "" || s.provisioner == nil {
+		return ""
+	}
+	check, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	_, err := s.provisioner.Endpoint(check, c.ID)
+	var ended *provisioning.ExecutionEndedError
+	if errors.As(err, &ended) && ended.Missing {
+		return missingContainerRecovery
+	}
+	return ""
+}
 
 func recoveryControlPending(reason string) bool {
 	for _, prefix := range []string{"Interrupting current work", "Stopping container", "Capture shutdown could not be confirmed.", "Runtime abort or tool teardown could not be confirmed.", "Runtime acceptance is uncertain.", "Preparation has no runtime session to interrupt.", "Container stop could not be confirmed.", pendingRecoveryControl} {
@@ -52,6 +73,9 @@ func (s *Service) reconcileChat(ctx context.Context, chatID string) error {
 		return err
 	}
 	if c.Status == storage.Stopped || c.Status == storage.Failed {
+		if reason := s.ContinuationBlock(ctx, c); reason != "" && c.StatusReason != reason {
+			return s.Store.Transition(ctx, c.ID, c.ActiveMessageID, storage.Failed, reason)
+		}
 		return nil
 	}
 	s.turnMu.Lock()
@@ -82,10 +106,14 @@ func (s *Service) reconcileChat(ctx context.Context, chatID string) error {
 		cancel()
 		var ended *provisioning.ExecutionEndedError
 		if errors.As(err, &ended) {
-			return s.Store.Transition(ctx, c.ID, "", storage.Failed, ended.Reason+". Workspace and saved history are retained. Send new input to continue; prior actions are not replayed.")
+			reason := ended.Reason + ". Workspace and saved history are retained. Send new input to continue; prior actions are not replayed."
+			if ended.Missing {
+				reason = missingContainerRecovery
+			}
+			return s.Store.Transition(ctx, c.ID, "", storage.Failed, reason)
 		}
-		if err != nil && c.StatusReason != uncertainRecovery {
-			return s.Store.Transition(ctx, c.ID, "", storage.Waiting, uncertainRecovery)
+		if err != nil && c.StatusReason != idleConnectionUnavailable {
+			return s.Store.Transition(ctx, c.ID, "", storage.Waiting, idleConnectionUnavailable)
 		}
 		if err == nil && c.Status == storage.Waiting {
 			return s.Store.Transition(ctx, c.ID, "", storage.Idle, "Container connection restored; ready for new input")
@@ -111,12 +139,13 @@ func (s *Service) reconcileChat(ctx context.Context, chatID string) error {
 	return nil
 }
 
-func (s *Service) recoveryGap(ctx context.Context, chatID string) {
-	_ = s.Store.AppendActivity(ctx, chatID, rand.Text(), "capture.gap", json.RawMessage(`{"reason":"Flora is reconnecting to existing execution. Runtime message and tool snapshots will be reconciled, but transient events during the disconnection cannot be recovered. No accepted message or action is replayed."}`))
+func (s *Service) recoveryGap(ctx context.Context, chatID string) error {
+	return s.Store.AppendActivity(ctx, chatID, rand.Text(), "capture.gap", json.RawMessage(`{"reason":"Flora is reconnecting to existing execution. Runtime message and tool snapshots will be reconciled, but transient events during the disconnection cannot be recovered. No accepted message or action is replayed."}`))
 }
 
 func (s *Service) observeRecovery(ctx context.Context, c storage.Chat) {
-	s.recoveryGap(ctx, c.ID)
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 	activity := &turnActivity{provisioner: s.provisioner, containerID: c.ContainerID, messageID: c.ActiveMessageID, questions: map[string]bool{}}
 	blocked := recoveryControlPending(c.StatusReason)
 	activity.finished = blocked
@@ -126,9 +155,21 @@ func (s *Service) observeRecovery(ctx context.Context, c storage.Chat) {
 	s.turnMu.Unlock()
 	defer s.endTurnActivity(c.ID, activity)
 	known, seen := map[string]bool{}, map[string][32]byte{}
-	messages, err := s.Store.Messages(ctx, c.ID)
-	if err != nil {
-		return
+	var messages []storage.Message
+	for {
+		var err error
+		messages, err = s.Store.Messages(ctx, c.ID)
+		if err == nil {
+			break
+		}
+		if ctx.Err() != nil || errors.Is(err, storage.ErrNotFound) {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
 	}
 	var runtimeID string
 	for _, m := range messages {
@@ -144,22 +185,33 @@ func (s *Service) observeRecovery(ctx context.Context, c storage.Chat) {
 	}
 	var streamCancel context.CancelFunc
 	var streamDone chan error
+	var streamReady <-chan error
 	var runtimeFailure atomic.Bool
+	disconnected, gapPending := true, true
 	defer func() {
 		if streamCancel != nil {
 			streamCancel()
 			<-streamDone
 		}
 	}()
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
 	for {
 		if ctx.Err() != nil {
 			return
 		}
 		current, err := s.Store.Chat(ctx, c.ID)
-		if err != nil || current.ActiveMessageID != c.ActiveMessageID {
+		if errors.Is(err, storage.ErrNotFound) || err == nil && current.ActiveMessageID != c.ActiveMessageID {
 			return
+		}
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+			continue
+		}
+		if gapPending && s.recoveryGap(ctx, c.ID) == nil {
+			gapPending = false
 		}
 		check, cancel := context.WithTimeout(ctx, 3*time.Second)
 		endpoint, err := s.provisioner.Endpoint(check, c.ID)
@@ -173,8 +225,19 @@ func (s *Service) observeRecovery(ctx context.Context, c storage.Chat) {
 		var ended *provisioning.ExecutionEndedError
 		if errors.As(err, &ended) {
 			cancel()
-			_ = s.transition(c.ID, c.ActiveMessageID, storage.Failed, ended.Reason+". Execution ended unexpectedly. Workspace and saved history are retained; output may be missing and external effects are uncertain. Send explicit new input to continue with saved context. Prior actions will not be replayed.")
-			return
+			reason := ended.Reason + ". Execution ended unexpectedly. Workspace and saved history are retained; output may be missing and external effects are uncertain. Send explicit new input to continue with saved context. Prior actions will not be replayed."
+			if ended.Missing {
+				reason = missingContainerRecovery
+			}
+			if err := s.transition(c.ID, c.ActiveMessageID, storage.Failed, reason); err == nil || errors.Is(err, storage.ErrStale) {
+				return
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+			continue
 		}
 		if blocked {
 			// A terminal message cannot replace process-exit verification for a
@@ -195,9 +258,11 @@ func (s *Service) observeRecovery(ctx context.Context, c storage.Chat) {
 				streamCtx, stop := context.WithCancel(ctx)
 				streamCancel = stop
 				streamDone = make(chan error, 1)
+				ready := make(chan error, 1)
+				streamReady = ready
 				done := streamDone
 				go func() {
-					done <- rt.stream(streamCtx, c.SessionID, make(chan error, 1), func(kind string, raw json.RawMessage) error {
+					done <- rt.stream(streamCtx, c.SessionID, ready, func(kind string, raw json.RawMessage) error {
 						if kind == "message.part.delta" {
 							return nil
 						}
@@ -236,10 +301,11 @@ func (s *Service) observeRecovery(ctx context.Context, c storage.Chat) {
 						if failure || runtimeFailure.Load() {
 							target, reason = storage.Failed, "The recovered response reports a provider or runtime failure. Inspect saved activity before sending new input."
 						}
-						_ = s.transition(c.ID, c.ActiveMessageID, target, reason)
-						rt.client.CloseIdleConnections()
-						cancel()
-						return
+						if saveErr := s.transition(c.ID, c.ActiveMessageID, target, reason); saveErr == nil || errors.Is(saveErr, storage.ErrStale) {
+							rt.client.CloseIdleConnections()
+							cancel()
+							return
+						}
 					}
 					if err == nil && !waiting {
 						reason, target := uncertainRecovery, storage.Waiting
@@ -264,10 +330,26 @@ func (s *Service) observeRecovery(ctx context.Context, c storage.Chat) {
 		select {
 		case <-ctx.Done():
 			return
+		case err := <-streamReady:
+			if err == nil {
+				disconnected = false
+			}
+			streamReady = nil
 		case <-streamDone:
+			select {
+			case err := <-streamReady:
+				if err == nil {
+					disconnected = false
+				}
+			default:
+			}
 			streamCancel()
 			streamCancel, streamDone = nil, nil
-			s.recoveryGap(ctx, c.ID)
+			streamReady = nil
+			if !disconnected {
+				gapPending = true
+			}
+			disconnected = true
 			select {
 			case <-ctx.Done():
 				return

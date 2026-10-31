@@ -38,7 +38,14 @@ func (p *browserProvisioner) Start(ctx context.Context, id string) (provisioning
 	}
 	return p.Endpoint(ctx, id)
 }
-func (p *browserProvisioner) Endpoint(context.Context, string) (provisioning.Endpoint, error) {
+func (p *browserProvisioner) Endpoint(ctx context.Context, id string) (provisioning.Endpoint, error) {
+	c, err := p.store.Chat(ctx, id)
+	if err != nil {
+		return provisioning.Endpoint{}, err
+	}
+	if c.ContainerID == "missing-browser-container" {
+		return provisioning.Endpoint{}, &provisioning.ExecutionEndedError{Reason: "The saved container is missing", Missing: true}
+	}
 	return provisioning.Endpoint{URL: p.url, Username: "opencode", Password: "test-runtime-password", ContainerID: "browser-container"}, nil
 }
 func (*browserProvisioner) BeginActivity(string)                           {}
@@ -350,17 +357,35 @@ func TestChatBrowser(t *testing.T) {
 	if os.Getenv("FLORA_CHAT_BROWSER_TEST") != "1" {
 		t.Skip("set FLORA_CHAT_BROWSER_TEST=1 after installing Playwright Chromium")
 	}
-	store, svc, authentication, _, _, cleanup := chatAPI(t, true)
+	store, svc, authentication, _, project, cleanup := chatAPI(t, true)
 	defer cleanup()
+	missing, err := store.CreateChat(context.Background(), project.ID, "Missing container", "flora@sha256:"+strings.Repeat("a", 64), "1.2.27")
+	if err != nil {
+		t.Fatal(err)
+	}
+	accepted, err := store.AcceptMessage(context.Background(), missing.ID, "missing-saved", "Saved input from the missing container")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.BindRuntime(context.Background(), missing.ID, "missing-browser-container", "saved-session"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Transition(context.Background(), missing.ID, accepted.Message.ID, storage.Failed, "The saved container is missing. Saved history remains available."); err != nil {
+		t.Fatal(err)
+	}
 	gapCtx, stopGap := context.WithCancel(context.Background())
 	gapDone := make(chan struct{})
 	go func() {
 		defer close(gapDone)
 		for {
 			chats, err := store.Chats(gapCtx)
-			if err == nil && len(chats) > 0 {
-				_ = store.AppendActivity(gapCtx, chats[0].ID, "browser-capture-gap", "capture.gap", json.RawMessage(`{"reason":"Transient runtime events cannot be recovered."}`))
-				return
+			if err == nil {
+				for _, c := range chats {
+					if c.Title == "Browser persistence" {
+						_ = store.AppendActivity(gapCtx, c.ID, "browser-capture-gap", "capture.gap", json.RawMessage(`{"reason":"Transient runtime events cannot be recovered."}`))
+						return
+					}
+				}
 			}
 			select {
 			case <-gapCtx.Done():

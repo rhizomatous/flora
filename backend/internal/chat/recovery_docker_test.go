@@ -195,6 +195,23 @@ func TestRecoveryDocker(t *testing.T) {
 	if err != nil || info.State.Running || calls.Load() != 2 {
 		t.Fatal("reboot-equivalent state restarted execution")
 	}
+	if err := engine.ContainerRemove(ctx, c.ContainerID, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := recovered.Reconcile(ctx); err != nil {
+		t.Fatal(err)
+	}
+	missing, err := store.Chat(ctx, c.ID)
+	if err != nil || missing.StatusReason != missingContainerRecovery || recovered.ContinuationBlock(ctx, missing) == "" {
+		t.Fatal("removed container advertised continuation")
+	}
+	if _, err := recovered.Submit(ctx, c.ID, "after-removal", "continue"); err == nil {
+		t.Fatal("removed container accepted futile continuation")
+	}
+	saved, err := store.Messages(ctx, c.ID)
+	if err != nil || len(saved) != len(messages) || calls.Load() != 2 {
+		t.Fatal("missing-container check changed history or submitted work")
+	}
 	for _, mode := range []string{"crash", "oom", "host-reboot"} {
 		interrupted, err := recovered.Create(ctx, project.ID, mode, mode, "Hold another real command")
 		if err != nil {

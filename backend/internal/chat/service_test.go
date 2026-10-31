@@ -73,6 +73,8 @@ type runtimeFixture struct {
 	questionMaxInFlight atomic.Int32
 	busy                bool
 	streams             atomic.Int32
+	streamUnavailable   atomic.Bool
+	connectedStreams    atomic.Int32
 	questionReplies     atomic.Int32
 	replyStarted        chan struct{}
 	replyRelease        chan struct{}
@@ -111,9 +113,14 @@ func newFixture(t *testing.T) *runtimeFixture {
 			fmt.Fprint(w, `true`)
 		case r.URL.Path == "/event":
 			f.streams.Add(1)
+			if f.streamUnavailable.Load() {
+				w.WriteHeader(503)
+				return
+			}
 			w.Header().Set("Content-Type", "text/event-stream")
 			fmt.Fprint(w, ": connected\n\n")
 			w.(http.Flusher).Flush()
+			f.connectedStreams.Add(1)
 			for {
 				select {
 				case <-r.Context().Done():

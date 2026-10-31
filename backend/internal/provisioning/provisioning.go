@@ -692,7 +692,7 @@ func (m *Manager) Endpoint(ctx context.Context, chatID string) (Endpoint, error)
 	info, err := m.engine.ContainerInspect(ctx, lookup)
 	if err != nil {
 		if docker.IsNotFound(err) {
-			return Endpoint{}, &ExecutionEndedError{Reason: "The saved container is missing"}
+			return Endpoint{}, &ExecutionEndedError{Reason: "The saved container is missing", Missing: true}
 		}
 		return Endpoint{}, err
 	}
@@ -732,7 +732,10 @@ func (m *Manager) Endpoint(ctx context.Context, chatID string) (Endpoint, error)
 
 // ExecutionEndedError confirms that the saved container cannot still execute.
 // It does not establish whether commands made external changes before exit.
-type ExecutionEndedError struct{ Reason string }
+type ExecutionEndedError struct {
+	Reason  string
+	Missing bool
+}
 
 func (e *ExecutionEndedError) Error() string { return e.Reason }
 

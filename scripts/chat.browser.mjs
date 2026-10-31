@@ -65,6 +65,14 @@ try {
   assert.equal(await page.getByLabel("Conversation").getByText("First browser prompt 🌸", { exact: true }).count(), 1);
   await page.setViewportSize({ width: 375, height: 812 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  await page.getByRole("link", { name: "All chats", exact: true }).click();
+  await page.getByRole("link", { name: "Missing container", exact: true }).click();
+  await page.getByRole("button", { name: "Continuation unavailable", exact: true }).waitFor();
+  assert.equal(await page.getByLabel("Follow-up", { exact: true }).isDisabled(), true);
+  assert.equal(await page.getByRole("button", { name: "Continuation unavailable", exact: true }).isDisabled(), true);
+  assert.equal(await page.getByRole("button", { name: "Stop container", exact: true }).count(), 0);
+  await page.getByLabel("Conversation").getByText("Saved input from the missing container", { exact: true }).waitFor();
+  assert.doesNotMatch(await page.locator("body").innerText(), /Send a new message to restart|Send new input to continue/);
   await page.getByRole("button", { name: "Log out", exact: true }).click();
   await page.goto(chatURL);
   await page.getByRole("heading", { name: "Log in", exact: true }).waitFor();
