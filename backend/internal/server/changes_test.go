@@ -35,6 +35,12 @@ func savedReview(t *testing.T, store *storage.Store, p storage.Project) storage.
 		{Path: "picture.png", Status: "M", Binary: true, Diff: "Binary files differ\n", Bytes: 20},
 		{Path: "removed.txt", Status: "D", Diff: "-removed\n", Bytes: 9},
 	}}
+	snap.Bases = map[string]string{"first/app": strings.Repeat("b", 40), "second/app": strings.Repeat("c", 40)}
+	for i := range snap.Files {
+		snap.Files[i].Repository = "first/app"
+	}
+	snap.Files[1].Repository = "second/app"
+	snap.Files = append(snap.Files, changes.File{Repository: "second/app", Path: "src/hello.ts", Status: "M", Diff: "+second repository review\n", Bytes: 26})
 	b, _ := json.Marshal(snap)
 	if err = os.WriteFile(filepath.Join(paths.Artifacts, "changes.json"), b, 0600); err != nil {
 		t.Fatal(err)

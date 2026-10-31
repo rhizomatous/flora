@@ -4,9 +4,11 @@ package githubbroker
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -18,8 +20,9 @@ import (
 )
 
 type Broker struct {
-	store     *storage.Store
-	transport http.RoundTripper
+	store       *storage.Store
+	transport   http.RoundTripper
+	materialize func(context.Context, string, string) (string, error)
 }
 
 func New(store *storage.Store) *Broker {
@@ -52,7 +55,8 @@ func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		unauthorized(w)
 		return
 	}
-	if _, err := b.store.GitHubCapability(r.Context(), credential, time.Now()); err != nil {
+	chatID, err := b.store.GitHubCapability(r.Context(), credential, time.Now())
+	if err != nil {
 		unauthorized(w)
 		return
 	}
@@ -61,6 +65,39 @@ func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path, escaped := r.URL.Path, r.URL.EscapedPath()
+	if path == "/api/v3/flora/repositories" && escaped == path {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		var in struct {
+			Repository string `json:"repository"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&in) != nil || in.Repository == "" {
+			http.Error(w, "provide a repository identity", http.StatusBadRequest)
+			return
+		}
+		if b.materialize == nil {
+			http.Error(w, "repository fetching unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		p, err := b.materialize(r.Context(), chatID, in.Repository)
+		if err != nil {
+			var validation *MaterializeValidationError
+			if errors.As(err, &validation) {
+				http.Error(w, validation.Message, http.StatusBadRequest)
+			} else {
+				// Do not log raw executor/storage errors or request input: either
+				// may contain credentials or host paths.
+				slog.Warn("Repository materialization unavailable; check storage, Docker, repository and token permissions", "chat", chatID)
+				http.Error(w, "Repository fetch unavailable. Check storage, Docker, repository and token permissions, then retry.", http.StatusServiceUnavailable)
+			}
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"path": p})
+		return
+	}
 	origin := "https://api.github.com"
 	git := false
 	switch {

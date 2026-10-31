@@ -122,12 +122,17 @@ func TestCanceledCheckoutDoesNotRelease(t *testing.T) {
 	}
 }
 
-func TestCheckoutRejectsUnsupportedCoreCountWithoutChangingSnapshotOrAccess(t *testing.T) {
+func TestCheckoutCoreCountsAndExtraMaterialization(t *testing.T) {
 	s, fixtureChat, b := fixture(t)
 	ctx := context.Background()
-	a, err := NewAccess(b, execFunc(func(context.Context, string, string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
-		t.Fatal("unsupported checkout executed a container command")
-		return -1, nil
+	var scripts []string
+	a, err := NewAccess(b, execFunc(func(_ context.Context, _ string, _ string, _ []string, in io.Reader, out io.Writer, _ io.Writer) (int, error) {
+		raw, _ := io.ReadAll(in)
+		scripts = append(scripts, string(raw))
+		if strings.Contains(string(raw), "git cat-file") {
+			io.WriteString(out, strings.Repeat("a", 40))
+		}
+		return 0, nil
 	}), CheckoutConfig{Host: "github.internal", CACert: "fixture-ca"})
 	if err != nil {
 		t.Fatal(err)
@@ -155,15 +160,28 @@ func TestCheckoutRejectsUnsupportedCoreCountWithoutChangingSnapshotOrAccess(t *t
 			if err := s.ReplaceGitHubCapability(ctx, chat.ID, credential, time.Now().Add(time.Hour)); err != nil {
 				t.Fatal(err)
 			}
-			if err := a.Checkout(ctx, chat, paths, "container"); err == nil || !strings.Contains(err.Error(), fmt.Sprintf("found %d", count)) || !strings.Contains(err.Error(), "create a new chat") {
-				t.Fatalf("unsupported configuration diagnostic: %v", err)
+			scripts = nil
+			if err := a.Checkout(ctx, chat, paths, "container"); err != nil {
+				t.Fatal(err)
 			}
 			saved, err := s.Chat(ctx, chat.ID)
-			if err != nil || len(saved.Configuration.Repositories) != len(repos) || len(saved.StartingCommits) != 0 {
-				t.Fatal("unsupported checkout changed the snapshot or starting commits")
+			if err != nil || len(saved.Configuration.Repositories) != len(repos) || len(saved.StartingCommits) != count {
+				t.Fatal("wrong core checkout commits")
 			}
-			if id, err := s.GitHubCapability(ctx, credential, time.Now()); err != nil || id != chat.ID {
-				t.Fatal("unsupported checkout replaced existing access")
+			for _, script := range scripts[1:] {
+				if strings.Contains(script, "/octo/extra") {
+					t.Fatal("extra cloned eagerly")
+				}
+			}
+			if _, err := a.Materialize(ctx, chat.ID, "octo/extra"); err != nil {
+				t.Fatal(err)
+			}
+			saved, _ = s.Chat(ctx, chat.ID)
+			if len(saved.StartingCommits) != count+1 {
+				t.Fatal("extra base not recorded")
+			}
+			if _, err := a.Materialize(ctx, chat.ID, "other/repo"); err == nil {
+				t.Fatal("unknown repository materialized")
 			}
 		})
 	}

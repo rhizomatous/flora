@@ -24,7 +24,8 @@ func (e *localExecutor) Exec(ctx context.Context, _, _ string, _ []string, in io
 	b, _ := io.ReadAll(in)
 	cmd := exec.CommandContext(ctx, "sh", "-s")
 	cmd.Dir = e.dir
-	cmd.Stdin = strings.NewReader(strings.Replace(string(b), "cd /workspace", "cd "+quote(e.dir), 1))
+	script := strings.ReplaceAll(string(b), "'/workspace", "'"+e.dir)
+	cmd.Stdin = strings.NewReader(strings.ReplaceAll(script, "cd /workspace", "cd "+quote(e.dir)))
 	cmd.Stdout = out
 	cmd.Stderr = stderr
 	err := cmd.Run()
@@ -173,6 +174,114 @@ func TestInvalidStartingCommitRejected(t *testing.T) {
 	c.StartingCommits["core"] = "HEAD; touch /tmp/unsafe"
 	if _, err := s.capture(context.Background(), c); err == nil {
 		t.Fatal("accepted injected revision")
+	}
+}
+
+func TestCaptureSameSizeEditAtIndexTimestamp(t *testing.T) {
+	s, c, e := fixture(t)
+	git(t, e.dir, "config", "core.trustctime", "false")
+	path := filepath.Join(e.dir, "unstaged")
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stamp := info.ModTime()
+	if err := os.Chtimes(filepath.Join(e.dir, ".git/index"), stamp, stamp); err != nil {
+		t.Fatal(err)
+	}
+	write(t, e.dir, "unstaged", strings.Repeat("x", int(info.Size())-1)+"\n")
+	if err := os.Chtimes(path, stamp, stamp); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Refresh(context.Background(), c.ID); err != nil {
+		t.Fatal(err)
+	}
+	r, err := s.Read(context.Background(), c.ID, false)
+	if err != nil || len(r.Snapshot.Files) != 1 || r.Snapshot.Files[0].Path != "unstaged" {
+		t.Fatalf("same-size edit missed: %+v %v", r, err)
+	}
+}
+
+func TestMultipleRepositoryReviewBeforeAndAfterExtra(t *testing.T) {
+	s, old, e := fixture(t)
+	ctx := context.Background()
+	repos := []storage.Repository{
+		{Name: "first/app", URL: "https://github.com/first/app.git", BaseBranch: "main", Role: "core"},
+		{Name: "second/app", URL: "https://github.com/second/app.git", BaseBranch: "release", Role: "core"},
+		{Name: "third/extra", URL: "https://github.com/third/extra.git", BaseBranch: "next", Role: "extra"},
+	}
+	p, err := s.Store.CreateProject(ctx, "collection", storage.Configuration{Repositories: repos})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := s.Store.CreateChat(ctx, p.ID, "review", old.ImageDigest, old.HarnessVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, r := range repos {
+		dir := filepath.Join(e.dir, "repos", r.Name)
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+		git(t, dir, "init")
+		write(t, dir, "same.txt", "base\n")
+		git(t, dir, "add", ".")
+		git(t, dir, "commit", "-m", "base")
+		sha := git(t, dir, "rev-parse", "HEAD")
+		if i < 2 {
+			if err := s.Store.RecordStartingCommit(ctx, c.ID, r.Name, sha); err != nil {
+				t.Fatal(err)
+			}
+		}
+		write(t, dir, "same.txt", r.Name+"\n")
+		if i == 1 {
+			write(t, dir, "binary", "\x00binary")
+		}
+		if i == 2 {
+			write(t, dir, "large", strings.Repeat("large line\n", InlineLimit/5))
+		}
+	}
+	if err := s.Refresh(ctx, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	r, err := s.Read(ctx, c.ID, false)
+	if err != nil || len(r.Snapshot.Files) != 3 || len(r.Snapshot.Bases) != 2 {
+		t.Fatalf("before extra: %+v %v snapshot %+v", r, err, r.Snapshot)
+	}
+	for _, f := range r.Snapshot.Files {
+		if f.Repository == "third/extra" || (f.Path == "same.txt" && !strings.Contains(f.Diff, "+"+f.Repository)) {
+			t.Fatalf("wrong repo: %+v", f)
+		}
+	}
+	dir := filepath.Join(e.dir, "repos/third/extra")
+	if err := s.Store.RecordStartingCommit(ctx, c.ID, "third/extra", git(t, dir, "rev-parse", "HEAD")); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Refresh(ctx, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	r, err = s.Read(ctx, c.ID, true)
+	if err != nil || len(r.Snapshot.Files) != 5 || len(r.Snapshot.Bases) != 3 {
+		t.Fatalf("after extra: %+v %v", r, err)
+	}
+	for _, f := range r.Snapshot.Files {
+		if f.Path == "large" && (f.Repository != "third/extra" || !f.Truncated || f.Diff != "") {
+			t.Fatal("large diff lost repository")
+		}
+		if f.Path == "binary" && (f.Repository != "second/app" || !f.Binary || f.Diff != "") {
+			t.Fatal("binary lost repository")
+		}
+	}
+	id := r.Snapshot.ID
+	if err := os.RemoveAll(filepath.Join(e.dir, "repos/second/app")); err != nil {
+		t.Fatal(err)
+	}
+	if s.Refresh(ctx, c.ID) == nil {
+		t.Fatal("missing core silently omitted")
+	}
+	r, err = s.Read(ctx, c.ID, true)
+	if err != nil || r.Snapshot.ID != id || !r.Stale {
+		t.Fatal("failed capture replaced review")
 	}
 }
 

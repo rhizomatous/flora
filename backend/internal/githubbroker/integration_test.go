@@ -45,7 +45,7 @@ func git(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-func fixtureUpstream(t *testing.T, broker *Broker) (string, *atomic.Int32) {
+func fixtureUpstream(t *testing.T, broker *Broker, additional ...string) (string, *atomic.Int32) {
 	t.Helper()
 	root := t.TempDir()
 	if err := os.Mkdir(filepath.Join(root, "octo"), 0700); err != nil {
@@ -63,6 +63,14 @@ func fixtureUpstream(t *testing.T, broker *Broker) (string, *atomic.Int32) {
 	git(t, seed, "commit", "-m", "fixture")
 	git(t, seed, "push", repo, "main")
 	sha := git(t, seed, "rev-parse", "HEAD")
+	for _, name := range additional {
+		path := filepath.Join(root, name+".git")
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		git(t, root, "clone", "--bare", repo, path)
+		git(t, path, "branch", "release", "main")
+	}
 	gitBin, err := exec.LookPath("git")
 	if err != nil {
 		t.Fatal(err)

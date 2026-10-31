@@ -13,8 +13,11 @@ try {
   await page.goto(`${process.env.FLORA_BROWSER_URL}/#chats/${process.env.FLORA_BROWSER_CHAT}`);
   const review = page.getByRole("region", { name: "Changes", exact: true });
   await review.getByText(/Saved review, possibly out of date/).waitFor();
-  await review.locator("summary").filter({ hasText: "src/hello.ts" }).click();
+  await review.locator("summary").filter({ hasText: "first/app" }).filter({ hasText: "src/hello.ts" }).click();
   await review.getByText(/hello review/).waitFor();
+  await review.locator("summary").filter({ hasText: "second/app" }).filter({ hasText: "src/hello.ts" }).click();
+  await review.getByText(/second repository review/).waitFor();
+  assert.equal(await review.getByRole("list", { name: "Repository bases" }).getByRole("listitem").count(), 2);
   await review.locator("summary").filter({ hasText: "big.txt" }).click();
   await review.getByText(/exceeds the 1 MiB inline limit/).waitFor();
   const [download] = await Promise.all([

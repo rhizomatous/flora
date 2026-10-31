@@ -78,7 +78,9 @@ func encodeFiles(w io.Writer, files []File) error {
 		if i > 0 {
 			s.raw(",")
 		}
-		s.raw(`{"path":`)
+		s.raw(`{"repository":`)
+		s.text(f.Repository)
+		s.raw(`,"path":`)
 		s.text(f.Path)
 		s.raw(`,"previous":`)
 		s.text(f.Previous)
@@ -109,6 +111,8 @@ func encodeJSON(w io.Writer, v any) error {
 		s.text(snapshot.CapturedAt)
 		s.raw(`,"base":`)
 		s.text(snapshot.Base)
+		s.raw(`,"bases":`)
+		s.value(snapshot.Bases)
 		s.raw(`,"files":`)
 		if s.err == nil {
 			s.err = encodeFiles(w, snapshot.Files)
