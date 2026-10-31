@@ -42,7 +42,7 @@ jobs:
           FLORA_BROKER_GH_TOKEN: ""
         run: nix develop --command go -C backend test -race -count=1 -v -run '^Test(Checkout|MultiRepository)Docker$' ./internal/githubbroker
       - name: Check persistent turns against pinned OpenCode and a local provider fixture
-        run: FLORA_CHAT_TEST_IMAGE=flora-agent-test:ci FLORA_CHAT_TEST_LSP=1 FLORA_CHAT_PROVIDER_HOST="$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')" nix develop --command go -C backend test -race -count=1 -v -run '^TestChatDocker$' ./internal/chat
+        run: FLORA_CHAT_TEST_IMAGE=flora-agent-test:ci FLORA_CHAT_TEST_LSP=1 FLORA_CHAT_PROVIDER_HOST="$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')" nix develop --command go -C backend test -race -count=1 -v -run '^Test(Chat|Recovery)Docker$' ./internal/chat
       - name: Check review retention after container stop and removal
         env:
           FLORA_CHANGES_DOCKER_TEST: "1"

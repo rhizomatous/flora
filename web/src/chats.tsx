@@ -6,8 +6,8 @@ import { Changes } from "./changes";
 type Chat = { ID: string; ProjectID: string; Title: string; Status: "working" | "waiting" | "failed" | "idle" | "stopped"; StatusReason: string; UpdatedAt: string; ImageDigest: string; HarnessVersion: string; StartingCommits: Record<string, string> };
 type Part = { id?: string; type: string; text?: string; tool?: string; state?: { status: string; input?: unknown; output?: string; error?: string; title?: string } };
 type Message = { ID: string; Role: string; Text: string; Provider: string; Model: string; Payload: { parts?: Part[]; info?: { error?: unknown } } };
-type Activity = { Sequence: number; Kind: string; CreatedAt: string; Payload: unknown };
-type Detail = { chat: Chat; messages: Message[] };
+type Activity = { ChatID: string; Sequence: number; Kind: string; CreatedAt: string; Payload: unknown };
+type Detail = { chat: Chat; messages: Message[]; continuationBlockedReason?: string };
 type Project = { id: string; name: string };
 type Question = { id: string; questions: { question: string; header: string; multiple: boolean; custom?: boolean; options: { label: string; description: string }[] }[] };
 const control = "mt-2 w-full rounded-md border border-foreground/30 bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-foreground disabled:opacity-60";
@@ -167,11 +167,12 @@ export function Chats({ path, onExpired }: { path: string; onExpired: () => void
     {detail && <>
       <div role="status" className="mt-6 flex flex-wrap items-center gap-2 rounded-md border border-foreground/20 p-3 text-sm">{detail.chat.Status === "working" && <FlowerMark />}<strong>{statusName(detail.chat.Status)}</strong><span>{detail.chat.StatusReason}</span></div>
       <p role="status" className="mt-2 text-xs text-muted-foreground">{connection} · {projects.find(p => p.id === detail.chat.ProjectID)?.name}</p>
-      <div className="mt-4 flex flex-wrap gap-3" aria-label="Execution controls">
+      {activity.some(row => row.ChatID === id && row.Kind === "capture.gap") && <p role="note" className="mt-4 rounded-md border border-foreground/20 p-3 text-sm">Some live activity could not be captured while Flora was disconnected from OpenCode. Recovered message and tool snapshots are shown below. Transient output may be missing. Reconnecting does not replay accepted messages or actions.</p>}
+      {!detail.continuationBlockedReason && <div className="mt-4 flex flex-wrap gap-3" aria-label="Execution controls">
         {activeTurn && <button type="button" className={button} disabled={busy} onClick={() => controlWork("interrupt")}>Interrupt current work</button>}
         {detail.chat.Status !== "stopped" && <button type="button" className={button} disabled={busy} onClick={() => controlWork("stop")}>Stop container</button>}
-      </div>
-      <p className="mt-2 text-sm text-muted-foreground">{detail.chat.Status === "stopped" ? "Send a new message to restart this container with its saved workspace and conversation. Interrupted work is not replayed." : "Interrupt keeps the container running. Stop frees container capacity. Both preserve saved work and conversation."}</p>
+      </div>}
+      {!detail.continuationBlockedReason && <p className="mt-2 text-sm text-muted-foreground">{detail.chat.Status === "stopped" ? "Send a new message to restart this container with its saved workspace and conversation. Interrupted work is not replayed." : "Interrupt keeps the container running. Stop frees container capacity. Both preserve saved work and conversation."}</p>}
       <ol aria-label="Conversation" className="mt-8 space-y-8">{detail.messages.map(m => <li key={m.ID} className="min-w-0 rounded-md border border-foreground/20 p-4">
         <h2 className="text-sm font-semibold">{m.Role === "user" ? "You" : "Flora"}{m.Provider && <span className="ml-2 break-all font-normal text-muted-foreground">{m.Provider}/{m.Model}</span>}</h2>
         <div className="mt-3 space-y-4">{m.Payload.parts?.length ? m.Payload.parts.map((p, i) => <MessagePart key={p.id || i} part={p} />) : <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-6">{m.Text}</pre>}</div>
@@ -181,9 +182,9 @@ export function Chats({ path, onExpired }: { path: string; onExpired: () => void
       {questionError && <p className="mt-6 text-sm" role="status">{questionError}</p>}
       {questions.map(q => <QuestionForm key={q.id} question={q} chatID={id} onError={report} onAnswered={() => setQuestions(rows => rows.filter(row => row.id !== q.id))} />)}
       <form onSubmit={send} className="mt-8 space-y-4">
-        <label className="block text-sm font-medium">Follow-up<textarea className={`${control} min-h-28`} name="text" required disabled={busy || activeTurn} aria-describedby="followup-help" /></label>
-        <p id="followup-help" className="text-sm text-muted-foreground">{activeTurn ? "Wait for the current turn to finish or answer Flora’s question. Messages are not queued." : "Continue in the same workspace and conversation. Up to 128 KiB UTF-8."}</p>
-        <button className={button} disabled={busy || activeTurn}>{busy ? "Working…" : detail.chat.Status === "stopped" ? "Resume with new message" : "Send message"}</button>
+        <label className="block text-sm font-medium">Follow-up<textarea className={`${control} min-h-28`} name="text" required disabled={busy || activeTurn || !!detail.continuationBlockedReason} aria-describedby="followup-help" /></label>
+        <p id="followup-help" className="text-sm text-muted-foreground">{detail.continuationBlockedReason ? "Continuation is unavailable. Saved conversation and workspace files are retained." : activeTurn ? "Wait for the current turn to finish or answer Flora’s question. Messages are not queued." : "Continue in the same workspace and conversation. Up to 128 KiB UTF-8."}</p>
+        <button className={button} disabled={busy || activeTurn || !!detail.continuationBlockedReason}>{detail.continuationBlockedReason ? "Continuation unavailable" : busy ? "Working…" : detail.chat.Status === "stopped" ? "Resume with new message" : "Send message"}</button>
       </form>
       <details className="mt-10 rounded-md border border-foreground/20 p-4"><summary className="cursor-pointer text-sm font-medium">Full activity ({activity.length} saved events)</summary><p className="mt-3 text-sm text-muted-foreground">Setup activity contains bounded previews. After setup finishes, <a className={link} href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>download the full redacted setup log</a>. Any capture failure is shown in the final setup event.</p><ol className="mt-4 space-y-3">{activity.map(row => <li key={row.Sequence}><details><summary className="cursor-pointer break-words text-xs">{row.Kind} · <time dateTime={row.CreatedAt}>{new Date(row.CreatedAt).toLocaleTimeString()}</time> · #{row.Sequence}</summary><pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(row.Payload, null, 2)}</pre></details></li>)}</ol></details>
       <details className="mt-4 rounded-md border border-foreground/20 p-4"><summary className="cursor-pointer text-sm font-medium">Environment snapshot</summary><pre className="mt-3 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify({ image: detail.chat.ImageDigest, OpenCode: detail.chat.HarnessVersion, startingCommits: detail.chat.StartingCommits }, null, 2)}</pre></details>

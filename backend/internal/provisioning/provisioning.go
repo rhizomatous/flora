@@ -685,15 +685,43 @@ func (m *Manager) Endpoint(ctx context.Context, chatID string) (Endpoint, error)
 	if err != nil {
 		return Endpoint{}, err
 	}
-	if chat.ContainerID == "" {
-		return Endpoint{}, storage.ErrNotFound
+	lookup := chat.ContainerID
+	if lookup == "" {
+		lookup = containerName(chatID)
 	}
-	info, err := m.engine.ContainerInspect(ctx, chat.ContainerID)
+	info, err := m.engine.ContainerInspect(ctx, lookup)
+	if err != nil {
+		if docker.IsNotFound(err) {
+			return Endpoint{}, &ExecutionEndedError{Reason: "The saved container is missing", Missing: true}
+		}
+		return Endpoint{}, err
+	}
+	paths, err := m.store.Paths(ctx, chatID)
 	if err != nil {
 		return Endpoint{}, err
 	}
+	image, err := m.engine.ImageInspect(ctx, m.cfg.ImageRef)
+	if err != nil {
+		return Endpoint{}, err
+	}
+	if m.cfg.ImageID != "" && image.ID != m.cfg.ImageID {
+		return Endpoint{}, errors.New("configured runtime image identity changed")
+	}
+	if err := validateOwned(info, chat, paths, image.ID); err != nil {
+		return Endpoint{}, err
+	}
+	if chat.ContainerID == "" {
+		if err := m.store.BindRuntime(ctx, chatID, info.ID, ""); err != nil {
+			return Endpoint{}, err
+		}
+		chat.ContainerID = info.ID
+	}
 	if !info.State.Running {
-		return Endpoint{}, fmt.Errorf("container for chat is %s, not running", info.State.Status)
+		reason := fmt.Sprintf("The container exited with code %d", info.State.ExitCode)
+		if info.State.OOMKilled {
+			reason = "Docker reports that the container was killed after running out of memory"
+		}
+		return Endpoint{}, &ExecutionEndedError{Reason: reason}
 	}
 	addr := info.LoopbackAddress(runtimePort)
 	if addr == "" {
@@ -701,6 +729,15 @@ func (m *Manager) Endpoint(ctx context.Context, chatID string) (Endpoint, error)
 	}
 	return Endpoint{URL: "http://" + addr, Username: "opencode", Password: info.EnvValue("OPENCODE_SERVER_PASSWORD"), ProviderKey: containerProviderKey(info), ContainerID: chat.ContainerID}, nil
 }
+
+// ExecutionEndedError confirms that the saved container cannot still execute.
+// It does not establish whether commands made external changes before exit.
+type ExecutionEndedError struct {
+	Reason  string
+	Missing bool
+}
+
+func (e *ExecutionEndedError) Error() string { return e.Reason }
 
 func containerProviderKey(info docker.ContainerInfo) string {
 	for _, name := range []string{"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"} {

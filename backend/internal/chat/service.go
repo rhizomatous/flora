@@ -77,6 +77,18 @@ func (s *Service) Submit(ctx context.Context, chatID, requestID, text string) (s
 		if err := s.quiesce(ctx, chatID); err != nil {
 			return storage.Acceptance{}, err
 		}
+		if reason := s.ContinuationBlock(ctx, c); reason != "" {
+			messages, err := s.Store.Messages(ctx, chatID)
+			if err != nil {
+				return storage.Acceptance{}, err
+			}
+			for _, message := range messages {
+				if message.RequestID == requestID {
+					return s.Store.AcceptMessage(ctx, chatID, requestID, text)
+				}
+			}
+			return storage.Acceptance{}, &ControlError{Reason: reason}
+		}
 	}
 	a, err := s.Store.AcceptMessage(ctx, chatID, requestID, text)
 	if err != nil || a.Duplicate {
@@ -133,6 +145,11 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 	} else {
 		// Never rotate access while existing git/gh commands may be running.
 		endpoint, err = s.provisioner.Endpoint(ctx, chatID)
+		var ended *provisioning.ExecutionEndedError
+		if errors.As(err, &ended) {
+			// This path is reached only for newly accepted, explicit user input.
+			endpoint, err = s.provisioner.Start(ctx, chatID)
+		}
 	}
 	if err != nil {
 		var capacity *provisioning.CapacityError
@@ -240,6 +257,8 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 	captureErrors := make(chan error, 1)
 	var runtimeFailure atomic.Bool
 	var runtimeAccepted atomic.Bool
+	var captureReady <-chan error
+	captureDisconnected := false
 	priorUsers := maps.Clone(knownUsers)
 	secrets := redaction.Values(ctx, s.Store, chatID, endpoint.Password, endpoint.ProviderKey)
 	captureEvent := func(kind string, payload json.RawMessage) error {
@@ -263,6 +282,7 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 		return s.runtimeActivity(chatID, activity, kind, payload)
 	}
 	startCapture := func(ready chan error) {
+		captureReady = ready
 		captureErrors = make(chan error, 1)
 		result := captureErrors
 		go func() { result <- rt.stream(turnCtx, c.SessionID, ready, captureEvent) }()
@@ -278,6 +298,7 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 		fail("Could not connect activity capture. No message was delivered.")
 		return
 	}
+	captureReady = nil
 	_ = s.transition(chatID, message.ID, storage.Working, "Delivering message to OpenCode")
 	result := make(chan error, 1)
 	promptDone := make(chan struct{})
@@ -396,18 +417,36 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 			cancelPrompt()
 			transportCanceled = true
 			completionDeadline = nil
+		case err := <-captureReady:
+			if err == nil {
+				captureDisconnected = false
+			}
+			captureReady = nil
 		case <-captureErrors:
 			if turnCtx.Err() != nil {
 				return
 			}
-			_ = s.Store.AppendActivity(ctx, chatID, rand.Text(), "capture.gap", json.RawMessage(`{"reason":"OpenCode activity stream disconnected. Transient events may be missing; saved message snapshots remain available."}`))
+			select {
+			case err := <-captureReady:
+				if err == nil {
+					captureDisconnected = false
+				}
+			default:
+			}
+			captureReady = nil
+			if !captureDisconnected {
+				_ = s.Store.AppendActivity(ctx, chatID, rand.Text(), "capture.gap", json.RawMessage(`{"reason":"OpenCode activity stream disconnected. Transient events may be missing; saved message snapshots remain available."}`))
+			}
+			captureDisconnected = true
 			// History cannot reconstruct transient events. Only a successful prompt
 			// response together with a saved final snapshot can confirm completion.
 			captureErrors = nil
+			delay := 5 * time.Second
 			if reconnectAttempts < 3 {
 				reconnectAttempts++
-				reconnect = time.After(time.Duration(reconnectAttempts) * 250 * time.Millisecond)
+				delay = time.Duration(reconnectAttempts) * 250 * time.Millisecond
 			}
+			reconnect = time.After(delay)
 		case <-reconnect:
 			reconnect = nil
 			startCapture(make(chan error, 1))
@@ -449,6 +488,31 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 	}
 	providerFailure := false
 	*completed = false
+	unknownUsers := 0
+	for _, raw := range history {
+		var m runtimeMessage
+		if err := json.Unmarshal(raw, &m); err != nil {
+			return false, err
+		}
+		if m.Info.Role == "user" && !knownUsers[m.Info.ID] {
+			unknownUsers++
+		}
+	}
+	if unknownUsers > 1 {
+		return false, errors.New("ambiguous runtime message history")
+	}
+	var acceptedText string
+	if unknownUsers == 1 {
+		messages, err := s.Store.Messages(ctx, c.ID)
+		if err != nil {
+			return false, err
+		}
+		for _, saved := range messages {
+			if saved.ID == messageID {
+				acceptedText = saved.Text
+			}
+		}
+	}
 	for _, raw := range history {
 		raw = redaction.JSON(raw, secrets...)
 		var m runtimeMessage
@@ -456,6 +520,15 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 			return false, err
 		}
 		if m.Info.Role == "user" && !knownUsers[m.Info.ID] {
+			var text strings.Builder
+			for _, part := range m.Parts {
+				if part.Type == "text" {
+					text.WriteString(part.Text)
+				}
+			}
+			if text.String() != redaction.Text(acceptedText, secrets...) {
+				return false, errors.New("runtime user message does not match accepted input")
+			}
 			if *runtimeID != "" && *runtimeID != m.Info.ID {
 				return false, errors.New("unexpected concurrent runtime user message")
 			}
@@ -473,6 +546,19 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 		}
 		if m.Info.ParentID == *runtimeID {
 			*completed = m.Info.Time.Completed > 0 && (m.Info.Finish != "" && m.Info.Finish != "tool-calls" || len(m.Info.Error) > 0 && string(m.Info.Error) != "null")
+			var runtimeError struct {
+				Name string `json:"name"`
+			}
+			_ = json.Unmarshal(m.Info.Error, &runtimeError)
+			// An abort snapshot does not establish that child processes exited.
+			if runtimeError.Name == "MessageAbortedError" {
+				*completed = false
+			}
+			for _, part := range m.Parts {
+				if part.Type == "tool" && part.State.Status != "completed" && part.State.Status != "error" {
+					*completed = false
+				}
+			}
 		}
 		hash := sha256.Sum256(raw)
 		if seen[m.Info.ID] == hash {

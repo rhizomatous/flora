@@ -91,6 +91,9 @@ func main() {
 			os.Exit(1)
 		}
 		chats = chat.New(ctx, store, manager)
+		if err := chats.Reconcile(ctx); err != nil {
+			slog.Error("Saved chat reconciliation unavailable; check storage and Docker")
+		}
 		go func() {
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
@@ -102,6 +105,9 @@ func main() {
 				}
 				if err := chats.EnforceTimeouts(ctx); err != nil {
 					slog.Error("Activity timeout enforcement unavailable; check Docker")
+				}
+				if err := chats.Reconcile(ctx); err != nil {
+					slog.Error("Saved chat reconciliation unavailable; check storage and Docker")
 				}
 			}
 		}()
