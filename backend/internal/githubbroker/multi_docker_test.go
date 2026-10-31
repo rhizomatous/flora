@@ -128,12 +128,17 @@ func TestMultiRepositoryDocker(t *testing.T) {
 	if err != nil || len(next.Configuration.Repositories) != 1 || next.Configuration.SetupCommand != "different setup" {
 		t.Fatal("new chat did not use updated settings")
 	}
-	run("/home/flora/bin/flora-repository octo/extra; cd /workspace/repos/octo/extra; printf 'extra\\n' > hello.txt; printf '\\000binary' > binary; yes 'large line' | head -c 1100000 > large")
+	run("/home/flora/bin/flora-repository octo/extra")
 	chat, _ = s.Chat(ctx, chat.ID)
 	if len(chat.StartingCommits) != 3 || chat.StartingCommits["octo/extra"] != sha {
 		t.Fatal("extra base missing")
 	}
+	run("cd /workspace/repos/octo/extra; printf 'extra\\n' > hello.txt; printf '\\000binary' > binary; yes 'large line' | head -c 1100000 > large; printf 'agent-modified-marker\\n' > .git/flora-starting-commit")
 	run("/home/flora/bin/flora-repository octo/extra; grep extra /workspace/repos/octo/extra/hello.txt")
+	saved, err := s.Chat(ctx, chat.ID)
+	if err != nil || saved.StartingCommits["octo/extra"] != sha {
+		t.Fatal("agent marker changed a saved starting commit")
+	}
 	if _, err := access.Materialize(ctx, chat.ID, "unknown/repo"); err == nil {
 		t.Fatal("unknown repository recorded")
 	}

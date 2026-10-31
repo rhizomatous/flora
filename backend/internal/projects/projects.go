@@ -19,6 +19,13 @@ type Input struct {
 	Name          string                `json:"name"`
 	Configuration storage.Configuration `json:"configuration"`
 }
+
+const MaxRepositories = 100
+
+// MaxInputBytes allows 100 repository rows, including fully JSON-escaped names,
+// URLs (300 bytes), branches (255 bytes), and an 8192-byte setup command.
+const MaxInputBytes = 512 << 10
+
 type ValidationError struct{ Message string }
 
 func (e *ValidationError) Error() string { return e.Message }
@@ -80,12 +87,15 @@ func (s *Service) Validate(ctx context.Context, in Input) (Input, error) {
 	if len(in.Configuration.SetupCommand) > 8192 || strings.ContainsRune(in.Configuration.SetupCommand, 0) {
 		return in, invalid("Setup command must be at most 8192 bytes and contain no NUL characters.")
 	}
-	if len(in.Configuration.Repositories) == 0 || len(in.Configuration.Repositories) > 100 {
+	if len(in.Configuration.Repositories) == 0 || len(in.Configuration.Repositories) > MaxRepositories {
 		return in, invalid("Configure between 1 and 100 repositories for this project.")
 	}
 	seen := map[string]bool{}
 	for i := range in.Configuration.Repositories {
 		r := &in.Configuration.Repositories[i]
+		if len(r.URL) > 300 || len(r.Name) > 140 {
+			return in, invalid("Repository URL or name is too long.")
+		}
 		name, err := repository(r.URL)
 		if err != nil {
 			return in, err

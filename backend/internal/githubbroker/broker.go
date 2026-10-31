@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -82,7 +83,15 @@ func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		p, err := b.materialize(r.Context(), chatID, in.Repository)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			var validation *MaterializeValidationError
+			if errors.As(err, &validation) {
+				http.Error(w, validation.Message, http.StatusBadRequest)
+			} else {
+				// Do not log raw executor/storage errors or request input: either
+				// may contain credentials or host paths.
+				slog.Warn("Repository materialization unavailable; check storage, Docker, repository and token permissions", "chat", chatID)
+				http.Error(w, "Repository fetch unavailable. Check storage, Docker, repository and token permissions, then retry.", http.StatusServiceUnavailable)
+			}
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")

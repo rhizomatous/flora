@@ -1,7 +1,10 @@
 package githubbroker
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"log/slog"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -45,5 +48,32 @@ func TestMaterializationRequiresChatCapability(t *testing.T) {
 	request("POST", path, fixtureCapability, `{"repository":"octo/demo"}`, 401)
 	if calls != 1 {
 		t.Fatal("revoked request reached helper")
+	}
+}
+
+func TestMaterializationErrorsAreSafe(t *testing.T) {
+	_, _, b := fixture(t)
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	defer slog.SetDefault(previous)
+	for _, tc := range []struct {
+		err    error
+		status int
+	}{
+		{errors.New("open /private/host/credential-SECRET: permission denied"), 503},
+		{&MaterializeValidationError{"repository is not in this chat's configuration"}, 400},
+	} {
+		b.materialize = func(context.Context, string, string) (string, error) { return "", tc.err }
+		r := httptest.NewRequest("POST", "/api/v3/flora/repositories", strings.NewReader(`{"repository":"octo/demo"}`))
+		r.Header.Set("Authorization", "Bearer "+fixtureCapability)
+		w := httptest.NewRecorder()
+		b.ServeHTTP(w, r)
+		if w.Code != tc.status || strings.Contains(w.Body.String(), "SECRET") || strings.Contains(w.Body.String(), "/private") {
+			t.Fatalf("unsafe error: %d %s", w.Code, w.Body)
+		}
+	}
+	if strings.Contains(logs.String(), "SECRET") || strings.Contains(logs.String(), "/private") || !strings.Contains(logs.String(), "materialization unavailable") {
+		t.Fatalf("unsafe or missing diagnostic: %s", &logs)
 	}
 }

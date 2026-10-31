@@ -35,9 +35,11 @@ type Access struct {
 	broker *Broker
 	engine Executor
 	cfg    CheckoutConfig
-	mu     sync.Mutex
+	locks  sync.Map
 }
 
+// NewAccess wires the broker's repository helper. Call it before serving the
+// broker; the same broker must handle the container's git and gh requests.
 func NewAccess(broker *Broker, engine Executor, cfg CheckoutConfig) (*Access, error) {
 	u, err := url.Parse("https://" + cfg.Host)
 	if err != nil || u.Host != cfg.Host || u.Hostname() == "" || u.Port() != "" || u.User != nil || u.Path != "" || u.RawQuery != "" || strings.ContainsAny(cfg.Host, "\r\n\t '") || cfg.CACert == "" || broker == nil || engine == nil {
@@ -61,6 +63,17 @@ func (a *Access) Revoke(ctx context.Context, chatID string) error {
 	return a.broker.Revoke(ctx, chatID)
 }
 
+func (a *Access) lockChat(ctx context.Context, id string) (func(), error) {
+	value, _ := a.locks.LoadOrStore(id, make(chan struct{}, 1))
+	lock := value.(chan struct{})
+	select {
+	case lock <- struct{}{}:
+		return func() { <-lock }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
 func quote(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'" }
 
 type tailBuffer struct{ data []byte }
@@ -78,10 +91,13 @@ func (b *tailBuffer) Write(p []byte) (int, error) {
 // the container, saves their immutable bases, then allows setup to start. Existing
 // repositories are never reset on retry, even if the remote branch has moved.
 func (a *Access) Checkout(ctx context.Context, chat storage.Chat, paths storage.Paths, containerID string) (err error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, a.cfg.Timeout)
 	defer cancel()
+	unlock, err := a.lockChat(ctx, chat.ID)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	for _, r := range chat.Configuration.Repositories {
 		if err := checkoutRepository(r); err != nil {
 			return err
@@ -184,6 +200,8 @@ func checkoutRepository(r storage.Repository) error {
 
 // checkoutOne never changes a materialized checkout. Its marker lets a retry
 // recover the original base after cloning succeeded but saving to SQLite failed.
+// The marker belongs to the agent's writable checkout, so it is a retry aid,
+// not trusted evidence against an agent deliberately changing its own base.
 func (a *Access) checkoutOne(ctx context.Context, chat storage.Chat, r storage.Repository, run func(string) (string, error)) error {
 	if err := checkoutRepository(r); err != nil {
 		return err
@@ -228,10 +246,13 @@ func (a *Access) checkoutOne(ctx context.Context, chat storage.Chat, r storage.R
 // Materialize fetches a configured repository using the chat's frozen settings.
 // This helper records review bases; ordinary git/gh access remains token-wide.
 func (a *Access) Materialize(ctx context.Context, chatID, name string) (string, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, a.cfg.Timeout)
 	defer cancel()
+	unlock, err := a.lockChat(ctx, chatID)
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
 	chat, err := a.broker.store.Chat(ctx, chatID)
 	if err != nil {
 		return "", err
@@ -262,8 +283,12 @@ func (a *Access) Materialize(ctx context.Context, chatID, name string) (string, 
 		})
 		return storage.RepositoryPath(chat.Configuration, r), err
 	}
-	return "", errors.New("repository is not in this chat's configuration; use ordinary git/gh for other token-authorized repositories")
+	return "", &MaterializeValidationError{"repository is not in this chat's configuration; use ordinary git/gh for other token-authorized repositories"}
 }
+
+type MaterializeValidationError struct{ Message string }
+
+func (e *MaterializeValidationError) Error() string { return e.Message }
 
 func workspaceUser(info os.FileInfo) (string, error) {
 	stat, ok := info.Sys().(*syscall.Stat_t)

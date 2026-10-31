@@ -191,6 +191,8 @@ func TestConfigurationLimits(t *testing.T) {
 		func(in *Input) { in.Configuration.SetupCommand = strings.Repeat("x", 8193) },
 		func(in *Input) { in.Configuration.SetupCommand = "a\x00b" },
 		func(in *Input) { in.Configuration.Repositories = make([]storage.Repository, 101) },
+		func(in *Input) { in.Configuration.Repositories[0].URL = strings.Repeat("x", 301) },
+		func(in *Input) { in.Configuration.Repositories[0].Name = strings.Repeat("x", 141) },
 		func(in *Input) {
 			in.Configuration.Repositories = append(in.Configuration.Repositories, storage.Repository{URL: "OWNER/private"})
 		},

@@ -135,8 +135,14 @@ func (s *Service) command(ctx context.Context, c storage.Chat, script string) ([
 // Copying the real index preserves tracked ignored files, including staged adds.
 // Git stores symlink targets rather than reading the files they point to.
 func (s *Service) capture(ctx context.Context, c storage.Chat) (*Snapshot, error) {
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
 	combined := &Snapshot{CapturedAt: time.Now().UTC().Format(time.RFC3339Nano), Bases: map[string]string{}, Files: []File{}}
+	bytes := 0
 	for _, r := range c.Configuration.Repositories {
+		if ctx.Err() != nil {
+			return nil, errCapture
+		}
 		base := c.StartingCommits[r.Name]
 		if base == "" && r.Role == "extra" {
 			continue
@@ -149,6 +155,15 @@ func (s *Service) capture(ctx context.Context, c storage.Chat) (*Snapshot, error
 			return nil, err
 		}
 		combined.Bases[r.Name] = base
+		if len(combined.Files)+len(snap.Files) > 10000 {
+			return nil, errReviewLimit
+		}
+		for _, f := range snap.Files {
+			bytes += len(f.Diff)
+			if bytes > captureLimit {
+				return nil, errReviewLimit
+			}
+		}
 		combined.Files = append(combined.Files, snap.Files...)
 	}
 	if len(c.Configuration.Repositories) == 1 {
@@ -162,13 +177,14 @@ func (s *Service) capture(ctx context.Context, c storage.Chat) (*Snapshot, error
 	if err := encodeFiles(budget, combined.Files); err != nil {
 		return nil, err
 	}
+	if ctx.Err() != nil {
+		return nil, errCapture
+	}
 	combined.ID = fmt.Sprintf("%x", digest.Sum(nil))
 	return combined, nil
 }
 
 func (s *Service) captureRepository(ctx context.Context, c storage.Chat, r storage.Repository, base string) (*Snapshot, error) {
-	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
-	defer cancel()
 	command := func(script string) ([]byte, error) {
 		if storage.RepositoryPath(c.Configuration, r) == "/workspace" {
 			return s.command(ctx, c, script)

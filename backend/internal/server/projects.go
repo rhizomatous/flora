@@ -50,7 +50,7 @@ func (a *api) projectRoutes(mux *http.ServeMux) {
 				}
 			}
 			var in projects.Input
-			if !decode(w, r, &in) {
+			if !decodeLimit(w, r, &in, projects.MaxInputBytes) {
 				return
 			}
 			in, err := a.projects.Validate(r.Context(), in)

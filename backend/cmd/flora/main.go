@@ -56,12 +56,6 @@ func main() {
 			slog.Error("Storage close failed", "error", err)
 		}
 	}()
-	if *githubListen != "" {
-		if err := serveGitHub(ctx, store, *githubListen, *githubCert, *githubKey); err != nil {
-			slog.Error("GitHub transport startup failed; check private listen IP and TLS files", "error", err)
-			os.Exit(1)
-		}
-	}
 	var chats *chat.Service
 	if *agentImage != "" {
 		if *githubListen == "" {
@@ -86,7 +80,7 @@ func main() {
 			changes.New(store, engine).Run(reviewCtx)
 		}()
 		defer func() { stopReview(); <-reviewDone }()
-		access, err := githubbroker.NewAccess(githubbroker.New(store), engine, githubbroker.CheckoutConfig{Host: *githubHost, CACert: string(ca)})
+		access, _, err := startGitHub(ctx, store, engine, githubbroker.CheckoutConfig{Host: *githubHost, CACert: string(ca)}, *githubListen, *githubCert, *githubKey)
 		if err != nil {
 			slog.Error("Cannot configure container GitHub access", "error", err)
 			os.Exit(1)
@@ -111,6 +105,12 @@ func main() {
 				}
 			}
 		}()
+	}
+	if *agentImage == "" && *githubListen != "" {
+		if _, _, err := startGitHub(ctx, store, nil, githubbroker.CheckoutConfig{}, *githubListen, *githubCert, *githubKey); err != nil {
+			slog.Error("GitHub transport startup failed; check private listen IP and TLS files", "error", err)
+			os.Exit(1)
+		}
 	}
 	srv := &http.Server{
 		Addr:              *addr,
@@ -141,24 +141,24 @@ func main() {
 	<-done
 }
 
-func serveGitHub(ctx context.Context, store *storage.Store, addr, certFile, keyFile string) error {
+func serveGitHub(ctx context.Context, broker *githubbroker.Broker, addr, certFile, keyFile string) (net.Addr, error) {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
-		return errors.New("GitHub listen address must be a private IP:port")
+		return nil, errors.New("GitHub listen address must be a private IP:port")
 	}
 	ip := net.ParseIP(host)
 	if ip == nil || (!ip.IsPrivate() && !ip.IsLoopback()) {
-		return errors.New("GitHub listener must bind a private or loopback IP")
+		return nil, errors.New("GitHub listener must bind a private or loopback IP")
 	}
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
-		return errors.New("cannot load GitHub TLS certificate and key")
+		return nil, errors.New("cannot load GitHub TLS certificate and key")
 	}
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	srv := &http.Server{Handler: githubbroker.New(store), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: time.Minute,
+	srv := &http.Server{Handler: broker, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: time.Minute,
 		TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}}}
 	go func() {
 		<-ctx.Done()
@@ -171,5 +171,5 @@ func serveGitHub(ctx context.Context, store *storage.Store, addr, certFile, keyF
 			slog.Error("GitHub transport stopped; container GitHub access is unavailable")
 		}
 	}()
-	return nil
+	return listener.Addr(), nil
 }
