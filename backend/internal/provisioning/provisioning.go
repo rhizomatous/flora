@@ -63,6 +63,8 @@ type Config struct {
 	// tests; model calls then fail inside the container until replaced.
 	ProviderAPIKey string
 
+	// MaxRunning counts idle running containers too. Lowering it leaves existing
+	// containers running and rejects starts until the running count is below it.
 	MaxRunning   int
 	SetupTimeout time.Duration
 	// SetupKillGrace bounds how long setup may ignore the timeout's SIGTERM
@@ -237,7 +239,6 @@ type Manager struct {
 	ownerOf func(path string) (uid, gid int, err error)
 
 	mu          sync.Mutex
-	locks       map[string]*sync.Mutex
 	activeSince map[string]time.Time
 	now         func() time.Time
 }
@@ -257,7 +258,6 @@ func New(engine Engine, store *storage.Store, cfg Config, access WorkspaceAccess
 		access:      access,
 		health:      healthy,
 		ownerOf:     storageOwner,
-		locks:       map[string]*sync.Mutex{},
 		activeSince: map[string]time.Time{},
 		now:         time.Now,
 	}, nil
@@ -284,21 +284,6 @@ func (m *Manager) Identity() (imageDigest, harnessVersion string) {
 	return m.cfg.ImageDigest, m.cfg.HarnessVersion
 }
 
-// lockChat serializes Start and Stop calls for one chat. Callers re-read the
-// chat's stored binding only after acquiring this lock, so a concurrent or
-// retried Start cannot create a second container for the same chat.
-func (m *Manager) lockChat(chatID string) func() {
-	m.mu.Lock()
-	lock, ok := m.locks[chatID]
-	if !ok {
-		lock = &sync.Mutex{}
-		m.locks[chatID] = lock
-	}
-	m.mu.Unlock()
-	lock.Lock()
-	return lock.Unlock
-}
-
 // Start makes a chat's container running and its runtime endpoint reachable.
 // On the first start it creates and binds the container, then checks out its
 // workspace before setup can run. If an earlier attempt died before
@@ -313,7 +298,10 @@ func (m *Manager) lockChat(chatID string) func() {
 // its GitHub credential. Callers must quiesce git/gh work before calling Start;
 // use Endpoint to locate a running container without changing its credentials.
 func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
-	unlock := m.lockChat(chatID)
+	unlock, err := m.store.LockContainer(ctx, chatID)
+	if err != nil {
+		return Endpoint{}, err
+	}
 	defer unlock()
 	chat, err := m.store.Chat(ctx, chatID)
 	if err != nil {
@@ -384,13 +372,16 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 			// Hold the lock across the capacity check, creation, and start
 			// so concurrent starts cannot overbook the running-container limit.
 			var id string
-			m.mu.Lock()
+			release, lockErr := m.store.LockContainerCapacity(ctx)
+			if lockErr != nil {
+				return Endpoint{}, lockErr
+			}
 			if err = m.checkCapacity(ctx); err == nil {
 				if id, err = m.engine.ContainerCreate(ctx, spec); err == nil {
 					err = m.engine.ContainerStart(ctx, id)
 				}
 			}
-			m.mu.Unlock()
+			release()
 			if err != nil {
 				return Endpoint{}, err
 			}
@@ -406,16 +397,28 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 	if err != nil {
 		return Endpoint{}, err
 	}
+	if chat.ContainerID != "" {
+		imageID, err := m.resolveImage(ctx)
+		if err != nil {
+			return Endpoint{}, err
+		}
+		if err := validateOwned(info, chat, paths, imageID); err != nil {
+			return Endpoint{}, err
+		}
+	}
 	if m.access != nil && info.EnvValue("FLORA_CHECKOUT_REQUIRED") != "1" {
 		return Endpoint{}, errors.New("provisioning: container lacks the pre-setup checkout barrier; refusing to start it")
 	}
 	if !info.State.Running {
-		m.mu.Lock()
+		release, lockErr := m.store.LockContainerCapacity(ctx)
+		if lockErr != nil {
+			return Endpoint{}, lockErr
+		}
 		err = m.checkCapacity(ctx)
 		if err == nil {
 			err = m.engine.ContainerStart(ctx, containerID)
 		}
-		m.mu.Unlock()
+		release()
 		if err != nil {
 			return Endpoint{}, err
 		}
@@ -434,19 +437,18 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 
 func containerName(chatID string) string { return "flora-chat-" + chatID }
 
-// validateOwned checks that a container found under the chat's deterministic
-// name is exactly the container this chat would have created: management and
-// chat labels, image content, and mounts must all match. A name collision
-// with anything else is an operator error, never silently adopted or removed.
+// validateOwned checks the container's chat name, ownership labels, image
+// content, and mounts before accessing it. A mismatched container is never
+// silently adopted, used, or stopped.
 func validateOwned(info docker.ContainerInfo, chat storage.Chat, paths storage.Paths, imageID string) error {
 	if info.Name != "/"+containerName(chat.ID) {
 		return fmt.Errorf("provisioning: container name %q does not match chat %s", info.Name, chat.ID)
 	}
 	if info.Config.Labels[labelManaged] != "true" || info.Config.Labels[labelChatID] != chat.ID {
-		return fmt.Errorf("provisioning: container %s lacks this chat's ownership labels; refusing to adopt it", info.Name)
+		return fmt.Errorf("provisioning: container %s lacks this chat's ownership labels; refusing access", info.Name)
 	}
 	if info.Image != imageID {
-		return fmt.Errorf("provisioning: container %s runs image %s, expected %s; refusing to adopt it", info.Name, info.Image, imageID)
+		return fmt.Errorf("provisioning: container %s runs image %s, expected %s; refusing access", info.Name, info.Image, imageID)
 	}
 	want := map[string]bool{
 		paths.Workspace + ":/workspace":     false,
@@ -454,13 +456,13 @@ func validateOwned(info docker.ContainerInfo, chat storage.Chat, paths storage.P
 	}
 	for _, bind := range info.HostConfig.Binds {
 		if _, ok := want[bind]; !ok {
-			return fmt.Errorf("provisioning: container %s has unexpected mount %q; refusing to adopt it", info.Name, bind)
+			return fmt.Errorf("provisioning: container %s has unexpected mount %q; refusing access", info.Name, bind)
 		}
 		want[bind] = true
 	}
 	for bind, seen := range want {
 		if !seen {
-			return fmt.Errorf("provisioning: container %s is missing mount %q; refusing to adopt it", info.Name, bind)
+			return fmt.Errorf("provisioning: container %s is missing mount %q; refusing access", info.Name, bind)
 		}
 	}
 	return nil
@@ -490,7 +492,7 @@ func (m *Manager) resolveImage(ctx context.Context) (string, error) {
 }
 
 // checkCapacity enforces the running-container limit. Idle running containers
-// count toward the limit. Callers hold m.mu across the check and
+// count toward the limit. Callers hold the storage capacity lock across the check and
 // the subsequent create or start.
 func (m *Manager) checkCapacity(ctx context.Context) error {
 	running, err := m.engine.ContainerList(ctx, true, map[string]string{labelManaged: "true"})
@@ -621,16 +623,28 @@ func (m *Manager) containerExited(ctx context.Context, chatID string, paths stor
 // while a Start is still waiting for readiness must first cancel that Start's
 // context.
 func (m *Manager) Stop(ctx context.Context, chatID string) error {
-	unlock := m.lockChat(chatID)
+	unlock, err := m.store.LockContainer(ctx, chatID)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	chat, err := m.store.Chat(ctx, chatID)
 	if err != nil {
 		return err
 	}
+	// Docker confirmed that no container can execute. Revoke the chat's own
+	// capability even when external removal left a saved binding behind.
+	missing := func() error {
+		m.EndActivity(chat.ContainerID)
+		if m.access != nil {
+			return m.access.Revoke(ctx, chatID)
+		}
+		return nil
+	}
 	if chat.ContainerID == "" {
 		info, inspectErr := m.engine.ContainerInspect(ctx, containerName(chatID))
 		if docker.IsNotFound(inspectErr) {
-			return nil
+			return missing()
 		}
 		if inspectErr != nil {
 			return inspectErr
@@ -652,6 +666,24 @@ func (m *Manager) Stop(ctx context.Context, chatID string) error {
 		chat.ContainerID = info.ID
 	}
 	var revokeErr error
+	paths, err := m.store.Paths(ctx, chatID)
+	if err != nil {
+		return err
+	}
+	info, err := m.engine.ContainerInspect(ctx, chat.ContainerID)
+	if docker.IsNotFound(err) {
+		return missing()
+	}
+	if err != nil {
+		return err
+	}
+	imageID, err := m.resolveImage(ctx)
+	if err != nil {
+		return err
+	}
+	if err := validateOwned(info, chat, paths, imageID); err != nil {
+		return err
+	}
 	if m.access != nil {
 		revokeErr = m.access.Revoke(ctx, chatID)
 	}

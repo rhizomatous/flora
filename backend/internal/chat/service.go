@@ -423,6 +423,9 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 			}
 			captureReady = nil
 		case <-captureErrors:
+			// This worker has already been joined. Cancellation may arrive with
+			// its result; deferred cleanup must not wait for that result again.
+			captureErrors = nil
 			if turnCtx.Err() != nil {
 				return
 			}
@@ -440,7 +443,6 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 			captureDisconnected = true
 			// History cannot reconstruct transient events. Only a successful prompt
 			// response together with a saved final snapshot can confirm completion.
-			captureErrors = nil
 			delay := 5 * time.Second
 			if reconnectAttempts < 3 {
 				reconnectAttempts++

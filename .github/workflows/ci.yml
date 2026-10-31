@@ -19,6 +19,8 @@ jobs:
         run: nix develop --command make deps
       - name: Check Go and TypeScript; build and exercise the standalone binary
         run: nix develop --command make check smoke build-linux
+      - name: Check offline admission, lifecycle, and storage races
+        run: nix develop --command go -C backend test -race -count=1 ./internal/storage ./internal/provisioning ./internal/chat
       - name: Install Chromium and check the browser chat workflow
         run: nix develop --command npx playwright install --with-deps chromium && nix develop --command make browser
 
@@ -42,7 +44,7 @@ jobs:
           FLORA_BROKER_GH_TOKEN: ""
         run: nix develop --command go -C backend test -race -count=1 -v -run '^Test(Checkout|MultiRepository)Docker$' ./internal/githubbroker
       - name: Check persistent turns against pinned OpenCode and a local provider fixture
-        run: FLORA_CHAT_TEST_IMAGE=flora-agent-test:ci FLORA_CHAT_TEST_LSP=1 FLORA_CHAT_PROVIDER_HOST="$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')" nix develop --command go -C backend test -race -count=1 -v -run '^Test(Chat|Recovery)Docker$' ./internal/chat
+        run: FLORA_CHAT_TEST_IMAGE=flora-agent-test:ci FLORA_CHAT_TEST_LSP=1 FLORA_CHAT_PROVIDER_HOST="$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')" nix develop --command go -C backend test -race -count=1 -v -run '^Test(Chat|Recovery|ThreeChats)Docker$' ./internal/chat
       - name: Check review retention after container stop and removal
         env:
           FLORA_CHANGES_DOCKER_TEST: "1"

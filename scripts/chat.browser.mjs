@@ -49,7 +49,7 @@ try {
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await page.getByLabel("Conversation").getByText("interrupt control work", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Interrupt current work", exact: true }).click();
-  await page.getByText(/Current work interrupted;/).waitFor();
+  await page.getByText("Current work interrupted; send a new message to continue with saved context", { exact: true }).waitFor();
   await page.getByLabel("Follow-up", { exact: true }).fill("New explicit work after interruption");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await page.getByText("Saved response 4", { exact: true }).waitFor();

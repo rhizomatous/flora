@@ -690,7 +690,7 @@ func TestStartRejectsForeignNameCollision(t *testing.T) {
 				t.Fatal(err)
 			}
 			mutate(engine, id)
-			if _, err := m.Start(context.Background(), chat.ID); err == nil || !strings.Contains(err.Error(), "refusing to adopt") {
+			if _, err := m.Start(context.Background(), chat.ID); err == nil || !strings.Contains(err.Error(), "refusing access") {
 				t.Fatalf("foreign container must be rejected: %v", err)
 			}
 			if len(engine.created) != 1 {
