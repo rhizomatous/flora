@@ -6,7 +6,7 @@ import { Changes } from "./changes";
 type Chat = { ID: string; ProjectID: string; Title: string; Status: "working" | "waiting" | "failed" | "idle" | "stopped"; StatusReason: string; UpdatedAt: string; ImageDigest: string; HarnessVersion: string; StartingCommits: Record<string, string> };
 type Part = { id?: string; type: string; text?: string; tool?: string; state?: { status: string; input?: unknown; output?: string; error?: string; title?: string } };
 type Message = { ID: string; Role: string; Text: string; Provider: string; Model: string; Payload: { parts?: Part[]; info?: { error?: unknown } } };
-type Activity = { Sequence: number; Kind: string; CreatedAt: string; Payload: unknown };
+type Activity = { ChatID: string; Sequence: number; Kind: string; CreatedAt: string; Payload: unknown };
 type Detail = { chat: Chat; messages: Message[] };
 type Project = { id: string; name: string };
 type Question = { id: string; questions: { question: string; header: string; multiple: boolean; custom?: boolean; options: { label: string; description: string }[] }[] };
@@ -167,6 +167,7 @@ export function Chats({ path, onExpired }: { path: string; onExpired: () => void
     {detail && <>
       <div role="status" className="mt-6 flex flex-wrap items-center gap-2 rounded-md border border-foreground/20 p-3 text-sm">{detail.chat.Status === "working" && <FlowerMark />}<strong>{statusName(detail.chat.Status)}</strong><span>{detail.chat.StatusReason}</span></div>
       <p role="status" className="mt-2 text-xs text-muted-foreground">{connection} · {projects.find(p => p.id === detail.chat.ProjectID)?.name}</p>
+      {activity.some(row => row.ChatID === id && row.Kind === "capture.gap") && <p role="note" className="mt-4 rounded-md border border-foreground/20 p-3 text-sm">Some live activity could not be captured while Flora was disconnected from OpenCode. Recovered message and tool snapshots are shown below. Transient output may be missing. Reconnecting does not replay accepted messages or actions.</p>}
       <div className="mt-4 flex flex-wrap gap-3" aria-label="Execution controls">
         {activeTurn && <button type="button" className={button} disabled={busy} onClick={() => controlWork("interrupt")}>Interrupt current work</button>}
         {detail.chat.Status !== "stopped" && <button type="button" className={button} disabled={busy} onClick={() => controlWork("stop")}>Stop container</button>}

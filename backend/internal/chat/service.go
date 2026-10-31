@@ -133,6 +133,11 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 	} else {
 		// Never rotate access while existing git/gh commands may be running.
 		endpoint, err = s.provisioner.Endpoint(ctx, chatID)
+		var ended *provisioning.ExecutionEndedError
+		if errors.As(err, &ended) {
+			// This path is reached only for newly accepted, explicit user input.
+			endpoint, err = s.provisioner.Start(ctx, chatID)
+		}
 	}
 	if err != nil {
 		var capacity *provisioning.CapacityError
@@ -404,10 +409,12 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 			// History cannot reconstruct transient events. Only a successful prompt
 			// response together with a saved final snapshot can confirm completion.
 			captureErrors = nil
+			delay := 5 * time.Second
 			if reconnectAttempts < 3 {
 				reconnectAttempts++
-				reconnect = time.After(time.Duration(reconnectAttempts) * 250 * time.Millisecond)
+				delay = time.Duration(reconnectAttempts) * 250 * time.Millisecond
 			}
+			reconnect = time.After(delay)
 		case <-reconnect:
 			reconnect = nil
 			startCapture(make(chan error, 1))
@@ -449,6 +456,31 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 	}
 	providerFailure := false
 	*completed = false
+	unknownUsers := 0
+	for _, raw := range history {
+		var m runtimeMessage
+		if err := json.Unmarshal(raw, &m); err != nil {
+			return false, err
+		}
+		if m.Info.Role == "user" && !knownUsers[m.Info.ID] {
+			unknownUsers++
+		}
+	}
+	if unknownUsers > 1 {
+		return false, errors.New("ambiguous runtime message history")
+	}
+	var acceptedText string
+	if unknownUsers == 1 {
+		messages, err := s.Store.Messages(ctx, c.ID)
+		if err != nil {
+			return false, err
+		}
+		for _, saved := range messages {
+			if saved.ID == messageID {
+				acceptedText = saved.Text
+			}
+		}
+	}
 	for _, raw := range history {
 		raw = redaction.JSON(raw, secrets...)
 		var m runtimeMessage
@@ -456,6 +488,15 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 			return false, err
 		}
 		if m.Info.Role == "user" && !knownUsers[m.Info.ID] {
+			var text strings.Builder
+			for _, part := range m.Parts {
+				if part.Type == "text" {
+					text.WriteString(part.Text)
+				}
+			}
+			if text.String() != redaction.Text(acceptedText, secrets...) {
+				return false, errors.New("runtime user message does not match accepted input")
+			}
 			if *runtimeID != "" && *runtimeID != m.Info.ID {
 				return false, errors.New("unexpected concurrent runtime user message")
 			}
@@ -473,6 +514,19 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 		}
 		if m.Info.ParentID == *runtimeID {
 			*completed = m.Info.Time.Completed > 0 && (m.Info.Finish != "" && m.Info.Finish != "tool-calls" || len(m.Info.Error) > 0 && string(m.Info.Error) != "null")
+			var runtimeError struct {
+				Name string `json:"name"`
+			}
+			_ = json.Unmarshal(m.Info.Error, &runtimeError)
+			// An abort snapshot does not establish that child processes exited.
+			if runtimeError.Name == "MessageAbortedError" {
+				*completed = false
+			}
+			for _, part := range m.Parts {
+				if part.Type == "tool" && part.State.Status != "completed" && part.State.Status != "error" {
+					*completed = false
+				}
+			}
 		}
 		hash := sha256.Sum256(raw)
 		if seen[m.Info.ID] == hash {

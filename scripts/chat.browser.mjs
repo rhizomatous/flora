@@ -44,6 +44,7 @@ try {
   await page.reload();
   await page.getByText("Saved response 2", { exact: true }).waitFor();
   assert.equal(await page.getByLabel("Conversation").getByText("Saved response 2", { exact: true }).count(), 1);
+  await page.getByRole("note").filter({ hasText: "Transient output may be missing" }).waitFor();
   await page.getByLabel("Follow-up", { exact: true }).fill("interrupt control work");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await page.getByLabel("Conversation").getByText("interrupt control work", { exact: true }).waitFor();

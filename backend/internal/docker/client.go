@@ -189,9 +189,10 @@ func (c *Client) ContainerRemove(ctx context.Context, id string, force bool) err
 }
 
 type ContainerState struct {
-	Status   string
-	Running  bool
-	ExitCode int
+	OOMKilled bool
+	Status    string
+	Running   bool
+	ExitCode  int
 }
 
 type PortBinding struct {
@@ -231,7 +232,7 @@ func (c *Client) ContainerInspect(ctx context.Context, id string) (ContainerInfo
 		return ContainerInfo{}, fmt.Errorf("docker container inspect %s: missing state", id)
 	}
 	info := ContainerInfo{ID: inspected.ID, Name: inspected.Name, Image: inspected.Image}
-	info.State = ContainerState{Status: string(inspected.State.Status), Running: inspected.State.Running, ExitCode: inspected.State.ExitCode}
+	info.State = ContainerState{Status: string(inspected.State.Status), Running: inspected.State.Running, ExitCode: inspected.State.ExitCode, OOMKilled: inspected.State.OOMKilled}
 	if inspected.Config != nil {
 		info.Config.Env, info.Config.Labels = inspected.Config.Env, inspected.Config.Labels
 	}

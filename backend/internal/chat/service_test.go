@@ -195,6 +195,7 @@ func newFixture(t *testing.T) *runtimeFixture {
 				MessageID string `json:"messageID"`
 				System    string `json:"system"`
 				Parts     []struct {
+					Type string `json:"type"`
 					Text string `json:"text"`
 				} `json:"parts"`
 			}

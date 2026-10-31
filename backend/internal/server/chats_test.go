@@ -128,6 +128,7 @@ func chatAPI(t *testing.T, interactive ...bool) (*storage.Store, *chat.Service, 
 			}
 			var input struct {
 				Parts []struct {
+					Type string `json:"type"`
 					Text string `json:"text"`
 				} `json:"parts"`
 			}
@@ -351,6 +352,24 @@ func TestChatBrowser(t *testing.T) {
 	}
 	store, svc, authentication, _, _, cleanup := chatAPI(t, true)
 	defer cleanup()
+	gapCtx, stopGap := context.WithCancel(context.Background())
+	gapDone := make(chan struct{})
+	go func() {
+		defer close(gapDone)
+		for {
+			chats, err := store.Chats(gapCtx)
+			if err == nil && len(chats) > 0 {
+				_ = store.AppendActivity(gapCtx, chats[0].ID, "browser-capture-gap", "capture.gap", json.RawMessage(`{"reason":"Transient runtime events cannot be recovered."}`))
+				return
+			}
+			select {
+			case <-gapCtx.Done():
+				return
+			case <-time.After(20 * time.Millisecond):
+			}
+		}
+	}()
+	defer func() { stopGap(); <-gapDone }()
 	srv := httptest.NewUnstartedServer(nil)
 	origin := "https://" + srv.Listener.Addr().String()
 	srv.Config.Handler = New(webassets.FS(), authentication, settings.New(store), origin, svc)
