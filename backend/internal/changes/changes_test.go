@@ -262,3 +262,34 @@ func TestRefreshReplacesOnlyChangedContentIdentity(t *testing.T) {
 		t.Fatalf("unexpected snapshot history: %v", entries)
 	}
 }
+
+func TestFileReplacedByDirectoryHasSeparatePatches(t *testing.T) {
+	s, c, e := fixture(t)
+	ctx := context.Background()
+	if err := os.Remove(filepath.Join(e.dir, "deleted")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(e.dir, "deleted"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	write(t, e.dir, "deleted/child", "new child\n")
+	write(t, e.dir, "line\ndiff --git fake", "not a patch boundary\n")
+	if err := s.Refresh(ctx, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	r, err := s.Read(ctx, c.ID, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Snapshot.Files) != 3 {
+		t.Fatalf("bad changed-file list: %+v", r.Snapshot.Files)
+	}
+	for _, f := range r.Snapshot.Files {
+		if !strings.HasPrefix(f.Diff, "diff --git ") || strings.Contains(f.Diff, "\ndiff --git ") {
+			t.Fatalf("mixed file patches: %q", f.Diff)
+		}
+		if f.Path == "deleted" && strings.Contains(f.Diff, "+new child") {
+			t.Fatal("directory pathspec included child diff in parent")
+		}
+	}
+}

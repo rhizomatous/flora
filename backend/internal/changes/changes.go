@@ -145,14 +145,36 @@ git write-tree
 	if !hash.MatchString(tree) {
 		return nil, errCapture
 	}
-	args := "GIT_ATTR_SOURCE=" + quote(tree) + " git -c core.quotePath=true diff --no-ext-diff --no-textconv --no-color --find-renames " + quote(base) + " " + quote(tree)
+	args := "GIT_ATTR_SOURCE=" + quote(tree) + " git -c core.quotePath=true diff --no-ext-diff --no-textconv --no-color --no-relative --line-prefix= --find-renames " + quote(base) + " " + quote(tree)
 	raw, err := s.command(ctx, c, args+" --raw -z --\n")
 	if err != nil {
 		return nil, err
 	}
 	parts := bytes.Split(raw, []byte{0})
+	// Both outputs use the same immutable trees and Git ordering. Patch headers
+	// start at column zero; source lines always carry a context/add/delete prefix.
+	// Capturing once also avoids directory pathspecs pulling in neighboring files.
+	patches, err := s.command(ctx, c, args+" --patch --\n")
+	if err != nil {
+		return nil, err
+	}
+	var blocks [][]byte
+	if len(patches) > 0 {
+		if !bytes.HasPrefix(patches, []byte("diff --git ")) {
+			return nil, errCapture
+		}
+		blocks = bytes.Split(patches, []byte("\ndiff --git "))
+		for i := range blocks {
+			if i > 0 {
+				blocks[i] = append([]byte("diff --git "), blocks[i]...)
+			}
+			if i < len(blocks)-1 {
+				blocks[i] = append(blocks[i], '\n')
+			}
+		}
+	}
 	files := []File{}
-	total := 0
+	patchIndex := 0
 	for i := 0; i < len(parts)-1; {
 		meta := strings.Fields(string(parts[i]))
 		i++
@@ -169,23 +191,28 @@ git write-tree
 			f.Path = string(parts[i])
 			i++
 		}
-		paths := quote(f.Path)
-		if f.Previous != "" {
-			paths = quote(f.Previous) + " " + paths
+		if patchIndex >= len(blocks) || len(files) >= 10000 {
+			return nil, errCapture
 		}
-		patch, err := s.command(ctx, c, args+" --patch -- "+paths+"\n")
-		if err != nil {
-			return nil, err
+		patch := blocks[patchIndex]
+		patchIndex++
+		// Git renders a file-type change as a deletion and an addition, with
+		// two patch headers for the single raw changed-file entry.
+		if f.Status == "T" {
+			if patchIndex >= len(blocks) {
+				return nil, errCapture
+			}
+			patch = bytes.Join([][]byte{patch, blocks[patchIndex]}, nil)
+			patchIndex++
 		}
 		f.Diff = string(patch)
 		f.Bytes = len(patch)
-		total += len(patch)
-		if total > captureLimit || len(files) >= 10000 {
-			return nil, errCapture
-		}
 		f.Binary = bytes.Contains(patch, []byte("\nBinary files ")) || bytes.Contains(patch, []byte("\nGIT binary patch\n"))
 		f.Undisplayable = !utf8.Valid(patch) || strings.HasPrefix(meta[0], ":160000") || meta[1] == "160000"
 		files = append(files, f)
+	}
+	if patchIndex != len(blocks) {
+		return nil, errCapture
 	}
 	encoded, err := json.Marshal(files)
 	if err != nil {
