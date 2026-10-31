@@ -2,6 +2,7 @@ package changes
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/storage"
@@ -32,26 +34,38 @@ type pullBranch struct {
 	Page           int    `json:"page,omitempty"`
 }
 type Pulls struct {
-	Items      []Pull       `json:"items"`
-	CheckedAt  string       `json:"checkedAt"`
-	Error      string       `json:"error"`
-	Branches   []pullBranch `json:"branches,omitempty"`
-	Cursor     int          `json:"cursor,omitempty"`
-	Candidates []string     `json:"candidates,omitempty"`
+	Items      []Pull            `json:"items"`
+	CheckedAt  string            `json:"checkedAt"`
+	Error      string            `json:"error"`
+	Branches   []pullBranch      `json:"branches,omitempty"`
+	Cursor     int               `json:"cursor,omitempty"`
+	Candidates []string          `json:"candidates,omitempty"`
+	Missing    map[string]string `json:"missing,omitempty"`
 }
 
 var pullLink = regexp.MustCompile(`https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/([1-9][0-9]*)(?:[/?#\s<>"'\x60),.;\]}]|$)`)
 var repositoryName = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 
 func githubRepository(raw string) string {
-	if strings.HasPrefix(raw, "git@github.com:") {
-		raw = "https://github.com/" + strings.TrimPrefix(raw, "git@github.com:")
+	if !strings.Contains(raw, "://") {
+		host, path, ok := strings.Cut(raw, ":")
+		if at := strings.LastIndex(host, "@"); at >= 0 {
+			host = host[at+1:]
+		}
+		if ok && strings.EqualFold(host, "github.com") {
+			raw = "https://github.com/" + path
+		}
 	}
 	u, err := url.Parse(raw)
-	if err != nil || u.Host != "github.com" || (u.Scheme != "https" && u.Scheme != "ssh") || u.RawQuery != "" || u.Fragment != "" {
+	if err != nil || !strings.EqualFold(u.Hostname(), "github.com") || (u.Scheme != "https" && u.Scheme != "ssh") || u.RawQuery != "" || u.Fragment != "" {
 		return ""
 	}
-	name := strings.TrimSuffix(strings.Trim(u.Path, "/"), ".git")
+	if port := u.Port(); port != "" && !((u.Scheme == "https" && port == "443") || (u.Scheme == "ssh" && port == "22")) {
+		return ""
+	}
+	// A single optional .git suffix denotes the transport URL, not part of the
+	// repository identity. Preserve other dots and reject extra path segments.
+	name := strings.TrimSuffix(strings.TrimSuffix(strings.TrimPrefix(u.Path, "/"), "/"), ".git")
 	if !repositoryName.MatchString(name) {
 		return ""
 	}
@@ -60,6 +74,74 @@ func githubRepository(raw string) string {
 
 func pullURL(repo string, number int) string {
 	return fmt.Sprintf("https://github.com/%s/pull/%d", strings.ToLower(repo), number)
+}
+
+// A scan is the sole writer of one pulls.json file. Other Service instances use
+// the same lock, while readers can keep using the atomically replaced artifact.
+// No scan holds the Changes capture/read mutex during Docker or GitHub calls.
+var pullScans sync.Map
+
+var githubBackoff = struct {
+	sync.Mutex
+	until map[[32]byte]time.Time
+}{until: map[[32]byte]time.Time{}}
+
+func githubDelayed(token string, now time.Time) bool {
+	githubBackoff.Lock()
+	defer githubBackoff.Unlock()
+	return now.Before(githubBackoff.until[sha256.Sum256([]byte(token))])
+}
+
+func delayGitHub(token string, header http.Header, now time.Time) {
+	until := now.Add(time.Minute)
+	if seconds, err := strconv.ParseInt(header.Get("Retry-After"), 10, 64); err == nil && seconds >= 0 {
+		if seconds > 3600 {
+			seconds = 3600
+		}
+		until = now.Add(time.Duration(seconds) * time.Second)
+	} else if date, err := http.ParseTime(header.Get("Retry-After")); err == nil {
+		until = date
+	} else if seconds, err := strconv.ParseInt(header.Get("X-RateLimit-Reset"), 10, 64); err == nil {
+		until = time.Unix(seconds, 0)
+	}
+	if until.Before(now.Add(30 * time.Second)) {
+		until = now.Add(30 * time.Second)
+	}
+	if until.After(now.Add(time.Hour)) {
+		until = now.Add(time.Hour)
+	}
+	githubBackoff.Lock()
+	defer githubBackoff.Unlock()
+	for key, end := range githubBackoff.until {
+		if !now.Before(end) {
+			delete(githubBackoff.until, key)
+		}
+	}
+	key := sha256.Sum256([]byte(token))
+	if until.After(githubBackoff.until[key]) {
+		githubBackoff.until[key] = until
+	}
+}
+
+type branchKey struct{ repository, head, ref string }
+
+func (b pullBranch) key() branchKey { return branchKey{b.Repository, b.HeadRepository, b.Ref} }
+
+// Keep one tip per branch, including when loading older artifacts that retained
+// a tip for every commit. Verified PRs and pending candidates are separate data.
+func compactBranches(state *Pulls) map[branchKey]int {
+	indices := map[branchKey]int{}
+	branches := []pullBranch{}
+	for _, b := range state.Branches {
+		if i, ok := indices[b.key()]; ok {
+			branches[i] = b
+		} else {
+			indices[b.key()] = len(branches)
+			branches = append(branches, b)
+		}
+	}
+	state.Branches = branches
+	return indices
 }
 
 // Observe local branch tips that differ from the recorded checkout, never remote
@@ -71,11 +153,7 @@ func (s *Service) observeBranches(ctx context.Context, c storage.Chat, state *Pu
 		return false
 	}
 	failed := false
-	seen := map[pullBranch]bool{}
-	for _, b := range state.Branches {
-		b.Page = 0
-		seen[b] = true
-	}
+	seen := compactBranches(state)
 	for _, r := range c.Configuration.Repositories {
 		base := c.StartingCommits[r.Name]
 		if base == "" && r.Role == "extra" {
@@ -117,9 +195,13 @@ git for-each-ref --format='%(refname:short)%00%(objectname)%00%(upstream:remoten
 				continue
 			}
 			b := pullBranch{Repository: repo, HeadRepository: head, Ref: ref, SHA: fields[1]}
-			if !seen[b] {
+			if i, ok := seen[b.key()]; ok {
+				if state.Branches[i].SHA != b.SHA {
+					state.Branches[i] = b
+				}
+			} else {
+				seen[b.key()] = len(state.Branches)
 				state.Branches = append(state.Branches, b)
-				seen[b] = true
 			}
 		}
 	}
@@ -145,14 +227,18 @@ type remotePull struct {
 // number, but never an API host or redirect destination. Credentials are read
 // anew for each bounded scan and are never copied into saved artifacts.
 func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.Client) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 	p, err := s.Store.Paths(ctx, c.ID)
 	if err != nil {
 		return
 	}
+	entry, _ := pullScans.LoadOrStore(p.Artifacts, &sync.Mutex{})
+	lock := entry.(*sync.Mutex)
+	if !lock.TryLock() {
+		return
+	}
+	defer lock.Unlock()
 	root, err := os.OpenRoot(p.Artifacts)
 	if err != nil {
 		return
@@ -160,6 +246,10 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 	defer root.Close()
 	state := Pulls{Items: []Pull{}}
 	_ = load(root, "pulls.json", &state)
+	compactBranches(&state)
+	if state.Missing == nil {
+		state.Missing = map[string]string{}
+	}
 	stamp, _ := time.Parse(time.RFC3339Nano, state.CheckedAt)
 	if time.Since(stamp) < 30*time.Second {
 		return
@@ -207,6 +297,11 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 	}
 	tasks := []task{}
 	for link := range links {
+		if _, verified := known[link]; !verified {
+			if until, err := time.Parse(time.RFC3339Nano, state.Missing[link]); err == nil && time.Now().Before(until) {
+				continue
+			}
+		}
 		tasks = append(tasks, task{link: link})
 	}
 	sort.Slice(tasks, func(i, j int) bool { return tasks[i].link < tasks[j].link })
@@ -225,16 +320,21 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 	secure.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	budget := 32
 	blocked := false
-	get := func(path string, target any) bool {
-		if budget == 0 || blocked || ctx.Err() != nil {
+	// A missing unverified candidate is not an outage. Remember it for a day so
+	// the same saved message cannot reintroduce it on every scan. Known PRs that
+	// become inaccessible still retain their saved status and show a warning.
+	get := func(path string, target any) int {
+		delayed := githubDelayed(creds.GitHubToken, time.Now())
+		if budget == 0 || blocked || ctx.Err() != nil || delayed {
 			failure()
-			return false
+			blocked = blocked || delayed
+			return 0
 		}
 		budget--
 		req, e := http.NewRequestWithContext(ctx, "GET", "https://api.github.com"+path, nil)
 		if e != nil {
 			failure()
-			return false
+			return 0
 		}
 		req.Header.Set("Authorization", "Bearer "+creds.GitHubToken)
 		req.Header.Set("Accept", "application/vnd.github+json")
@@ -242,21 +342,27 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 		res, e := secure.Do(req)
 		if e != nil {
 			failure()
-			return false
+			return 0
 		}
 		defer res.Body.Close()
 		if res.StatusCode == 403 || res.StatusCode == 429 || res.StatusCode == 401 {
 			blocked = true
 		}
+		if res.StatusCode == 403 || res.StatusCode == 429 {
+			delayGitHub(creds.GitHubToken, res.Header, time.Now())
+		}
+		if res.StatusCode == 404 {
+			return 404
+		}
 		if res.StatusCode != 200 {
 			failure()
-			return false
+			return 0
 		}
 		if json.NewDecoder(io.LimitReader(res.Body, 8<<20)).Decode(target) != nil {
 			failure()
-			return false
+			return 0
 		}
-		return true
+		return 200
 	}
 	verify := func(link string) {
 		match := pullLink.FindStringSubmatch(link)
@@ -265,7 +371,16 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 			return
 		}
 		var remote remotePull
-		if !get("/repos/"+match[1]+"/pulls/"+match[2], &remote) {
+		status := get("/repos/"+match[1]+"/pulls/"+match[2], &remote)
+		if status == 404 {
+			if _, verified := known[link]; verified {
+				failure()
+			} else {
+				state.Missing[link] = time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339Nano)
+			}
+			return
+		}
+		if status != 200 {
 			return
 		}
 		number, _ := strconv.Atoi(match[2])
@@ -277,6 +392,7 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 			remote.State = "merged"
 		}
 		known[link] = Pull{Repository: strings.ToLower(match[1]), URL: link, Number: number, State: remote.State, Draft: remote.Draft}
+		delete(state.Missing, link)
 	}
 	if err == nil && len(tasks) > 0 {
 		start := state.Cursor % len(tasks)
@@ -298,7 +414,8 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 			}
 			query := url.Values{"state": {"all"}, "head": {strings.Split(b.HeadRepository, "/")[0] + ":" + b.Ref}, "per_page": {"100"}, "page": {strconv.Itoa(b.Page)}}
 			var candidates []remotePull
-			if !get("/repos/"+b.Repository+"/pulls?"+query.Encode(), &candidates) {
+			if get("/repos/"+b.Repository+"/pulls?"+query.Encode(), &candidates) != 200 {
+				failure()
 				continue
 			}
 			if len(candidates) == 100 {
@@ -324,5 +441,12 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 		state.Items = append(state.Items, p)
 	}
 	sort.Slice(state.Items, func(i, j int) bool { return state.Items[i].URL < state.Items[j].URL })
+	pending := state.Candidates[:0]
+	for _, link := range state.Candidates {
+		if _, missing := state.Missing[link]; !missing {
+			pending = append(pending, link)
+		}
+	}
+	state.Candidates = pending
 	_ = save(root, "pulls.json", state)
 }

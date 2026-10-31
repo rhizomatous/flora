@@ -2,6 +2,7 @@ package changes
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -38,6 +39,11 @@ func expirePulls(t *testing.T, s *Service, c storage.Chat) Pulls {
 
 func credentials(t *testing.T, s *Service, token string) {
 	t.Helper()
+	t.Cleanup(func() {
+		githubBackoff.Lock()
+		delete(githubBackoff.until, sha256.Sum256([]byte(token)))
+		githubBackoff.Unlock()
+	})
 	if err := s.Store.SaveCredentials(context.Background(), storage.Credentials{GitHubToken: token, Provider: "anthropic", Model: "test", ProviderKey: "fixture-key"}); err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +157,7 @@ func TestLinksCanonicalIdentityRotationAndOutage(t *testing.T) {
 	if len(r.Pulls.Items) != 2 || count != 2 || r.Pulls.Error != "" {
 		t.Fatalf("canonical discovery: %+v count=%d", r.Pulls, count)
 	}
-	for _, failure := range []int{429, 404, 500, 302, 0} {
+	for _, failure := range []int{404, 500, 302, 0, 429} {
 		expirePulls(t, s, c)
 		token = "rotated-token"
 		credentials(t, s, token)

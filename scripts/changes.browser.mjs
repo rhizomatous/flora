@@ -14,12 +14,13 @@ try {
   const review = page.getByRole("region", { name: "Changes", exact: true });
   await review.getByText(/Saved review, possibly out of date/).waitFor();
   const pulls = review.getByRole("list", { name: "Pull requests" });
-  assert.equal(await pulls.getByRole("listitem").count(), 4);
+  assert.equal(await pulls.getByRole("listitem").count(), 5);
   for (const [label, state, href] of [
     ["first/app PR #7", "Draft", "https://github.com/first/app/pull/7"],
     ["second/app PR #7", "Merged", "https://github.com/second/app/pull/7"],
     ["first/app PR #8", "Closed", "https://github.com/first/app/pull/8"],
     ["third/private PR #9", "Open", "https://github.com/third/private/pull/9"],
+    ["third/private PR #10", "Unknown", "https://github.com/third/private/pull/10"],
   ]) {
     const link = pulls.getByRole("link", { name: label, exact: true });
     assert.equal(await link.getAttribute("href"), href);
@@ -44,7 +45,7 @@ try {
   await review.getByText(/removed.txt/).waitFor();
   await page.reload();
   await review.getByText(/Saved review, possibly out of date/).waitFor();
-  assert.equal(await pulls.getByRole("listitem").count(), 4);
+  assert.equal(await pulls.getByRole("listitem").count(), 5);
   await review.getByText(/Saved statuses may be out of date/).waitFor();
   await page.setViewportSize({ width: 375, height: 812 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);

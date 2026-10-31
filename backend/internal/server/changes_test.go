@@ -50,6 +50,7 @@ func savedReview(t *testing.T, store *storage.Store, p storage.Project) storage.
 		{Repository: "second/app", URL: "https://github.com/second/app/pull/7", Number: 7, State: "merged"},
 		{Repository: "first/app", URL: "https://github.com/first/app/pull/8", Number: 8, State: "closed"},
 		{Repository: "third/private", URL: "https://github.com/third/private/pull/9", Number: 9, State: "open"},
+		{Repository: "third/private", URL: "https://github.com/third/private/pull/10", Number: 10, State: ""},
 	}}
 	b, _ = json.Marshal(pulls)
 	if err = os.WriteFile(filepath.Join(paths.Artifacts, "pulls.json"), b, 0600); err != nil {
@@ -87,7 +88,7 @@ func TestChangesAuthenticationAndFullDownload(t *testing.T) {
 	if !r.Stale || !r.Snapshot.Files[1].Truncated || r.Snapshot.Files[1].Diff != "" || r.Snapshot.Files[2].Diff != "" {
 		t.Fatal("bad inline review")
 	}
-	if len(r.Pulls.Items) != 4 || r.Pulls.Error == "" {
+	if len(r.Pulls.Items) != 5 || r.Pulls.Error == "" {
 		t.Fatal("saved PRs missing from authenticated review")
 	}
 	w = call(download, token)
