@@ -87,10 +87,14 @@ follow-up, Flora checks that the existing runtime session is idle. An uncertain
 or busy runtime remains blocked until an explicit interrupt or container stop.
 
 **Interrupt current work** keeps the container running. Flora waits for terminal
-runtime parts and verifies that tool processes have exited before allowing new
-work. Lingering background jobs or language servers can prevent confirmation;
-the chat remains blocked and can be stopped instead. Interrupt during preparation
-also requires a container stop because no runtime session exists to abort yet.
+runtime parts, closes OpenCode's workspace resources including language-server
+clients, and verifies that tool processes have exited before allowing new work.
+Language servers start again on demand in later work. Background jobs or custom
+services that survive resource shutdown can prevent confirmation. A service still
+starting during disposal may also survive and require a container stop. The chat
+remains blocked until teardown is confirmed. Question replies are also blocked
+after capture has been abandoned, so they cannot restart unmonitored work. Interrupt during
+preparation requires a container stop because no runtime session exists to abort yet.
 **Stop container** frees capacity after Docker confirms the stop. Both controls
 preserve workspace, conversation, and saved activity. Send a new message to resume
 a stopped chat in the same container and session. Successful setup does not rerun,
@@ -118,6 +122,9 @@ agent image and run `FLORA_CHAT_TEST_IMAGE=<local-tag> go -C backend test -v
 Anthropic-compatible fixture with the real pinned runtime, setup, Git workspace,
 bash tool, questions, and follow-ups. On native Linux, set
 `FLORA_CHAT_PROVIDER_HOST` to a host address reachable from the container.
+Set `FLORA_CHAT_TEST_LSP=1` to install Go and gopls during the fixture's setup and
+verify interruption with a real connected language server, followed by lazy LSP
+restart in the same saved session. CI enables this coverage.
 
 For the Chromium app check, run `npx playwright install chromium` and
 `make browser` in the Nix shell. This launches the compiled UI against the real

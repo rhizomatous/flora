@@ -85,6 +85,8 @@ func chatAPI(t *testing.T, interactive ...bool) (*storage.Store, *chat.Service, 
 			fmt.Fprint(w, `{"id":"ses_browser"}`)
 		case "/session/status":
 			fmt.Fprint(w, `{}`)
+		case "/instance/dispose":
+			fmt.Fprint(w, `true`)
 		case "/session/ses_browser/abort":
 			mu.Lock()
 			pending = false

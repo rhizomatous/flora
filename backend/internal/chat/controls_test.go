@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -19,6 +20,7 @@ type controlledProvisioner struct {
 	stopError          atomic.Bool
 	expired            atomic.Bool
 	stops              atomic.Int32
+	failChat           string
 }
 
 func (p *controlledProvisioner) Start(ctx context.Context, id string) (provisioning.Endpoint, error) {
@@ -41,10 +43,10 @@ func (p *controlledProvisioner) ConfirmInterrupt(ctx context.Context, _ string) 
 	}
 	return nil
 }
-func (p *controlledProvisioner) Stop(context.Context, string) error {
+func (p *controlledProvisioner) Stop(_ context.Context, chatID string) error {
 	p.stops.Add(1)
-	if p.stopError.Load() {
-		return errors.New("unconfirmed stop")
+	if p.stopError.Load() && (p.failChat == "" || p.failChat == chatID) {
+		return errors.New("unconfirmed stop secret-diagnostic")
 	}
 	return nil
 }
@@ -282,4 +284,109 @@ func TestRuntimeReconnectIsBoundedAndNeverResubmits(t *testing.T) {
 	}
 	f.release <- false
 	waitStatus(t, s, c.ID, storage.Idle)
+}
+
+func TestFailedStopCannotAnswerAbandonedQuestion(t *testing.T) {
+	f := newFixture(t)
+	s, base, project := testService(t, f)
+	p := &controlledProvisioner{testProvisioner: base}
+	s.provisioner = p
+	c, err := s.Create(context.Background(), project.ID, "Question", "first", "work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	awaitPrompt(t, f)
+	f.mu.Lock()
+	f.question = true
+	f.mu.Unlock()
+	f.events <- `{"type":"question.asked","properties":{"sessionID":"ses_one","id":"que_one"}}`
+	waitStatus(t, s, c.ID, storage.Waiting)
+	p.stopError.Store(true)
+	err = s.Stop(context.Background(), c.ID)
+	var failure *ControlError
+	if !errors.As(err, &failure) {
+		t.Fatalf("expected safe unconfirmed control: %v", err)
+	}
+	blocked := waitStatus(t, s, c.ID, storage.Waiting)
+	if failure.Reason != blocked.StatusReason {
+		t.Fatal("API and saved control reasons differ")
+	}
+	if strings.Contains(failure.Reason, "secret-diagnostic") {
+		t.Fatal("runtime diagnostic escaped the safe control explanation")
+	}
+	if err := s.Reply(context.Background(), c.ID, "que_one", [][]string{{"Yes"}}); !errors.As(err, &failure) {
+		t.Fatalf("abandoned reply: %v", err)
+	}
+	s.questionActivity(c.ID, blocked.ActiveMessageID, "que_one", true)
+	after, _ := s.Store.Chat(context.Background(), c.ID)
+	if after.Status != storage.Waiting || after.StatusReason != blocked.StatusReason || after.ActiveMessageID == "" || f.questionReplies.Load() != 0 {
+		t.Fatal("abandoned question restarted invisible work")
+	}
+	if questions, err := s.Questions(context.Background(), c.ID); err != nil || len(questions) != 0 {
+		t.Fatal("abandoned question still offered for reply")
+	}
+}
+
+func TestStopAcceptsCompletedTurnButRejectsNewTurn(t *testing.T) {
+	f := newFixture(t)
+	s, p, project := testService(t, f)
+	c, err := s.Create(context.Background(), project.ID, "Completion", "first", "work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	awaitPrompt(t, f)
+	observed, _ := s.Store.Chat(context.Background(), c.ID)
+	f.release <- false
+	waitStatus(t, s, c.ID, storage.Idle)
+	if err := s.controlObserved(context.Background(), observed, true, false); err != nil {
+		t.Fatal("completion raced with stop: ", err)
+	}
+	waitStatus(t, s, c.ID, storage.Stopped)
+	if _, err := s.Submit(context.Background(), c.ID, "new", "new work"); err != nil {
+		t.Fatal(err)
+	}
+	awaitPrompt(t, f)
+	if err := s.controlObserved(context.Background(), observed, true, false); !errors.Is(err, storage.ErrStale) {
+		t.Fatal("stale stop affected new turn: ", err)
+	}
+	if p.starts.Load() != 2 {
+		t.Fatal("resume did not use existing container")
+	}
+	f.release <- false
+	waitStatus(t, s, c.ID, storage.Idle)
+}
+
+func TestTimeoutFailureDoesNotStarveOtherChats(t *testing.T) {
+	f := newFixture(t)
+	s, base, project := testService(t, f)
+	p := &controlledProvisioner{testProvisioner: base}
+	s.provisioner = p
+	ctx := context.Background()
+	for _, title := range []string{"One", "Two"} {
+		c, err := s.Store.CreateChat(ctx, project.ID, title, testImage, "1.2.27")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Store.BindRuntime(ctx, c.ID, "container-"+c.ID, ""); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.Store.AcceptMessage(ctx, c.ID, "first", "work"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ordered, err := s.Store.Chats(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.failChat = ordered[0].ID
+	p.stopError.Store(true)
+	p.expired.Store(true)
+	if err := s.EnforceTimeouts(ctx); err == nil {
+		t.Fatal("timeout failure not reported")
+	}
+	waitStatus(t, s, ordered[0].ID, storage.Waiting)
+	waitStatus(t, s, ordered[1].ID, storage.Stopped)
+	if p.stops.Load() != 2 {
+		t.Fatal("failed first stop starved later chat")
+	}
 }

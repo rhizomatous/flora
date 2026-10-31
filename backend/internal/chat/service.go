@@ -509,6 +509,9 @@ func (s *Service) Questions(ctx context.Context, chatID string) ([]Question, err
 	if c.SessionID == "" || (c.Status != storage.Working && c.Status != storage.Waiting) {
 		return []Question{}, nil
 	}
+	if !s.monitoredTurn(chatID, c.ActiveMessageID) {
+		return []Question{}, nil
+	}
 	e, err := s.provisioner.Endpoint(ctx, chatID)
 	if err != nil {
 		return nil, errors.New("runtime questions unavailable; saved questions may be stale")
@@ -545,6 +548,9 @@ func (s *Service) Reply(ctx context.Context, chatID, questionID string, answers 
 	}
 	if c.ActiveMessageID == "" {
 		return storage.ErrStale
+	}
+	if !s.monitoredTurn(chatID, c.ActiveMessageID) {
+		return &ControlError{Reason: "Question replies are blocked because this turn is no longer being monitored. Interrupt current work or stop the container before continuing."}
 	}
 	questions, err := s.Questions(ctx, chatID)
 	if err != nil {

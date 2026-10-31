@@ -18,6 +18,42 @@ type turnJob struct {
 	attempted atomic.Bool
 }
 
+// ControlError contains only a fixed, credential-free explanation of an
+// unconfirmed control. The active message remains reserved for explicit recovery.
+type ControlError struct{ Reason string }
+
+func (e *ControlError) Error() string { return e.Reason }
+
+func (s *Service) abandonTurn(chatID string) {
+	s.turnMu.Lock()
+	defer s.turnMu.Unlock()
+	if a := s.turns[chatID]; a != nil {
+		a.mu.Lock()
+		a.finished = true
+		a.mu.Unlock()
+	}
+}
+
+func (s *Service) monitoredTurn(chatID, messageID string) bool {
+	s.turnMu.Lock()
+	defer s.turnMu.Unlock()
+	a, job := s.turns[chatID], s.jobs[chatID]
+	if a == nil || job == nil || a.messageID != messageID {
+		return false
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.finished {
+		return false
+	}
+	select {
+	case <-job.done:
+		return false
+	default:
+		return true
+	}
+}
+
 // Admission and controls share this lock. Runtime workers never acquire it, so
 // a control can cancel and join preparation, capture, and delivery before release.
 func (s *Service) lockOperation(chatID string) func() {
@@ -67,21 +103,27 @@ func (s *Service) EnforceTimeouts(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	var failures []error
 	for _, c := range chats {
 		if p.ActivityExpired(c.ContainerID) {
 			if err := s.control(ctx, c.ID, true, true); err != nil {
-				return err
+				failures = append(failures, err)
 			}
 		}
 	}
-	return nil
+	return errors.Join(failures...)
 }
 
-func (s *Service) control(_ context.Context, chatID string, stop, timeout bool) error {
+func (s *Service) control(ctx context.Context, chatID string, stop, timeout bool) error {
 	observed, err := s.Store.Chat(s.ctx, chatID)
 	if err != nil {
 		return err
 	}
+	return s.controlObserved(ctx, observed, stop, timeout)
+}
+
+func (s *Service) controlObserved(_ context.Context, observed storage.Chat, stop, timeout bool) error {
+	chatID := observed.ID
 	unlock := s.lockOperation(chatID)
 	defer unlock()
 	if s.provisioner == nil {
@@ -97,7 +139,7 @@ func (s *Service) control(_ context.Context, chatID string, stop, timeout bool) 
 	if c.Status == storage.Stopped || (!stop && c.ActiveMessageID == "" && c.Status == storage.Idle) {
 		return nil
 	}
-	if c.ActiveMessageID != observed.ActiveMessageID {
+	if c.ActiveMessageID != observed.ActiveMessageID && !(stop && c.ActiveMessageID == "" && c.Status == storage.Idle) {
 		return storage.ErrStale
 	}
 	if timeout {
@@ -116,8 +158,14 @@ func (s *Service) control(_ context.Context, chatID string, stop, timeout bool) 
 			return nil
 		}
 	}
+	// No answer may restart work once this control abandons its capture worker.
+	s.abandonTurn(chatID)
 	if err := s.quiesce(ctx, chatID); err != nil {
-		return err
+		reason := "Capture shutdown could not be confirmed. New messages and question replies remain blocked. Retry the control."
+		if err := s.Store.Transition(s.ctx, chatID, c.ActiveMessageID, storage.Waiting, reason); err != nil {
+			return err
+		}
+		return &ControlError{Reason: reason}
 	}
 	c, err = s.Store.Chat(ctx, chatID)
 	if err != nil {
@@ -189,8 +237,11 @@ func (s *Service) control(_ context.Context, chatID string, stop, timeout bool) 
 		failureReason = "Preparation has no runtime session to interrupt. Stop the container to confirm teardown."
 	}
 	if err != nil {
-		_ = s.Store.Transition(s.ctx, chatID, c.ActiveMessageID, storage.Waiting, failureReason+" New messages remain blocked.")
-		return err
+		reason := failureReason + " New messages and question replies remain blocked."
+		if err := s.Store.Transition(s.ctx, chatID, c.ActiveMessageID, storage.Waiting, reason); err != nil {
+			return err
+		}
+		return &ControlError{Reason: reason}
 	}
 	status, reason := storage.Idle, "Current work interrupted; send a new message to continue with saved context"
 	if stop {

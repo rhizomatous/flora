@@ -8,9 +8,9 @@ import (
 )
 
 // ConfirmInterrupt checks for processes left by tools after OpenCode has saved
-// terminal parts. This deliberately rejects lingering language servers and
-// background jobs too: without proof of teardown, only an explicit container
-// stop can safely release the chat. No process or workspace file is changed.
+// terminal parts and disposed its workspace resources, including LSP clients.
+// Remaining background jobs or services whose shutdown failed still block new
+// work. No process or workspace file is changed by this verification.
 func (m *Manager) ConfirmInterrupt(ctx context.Context, chatID string) error {
 	e, ok := m.engine.(interface {
 		Exec(context.Context, string, string, []string, io.Reader, io.Writer, io.Writer) (int, error)

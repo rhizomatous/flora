@@ -73,6 +73,7 @@ type runtimeFixture struct {
 	questionMaxInFlight atomic.Int32
 	busy                bool
 	streams             atomic.Int32
+	questionReplies     atomic.Int32
 }
 
 func newFixture(t *testing.T) *runtimeFixture {
@@ -99,6 +100,8 @@ func newFixture(t *testing.T) *runtimeFixture {
 			} else {
 				fmt.Fprint(w, `{}`)
 			}
+		case r.URL.Path == "/instance/dispose":
+			fmt.Fprint(w, `true`)
 		case r.URL.Path == "/session/ses_one/abort":
 			f.mu.Lock()
 			f.question = false
@@ -158,6 +161,7 @@ func newFixture(t *testing.T) *runtimeFixture {
 				fmt.Fprint(w, `[]`)
 			}
 		case r.URL.Path == "/question/que_one/reply":
+			f.questionReplies.Add(1)
 			f.mu.Lock()
 			f.question = false
 			f.mu.Unlock()

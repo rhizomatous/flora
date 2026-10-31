@@ -13,11 +13,15 @@ import (
 	"unicode/utf8"
 
 	"github.com/rhizomatous/flora/backend/internal/agentfiles"
+	"github.com/rhizomatous/flora/backend/internal/chat"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
 func chatError(w http.ResponseWriter, err error) {
+	var control *chat.ControlError
 	switch {
+	case errors.As(err, &control):
+		failure(w, http.StatusConflict, control.Reason)
 	case errors.Is(err, storage.ErrNotFound):
 		failure(w, 404, "Chat or project was not found.")
 	case errors.Is(err, storage.ErrActive):

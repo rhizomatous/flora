@@ -134,6 +134,16 @@ func (c *runtime) abort(ctx context.Context, session string) error {
 			}
 		}
 		if status := statuses[session].Type; (status == "" || status == "idle") && !waiting {
+			// Abort reports idle before tools exit. Dispose closes the runtime's
+			// owned LSP clients and other workspace services without deleting its
+			// persisted session. The caller still verifies actual process exit.
+			var disposed bool
+			if err := c.call(ctx, "POST", "/instance/dispose", nil, &disposed); err != nil {
+				return err
+			}
+			if !disposed {
+				return errors.New("runtime workspace resource shutdown unconfirmed")
+			}
 			return nil
 		}
 		select {
