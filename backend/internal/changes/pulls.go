@@ -17,10 +17,11 @@ import (
 )
 
 type Pull struct {
-	URL    string `json:"url"`
-	Number int    `json:"number"`
-	State  string `json:"state"`
-	Draft  bool   `json:"draft"`
+	Repository string `json:"repository,omitempty"`
+	URL        string `json:"url"`
+	Number     int    `json:"number"`
+	State      string `json:"state"`
+	Draft      bool   `json:"draft"`
 }
 type Pulls struct {
 	Items     []Pull `json:"items"`
@@ -124,7 +125,7 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 		if remote.Merged {
 			remote.State = "merged"
 		}
-		known[link] = Pull{URL: link, Number: number, State: remote.State, Draft: remote.Draft}
+		known[link] = Pull{Repository: match[1], URL: link, Number: number, State: remote.State, Draft: remote.Draft}
 	}
 	state.Items = []Pull{}
 	for _, p := range known {

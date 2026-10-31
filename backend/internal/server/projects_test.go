@@ -60,7 +60,7 @@ func TestProjectAPIAndChatSnapshots(t *testing.T) {
 		}
 		return w
 	}
-	body := `{"name":"Project","configuration":{"repositories":[{"url":"owner/private"}],"setupCommand":"npm ci"}}`
+	body := `{"name":"Project","configuration":{"repositories":[{"url":"owner/private"},{"url":"other/private","baseBranch":"release","role":"core"},{"url":"owner/extra","baseBranch":"next","role":"extra"}],"setupCommand":"npm ci"}}`
 	for _, route := range []struct{ method, path string }{{"GET", "/api/projects"}, {"GET", "/api/projects/missing"}, {"POST", "/api/projects"}, {"PUT", "/api/projects/missing"}} {
 		call(route.method, route.path, body, "", a.origin, 401)
 		if route.method != "GET" {
@@ -96,7 +96,7 @@ func TestProjectAPIAndChatSnapshots(t *testing.T) {
 	if len(chat.StartingCommits) != 0 {
 		t.Fatal("validation recorded a starting commit before checkout")
 	}
-	updated := `{"name":"Renamed","configuration":{"repositories":[{"url":"owner/other","baseBranch":"next","role":"extra"}],"setupCommand":"new setup"}}`
+	updated := `{"name":"Renamed","configuration":{"repositories":[{"url":"owner/other","baseBranch":"next","role":"extra"},{"url":"owner/private","baseBranch":"develop","role":"core"}],"setupCommand":"new setup"}}`
 	remoteStatus = 404
 	call("PUT", path, updated, token, a.origin, 400)
 	unchanged, _ := store.Project(ctx, p.ID)
@@ -110,6 +110,9 @@ func TestProjectAPIAndChatSnapshots(t *testing.T) {
 		t.Fatal(err)
 	}
 	old, _ := store.Chat(ctx, chat.ID)
+	if len(old.Configuration.Repositories) != 3 || len(later.Configuration.Repositories) != 2 || old.Configuration.Repositories[1].Name != "other/private" || old.Configuration.Repositories[1].BaseBranch != "release" || old.Configuration.Repositories[2].Role != "extra" || later.Configuration.Repositories[1].BaseBranch != "develop" {
+		t.Fatal("repository arrays were not frozen per chat")
+	}
 	if old.Configuration.SetupCommand != "npm ci" || old.Configuration.Repositories[0].BaseBranch != "main" || later.Configuration.SetupCommand != "new setup" || later.Configuration.Repositories[0].Role != "extra" || later.Configuration.Repositories[0].BaseBranch != "next" {
 		t.Fatal("snapshot settings changed incorrectly")
 	}

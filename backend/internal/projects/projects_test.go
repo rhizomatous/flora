@@ -190,14 +190,43 @@ func TestConfigurationLimits(t *testing.T) {
 		func(in *Input) { in.Name = strings.Repeat("n", 201) },
 		func(in *Input) { in.Configuration.SetupCommand = strings.Repeat("x", 8193) },
 		func(in *Input) { in.Configuration.SetupCommand = "a\x00b" },
+		func(in *Input) { in.Configuration.Repositories = make([]storage.Repository, 101) },
 		func(in *Input) {
-			in.Configuration.Repositories = append(in.Configuration.Repositories, storage.Repository{URL: "a/b"})
+			in.Configuration.Repositories = append(in.Configuration.Repositories, storage.Repository{URL: "OWNER/private"})
 		},
 	} {
 		in := input("owner/private", "main")
 		mutate(&in)
 		if _, err := s.Validate(context.Background(), in); err == nil {
 			t.Fatal("accepted invalid input")
+		}
+	}
+}
+
+func TestValidateEveryRepositoryAndBranch(t *testing.T) {
+	s := fixture(t)
+	in := input("first/app", "main")
+	in.Configuration.Repositories = append(in.Configuration.Repositories,
+		storage.Repository{URL: "second/app", BaseBranch: "release", Role: "core"},
+		storage.Repository{URL: "third/extra", BaseBranch: "next", Role: "extra"})
+	for _, missing := range []string{"", "/repos/second/app", "/repos/third/extra/branches/next"} {
+		var paths []string
+		s.Client.Transport = transport(func(r *http.Request) (*http.Response, error) {
+			paths = append(paths, r.URL.Path)
+			if r.URL.Path == missing {
+				return response(404, ""), nil
+			}
+			return response(200, `{"default_branch":"main"}`), nil
+		})
+		got, err := s.Validate(context.Background(), in)
+		if missing != "" {
+			if err == nil {
+				t.Fatalf("accepted missing %s", missing)
+			}
+			continue
+		}
+		if err != nil || len(paths) != 6 || got.Configuration.Repositories[1].Name != "second/app" || got.Configuration.Repositories[2].Role != "extra" {
+			t.Fatalf("validation: %+v %v %v", got, paths, err)
 		}
 	}
 }

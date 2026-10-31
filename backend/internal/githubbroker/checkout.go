@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -34,6 +35,7 @@ type Access struct {
 	broker *Broker
 	engine Executor
 	cfg    CheckoutConfig
+	mu     sync.Mutex
 }
 
 func NewAccess(broker *Broker, engine Executor, cfg CheckoutConfig) (*Access, error) {
@@ -50,7 +52,9 @@ func NewAccess(broker *Broker, engine Executor, cfg CheckoutConfig) (*Access, er
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = 2 * time.Minute
 	}
-	return &Access{broker, engine, cfg}, nil
+	a := &Access{broker: broker, engine: engine, cfg: cfg}
+	broker.materialize = a.Materialize
+	return a, nil
 }
 
 func (a *Access) Revoke(ctx context.Context, chatID string) error {
@@ -70,25 +74,18 @@ func (b *tailBuffer) Write(p []byte) (int, error) {
 	return n, nil
 }
 
-// Checkout configures ordinary git/gh, resolves the initial core repository in
-// the container, saves its immutable base, then allows setup to start. Existing
+// Checkout configures ordinary git/gh, resolves all core repositories in
+// the container, saves their immutable bases, then allows setup to start. Existing
 // repositories are never reset on retry, even if the remote branch has moved.
 func (a *Access) Checkout(ctx context.Context, chat storage.Chat, paths storage.Paths, containerID string) (err error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, a.cfg.Timeout)
 	defer cancel()
-	var core []storage.Repository
 	for _, r := range chat.Configuration.Repositories {
-		if r.Role == "core" {
-			core = append(core, r)
+		if err := checkoutRepository(r); err != nil {
+			return err
 		}
-	}
-	if len(core) != 1 {
-		return fmt.Errorf("checkout supports exactly one core repository in /workspace; found %d; configure a project with one core repository and create a new chat", len(core))
-	}
-	r := core[0]
-	u, parseErr := url.Parse(r.URL)
-	if parseErr != nil || u.Scheme != "https" || u.Host != "github.com" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || !gitPath.MatchString(strings.TrimSuffix(u.Path, ".git")+".git/info/refs") || u.RawPath != "" {
-		return errors.New("checkout requires a canonical GitHub HTTPS repository URL")
 	}
 	credential := rand.Text() + rand.Text()
 	if err := a.broker.store.ReplaceGitHubCapability(ctx, chat.ID, credential, time.Now().Add(7*24*time.Hour)); err != nil {
@@ -118,6 +115,21 @@ func (a *Access) Checkout(ctx context.Context, chat storage.Chat, paths storage.
 		"git config --global " + quote("url.https://"+a.cfg.Host+"/.insteadOf") + " https://github.com/\n" +
 		"git config --global " + quote("http.https://"+a.cfg.Host+"/.sslCAInfo") + " /home/flora/.flora-github-ca.pem\n" +
 		"git config --global " + quote("credential.https://"+a.cfg.Host+".helper") + " '!gh auth git-credential'\n"
+	type entry struct {
+		storage.Repository
+		Path string `json:"path"`
+	}
+	manifest := []entry{}
+	for _, r := range chat.Configuration.Repositories {
+		manifest = append(manifest, entry{r, storage.RepositoryPath(chat.Configuration, r)})
+	}
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		return err
+	}
+	helper := "#!/bin/sh\nset -eu\n. /home/flora/.flora-github.env\ntest \"$#\" = 1 || { printf 'Usage: flora-repository OWNER/REPO\\n' >&2; exit 2; }\nexec gh api --hostname " + quote(a.cfg.Host) + " /flora/repositories -f repository=\"$1\"\n"
+	config += "mkdir -p /home/flora/bin\nprintf '%s\\n' " + quote(string(data)) + " > /home/flora/.flora-repositories.json\n" +
+		"printf '%s' " + quote(helper) + " > /home/flora/bin/flora-repository\nchmod 700 /home/flora/bin/flora-repository\n"
 	var output tailBuffer
 	run := func(user, script string) error {
 		output.data = nil
@@ -143,8 +155,54 @@ func (a *Access) Checkout(ctx context.Context, chat storage.Chat, paths storage.
 	if err := run(user, config); err != nil {
 		return err
 	}
-	url := "https://" + a.cfg.Host + strings.TrimSuffix(u.Path, ".git") + ".git"
-	script := "set -eu\n. /home/flora/.flora-github.env\ncd /workspace\n"
+	for _, r := range chat.Configuration.Repositories {
+		if r.Role != "core" {
+			continue
+		}
+		if err := a.checkoutOne(ctx, chat, r, func(script string) (string, error) {
+			err := run(user, script)
+			return strings.TrimSpace(string(output.data)), err
+		}); err != nil {
+			return err
+		}
+	}
+	return run("0", "set -eu\ntouch /var/lib/flora-checkout.ready\n")
+}
+
+func checkoutRepository(r storage.Repository) error {
+	u, err := url.Parse(r.URL)
+	if err != nil || u.Scheme != "https" || u.Host != "github.com" || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.RawPath != "" || !gitPath.MatchString(u.Path+"/info/refs") || u.Path != "/"+r.Name+".git" {
+		return errors.New("checkout requires a canonical GitHub HTTPS repository URL and identity")
+	}
+	for _, part := range strings.Split(r.Name, "/") {
+		if part == "." || part == ".." {
+			return errors.New("invalid repository identity")
+		}
+	}
+	return nil
+}
+
+// checkoutOne never changes a materialized checkout. Its marker lets a retry
+// recover the original base after cloning succeeded but saving to SQLite failed.
+func (a *Access) checkoutOne(ctx context.Context, chat storage.Chat, r storage.Repository, run func(string) (string, error)) error {
+	if err := checkoutRepository(r); err != nil {
+		return err
+	}
+	url := "https://" + a.cfg.Host + "/" + r.Name + ".git"
+	path := storage.RepositoryPath(chat.Configuration, r)
+	script := "set -eu\n. /home/flora/.flora-github.env\n"
+	if path != "/workspace" && chat.StartingCommits[r.Name] == "" {
+		script += "if [ ! -e " + quote(path) + " ]; then\n" +
+			"tmp=$(mktemp -d /workspace/.flora-clone.XXXXXXXX)\ntrap 'rm -rf -- \"$tmp\"' EXIT\n" +
+			"git -c http.followRedirects=false clone --single-branch --branch " + quote(r.BaseBranch) + " " + quote(url) + " \"$tmp\" >&2\n" +
+			"git -C \"$tmp\" checkout -b " + quote("flora/"+chat.ID) + " >&2\n" +
+			"git -C \"$tmp\" rev-parse HEAD > \"$tmp/.git/flora-starting-commit\"\n" +
+			"mkdir -p " + quote(filepath.Dir(path)) + "\nmv -- \"$tmp\" " + quote(path) + "\ntrap - EXIT\nfi\n"
+	}
+	script += "cd " + quote(path) + "\n"
+	if path != "/workspace" {
+		script += "test -f .git/flora-starting-commit\n"
+	}
 	if sha := chat.StartingCommits[r.Name]; sha != "" {
 		script += "git cat-file -e " + quote(sha+"^{commit}") + "\nprintf '%s\\n' " + quote(sha) + "\n"
 	} else {
@@ -155,16 +213,56 @@ func (a *Access) Checkout(ctx context.Context, chat storage.Chat, paths storage.
 			"sha=$(git rev-parse --verify 'FETCH_HEAD^{commit}')\n" +
 			"git checkout -B " + quote("flora/"+chat.ID) + " \"$sha\" >&2\n" +
 			"printf '%s\\n' \"$sha\" > .git/flora-starting-commit.tmp\nmv .git/flora-starting-commit.tmp .git/flora-starting-commit\nfi\n" +
-			"sha=$(cat .git/flora-starting-commit)\ngit cat-file -e \"$sha^{commit}\"\ntest \"$(git rev-parse HEAD)\" = \"$sha\"\nprintf '%s\\n' \"$sha\"\n"
+			"sha=$(cat .git/flora-starting-commit)\ngit cat-file -e \"$sha^{commit}\"\nprintf '%s\\n' \"$sha\"\n"
 	}
-	if err := run(user, script); err != nil {
+	sha, err := run(script)
+	if err != nil {
 		return err
 	}
-	sha := strings.TrimSpace(string(output.data))
 	if err := a.broker.store.RecordStartingCommit(ctx, chat.ID, r.Name, sha); err != nil {
 		return fmt.Errorf("save resolved checkout commit: %w", err)
 	}
-	return run("0", "set -eu\ntouch /var/lib/flora-checkout.ready\n")
+	return nil
+}
+
+// Materialize fetches a configured repository using the chat's frozen settings.
+// This helper records review bases; ordinary git/gh access remains token-wide.
+func (a *Access) Materialize(ctx context.Context, chatID, name string) (string, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	ctx, cancel := context.WithTimeout(ctx, a.cfg.Timeout)
+	defer cancel()
+	chat, err := a.broker.store.Chat(ctx, chatID)
+	if err != nil {
+		return "", err
+	}
+	paths, err := a.broker.store.Paths(ctx, chatID)
+	if err != nil {
+		return "", err
+	}
+	info, err := os.Stat(paths.Workspace)
+	if err != nil {
+		return "", err
+	}
+	user, err := workspaceUser(info)
+	if err != nil {
+		return "", err
+	}
+	for _, r := range chat.Configuration.Repositories {
+		if !strings.EqualFold(r.Name, name) {
+			continue
+		}
+		err := a.checkoutOne(ctx, chat, r, func(script string) (string, error) {
+			var out tailBuffer
+			code, err := a.engine.Exec(ctx, chat.ContainerID, user, []string{"sh", "-s"}, strings.NewReader(script), &out, io.Discard)
+			if err != nil || code != 0 {
+				return "", errors.New("repository fetch failed; check repository, branch, Docker and token permissions, then retry")
+			}
+			return strings.TrimSpace(string(out.data)), nil
+		})
+		return storage.RepositoryPath(chat.Configuration, r), err
+	}
+	return "", errors.New("repository is not in this chat's configuration; use ordinary git/gh for other token-authorized repositories")
 }
 
 func workspaceUser(info os.FileInfo) (string, error) {

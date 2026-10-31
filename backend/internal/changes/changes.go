@@ -30,6 +30,7 @@ type Executor interface {
 	Exec(context.Context, string, string, []string, io.Reader, io.Writer, io.Writer) (int, error)
 }
 type File struct {
+	Repository    string `json:"repository,omitempty"`
 	Path          string `json:"path"`
 	Previous      string `json:"previous,omitempty"`
 	Status        string `json:"status"`
@@ -40,10 +41,11 @@ type File struct {
 	Truncated     bool   `json:"truncated"`
 }
 type Snapshot struct {
-	ID         string `json:"id"`
-	CapturedAt string `json:"capturedAt"`
-	Base       string `json:"base"`
-	Files      []File `json:"files"`
+	ID         string            `json:"id"`
+	CapturedAt string            `json:"capturedAt"`
+	Base       string            `json:"base"`
+	Bases      map[string]string `json:"bases,omitempty"`
+	Files      []File            `json:"files"`
 }
 type Review struct {
 	Pulls    Pulls     `json:"pulls"`
@@ -133,23 +135,51 @@ func (s *Service) command(ctx context.Context, c storage.Chat, script string) ([
 // Copying the real index preserves tracked ignored files, including staged adds.
 // Git stores symlink targets rather than reading the files they point to.
 func (s *Service) capture(ctx context.Context, c storage.Chat) (*Snapshot, error) {
+	combined := &Snapshot{CapturedAt: time.Now().UTC().Format(time.RFC3339Nano), Bases: map[string]string{}, Files: []File{}}
+	for _, r := range c.Configuration.Repositories {
+		base := c.StartingCommits[r.Name]
+		if base == "" && r.Role == "extra" {
+			continue
+		}
+		if !hash.MatchString(base) {
+			return nil, errCapture
+		}
+		snap, err := s.captureRepository(ctx, c, r, base)
+		if err != nil {
+			return nil, err
+		}
+		combined.Bases[r.Name] = base
+		combined.Files = append(combined.Files, snap.Files...)
+	}
+	if len(c.Configuration.Repositories) == 1 {
+		combined.Base = c.StartingCommits[c.Configuration.Repositories[0].Name]
+	}
+	digest := sha256.New()
+	budget := &budgetWriter{w: digest, remaining: snapshotLimit - 4096}
+	if err := json.NewEncoder(budget).Encode(combined.Bases); err != nil {
+		return nil, err
+	}
+	if err := encodeFiles(budget, combined.Files); err != nil {
+		return nil, err
+	}
+	combined.ID = fmt.Sprintf("%x", digest.Sum(nil))
+	return combined, nil
+}
+
+func (s *Service) captureRepository(ctx context.Context, c storage.Chat, r storage.Repository, base string) (*Snapshot, error) {
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
-	var base string
-	for _, r := range c.Configuration.Repositories {
-		if r.Role == "core" {
-			if base != "" {
-				return nil, errCapture
-			}
-			base = c.StartingCommits[r.Name]
+	command := func(script string) ([]byte, error) {
+		if storage.RepositoryPath(c.Configuration, r) == "/workspace" {
+			return s.command(ctx, c, script)
 		}
+		return s.command(ctx, c, "cd "+quote(storage.RepositoryPath(c.Configuration, r))+"\n"+script)
 	}
-	if !hash.MatchString(base) {
-		return nil, errCapture
-	}
-	out, err := s.command(ctx, c, `idx=$(mktemp /tmp/flora-review.XXXXXXXX)
+	// Git uses the index timestamp to detect same-size edits made immediately
+	// after checkout. A newer copy could incorrectly treat those files as clean.
+	out, err := command(`idx=$(mktemp /tmp/flora-review.XXXXXXXX)
 trap 'rm -f "$idx" "$idx.lock"' EXIT
-cp -- "$(git rev-parse --git-path index)" "$idx"
+cp -p -- "$(git rev-parse --git-path index)" "$idx"
 export GIT_INDEX_FILE="$idx"
 git ls-files -z | git update-index --no-assume-unchanged -z --stdin
 git ls-files -z | git update-index --no-skip-worktree -z --stdin
@@ -164,7 +194,7 @@ git write-tree
 		return nil, errCapture
 	}
 	args := "GIT_ATTR_SOURCE=" + quote(tree) + " git -c core.quotePath=true diff --no-ext-diff --no-textconv --no-color --no-relative --line-prefix= --find-renames " + quote(base) + " " + quote(tree)
-	raw, err := s.command(ctx, c, args+" --raw -z --\n")
+	raw, err := command(args + " --raw -z --\n")
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +202,7 @@ git write-tree
 	// Both outputs use the same immutable trees and Git ordering. Patch headers
 	// start at column zero; source lines always carry a context/add/delete prefix.
 	// Capturing once also avoids directory pathspecs pulling in neighboring files.
-	patches, err := s.command(ctx, c, args+" --patch --\n")
+	patches, err := command(args + " --patch --\n")
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +229,7 @@ git write-tree
 		if len(meta) != 5 || i >= len(parts)-1 {
 			return nil, errCapture
 		}
-		f := File{Path: string(parts[i]), Status: meta[4]}
+		f := File{Repository: r.Name, Path: string(parts[i]), Status: meta[4]}
 		i++
 		if strings.HasPrefix(f.Status, "R") || strings.HasPrefix(f.Status, "C") {
 			f.Previous = f.Path
@@ -232,12 +262,7 @@ git write-tree
 	if patchIndex != len(blocks) {
 		return nil, errCapture
 	}
-	digest := sha256.New()
-	if err := encodeFiles(&budgetWriter{w: digest, remaining: snapshotLimit - 4096}, files); err != nil {
-		return nil, err
-	}
-	identity := fmt.Sprintf("%x", digest.Sum(nil))
-	return &Snapshot{ID: identity, CapturedAt: time.Now().UTC().Format(time.RFC3339Nano), Base: base, Files: files}, nil
+	return &Snapshot{Files: files}, nil
 }
 
 // Save uses one fsynced rename for the list and every full diff. Artifacts are
