@@ -3,11 +3,11 @@
 A self-hosted autonomous coding agent. Describe a task, let the agent work, then
 return to review its changes and open a draft pull request.
 
-**Status:** administrator onboarding, protected settings, projects, and durable storage.
-The binary serves first-time account creation, login/logout, and hosted-model
-and GitHub credential settings. Container provisioning and host-side GitHub
-transport are available as backend services; browser chat execution is not wired
-yet. See [agent setup](agent/README.md), the [roadmap](https://github.com/rhizomatous/flora/issues/20)
+**Status:** authenticated projects and persistent browser chats with full activity,
+follow-ups, runtime questions, and reconnectable saved events. Chat execution uses
+the pinned agent image and private host-side GitHub transport. Changes review,
+execution controls, and broad restart reconciliation are still separate work.
+See [agent setup](agent/README.md), the [roadmap](https://github.com/rhizomatous/flora/issues/20)
 and [product requirements](specs/PRD.md).
 
 ## Develop
@@ -53,6 +53,64 @@ are fixed on first save; keys can be replaced later. Blank keys keep saved value
 HTTP responses expose only the provider, model, and whether each key is saved.
 Credentials are stored in the private SQLite database, not encrypted separately.
 Protect the storage directory and backups, and never mount them into agents.
+
+### Enable chat execution
+
+Build the pinned image as described in `agent/README.md`, then supply
+`-agent-image` with its digest-pinned reference. For a local build, also supply
+`-agent-image-digest` with its recorded `name@sha256:...` identity and
+`-agent-image-id` with the expected Docker content ID. The harness version is
+fixed to the image's OpenCode 1.2.27. Docker must run on the same host as Flora's
+storage. `-docker-socket` defaults to `/var/run/docker.sock`.
+
+Enable the private GitHub listener with `-github-listen`, `-github-tls-cert`, and
+`-github-tls-key`. Supply `-github-host` with its private hostname, reachable on
+port 443 from containers, and `-github-ca` with the trusted CA PEM file. Keep this
+listener separate from the browser origin. The administrator's GitHub token
+stays on the host. See the agent setup for the transport and DNS requirements.
+
+After saving installation credentials and connecting a project with one core
+repository, choose **Start chat**. New containers receive the installation's
+provider key and fixed model. Replacing a saved key does not change an existing
+container's environment. Follow-ups use the existing endpoint, workspace, and
+OpenCode session without rotating its git/gh capability.
+
+Messages accept up to 128 KiB of decoded UTF-8. An accepted request identity
+deduplicates retries, including after completion. New requests during active
+work are rejected instead of queued. Browser disconnection does not cancel work;
+saved events replay in order on reconnect. OpenCode has no upstream replay cursor,
+so a runtime stream disconnection records a visible capture gap. Uncertain
+delivery remains blocked and is never automatically resent. Saved status alone
+does not prove runtime liveness after an application restart. Stop/resume and
+restart reconciliation are not provided by this slice.
+
+Setup progress uses bounded previews, capped at 1 MiB of saved progress plus a
+final preview. When setup ends, Flora retains the complete redacted output once
+as an authenticated log download. Preview omissions and full-log capture failures
+are explicit in the saved activity. Waiting for a user question pauses the
+continuous-activity timer; provider retries still count as active work.
+The active turn checks pending questions independently of the browser and SSE.
+Failed checks preserve known waits, and stale checks cannot undo newer questions
+or confirmed answers.
+
+The pinned runtime may buffer prompt response headers until a turn ends. Flora
+bounds the wait for acceptance evidence and for a response after saved completion,
+rather than imposing a short header deadline on valid work or question waits.
+An unresponsive history/capture path also ends the HTTP worker with delivery
+marked uncertain. These bounds never authorize resending an accepted message.
+
+For a no-paid-provider runtime integration check, build a uniquely named local
+agent image and run `FLORA_CHAT_TEST_IMAGE=<local-tag> go -C backend test -v
+-run TestChatDocker ./internal/chat` inside the Nix shell. It uses a local
+Anthropic-compatible fixture with the real pinned runtime, setup, Git workspace,
+bash tool, questions, and follow-ups. On native Linux, set
+`FLORA_CHAT_PROVIDER_HOST` to a host address reachable from the container.
+
+For the Chromium app check, run `npx playwright install chromium` and
+`make browser` in the Nix shell. This launches the compiled UI against the real
+authenticated app APIs and a deterministic runtime HTTP fixture. It checks chat
+creation, reload during execution, question/answer, full output/model metadata, follow-up,
+reconnect, grouped listing, mobile width, and logout protection.
 
 For fast frontend iteration, run `npm run dev` inside the development shell.
 Vite serves the web app and proxies `/api` to a backend on port 8080. For interactive

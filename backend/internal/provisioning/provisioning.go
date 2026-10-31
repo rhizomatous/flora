@@ -13,14 +13,15 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/rhizomatous/flora/backend/internal/agentfiles"
 	"github.com/rhizomatous/flora/backend/internal/docker"
+	"github.com/rhizomatous/flora/backend/internal/redaction"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
@@ -167,9 +168,13 @@ type WorkspaceAccess interface {
 // password is per-container and is recovered from the container's own
 // configuration, so a Flora restart does not lose access.
 type Endpoint struct {
-	URL         string
-	Username    string
-	Password    string
+	URL      string
+	Username string
+	Password string `json:"-"`
+	// ProviderKey is the key this container actually received. It may differ
+	// from current installation settings after a key replacement. Capture uses
+	// it only for redaction; never include it in browser responses or logs.
+	ProviderKey string `json:"-"`
 	ContainerID string
 }
 
@@ -357,6 +362,26 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 				return Endpoint{}, err
 			}
 			spec := m.containerSpec(chat, paths, password, uid, gid)
+			credentials, credentialsErr := m.store.Credentials(ctx)
+			if credentialsErr == nil {
+				keyName := map[string]string{"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "google": "GOOGLE_GENERATIVE_AI_API_KEY"}[credentials.Provider]
+				if keyName == "" {
+					return Endpoint{}, errors.New("unsupported installed provider")
+				}
+				// Stored credentials override the optional test key. They enter only
+				// newly created containers; existing running endpoints are unchanged.
+				for i := 0; i < len(spec.Env); i++ {
+					if strings.HasPrefix(spec.Env[i], "ANTHROPIC_API_KEY=") {
+						spec.Env = append(spec.Env[:i], spec.Env[i+1:]...)
+						break
+					}
+				}
+				spec.Env = append(spec.Env, keyName+"="+credentials.ProviderKey)
+				config, _ := json.Marshal(map[string]any{"model": credentials.Provider + "/" + credentials.Model, "small_model": credentials.Provider + "/" + credentials.Model, "enabled_providers": []string{credentials.Provider}})
+				spec.Env = append(spec.Env, "OPENCODE_CONFIG_CONTENT="+string(config))
+			} else if !errors.Is(credentialsErr, storage.ErrNotFound) {
+				return Endpoint{}, credentialsErr
+			}
 			// Hold the lock across the capacity check, creation, and start
 			// so concurrent starts cannot overbook the running-container limit.
 			var id string
@@ -536,7 +561,7 @@ func (m *Manager) awaitReady(ctx context.Context, chatID string, paths storage.P
 			password := info.EnvValue("OPENCODE_SERVER_PASSWORD")
 			url := "http://" + addr
 			if m.health(ctx, url, password) {
-				return Endpoint{URL: url, Username: "opencode", Password: password, ContainerID: containerID}, nil
+				return Endpoint{URL: url, Username: "opencode", Password: password, ProviderKey: containerProviderKey(info), ContainerID: containerID}, nil
 			}
 		}
 		select {
@@ -554,10 +579,14 @@ func (m *Manager) awaitReady(ctx context.Context, chatID string, paths storage.P
 // a leftover success status from an earlier setup must not turn a later
 // runtime exit into a bogus "setup failed with exit 0".
 func (m *Manager) containerExited(ctx context.Context, chatID string, paths storage.Paths, info docker.ContainerInfo) error {
-	dir := filepath.Join(paths.RuntimeState, "setup")
+	root, rootErr := os.OpenRoot(paths.RuntimeState)
+	if rootErr != nil {
+		return rootErr
+	}
+	defer root.Close()
 	exitCode := info.State.ExitCode
 	setupFailed := false
-	if raw, err := os.ReadFile(filepath.Join(dir, "exit-status")); err == nil {
+	if raw, err := agentfiles.Read(root, "setup/exit-status", 4096); err == nil {
 		if parsed, err := strconv.Atoi(strings.TrimSpace(string(raw))); err == nil && parsed != 0 {
 			exitCode = parsed
 			setupFailed = true
@@ -570,12 +599,10 @@ func (m *Manager) containerExited(ctx context.Context, chatID string, paths stor
 		return &RuntimeStartError{ChatID: chatID, ExitCode: exitCode}
 	}
 	var tail string
-	if raw, err := os.ReadFile(filepath.Join(dir, "output.log")); err == nil {
-		if len(raw) > setupTailMax {
-			raw = raw[len(raw)-setupTailMax:]
-		}
+	if raw, err := agentfiles.Tail(root, "setup/output.log", 32<<10); err == nil {
 		tail = string(raw)
 	}
+	tail = redaction.Tail(tail, setupTailMax, redaction.Values(ctx, m.store, chatID, m.cfg.ProviderAPIKey, containerProviderKey(info))...)
 	payload, _ := json.Marshal(map[string]any{
 		"exit_code":   exitCode,
 		"output_tail": tail,
@@ -633,7 +660,16 @@ func (m *Manager) Endpoint(ctx context.Context, chatID string) (Endpoint, error)
 	if addr == "" {
 		return Endpoint{}, errors.New("container has no loopback runtime endpoint")
 	}
-	return Endpoint{URL: "http://" + addr, Username: "opencode", Password: info.EnvValue("OPENCODE_SERVER_PASSWORD"), ContainerID: chat.ContainerID}, nil
+	return Endpoint{URL: "http://" + addr, Username: "opencode", Password: info.EnvValue("OPENCODE_SERVER_PASSWORD"), ProviderKey: containerProviderKey(info), ContainerID: chat.ContainerID}, nil
+}
+
+func containerProviderKey(info docker.ContainerInfo) string {
+	for _, name := range []string{"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"} {
+		if key := info.EnvValue(name); key != "" {
+			return key
+		}
+	}
+	return ""
 }
 
 // BeginActivity marks continuous agent activity on a container. Repeated
@@ -672,19 +708,31 @@ func (m *Manager) SweepActivity(ctx context.Context) ([]string, error) {
 	m.mu.Unlock()
 	var stopped []string
 	for _, id := range overdue {
+		// A question or resumed active period may have changed this entry since
+		// the first scan. Serialize the stop decision with Begin/EndActivity.
+		m.mu.Lock()
+		since, active := m.activeSince[id]
+		if !active || m.now().Sub(since) <= m.cfg.ActivityTimeout {
+			m.mu.Unlock()
+			continue
+		}
 		if m.access != nil {
 			info, err := m.engine.ContainerInspect(ctx, id)
 			if err != nil {
+				m.mu.Unlock()
 				return stopped, err
 			}
 			if err := m.access.Revoke(ctx, info.Config.Labels[labelChatID]); err != nil {
+				m.mu.Unlock()
 				return stopped, err
 			}
 		}
 		if err := m.engine.ContainerStop(ctx, id, stopTimeout); err != nil {
+			m.mu.Unlock()
 			return stopped, fmt.Errorf("stop over-limit container %s: %w", id, err)
 		}
-		m.EndActivity(id)
+		delete(m.activeSince, id)
+		m.mu.Unlock()
 		stopped = append(stopped, id)
 	}
 	return stopped, nil

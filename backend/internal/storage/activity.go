@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -30,7 +31,7 @@ type Activity struct {
 // chat has active work. Callers must submit only new acceptances to the runtime
 // and reconcile uncertain delivery without automatically resending the message.
 func (s *Store) AcceptMessage(ctx context.Context, chatID, requestID, text string) (Acceptance, error) {
-	if requestID == "" || !utf8.ValidString(text) || len(text) > MaxMessageBytes {
+	if requestID == "" || len(requestID) > 200 || strings.TrimSpace(text) == "" || !utf8.ValidString(text) || len(text) > MaxMessageBytes {
 		return Acceptance{}, ErrInvalid
 	}
 	var a Acceptance

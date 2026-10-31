@@ -2,6 +2,7 @@ package provisioning
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -16,10 +17,129 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
+func TestSetupErrorTailMasksPartialSecretsAfterShrinkageAndTrim(t *testing.T) {
+	secret := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabc"
+	shrinkSecret := "another-credential-" + strings.Repeat("Q", 81)
+	engine := newFakeEngine()
+	manager, store := newTestManager(t, engine, Config{ProviderAPIKey: secret}, nil)
+	chat := newChat(t, store)
+	ctx := context.Background()
+	if err := store.SaveCredentials(ctx, storage.Credentials{Provider: "anthropic", Model: "model", ProviderKey: shrinkSecret, GitHubToken: "github_pat_test_fixture"}); err != nil {
+		t.Fatal(err)
+	}
+	paths, err := store.Paths(ctx, chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(paths.RuntimeState, "setup"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(paths.RuntimeState, "setup", "exit-status"), []byte("1"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	repeats := strings.Repeat(shrinkSecret, 300)
+	padding := strings.Repeat("z", (32<<10)-20-len(repeats)-20)
+	input := strings.Repeat("x", 64<<10) + secret + repeats + padding + secret[:20]
+	if len(input)-(32<<10) != (64<<10)+19 {
+		t.Fatal("fixture does not cut the credential at the raw window boundary")
+	}
+	for _, test := range []struct{ input, want string }{
+		{input, "[redacted]" + strings.Repeat("[redacted]", 300) + padding + "[redacted]"},
+		{strings.Repeat("x", 64<<10) + secret[19:] + strings.Repeat("z", setupTailMax-20), "[redacted]" + strings.Repeat("z", setupTailMax-20)},
+	} {
+		if err := os.WriteFile(filepath.Join(paths.RuntimeState, "setup", "output.log"), []byte(test.input), 0600); err != nil {
+			t.Fatal(err)
+		}
+		var info docker.ContainerInfo
+		info.State.ExitCode = 1
+		var setupErr *SetupError
+		if err := manager.containerExited(ctx, chat.ID, paths, info); !errors.As(err, &setupErr) {
+			t.Fatal("expected setup error")
+		}
+		if setupErr.OutputTail != test.want || len(setupErr.OutputTail) > setupTailMax {
+			t.Fatal("setup error exposed a credential boundary fragment")
+		}
+	}
+}
+
+func TestInstalledProviderEnvironmentAndEndpointRecovery(t *testing.T) {
+	for provider, key := range map[string]string{"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "google": "GOOGLE_GENERATIVE_AI_API_KEY"} {
+		t.Run(provider, func(t *testing.T) {
+			engine := newFakeEngine()
+			manager, store := newTestManager(t, engine, Config{ProviderAPIKey: "old-test-key"}, nil)
+			chat := newChat(t, store)
+			ctx := context.Background()
+			if err := store.SaveCredentials(ctx, storage.Credentials{Provider: provider, Model: "installed-model", ProviderKey: "installed-test-secret", GitHubToken: "github_pat_host-only"}); err != nil {
+				t.Fatal(err)
+			}
+			endpoint, err := manager.Start(ctx, chat.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			info, err := engine.ContainerInspect(ctx, endpoint.ContainerID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if info.EnvValue(key) != "installed-test-secret" {
+				t.Fatal("provider key not installed")
+			}
+			for _, value := range info.Config.Env {
+				if strings.Contains(value, "host-only") || strings.Contains(value, "old-test-key") {
+					t.Fatal("wrong credential entered container")
+				}
+			}
+			var config struct {
+				Model      string   `json:"model"`
+				SmallModel string   `json:"small_model"`
+				Enabled    []string `json:"enabled_providers"`
+			}
+			if json.Unmarshal([]byte(info.EnvValue("OPENCODE_CONFIG_CONTENT")), &config) != nil || config.Model != provider+"/installed-model" || config.SmallModel != config.Model || len(config.Enabled) != 1 || config.Enabled[0] != provider {
+				t.Fatal("installation model config missing")
+			}
+			recovered, err := manager.Endpoint(ctx, chat.ID)
+			if err != nil || recovered != endpoint || len(engine.created) != 1 {
+				t.Fatal("endpoint recovery changed runtime")
+			}
+		})
+	}
+}
+
 const (
 	testDigest  = "flora/agent@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	testImageID = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 )
+
+func TestPausedActivityDoesNotStopContainer(t *testing.T) {
+	engine := newFakeEngine()
+	manager, store := newTestManager(t, engine, Config{ActivityTimeout: time.Hour}, nil)
+	chat := newChat(t, store)
+	ctx := context.Background()
+	endpoint, err := manager.Start(ctx, chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	manager.now = func() time.Time { return now }
+	manager.BeginActivity(endpoint.ContainerID)
+	now = now.Add(30 * time.Minute)
+	manager.EndActivity(endpoint.ContainerID)
+	now = now.Add(3 * time.Hour)
+	stopped, err := manager.SweepActivity(ctx)
+	if err != nil || len(stopped) != 0 || len(engine.stopped) != 0 {
+		t.Fatal("paused user question stopped its container")
+	}
+	manager.BeginActivity(endpoint.ContainerID)
+	now = now.Add(59 * time.Minute)
+	stopped, err = manager.SweepActivity(ctx)
+	if err != nil || len(stopped) != 0 {
+		t.Fatal("resumed clock did not start fresh")
+	}
+	now = now.Add(2 * time.Minute)
+	stopped, err = manager.SweepActivity(ctx)
+	if err != nil || len(stopped) != 1 {
+		t.Fatal("resumed execution never timed out")
+	}
+}
 
 type fakeContainer struct {
 	id, name, imageID string

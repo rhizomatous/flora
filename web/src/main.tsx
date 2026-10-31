@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { FlowerMark } from "@flora/florets";
 import { request } from "./request";
 import { Projects } from "./projects";
+import { Chats } from "./chats";
 import "@flora/florets/styles.css";
 
 type Status = { setupRequired: boolean; authenticated: boolean };
@@ -17,9 +18,9 @@ function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [path, setPath] = useState(window.location.hash.slice(1) || "projects");
+  const [path, setPath] = useState(window.location.hash.slice(1) || "chats");
   useEffect(() => {
-    const changed = () => { setPath(window.location.hash.slice(1) || "projects"); setError(""); setNotice(""); };
+    const changed = () => { setPath(window.location.hash.slice(1) || "chats"); setError(""); setNotice(""); };
     window.addEventListener("hashchange", changed);
     return () => window.removeEventListener("hashchange", changed);
   }, []);
@@ -66,12 +67,12 @@ function App() {
   }
 
   return (
-    <main className="mx-auto min-h-svh max-w-2xl px-6 py-10 sm:px-10">
+    <main className="mx-auto min-h-svh max-w-4xl px-6 py-10 sm:px-10">
       <header className="mb-14 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-lg font-semibold"><FlowerMark /><span>Flora</span></div>
         {status?.authenticated && <button type="button" className="text-sm text-muted-foreground underline underline-offset-4" disabled={busy} onClick={logout}>Log out</button>}
       </header>
-      {status?.authenticated && <nav aria-label="Main" className="mb-8 flex gap-6 text-sm"><a href="#projects" aria-current={path !== "settings" ? "page" : undefined} className="underline underline-offset-4">Projects</a><a href="#settings" aria-current={path === "settings" ? "page" : undefined} className="underline underline-offset-4">Installation settings</a></nav>}
+      {status?.authenticated && <nav aria-label="Main" className="mb-8 flex flex-wrap gap-6 text-sm"><a href="#chats" aria-current={path.startsWith("chats") ? "page" : undefined} className="underline underline-offset-4">Chats</a><a href="#projects" aria-current={path.startsWith("projects") ? "page" : undefined} className="underline underline-offset-4">Projects</a><a href="#settings" aria-current={path === "settings" ? "page" : undefined} className="underline underline-offset-4">Installation settings</a></nav>}
       {error && <p role="alert" className="mb-6 rounded-md border border-foreground/50 p-3 text-sm">{error}</p>}
       {notice && <p role="status" className="mb-6 rounded-md border p-3 text-sm">{notice}</p>}
       {!status && <p role="status" className="text-muted-foreground">Loading…</p>}
@@ -85,7 +86,7 @@ function App() {
           <button className={button} disabled={busy}>{busy ? "Please wait…" : status.setupRequired ? "Create administrator" : "Log in"}</button>
         </form>
       </section>}
-      {status?.authenticated && settings && path !== "settings" && <Projects key={path} path={path} onExpired={() => { request<Status>("auth/status").then(setStatus).catch(() => {}); }} />}
+      {status?.authenticated && settings && path !== "settings" && (path.startsWith("chats") ? <Chats key={path} path={path} onExpired={() => { request<Status>("auth/status").then(setStatus).catch(() => {}); }} /> : <Projects key={path} path={path} onExpired={() => { request<Status>("auth/status").then(setStatus).catch(() => {}); }} />)}
       {status?.authenticated && settings && path === "settings" && <section aria-labelledby="settings-heading">
         <h1 ref={heading} tabIndex={-1} id="settings-heading" className="text-2xl font-semibold tracking-tight">Installation settings</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">Choose one hosted provider and model for all chats. Once saved, the provider and model cannot be changed.</p>
