@@ -11,7 +11,7 @@ import { setTimeout as delay } from "node:timers/promises";
 test("standalone binary serves embedded web assets and shuts down cleanly", { timeout: 15000 }, async () => {
   const binary = fileURLToPath(new URL("../bin/flora", import.meta.url));
   const dataDir = await mkdtemp(join(tmpdir(), "flora-smoke-"));
-  const child = spawn(binary, ["-listen", "127.0.0.1:0", "-data-dir", dataDir, "-public-url", "https://FLORA.test:443/"], {
+  const child = spawn(binary, ["-listen", "127.0.0.1:0", "-data-dir", dataDir, "-public-url", "https://FLORA.test:443/", "-max-running", "3"], {
     // No source files or dist directory are available in the working directory.
     cwd: tmpdir(),
     stdio: ["ignore", "pipe", "pipe"],
@@ -127,5 +127,26 @@ test("standalone binary requires a public HTTPS origin", { timeout: 15000 }, asy
     assert.equal(code, 1);
     assert.match(output, /Set -public-url/);
     assert.doesNotMatch(output, /Flora listening|DO_NOT_PRINT/);
+  }
+});
+
+test("standalone binary rejects nonpositive container capacity before opening storage", { timeout: 15000 }, async () => {
+  const binary = fileURLToPath(new URL("../bin/flora", import.meta.url));
+  const dir = await mkdtemp(join(tmpdir(), "flora-capacity-failure-"));
+  try {
+    for (const limit of ["0", "-1"]) {
+      const child = spawn(binary, ["-max-running", limit, "-public-url", "https://flora.test", "-data-dir", join(dir, "data")], {
+        cwd: tmpdir(), stdio: ["ignore", "ignore", "pipe"],
+      });
+      let output = "";
+      child.stderr.on("data", chunk => { output += chunk; });
+      const [code] = await once(child, "exit");
+      assert.equal(code, 1);
+      assert.match(output, /Set -max-running to a positive number/);
+      assert.doesNotMatch(output, /Flora listening/);
+      assert.deepEqual(await readdir(dir), []);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });

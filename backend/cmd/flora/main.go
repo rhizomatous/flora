@@ -35,10 +35,15 @@ func main() {
 	agentImage := flag.String("agent-image", "", "pinned Flora agent image reference; enables chat execution")
 	agentDigest := flag.String("agent-image-digest", "", "recorded name@sha256 image identity (defaults to agent-image)")
 	agentID := flag.String("agent-image-id", "", "expected sha256 content ID, required for a local image tag")
+	maxRunning := flag.Int("max-running", provisioning.DefaultMaxRunning, "maximum running chat containers, including idle; lowering it does not stop existing containers")
 	dockerSocket := flag.String("docker-socket", docker.DefaultSocket, "Docker Engine socket on this host")
 	githubHost := flag.String("github-host", "", "private TLS hostname on port 443 reachable from agent containers")
 	githubCA := flag.String("github-ca", "", "CA PEM file trusted by agent git/gh for the private GitHub transport")
 	flag.Parse()
+	if *maxRunning <= 0 {
+		slog.Error("Set -max-running to a positive number of chat containers")
+		os.Exit(1)
+	}
 	origin, err := publicOrigin(*publicURL)
 	if err != nil {
 		slog.Error("Set -public-url to the public HTTPS origin, for example https://flora.example.com; configure your reverse proxy to forward to -listen")
@@ -85,7 +90,7 @@ func main() {
 			slog.Error("Cannot configure container GitHub access", "error", err)
 			os.Exit(1)
 		}
-		manager, err := provisioning.New(engine, store, provisioning.Config{ImageRef: *agentImage, ImageDigest: *agentDigest, ImageID: *agentID, HarnessVersion: "1.2.27"}, access)
+		manager, err := provisioning.New(engine, store, provisioning.Config{ImageRef: *agentImage, ImageDigest: *agentDigest, ImageID: *agentID, HarnessVersion: "1.2.27", MaxRunning: *maxRunning}, access)
 		if err != nil {
 			slog.Error("Cannot configure pinned agent runtime", "error", err)
 			os.Exit(1)

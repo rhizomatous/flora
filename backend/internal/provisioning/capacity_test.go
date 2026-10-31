@@ -295,3 +295,52 @@ func TestReadinessDoesNotSerializeOtherChats(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+type revocationAccess struct {
+	checkoutFunc
+	chatIDs []string
+	err     error
+}
+
+func (a *revocationAccess) Revoke(_ context.Context, chatID string) error {
+	a.chatIDs = append(a.chatIDs, chatID)
+	return a.err
+}
+
+func TestStopMissingBoundContainerRevokesChatAccess(t *testing.T) {
+	for _, revokeFails := range []bool{false, true} {
+		t.Run(map[bool]string{false: "revoked", true: "revocation unavailable"}[revokeFails], func(t *testing.T) {
+			engine := newFakeEngine()
+			m, s := newTestManager(t, engine, Config{}, nil)
+			ctx := context.Background()
+			c := newChat(t, s)
+			e, err := m.Start(ctx, c.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			m.BeginActivity(e.ContainerID)
+			engine.mu.Lock()
+			delete(engine.containers, e.ContainerID)
+			engine.mu.Unlock()
+			access := &revocationAccess{}
+			if revokeFails {
+				access.err = errors.New("revocation unavailable")
+			}
+			m.access = access
+			err = m.Stop(ctx, c.ID)
+			if !errors.Is(err, access.err) {
+				t.Fatalf("stop did not report revocation result: %v", err)
+			}
+			if len(access.chatIDs) != 1 || access.chatIDs[0] != c.ID {
+				t.Fatal("did not revoke only the missing container's chat")
+			}
+			if _, ok := m.activeSince[e.ContainerID]; ok {
+				t.Fatal("confirmed missing container kept active accounting")
+			}
+			saved, err := s.Chat(ctx, c.ID)
+			if err != nil || saved.ContainerID != e.ContainerID || len(engine.created) != 1 || len(engine.stopped) != 0 {
+				t.Fatal("missing container was replaced or identity changed")
+			}
+		})
+	}
+}

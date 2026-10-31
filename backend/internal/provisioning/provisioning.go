@@ -437,19 +437,18 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 
 func containerName(chatID string) string { return "flora-chat-" + chatID }
 
-// validateOwned checks that a container found under the chat's deterministic
-// name is exactly the container this chat would have created: management and
-// chat labels, image content, and mounts must all match. A name collision
-// with anything else is an operator error, never silently adopted or removed.
+// validateOwned checks the container's chat name, ownership labels, image
+// content, and mounts before accessing it. A mismatched container is never
+// silently adopted, used, or stopped.
 func validateOwned(info docker.ContainerInfo, chat storage.Chat, paths storage.Paths, imageID string) error {
 	if info.Name != "/"+containerName(chat.ID) {
 		return fmt.Errorf("provisioning: container name %q does not match chat %s", info.Name, chat.ID)
 	}
 	if info.Config.Labels[labelManaged] != "true" || info.Config.Labels[labelChatID] != chat.ID {
-		return fmt.Errorf("provisioning: container %s lacks this chat's ownership labels; refusing to adopt it", info.Name)
+		return fmt.Errorf("provisioning: container %s lacks this chat's ownership labels; refusing access", info.Name)
 	}
 	if info.Image != imageID {
-		return fmt.Errorf("provisioning: container %s runs image %s, expected %s; refusing to adopt it", info.Name, info.Image, imageID)
+		return fmt.Errorf("provisioning: container %s runs image %s, expected %s; refusing access", info.Name, info.Image, imageID)
 	}
 	want := map[string]bool{
 		paths.Workspace + ":/workspace":     false,
@@ -457,13 +456,13 @@ func validateOwned(info docker.ContainerInfo, chat storage.Chat, paths storage.P
 	}
 	for _, bind := range info.HostConfig.Binds {
 		if _, ok := want[bind]; !ok {
-			return fmt.Errorf("provisioning: container %s has unexpected mount %q; refusing to adopt it", info.Name, bind)
+			return fmt.Errorf("provisioning: container %s has unexpected mount %q; refusing access", info.Name, bind)
 		}
 		want[bind] = true
 	}
 	for bind, seen := range want {
 		if !seen {
-			return fmt.Errorf("provisioning: container %s is missing mount %q; refusing to adopt it", info.Name, bind)
+			return fmt.Errorf("provisioning: container %s is missing mount %q; refusing access", info.Name, bind)
 		}
 	}
 	return nil
@@ -633,10 +632,19 @@ func (m *Manager) Stop(ctx context.Context, chatID string) error {
 	if err != nil {
 		return err
 	}
+	// Docker confirmed that no container can execute. Revoke the chat's own
+	// capability even when external removal left a saved binding behind.
+	missing := func() error {
+		m.EndActivity(chat.ContainerID)
+		if m.access != nil {
+			return m.access.Revoke(ctx, chatID)
+		}
+		return nil
+	}
 	if chat.ContainerID == "" {
 		info, inspectErr := m.engine.ContainerInspect(ctx, containerName(chatID))
 		if docker.IsNotFound(inspectErr) {
-			return nil
+			return missing()
 		}
 		if inspectErr != nil {
 			return inspectErr
@@ -663,6 +671,9 @@ func (m *Manager) Stop(ctx context.Context, chatID string) error {
 		return err
 	}
 	info, err := m.engine.ContainerInspect(ctx, chat.ContainerID)
+	if docker.IsNotFound(err) {
+		return missing()
+	}
 	if err != nil {
 		return err
 	}
