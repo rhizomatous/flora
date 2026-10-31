@@ -73,6 +73,9 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 		}
 	}
 	if len(links) == 0 {
+		state.CheckedAt = time.Now().UTC().Format(time.RFC3339Nano)
+		state.Error = ""
+		_ = save(root, "pulls.json", state)
 		return
 	}
 	creds, err := s.Store.Credentials(ctx)

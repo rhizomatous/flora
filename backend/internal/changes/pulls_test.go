@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
@@ -56,5 +57,66 @@ func TestVerifyPullLinksAndRetainOnFailure(t *testing.T) {
 	r, err = s.Read(ctx, c.ID, true)
 	if err != nil || len(r.Pulls.Items) != 1 || r.Pulls.Error == "" || requests != 2 || strings.Contains(r.Pulls.Error, "sensitive") {
 		t.Fatalf("PR retention failed: %+v %v", r.Pulls, err)
+	}
+}
+
+func TestEmptyPullScanThrottlesAndDiscoversLaterLink(t *testing.T) {
+	s, c, _ := fixture(t)
+	ctx := context.Background()
+	requests := 0
+	client := &http.Client{Transport: transport(func(r *http.Request) (*http.Response, error) {
+		requests++
+		if r.URL.String() != "https://api.github.com/repos/example/core/pulls/42" {
+			t.Fatalf("unexpected verification: %s", r.URL)
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"number":42,"state":"open","draft":true,"html_url":"https://github.com/example/core/pull/42"}`)), Header: make(http.Header)}, nil
+	})}
+	s.verifyPulls(ctx, c, client)
+	p, err := s.Store.Paths(ctx, c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(p.Artifacts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	var empty Pulls
+	if err = load(root, "pulls.json", &empty); err != nil {
+		t.Fatal(err)
+	}
+	if stamp, err := time.Parse(time.RFC3339Nano, empty.CheckedAt); err != nil || time.Since(stamp) >= 30*time.Second || len(empty.Items) != 0 || requests != 0 {
+		t.Fatalf("empty scan was not recorded: %+v %v", empty, err)
+	}
+	before, err := root.Stat("pulls.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.Store.SaveCredentials(ctx, storage.Credentials{GitHubToken: "fixture-token", Provider: "anthropic", Model: "test", ProviderKey: "fixture-key"}); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.Store.SaveRuntimeMessage(ctx, "new-link", storage.Message{ChatID: c.ID, RuntimeMessageID: "assistant-link", Role: "assistant", Text: "https://github.com/example/core/pull/42", Payload: json.RawMessage(`{}`)}); err != nil {
+		t.Fatal(err)
+	}
+	// A new service also honors the saved scan window without reading new links.
+	New(s.Store, nil).verifyPulls(ctx, c, client)
+	after, err := root.Stat("pulls.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requests != 0 || !os.SameFile(before, after) {
+		t.Fatal("empty scan did not throttle the next scan and write")
+	}
+	empty.CheckedAt = time.Now().Add(-31 * time.Second).UTC().Format(time.RFC3339Nano)
+	if err = save(root, "pulls.json", empty); err != nil {
+		t.Fatal(err)
+	}
+	s.verifyPulls(ctx, c, client)
+	var discovered Pulls
+	if err = load(root, "pulls.json", &discovered); err != nil {
+		t.Fatal(err)
+	}
+	if requests != 1 || len(discovered.Items) != 1 || discovered.Items[0].Number != 42 || discovered.CheckedAt == empty.CheckedAt {
+		t.Fatalf("new link was not discovered after the scan window: %+v", discovered)
 	}
 }
