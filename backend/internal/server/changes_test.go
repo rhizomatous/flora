@@ -45,6 +45,16 @@ func savedReview(t *testing.T, store *storage.Store, p storage.Project) storage.
 	if err = os.WriteFile(filepath.Join(paths.Artifacts, "changes.json"), b, 0600); err != nil {
 		t.Fatal(err)
 	}
+	pulls := changes.Pulls{CheckedAt: "2026-01-01T00:00:00Z", Error: "Pull request verification unavailable. Saved statuses may be out of date.", Items: []changes.Pull{
+		{Repository: "first/app", URL: "https://github.com/first/app/pull/7", Number: 7, State: "open", Draft: true},
+		{Repository: "second/app", URL: "https://github.com/second/app/pull/7", Number: 7, State: "merged"},
+		{Repository: "first/app", URL: "https://github.com/first/app/pull/8", Number: 8, State: "closed"},
+		{Repository: "third/private", URL: "https://github.com/third/private/pull/9", Number: 9, State: "open"},
+	}}
+	b, _ = json.Marshal(pulls)
+	if err = os.WriteFile(filepath.Join(paths.Artifacts, "pulls.json"), b, 0600); err != nil {
+		t.Fatal(err)
+	}
 	return c
 }
 func TestChangesAuthenticationAndFullDownload(t *testing.T) {
@@ -76,6 +86,9 @@ func TestChangesAuthenticationAndFullDownload(t *testing.T) {
 	}
 	if !r.Stale || !r.Snapshot.Files[1].Truncated || r.Snapshot.Files[1].Diff != "" || r.Snapshot.Files[2].Diff != "" {
 		t.Fatal("bad inline review")
+	}
+	if len(r.Pulls.Items) != 4 || r.Pulls.Error == "" {
+		t.Fatal("saved PRs missing from authenticated review")
 	}
 	w = call(download, token)
 	if w.Code != 200 || w.Body.Len() != 1200000 || w.Header().Get("Content-Disposition") == "" {

@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/docker"
+	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
 func TestDockerCaptureAndRemoval(t *testing.T) {
@@ -77,6 +80,36 @@ func TestDockerCaptureAndRemoval(t *testing.T) {
 		t.Fatalf("Docker capture: %+v %v", r, err)
 	}
 	stamp := r.Snapshot.CapturedAt
+	out.Reset()
+	code, err = engine.Exec(ctx, id, "flora", []string{"sh", "-c", `cd /workspace && git remote add origin https://github.com/example/core.git && git checkout -qb work && git add . && git commit -qm work && git rev-parse HEAD`}, nil, &out, io.Discard)
+	if err != nil || code != 0 {
+		t.Fatalf("branch fixture: %v %d", err, code)
+	}
+	sha := strings.TrimSpace(out.String())
+	if err = s.Store.Transition(ctx, c.ID, "", storage.Idle, "Fixture ready"); err != nil {
+		t.Fatal(err)
+	}
+	c, err = s.Store.Chat(ctx, c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	credentials(t, s, "docker-fixture-token")
+	merged := false
+	client := &http.Client{Transport: transport(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path == "/repos/example/core/pulls" {
+			return reply(200, fmt.Sprintf(`[{"number":17,"html_url":"https://github.com/example/core/pull/17","head":{"ref":"work","sha":%q,"repo":{"full_name":"example/core"}}}]`, sha)), nil
+		}
+		state := "open"
+		if merged {
+			state = "closed"
+		}
+		return reply(200, fmt.Sprintf(`{"number":17,"state":%q,"merged":%t,"html_url":"https://github.com/example/core/pull/17"}`, state, merged)), nil
+	})}
+	s.verifyPulls(ctx, c, client)
+	r, err = s.Read(ctx, c.ID, false)
+	if err != nil || len(r.Pulls.Items) != 1 {
+		t.Fatalf("Docker branch discovery: %+v %v", r.Pulls, err)
+	}
 	if err = engine.ContainerStop(ctx, id, 1); err != nil {
 		t.Fatal(err)
 	}
@@ -87,8 +120,15 @@ func TestDockerCaptureAndRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 	removed = true
+	expirePulls(t, s, c)
+	c.Status = storage.Stopped
+	merged = true
+	s.verifyPulls(ctx, c, client)
 	r, err = New(s.Store, nil).Read(ctx, c.ID, false)
 	if err != nil || r.Snapshot.CapturedAt != stamp || !r.Stale || r.Error == "" {
 		t.Fatalf("removed-container retention: %+v %v", r, err)
+	}
+	if len(r.Pulls.Items) != 1 || r.Pulls.Items[0].State != "merged" {
+		t.Fatalf("removed-container PR retention: %+v", r.Pulls)
 	}
 }

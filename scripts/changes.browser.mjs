@@ -13,6 +13,19 @@ try {
   await page.goto(`${process.env.FLORA_BROWSER_URL}/#chats/${process.env.FLORA_BROWSER_CHAT}`);
   const review = page.getByRole("region", { name: "Changes", exact: true });
   await review.getByText(/Saved review, possibly out of date/).waitFor();
+  const pulls = review.getByRole("list", { name: "Pull requests" });
+  assert.equal(await pulls.getByRole("listitem").count(), 4);
+  for (const [label, state, href] of [
+    ["first/app PR #7", "Draft", "https://github.com/first/app/pull/7"],
+    ["second/app PR #7", "Merged", "https://github.com/second/app/pull/7"],
+    ["first/app PR #8", "Closed", "https://github.com/first/app/pull/8"],
+    ["third/private PR #9", "Open", "https://github.com/third/private/pull/9"],
+  ]) {
+    const link = pulls.getByRole("link", { name: label, exact: true });
+    assert.equal(await link.getAttribute("href"), href);
+    assert.match(await link.locator("..").textContent(), new RegExp(state));
+  }
+  await review.getByText(/Saved statuses may be out of date/).waitFor();
   await review.locator("summary").filter({ hasText: "first/app" }).filter({ hasText: "src/hello.ts" }).click();
   await review.getByText(/hello review/).waitFor();
   await review.locator("summary").filter({ hasText: "second/app" }).filter({ hasText: "src/hello.ts" }).click();
@@ -31,10 +44,12 @@ try {
   await review.getByText(/removed.txt/).waitFor();
   await page.reload();
   await review.getByText(/Saved review, possibly out of date/).waitFor();
+  assert.equal(await pulls.getByRole("listitem").count(), 4);
+  await review.getByText(/Saved statuses may be out of date/).waitFor();
   await page.setViewportSize({ width: 375, height: 812 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.deepEqual(errors, []);
-  console.log("Chromium: saved review after reload, stale label, text diff, binary/deletion list, full large-diff download, and mobile width passed.");
+  console.log("Chromium: multiple saved PRs across repositories, exact links, draft/open/closed/merged statuses and outage warning after reload; saved diffs, download and mobile width passed.");
 } finally {
   await browser.close();
 }
