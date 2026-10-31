@@ -42,3 +42,8 @@ jobs:
         run: nix develop --command go -C backend test -race -count=1 -v -run '^TestCheckoutDocker$' ./internal/githubbroker
       - name: Check persistent turns against pinned OpenCode and a local provider fixture
         run: FLORA_CHAT_TEST_IMAGE=flora-agent-test:ci FLORA_CHAT_TEST_LSP=1 FLORA_CHAT_PROVIDER_HOST="$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')" nix develop --command go -C backend test -race -count=1 -v -run '^TestChatDocker$' ./internal/chat
+      - name: Check review retention after container stop and removal
+        env:
+          FLORA_CHANGES_DOCKER_TEST: "1"
+          FLORA_CHANGES_TEST_IMAGE: flora-agent-test:ci
+        run: nix develop --command go -C backend test -race -count=1 -v -run '^TestDockerCaptureAndRemoval$' ./internal/changes

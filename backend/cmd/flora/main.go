@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/auth"
+	"github.com/rhizomatous/flora/backend/internal/changes"
 	"github.com/rhizomatous/flora/backend/internal/chat"
 	"github.com/rhizomatous/flora/backend/internal/docker"
 	"github.com/rhizomatous/flora/backend/internal/githubbroker"
@@ -78,6 +79,13 @@ func main() {
 			os.Exit(1)
 		}
 		defer engine.Close()
+		reviewCtx, stopReview := context.WithCancel(ctx)
+		reviewDone := make(chan struct{})
+		go func() {
+			defer close(reviewDone)
+			changes.New(store, engine).Run(reviewCtx)
+		}()
+		defer func() { stopReview(); <-reviewDone }()
 		access, err := githubbroker.NewAccess(githubbroker.New(store), engine, githubbroker.CheckoutConfig{Host: *githubHost, CACert: string(ca)})
 		if err != nil {
 			slog.Error("Cannot configure container GitHub access", "error", err)

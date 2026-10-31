@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { request, RequestError } from "./request";
 import { FlowerMark } from "@flora/florets";
+import { Changes } from "./changes";
 
 type Chat = { ID: string; ProjectID: string; Title: string; Status: "working" | "waiting" | "failed" | "idle" | "stopped"; StatusReason: string; UpdatedAt: string; ImageDigest: string; HarnessVersion: string; StartingCommits: Record<string, string> };
 type Part = { id?: string; type: string; text?: string; tool?: string; state?: { status: string; input?: unknown; output?: string; error?: string; title?: string } };
@@ -176,6 +177,7 @@ export function Chats({ path, onExpired }: { path: string; onExpired: () => void
         <div className="mt-3 space-y-4">{m.Payload.parts?.length ? m.Payload.parts.map((p, i) => <MessagePart key={p.id || i} part={p} />) : <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-6">{m.Text}</pre>}</div>
         {m.Payload.info?.error != null && <pre role="alert" className="mt-3 whitespace-pre-wrap break-words text-sm">{JSON.stringify(m.Payload.info.error, null, 2)}</pre>}
       </li>)}</ol>
+      <Changes key={id} chatID={id} onExpired={onExpired} />
       {questionError && <p className="mt-6 text-sm" role="status">{questionError}</p>}
       {questions.map(q => <QuestionForm key={q.id} question={q} chatID={id} onError={report} onAnswered={() => setQuestions(rows => rows.filter(row => row.id !== q.id))} />)}
       <form onSubmit={send} className="mt-8 space-y-4">
