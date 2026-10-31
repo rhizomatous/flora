@@ -390,3 +390,87 @@ func TestTimeoutFailureDoesNotStarveOtherChats(t *testing.T) {
 		t.Fatal("failed first stop starved later chat")
 	}
 }
+
+func TestConfirmedReplyAfterWorkerExitRemainsBlocked(t *testing.T) {
+	f := newFixture(t)
+	f.transportLoss = true
+	f.replyStarted, f.replyRelease = make(chan struct{}), make(chan struct{})
+	s, p, project := testService(t, f)
+	clock := &activityClock{testProvisioner: p, now: time.Now()}
+	s.provisioner = clock
+	ctx := context.Background()
+	c, err := s.Create(ctx, project.ID, "Reply race", "first", "work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	awaitPrompt(t, f)
+	f.mu.Lock()
+	f.question = true
+	f.mu.Unlock()
+	f.events <- `{"type":"question.asked","properties":{"sessionID":"ses_one","id":"que_one"}}`
+	waitStatus(t, s, c.ID, storage.Waiting)
+	if clock.advanceAndSweep(2*time.Hour) != 0 {
+		t.Fatal("question wait was not paused")
+	}
+	s.turnMu.Lock()
+	job := s.jobs[c.ID]
+	s.turnMu.Unlock()
+	replied := make(chan error, 1)
+	go func() { replied <- s.Reply(ctx, c.ID, "que_one", [][]string{{"Yes"}}) }()
+	select {
+	case <-f.replyStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("reply POST did not reach runtime")
+	}
+	f.release <- false
+	select {
+	case <-job.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("prompt worker did not exit after transport failure")
+	}
+	before, _ := s.Store.Chat(ctx, c.ID)
+	if before.Status != storage.Waiting || before.ActiveMessageID == "" || !strings.Contains(before.StatusReason, "uncertain") {
+		t.Fatalf("missing saved delivery uncertainty: %+v", before)
+	}
+	close(f.replyRelease)
+	var failure *ControlError
+	select {
+	case err := <-replied:
+		if !errors.As(err, &failure) || !strings.Contains(failure.Reason, "was delivered") || !strings.Contains(failure.Reason, "Do not resend") {
+			t.Fatalf("confirmed delivery was not reported accurately: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("reply response did not complete")
+	}
+	after, _ := s.Store.Chat(ctx, c.ID)
+	if after.Status != storage.Waiting || after.ActiveMessageID != before.ActiveMessageID || after.StatusReason != failure.Reason {
+		t.Fatalf("reply released or falsely resumed unmonitored turn: %+v", after)
+	}
+	s.questionActivity(c.ID, after.ActiveMessageID, "que_one", true)
+	if err := s.Reply(ctx, c.ID, "que_one", [][]string{{"Yes"}}); !errors.As(err, &failure) {
+		t.Fatalf("abandoned turn accepted another reply: %v", err)
+	}
+	if _, err := s.Submit(ctx, c.ID, "follow", "new work"); !errors.Is(err, storage.ErrActive) {
+		t.Fatal("unmonitored execution accepted new work: ", err)
+	}
+	rows, err := s.Store.Activities(ctx, c.ID, 0, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	confirmations := 0
+	for _, row := range rows {
+		if row.Kind == "question.reply.confirmed" {
+			confirmations++
+		}
+	}
+	if confirmations != 1 || f.questionReplies.Load() != 1 || f.prompts.Load() != 1 {
+		t.Fatal("lost confirmed reply or resent runtime work")
+	}
+	final, _ := s.Store.Chat(ctx, c.ID)
+	if final.Status != storage.Waiting {
+		t.Fatal("late question callback falsely marked unmonitored work Working")
+	}
+	if clock.advanceAndSweep(59*time.Minute) != 0 || clock.advanceAndSweep(2*time.Minute) != 1 {
+		t.Fatal("confirmed answer left unmonitored execution outside timeout enforcement")
+	}
+}

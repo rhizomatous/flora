@@ -115,6 +115,7 @@ func TestQuestionSnapshotsCannotUndoNewerEventsOrConfirmedAnswers(t *testing.T) 
 	clock := &activityClock{testProvisioner: p, now: time.Now()}
 	a := &turnActivity{provisioner: clock, containerID: "container", messageID: accepted.Message.ID, questions: map[string]bool{}}
 	s.turns[c.ID] = a
+	s.jobs[c.ID] = &turnJob{done: make(chan struct{})}
 	clock.BeginActivity("container")
 	event := func(id string) {
 		t.Helper()

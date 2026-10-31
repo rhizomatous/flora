@@ -74,6 +74,8 @@ type runtimeFixture struct {
 	busy                bool
 	streams             atomic.Int32
 	questionReplies     atomic.Int32
+	replyStarted        chan struct{}
+	replyRelease        chan struct{}
 }
 
 func newFixture(t *testing.T) *runtimeFixture {
@@ -162,6 +164,14 @@ func newFixture(t *testing.T) *runtimeFixture {
 			}
 		case r.URL.Path == "/question/que_one/reply":
 			f.questionReplies.Add(1)
+			if f.replyStarted != nil {
+				close(f.replyStarted)
+				select {
+				case <-f.replyRelease:
+				case <-r.Context().Done():
+					return
+				}
+			}
 			f.mu.Lock()
 			f.question = false
 			f.mu.Unlock()

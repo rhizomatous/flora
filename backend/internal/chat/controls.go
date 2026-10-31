@@ -16,6 +16,7 @@ type turnJob struct {
 	done      chan struct{}
 	resume    bool
 	attempted atomic.Bool
+	finished  bool // Protected by Service.turnMu, set before done closes.
 }
 
 // ControlError contains only a fixed, credential-free explanation of an
@@ -37,8 +38,13 @@ func (s *Service) abandonTurn(chatID string) {
 func (s *Service) monitoredTurn(chatID, messageID string) bool {
 	s.turnMu.Lock()
 	defer s.turnMu.Unlock()
+	return s.monitoredTurnLocked(chatID, messageID)
+}
+
+// The caller holds turnMu through any status change authorized by this check.
+func (s *Service) monitoredTurnLocked(chatID, messageID string) bool {
 	a, job := s.turns[chatID], s.jobs[chatID]
-	if a == nil || job == nil || a.messageID != messageID {
+	if a == nil || job == nil || job.finished || a.messageID != messageID {
 		return false
 	}
 	a.mu.Lock()

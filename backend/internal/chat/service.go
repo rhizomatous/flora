@@ -90,7 +90,12 @@ func (s *Service) Submit(ctx context.Context, chatID, requestID, text string) (s
 	s.jobs[chatID] = job
 	s.turnMu.Unlock()
 	go func() {
-		defer close(job.done)
+		defer func() {
+			s.turnMu.Lock()
+			job.finished = true
+			close(job.done)
+			s.turnMu.Unlock()
+		}()
 		defer cancel()
 		s.run(workerCtx, chatID, a.Message, job)
 	}()
@@ -410,6 +415,9 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 			if ctx.Err() != nil {
 				return
 			}
+			// No callback or reply may resume this turn while its final capture
+			// and status are being saved, even if delivery ended uncertainly.
+			s.abandonTurn(chatID)
 			providerFailure, captureErr := capture()
 			var rejected *responseError
 			if errors.As(err, &rejected) && rejected.status >= 400 && rejected.status < 500 && rejected.status != 409 {
@@ -609,6 +617,28 @@ func (s *Service) Reply(ctx context.Context, chatID, questionID string, answers 
 		_ = s.transition(chatID, c.ActiveMessageID, storage.Waiting, "Question reply delivery is uncertain. Refresh the live questions before continuing.")
 		return errors.New("question reply uncertain; refresh before continuing")
 	}
-	s.questionActivity(chatID, c.ActiveMessageID, questionID, true)
-	return nil
+	confirmation, _ := json.Marshal(map[string]string{"question_id": questionID})
+	if err := s.Store.AppendActivity(ctx, chatID, rand.Text(), "question.reply.confirmed", redaction.JSON(confirmation, redaction.Values(ctx, s.Store, chatID, e.Password, e.ProviderKey)...)); err != nil {
+		return &ControlError{Reason: "The question reply was delivered, but its confirmation could not be saved. Do not resend it. Refresh the chat before continuing."}
+	}
+	if s.questionActivity(chatID, c.ActiveMessageID, questionID, true) {
+		return nil
+	}
+	s.turnMu.Lock()
+	defer s.turnMu.Unlock()
+	current, err := s.Store.Chat(ctx, chatID)
+	if err != nil {
+		return err
+	}
+	if current.ActiveMessageID != c.ActiveMessageID {
+		return nil
+	}
+	reason := "The question reply was delivered, but ongoing execution is no longer monitored. Do not resend it. New messages and question replies remain blocked. Interrupt current work or stop the container before continuing."
+	if err := s.Store.Transition(ctx, chatID, c.ActiveMessageID, storage.Waiting, reason); err != nil {
+		return err
+	}
+	// The confirmed answer may have resumed runtime work despite the lost
+	// capture worker. Its previous question wait must no longer pause timeout.
+	s.provisioner.BeginActivity(c.ContainerID)
+	return &ControlError{Reason: reason}
 }
