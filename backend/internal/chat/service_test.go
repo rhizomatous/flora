@@ -42,8 +42,10 @@ func (p *testProvisioner) Endpoint(context.Context, string) (provisioning.Endpoi
 	p.endpoints.Add(1)
 	return provisioning.Endpoint{URL: p.url, Username: "opencode", Password: "runtime_SECRET", ContainerID: "container"}, nil
 }
-func (*testProvisioner) BeginActivity(string) {}
-func (*testProvisioner) EndActivity(string)   {}
+func (*testProvisioner) BeginActivity(string)                           {}
+func (*testProvisioner) EndActivity(string)                             {}
+func (*testProvisioner) Stop(context.Context, string) error             { return nil }
+func (*testProvisioner) ConfirmInterrupt(context.Context, string) error { return nil }
 
 // The HTTP fixture exercises the same authenticated streaming and synchronous
 // prompt contract as OpenCode. Turn delivery remains blocked until released.
@@ -69,6 +71,11 @@ type runtimeFixture struct {
 	questionCompletions atomic.Int32
 	questionInFlight    atomic.Int32
 	questionMaxInFlight atomic.Int32
+	busy                bool
+	streams             atomic.Int32
+	questionReplies     atomic.Int32
+	replyStarted        chan struct{}
+	replyRelease        chan struct{}
 }
 
 func newFixture(t *testing.T) *runtimeFixture {
@@ -86,7 +93,24 @@ func newFixture(t *testing.T) *runtimeFixture {
 		case r.URL.Path == "/session":
 			f.sessions.Add(1)
 			fmt.Fprint(w, `{"id":"ses_one"}`)
+		case r.URL.Path == "/session/status":
+			f.mu.Lock()
+			busy := f.busy
+			f.mu.Unlock()
+			if busy {
+				fmt.Fprint(w, `{"ses_one":{"type":"busy"}}`)
+			} else {
+				fmt.Fprint(w, `{}`)
+			}
+		case r.URL.Path == "/instance/dispose":
+			fmt.Fprint(w, `true`)
+		case r.URL.Path == "/session/ses_one/abort":
+			f.mu.Lock()
+			f.question = false
+			f.mu.Unlock()
+			fmt.Fprint(w, `true`)
 		case r.URL.Path == "/event":
+			f.streams.Add(1)
 			w.Header().Set("Content-Type", "text/event-stream")
 			fmt.Fprint(w, ": connected\n\n")
 			w.(http.Flusher).Flush()
@@ -139,18 +163,27 @@ func newFixture(t *testing.T) *runtimeFixture {
 				fmt.Fprint(w, `[]`)
 			}
 		case r.URL.Path == "/question/que_one/reply":
+			f.questionReplies.Add(1)
+			if f.replyStarted != nil {
+				close(f.replyStarted)
+				select {
+				case <-f.replyRelease:
+				case <-r.Context().Done():
+					return
+				}
+			}
 			f.mu.Lock()
 			f.question = false
 			f.mu.Unlock()
 			f.events <- `{"type":"question.replied","properties":{"sessionID":"ses_one","requestID":"que_one"}}`
 			fmt.Fprint(w, `true`)
 		case r.Method == "GET" && r.URL.Path == "/session/ses_one/message":
+			f.mu.Lock()
+			defer f.mu.Unlock()
 			if f.historyUnavailable {
 				w.WriteHeader(503)
 				return
 			}
-			f.mu.Lock()
-			defer f.mu.Unlock()
 			json.NewEncoder(w).Encode(f.history)
 		case r.Method == "POST" && r.URL.Path == "/session/ses_one/message":
 			if f.promptStatus != 0 {
@@ -408,7 +441,6 @@ func TestCompletedHistoryDoesNotLeavePromptTransportHanging(t *testing.T) {
 
 func TestUnavailableCaptureDoesNotLeaveQuestionTransportHanging(t *testing.T) {
 	f := newFixture(t)
-	f.historyUnavailable = true
 	f.noPromptHeaders = true
 	s, _, p := testService(t, f)
 	s.promptAdmissionTimeout = 300 * time.Millisecond
@@ -417,6 +449,9 @@ func TestUnavailableCaptureDoesNotLeaveQuestionTransportHanging(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-f.started
+	f.mu.Lock()
+	f.historyUnavailable = true
+	f.mu.Unlock()
 	f.events <- `{"type":"question.asked","properties":{"sessionID":"ses_one","id":"que_one","questions":[]}}`
 	waitStatus(t, s, c.ID, storage.Waiting)
 	deadline := time.Now().Add(3 * time.Second)

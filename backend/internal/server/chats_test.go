@@ -41,8 +41,10 @@ func (p *browserProvisioner) Start(ctx context.Context, id string) (provisioning
 func (p *browserProvisioner) Endpoint(context.Context, string) (provisioning.Endpoint, error) {
 	return provisioning.Endpoint{URL: p.url, Username: "opencode", Password: "test-runtime-password", ContainerID: "browser-container"}, nil
 }
-func (*browserProvisioner) BeginActivity(string) {}
-func (*browserProvisioner) EndActivity(string)   {}
+func (*browserProvisioner) BeginActivity(string)                           {}
+func (*browserProvisioner) EndActivity(string)                             {}
+func (*browserProvisioner) Stop(context.Context, string) error             { return nil }
+func (*browserProvisioner) ConfirmInterrupt(context.Context, string) error { return nil }
 
 func chatAPI(t *testing.T, interactive ...bool) (*storage.Store, *chat.Service, *auth.Service, string, storage.Project, func()) {
 	t.Helper()
@@ -81,6 +83,15 @@ func chatAPI(t *testing.T, interactive ...bool) (*storage.Store, *chat.Service, 
 			fmt.Fprint(w, `{"model":"anthropic/model"}`)
 		case "/session":
 			fmt.Fprint(w, `{"id":"ses_browser"}`)
+		case "/session/status":
+			fmt.Fprint(w, `{}`)
+		case "/instance/dispose":
+			fmt.Fprint(w, `true`)
+		case "/session/ses_browser/abort":
+			mu.Lock()
+			pending = false
+			mu.Unlock()
+			fmt.Fprint(w, `true`)
 		case "/question":
 			mu.Lock()
 			defer mu.Unlock()
@@ -134,6 +145,10 @@ func chatAPI(t *testing.T, interactive ...bool) (*storage.Store, *chat.Service, 
 				pending = true
 			}
 			mu.Unlock()
+			if strings.Contains(input.Parts[0].Text, "control work") {
+				<-r.Context().Done()
+				return
+			}
 			if ask {
 				events <- `{"type":"question.asked","properties":{"id":"que_browser","sessionID":"ses_browser"}}`
 				select {
@@ -191,6 +206,7 @@ func TestChatAPIAuthenticationValidationAndReplay(t *testing.T) {
 		return b
 	}
 	for _, route := range []struct{ method, path string }{
+		{"POST", "/api/chats/missing/interrupt"}, {"POST", "/api/chats/missing/stop"},
 		{"GET", "/api/chats"}, {"GET", "/api/chats/missing/setup-log"}, {"HEAD", "/api/chats/missing/setup-log"}, {"GET", "/api/chats/missing"}, {"GET", "/api/chats/missing/events"}, {"GET", "/api/chats/missing/questions"}, {"POST", "/api/projects/" + project.ID + "/chats"}, {"POST", "/api/chats/missing/messages"}, {"POST", "/api/chats/missing/questions/question/reply"},
 	} {
 		call(route.method, route.path, "{}", "", origin, 401)

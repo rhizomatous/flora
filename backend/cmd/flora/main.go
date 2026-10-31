@@ -106,24 +106,8 @@ func main() {
 					return
 				case <-ticker.C:
 				}
-				stopped, err := manager.SweepActivity(ctx)
-				if err != nil {
+				if err := chats.EnforceTimeouts(ctx); err != nil {
 					slog.Error("Activity timeout enforcement unavailable; check Docker")
-				}
-				if len(stopped) == 0 {
-					continue
-				}
-				chats, err := store.Chats(ctx)
-				if err != nil {
-					slog.Error("Cannot save stopped chat status")
-					continue
-				}
-				for _, c := range chats {
-					for _, id := range stopped {
-						if c.ContainerID == id {
-							_ = store.Transition(ctx, c.ID, c.ActiveMessageID, storage.Stopped, "Continuous activity limit reached; container stopped")
-						}
-					}
 				}
 			}
 		}()

@@ -36,10 +36,12 @@ type Service struct {
 	promptCompletionTimeout time.Duration
 	questionPollInterval    time.Duration
 	questionPollTimeout     time.Duration
+	operations              sync.Map
+	jobs                    map[string]*turnJob
 }
 
 func New(ctx context.Context, store *storage.Store, p Provisioner) *Service {
-	return &Service{Store: store, provisioner: p, ctx: ctx, turns: map[string]*turnActivity{}, promptAdmissionTimeout: 30 * time.Second, promptCompletionTimeout: 30 * time.Second, questionPollInterval: time.Second, questionPollTimeout: 3 * time.Second}
+	return &Service{Store: store, provisioner: p, ctx: ctx, turns: map[string]*turnActivity{}, jobs: map[string]*turnJob{}, promptAdmissionTimeout: 30 * time.Second, promptCompletionTimeout: 30 * time.Second, questionPollInterval: time.Second, questionPollTimeout: 3 * time.Second}
 }
 
 func (s *Service) Create(ctx context.Context, project, title, requestID, text string) (storage.Chat, error) {
@@ -62,8 +64,19 @@ func (s *Service) Create(ctx context.Context, project, title, requestID, text st
 }
 
 func (s *Service) Submit(ctx context.Context, chatID, requestID, text string) (storage.Acceptance, error) {
+	unlock := s.lockOperation(chatID)
+	defer unlock()
 	if s.provisioner == nil {
 		return storage.Acceptance{}, errors.New("chat runtime is not configured")
+	}
+	c, err := s.Store.Chat(ctx, chatID)
+	if err != nil {
+		return storage.Acceptance{}, err
+	}
+	if c.ActiveMessageID == "" {
+		if err := s.quiesce(ctx, chatID); err != nil {
+			return storage.Acceptance{}, err
+		}
 	}
 	a, err := s.Store.AcceptMessage(ctx, chatID, requestID, text)
 	if err != nil || a.Duplicate {
@@ -71,7 +84,21 @@ func (s *Service) Submit(ctx context.Context, chatID, requestID, text string) (s
 	}
 	// Only the process that first accepts the message starts delivery. A crash
 	// between acceptance and launch leaves saved uncertainty, never an auto-retry.
-	go s.run(chatID, a.Message)
+	workerCtx, cancel := context.WithCancel(s.ctx)
+	job := &turnJob{cancel: cancel, done: make(chan struct{}), resume: c.Status == storage.Stopped}
+	s.turnMu.Lock()
+	s.jobs[chatID] = job
+	s.turnMu.Unlock()
+	go func() {
+		defer func() {
+			s.turnMu.Lock()
+			job.finished = true
+			close(job.done)
+			s.turnMu.Unlock()
+		}()
+		defer cancel()
+		s.run(workerCtx, chatID, a.Message, job)
+	}()
 	return a, nil
 }
 
@@ -79,9 +106,12 @@ func (s *Service) transition(chatID, messageID string, status storage.Status, re
 	return s.Store.Transition(s.ctx, chatID, messageID, status, reason)
 }
 
-func (s *Service) run(chatID string, message storage.Message) {
-	ctx := s.ctx
-	fail := func(reason string) { _ = s.transition(chatID, message.ID, storage.Failed, reason) }
+func (s *Service) run(ctx context.Context, chatID string, message storage.Message, job *turnJob) {
+	fail := func(reason string) {
+		if ctx.Err() == nil {
+			_ = s.transition(chatID, message.ID, storage.Failed, reason)
+		}
+	}
 	c, err := s.Store.Chat(ctx, chatID)
 	if err != nil {
 		return
@@ -92,7 +122,7 @@ func (s *Service) run(chatID string, message storage.Message) {
 		return
 	}
 	var endpoint provisioning.Endpoint
-	if c.ContainerID == "" {
+	if c.ContainerID == "" || c.SessionID == "" || job.resume {
 		_ = s.transition(chatID, message.ID, storage.Working, "Preparing checkout and setup")
 		monitorCtx, stopMonitor := context.WithCancel(ctx)
 		monitorDone := make(chan struct{})
@@ -117,15 +147,35 @@ func (s *Service) run(chatID string, message storage.Message) {
 		}
 		return
 	}
+	if ctx.Err() != nil {
+		return
+	}
 	activity := &turnActivity{provisioner: s.provisioner, containerID: endpoint.ContainerID, messageID: message.ID, questions: map[string]bool{}}
 	s.turnMu.Lock()
 	s.provisioner.BeginActivity(endpoint.ContainerID)
 	s.turns[chatID] = activity
 	s.turnMu.Unlock()
-	defer s.endTurnActivity(chatID, activity)
+	keepActivity := false
+	defer func() {
+		if !keepActivity && ctx.Err() == nil {
+			s.endTurnActivity(chatID, activity)
+		}
+	}()
 	rt := newRuntime(endpoint)
 	defer rt.client.CloseIdleConnections()
 	setupCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	if c.SessionID != "" {
+		var statuses map[string]struct {
+			Type string `json:"type"`
+		}
+		if err := rt.call(setupCtx, "GET", "/session/status", nil, &statuses); err != nil || (statuses[c.SessionID].Type != "" && statuses[c.SessionID].Type != "idle") {
+			cancel()
+			if ctx.Err() == nil {
+				_ = s.transition(chatID, message.ID, storage.Waiting, "Existing runtime execution could not be confirmed idle. No new message was delivered. Interrupt current work or stop the container before continuing.")
+			}
+			return
+		}
+	}
 	// Installation settings enter the container before boot. Runtime config
 	// mutation writes project config, which this pinned image deliberately ignores.
 	var configuration struct {
@@ -170,6 +220,19 @@ func (s *Service) run(chatID string, message storage.Message) {
 			seen[saved.RuntimeMessageID] = sha256.Sum256(saved.Payload)
 		}
 	}
+	var priorHistory []runtimeMessage
+	historyCtx, historyCancel := context.WithTimeout(ctx, 10*time.Second)
+	err = rt.call(historyCtx, "GET", sessionPath(c.SessionID)+"/message", nil, &priorHistory)
+	historyCancel()
+	if err != nil {
+		fail("Could not read existing runtime context. No message was delivered.")
+		return
+	}
+	for _, prior := range priorHistory {
+		if prior.Info.Role == "user" {
+			knownUsers[prior.Info.ID] = true
+		}
+	}
 	var runtimeID string
 	turnCtx, stopCapture := context.WithCancel(ctx)
 	defer stopCapture()
@@ -179,27 +242,37 @@ func (s *Service) run(chatID string, message storage.Message) {
 	var runtimeAccepted atomic.Bool
 	priorUsers := maps.Clone(knownUsers)
 	secrets := redaction.Values(ctx, s.Store, chatID, endpoint.Password, endpoint.ProviderKey)
-	go func() {
-		captureErrors <- rt.stream(turnCtx, c.SessionID, ready, func(kind string, payload json.RawMessage) error {
-			// Persist complete part snapshots rather than text fragments. Separate
-			// deltas could expose a credential split across multiple observations.
-			if kind == "message.part.delta" {
-				return nil
-			}
-			clean := redaction.JSON(payload, secrets...)
-			if err := s.Store.AppendActivity(turnCtx, chatID, rand.Text(), "runtime."+kind, clean); err != nil {
-				return err
-			}
-			if kind == "session.error" {
-				runtimeFailure.Store(true)
-			}
-			var event runtimeEvent
-			_ = json.Unmarshal(payload, &event)
-			if kind == "question.asked" && event.Properties.ID != "" || kind == "message.updated" && event.Properties.Info.Role == "user" && !priorUsers[event.Properties.Info.ID] {
-				runtimeAccepted.Store(true)
-			}
-			return s.runtimeActivity(chatID, activity, kind, payload)
-		})
+	captureEvent := func(kind string, payload json.RawMessage) error {
+		// Persist complete part snapshots rather than text fragments. Separate
+		// deltas could expose a credential split across multiple observations.
+		if kind == "message.part.delta" {
+			return nil
+		}
+		clean := redaction.JSON(payload, secrets...)
+		if err := s.Store.AppendActivity(turnCtx, chatID, rand.Text(), "runtime."+kind, clean); err != nil {
+			return err
+		}
+		if kind == "session.error" {
+			runtimeFailure.Store(true)
+		}
+		var event runtimeEvent
+		_ = json.Unmarshal(payload, &event)
+		if kind == "question.asked" && event.Properties.ID != "" || kind == "message.updated" && event.Properties.Info.Role == "user" && !priorUsers[event.Properties.Info.ID] {
+			runtimeAccepted.Store(true)
+		}
+		return s.runtimeActivity(chatID, activity, kind, payload)
+	}
+	startCapture := func(ready chan error) {
+		captureErrors = make(chan error, 1)
+		result := captureErrors
+		go func() { result <- rt.stream(turnCtx, c.SessionID, ready, captureEvent) }()
+	}
+	startCapture(ready)
+	defer func() {
+		stopCapture()
+		if captureErrors != nil {
+			<-captureErrors
+		}
 	}()
 	if err := <-ready; err != nil {
 		fail("Could not connect activity capture. No message was delivered.")
@@ -207,8 +280,9 @@ func (s *Service) run(chatID string, message storage.Message) {
 	}
 	_ = s.transition(chatID, message.ID, storage.Working, "Delivering message to OpenCode")
 	result := make(chan error, 1)
+	promptDone := make(chan struct{})
 	promptCtx, cancelPrompt := context.WithCancel(turnCtx)
-	defer cancelPrompt()
+	defer func() { cancelPrompt(); <-promptDone }()
 	admission := time.NewTimer(s.promptAdmissionTimeout)
 	defer admission.Stop()
 	admissionDeadline := admission.C
@@ -219,7 +293,9 @@ func (s *Service) run(chatID string, message storage.Message) {
 	var completed bool
 	transportCanceled := false
 	var unreadableSince time.Time
+	job.attempted.Store(true)
 	go func() {
+		defer close(promptDone)
 		var response runtimeMessage
 		err := rt.call(promptCtx, "POST", sessionPath(c.SessionID)+"/message", map[string]any{
 			"model":  map[string]string{"providerID": credentials.Provider, "modelID": credentials.Model},
@@ -235,6 +311,8 @@ func (s *Service) run(chatID string, message storage.Message) {
 	questionResults := make(chan questionSnapshot, 1)
 	questionPollRunning, questionPollFailed := false, false
 	var nextQuestionPoll time.Time
+	var reconnect <-chan time.Time
+	reconnectAttempts := 0
 	pollQuestions := func() {
 		if questionPollRunning || time.Now().Before(nextQuestionPoll) {
 			return
@@ -326,13 +404,26 @@ func (s *Service) run(chatID string, message storage.Message) {
 			// History cannot reconstruct transient events. Only a successful prompt
 			// response together with a saved final snapshot can confirm completion.
 			captureErrors = nil
+			if reconnectAttempts < 3 {
+				reconnectAttempts++
+				reconnect = time.After(time.Duration(reconnectAttempts) * 250 * time.Millisecond)
+			}
+		case <-reconnect:
+			reconnect = nil
+			startCapture(make(chan error, 1))
 		case err := <-result:
+			if ctx.Err() != nil {
+				return
+			}
+			// No callback or reply may resume this turn while its final capture
+			// and status are being saved, even if delivery ended uncertainly.
+			s.abandonTurn(chatID)
 			providerFailure, captureErr := capture()
-			s.endTurnActivity(chatID, activity)
 			var rejected *responseError
 			if errors.As(err, &rejected) && rejected.status >= 400 && rejected.status < 500 && rejected.status != 409 {
 				fail(rejected.Error() + ". Check the installation model and runtime configuration.")
 			} else if err != nil || captureErr != nil || runtimeID == "" {
+				keepActivity = true
 				_ = s.transition(chatID, message.ID, storage.Waiting, "Runtime delivery or completion is uncertain. The accepted message will not be resent. Saved activity may be incomplete.")
 			} else if providerFailure || runtimeFailure.Load() {
 				fail("The model provider or runtime reported an error. Inspect the saved response and installation settings.")
@@ -341,6 +432,10 @@ func (s *Service) run(chatID string, message storage.Message) {
 			}
 			return
 		case <-ticker.C:
+			current, err := s.Store.Chat(ctx, chatID)
+			if err == nil && current.ActiveMessageID != message.ID {
+				return
+			}
 			pollQuestions()
 			_, _ = capture()
 		}
@@ -422,6 +517,9 @@ func (s *Service) Questions(ctx context.Context, chatID string) ([]Question, err
 	if c.SessionID == "" || (c.Status != storage.Working && c.Status != storage.Waiting) {
 		return []Question{}, nil
 	}
+	if !s.monitoredTurn(chatID, c.ActiveMessageID) {
+		return []Question{}, nil
+	}
 	e, err := s.provisioner.Endpoint(ctx, chatID)
 	if err != nil {
 		return nil, errors.New("runtime questions unavailable; saved questions may be stale")
@@ -448,6 +546,8 @@ func (s *Service) Questions(ctx context.Context, chatID string) ([]Question, err
 // Reply confirms the process-local request still belongs to this chat. A lost
 // reply response is uncertain and must not be retried as a fresh question answer.
 func (s *Service) Reply(ctx context.Context, chatID, questionID string, answers [][]string) error {
+	unlock := s.lockOperation(chatID)
+	defer unlock()
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	c, err := s.Store.Chat(ctx, chatID)
@@ -456,6 +556,9 @@ func (s *Service) Reply(ctx context.Context, chatID, questionID string, answers 
 	}
 	if c.ActiveMessageID == "" {
 		return storage.ErrStale
+	}
+	if !s.monitoredTurn(chatID, c.ActiveMessageID) {
+		return &ControlError{Reason: "Question replies are blocked because this turn is no longer being monitored. Interrupt current work or stop the container before continuing."}
 	}
 	questions, err := s.Questions(ctx, chatID)
 	if err != nil {
@@ -514,6 +617,28 @@ func (s *Service) Reply(ctx context.Context, chatID, questionID string, answers 
 		_ = s.transition(chatID, c.ActiveMessageID, storage.Waiting, "Question reply delivery is uncertain. Refresh the live questions before continuing.")
 		return errors.New("question reply uncertain; refresh before continuing")
 	}
-	s.questionActivity(chatID, c.ActiveMessageID, questionID, true)
-	return nil
+	confirmation, _ := json.Marshal(map[string]string{"question_id": questionID})
+	if err := s.Store.AppendActivity(ctx, chatID, rand.Text(), "question.reply.confirmed", redaction.JSON(confirmation, redaction.Values(ctx, s.Store, chatID, e.Password, e.ProviderKey)...)); err != nil {
+		return &ControlError{Reason: "The question reply was delivered, but its confirmation could not be saved. Do not resend it. Refresh the chat before continuing."}
+	}
+	if s.questionActivity(chatID, c.ActiveMessageID, questionID, true) {
+		return nil
+	}
+	s.turnMu.Lock()
+	defer s.turnMu.Unlock()
+	current, err := s.Store.Chat(ctx, chatID)
+	if err != nil {
+		return err
+	}
+	if current.ActiveMessageID != c.ActiveMessageID {
+		return nil
+	}
+	reason := "The question reply was delivered, but ongoing execution is no longer monitored. Do not resend it. New messages and question replies remain blocked. Interrupt current work or stop the container before continuing."
+	if err := s.Store.Transition(ctx, chatID, c.ActiveMessageID, storage.Waiting, reason); err != nil {
+		return err
+	}
+	// The confirmed answer may have resumed runtime work despite the lost
+	// capture worker. Its previous question wait must no longer pause timeout.
+	s.provisioner.BeginActivity(c.ContainerID)
+	return &ControlError{Reason: reason}
 }

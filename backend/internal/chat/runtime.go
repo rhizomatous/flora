@@ -74,6 +74,86 @@ func (c *runtime) call(ctx context.Context, method, path string, in, out any) er
 
 func sessionPath(id string) string { return "/session/" + url.PathEscape(id) }
 
+func (c *runtime) abort(ctx context.Context, session string) error {
+	var confirmed bool
+	if err := c.call(ctx, "POST", sessionPath(session)+"/abort", nil, &confirmed); err != nil {
+		return err
+	}
+	if !confirmed {
+		return errors.New("runtime did not confirm interruption")
+	}
+	questions, err := c.pendingQuestions(ctx)
+	if err != nil {
+		return err
+	}
+	for _, q := range questions {
+		if q.SessionID == session {
+			if err := c.call(ctx, "POST", "/question/"+url.PathEscape(q.ID)+"/reject", nil, nil); err != nil {
+				return err
+			}
+		}
+	}
+	for {
+		var statuses map[string]struct {
+			Type string `json:"type"`
+		}
+		if err := c.call(ctx, "GET", "/session/status", nil, &statuses); err != nil {
+			return err
+		}
+		questions, err := c.pendingQuestions(ctx)
+		if err != nil {
+			return err
+		}
+		var history []runtimeMessage
+		if err := c.call(ctx, "GET", sessionPath(session)+"/message", nil, &history); err != nil {
+			return err
+		}
+		waiting := false
+		for _, q := range questions {
+			if q.SessionID == session {
+				waiting = true
+			}
+		}
+		latestUser := ""
+		for _, m := range history {
+			if m.Info.Role == "user" {
+				latestUser = m.Info.ID
+			}
+		}
+		for _, m := range history {
+			if m.Info.Role != "assistant" || m.Info.ParentID != latestUser {
+				continue
+			}
+			if m.Info.Role == "assistant" && m.Info.Time.Completed == 0 {
+				waiting = true
+			}
+			for _, p := range m.Parts {
+				if p.Type == "tool" && p.State.Status != "completed" && p.State.Status != "error" {
+					waiting = true
+				}
+			}
+		}
+		if status := statuses[session].Type; (status == "" || status == "idle") && !waiting {
+			// Abort reports idle before tools exit. Dispose closes the runtime's
+			// owned LSP clients and other workspace services without deleting its
+			// persisted session. The caller still verifies actual process exit.
+			var disposed bool
+			if err := c.call(ctx, "POST", "/instance/dispose", nil, &disposed); err != nil {
+				return err
+			}
+			if !disposed {
+				return errors.New("runtime workspace resource shutdown unconfirmed")
+			}
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+}
+
 type runtimeMessage struct {
 	Info struct {
 		ID       string          `json:"id"`
@@ -88,8 +168,11 @@ type runtimeMessage struct {
 		} `json:"time"`
 	} `json:"info"`
 	Parts []struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
+		Type  string `json:"type"`
+		Text  string `json:"text"`
+		State struct {
+			Status string `json:"status"`
+		} `json:"state"`
 	} `json:"parts"`
 }
 

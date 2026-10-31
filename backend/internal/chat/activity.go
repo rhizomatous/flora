@@ -95,13 +95,15 @@ func (s *Service) runtimeActivity(chatID string, a *turnActivity, kind string, p
 	return nil
 }
 
-func (s *Service) questionActivity(chatID, messageID, questionID string, answered bool) {
+// questionActivity reports whether a live worker still monitors this turn.
+// A false result does not undo a confirmed runtime reply or authorize resending it.
+func (s *Service) questionActivity(chatID, messageID, questionID string, answered bool) bool {
 	s.turnMu.Lock()
 	defer s.turnMu.Unlock()
-	a := s.turns[chatID]
-	if a == nil || a.messageID != messageID {
-		return
+	if !s.monitoredTurnLocked(chatID, messageID) {
+		return false
 	}
+	a := s.turns[chatID]
 	kind, key := "question.asked", "id"
 	if answered {
 		kind, key = "question.replied", "requestID"
@@ -111,4 +113,5 @@ func (s *Service) questionActivity(chatID, messageID, questionID string, answere
 	if status != "" {
 		_ = s.transition(chatID, messageID, status, reason)
 	}
+	return true
 }

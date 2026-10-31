@@ -629,6 +629,36 @@ func TestStartAdoptsOwnedOrphan(t *testing.T) {
 	}
 }
 
+func TestStopAdoptsAndStopsOwnedOrphan(t *testing.T) {
+	engine := newFakeEngine()
+	m, store := newTestManager(t, engine, Config{}, nil)
+	chat := newChat(t, store)
+	ctx := context.Background()
+	paths, err := store.Paths(ctx, chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := engine.ContainerCreate(ctx, docker.ContainerSpec{
+		Name: containerName(chat.ID), Image: testDigest,
+		Labels: map[string]string{labelManaged: "true", labelChatID: chat.ID},
+		Binds:  []string{paths.Workspace + ":/workspace", paths.RuntimeState + ":/home/flora"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := engine.ContainerStart(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Stop(ctx, chat.ID); err != nil {
+		t.Fatal(err)
+	}
+	saved, _ := store.Chat(ctx, chat.ID)
+	info, err := engine.ContainerInspect(ctx, id)
+	if err != nil || info.State.Running || saved.ContainerID != id || len(engine.created) != 1 {
+		t.Fatal("orphan was left running or replaced")
+	}
+}
+
 // A container occupying the chat's name without the chat's exact identity is
 // never adopted or removed; the start fails with an explanation.
 func TestStartRejectsForeignNameCollision(t *testing.T) {
