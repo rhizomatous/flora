@@ -18,7 +18,26 @@ try {
   await page.waitForFunction(() => document.activeElement === document.querySelectorAll('input[name="repository"]')[1]);
   await page.getByLabel("GitHub repository", { exact: true }).nth(1).fill("second/app");
   await page.getByLabel("Base branch", { exact: true }).nth(1).fill("release");
+  // Observe focus when the new input enters the DOM, before another interaction
+  // can begin. A later animation-frame callback must not steal typing focus.
+  await page.evaluate(() => {
+    window.repositoryFocusAtInsert = new Promise(resolve => {
+      const observer = new MutationObserver(() => {
+        const inputs = document.querySelectorAll('input[name="repository"]');
+        if (inputs.length !== 3) return;
+        observer.disconnect();
+        const insertedFocused = document.activeElement === inputs[2];
+        const branch = inputs[2].closest("fieldset").querySelector('input[name="baseBranch"]');
+        branch.focus();
+        requestAnimationFrame(() => resolve({ insertedFocused, branchRetained: document.activeElement === branch }));
+      });
+      observer.observe(document.querySelector("form"), { childList: true, subtree: true });
+    });
+  });
   await page.getByRole("button", { name: "Add repository", exact: true }).click();
+  const focus = await page.evaluate(() => window.repositoryFocusAtInsert);
+  assert.equal(focus.branchRetained, true, "a pending focus callback must not redirect typing from the base branch");
+  assert.equal(focus.insertedFocused, true, "new repository must receive focus as its row is committed");
   await page.getByLabel("GitHub repository", { exact: true }).nth(2).fill("third/extra");
   await page.getByLabel("Base branch", { exact: true }).nth(2).fill("missing");
   await page.getByLabel("Repository role", { exact: true }).nth(2).selectOption("extra");

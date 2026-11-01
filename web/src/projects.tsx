@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { request, RequestError } from "./request";
 
 type Repository = { name: string; url: string; baseBranch: string; role: "core" | "extra" };
@@ -9,16 +9,36 @@ const button = "rounded-md bg-foreground px-4 py-2 text-sm font-medium text-back
 function RepositoryFields({ repositories }: { repositories?: Repository[] }) {
   const [rows, setRows] = useState(() => (repositories || [{ name: "", url: "", baseBranch: "", role: "core" as const }]).map((repo, key) => ({ repo, key })));
   const nextKey = useRef(rows.length);
-  return <div className="space-y-5">
+  const container = useRef<HTMLDivElement>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
+  const pendingFocus = useRef<number | "add" | undefined>(undefined);
+  // Move focus with the row commit. A deferred callback could otherwise run
+  // after the user has moved to another field and redirect their typing.
+  useLayoutEffect(() => {
+    const target = pendingFocus.current;
+    pendingFocus.current = undefined;
+    if (target === "add") addButton.current?.focus();
+    else if (target !== undefined) container.current?.querySelector<HTMLInputElement>(`[data-repository-key="${target}"] input[name="repository"]`)?.focus();
+  }, [rows]);
+  function addRepository() {
+    const key = nextKey.current++;
+    pendingFocus.current = key;
+    setRows(current => [...current, { key, repo: { name: "", url: "", baseBranch: "", role: "core" } }]);
+  }
+  function removeRepository(key: number) {
+    pendingFocus.current = "add";
+    setRows(current => current.filter(row => row.key !== key));
+  }
+  return <div ref={container} className="space-y-5">
     <p className="text-sm text-muted-foreground">Use owner/repository or an HTTPS GitHub URL. All repositories must be accessible to the saved GitHub token. Leave a base branch blank to use its default. Core repositories download before setup; extra repositories are fetched on demand.</p>
-    {rows.map(({ repo, key }, index) => <fieldset key={key} className="space-y-4 rounded-md border border-foreground/20 p-4">
+    {rows.map(({ repo, key }, index) => <fieldset key={key} data-repository-key={key} className="space-y-4 rounded-md border border-foreground/20 p-4">
       <legend className="px-1 text-sm font-medium">Repository {index + 1}</legend>
       <label className="block text-sm font-medium">GitHub repository<input name="repository" className={control} defaultValue={repo.url} placeholder="owner/repository" required maxLength={300} /></label>
       <label className="block text-sm font-medium">Base branch<input name="baseBranch" className={control} defaultValue={repo.baseBranch} maxLength={255} placeholder="Repository default branch" /></label>
       <label className="block text-sm font-medium">Repository role<select aria-label="Repository role" name="role" className={control} defaultValue={repo.role}><option value="core">Core</option><option value="extra">Extra</option></select></label>
-      {rows.length > 1 && <button type="button" className="text-sm underline underline-offset-4" onClick={event => { const form = event.currentTarget.form; setRows(current => current.filter(row => row.key !== key)); requestAnimationFrame(() => form?.querySelector<HTMLButtonElement>("[data-add-repository]")?.focus()); }}>Remove repository {index + 1}</button>}
+      {rows.length > 1 && <button type="button" className="text-sm underline underline-offset-4" onClick={() => removeRepository(key)}>Remove repository {index + 1}</button>}
     </fieldset>)}
-    <button type="button" data-add-repository className="text-sm underline underline-offset-4" disabled={rows.length >= 100} onClick={event => { const form = event.currentTarget.form; const key = nextKey.current++; setRows(current => [...current, { key, repo: { name: "", url: "", baseBranch: "", role: "core" } }]); requestAnimationFrame(() => { const inputs = form?.querySelectorAll<HTMLInputElement>('input[name="repository"]'); inputs?.[inputs.length - 1]?.focus(); }); }}>Add repository</button>
+    <button type="button" ref={addButton} data-add-repository className="text-sm underline underline-offset-4" disabled={rows.length >= 100} onClick={addRepository}>Add repository</button>
   </div>;
 }
 
