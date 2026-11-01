@@ -10,7 +10,7 @@ func TestChatRequestUpgradeAndReopen(t *testing.T) {
 	root := t.TempDir()
 	s := openTest(t, root)
 	p, original := fixture(t, s)
-	_, err := s.db.Exec("DROP TABLE chat_requests; PRAGMA user_version=3")
+	_, err := s.db.Exec("DROP TABLE installation_settings; DROP TABLE chat_requests; PRAGMA user_version=3")
 	must(t, err)
 	must(t, s.Close())
 	s = openTest(t, root)

@@ -122,6 +122,54 @@ func TestCanceledCheckoutDoesNotRelease(t *testing.T) {
 	}
 }
 
+func TestCheckoutUsesSavedAuthorAfterSettingsChange(t *testing.T) {
+	s, original, b := fixture(t)
+	ctx := context.Background()
+	prefs := storage.DefaultPreferences()
+	prefs.AuthorName = "Author's Name"
+	prefs.AuthorEmail = "saved@example.test"
+	if err := s.SavePreferences(ctx, prefs); err != nil {
+		t.Fatal(err)
+	}
+	chat, err := s.CreateChat(ctx, original.ProjectID, "Author", original.ImageDigest, "1.2.27")
+	if err != nil {
+		t.Fatal(err)
+	}
+	prefs.AuthorName = "Future Author"
+	prefs.AuthorEmail = "future@example.test"
+	if err := s.SavePreferences(ctx, prefs); err != nil {
+		t.Fatal(err)
+	}
+	paths, err := s.Paths(ctx, chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	configured := false
+	a, err := NewAccess(b, execFunc(func(_ context.Context, _ string, user string, _ []string, in io.Reader, out, diagnostics io.Writer) (int, error) {
+		raw, _ := io.ReadAll(in)
+		script := string(raw)
+		if strings.Contains(script, "git config --global user.name") {
+			configured = true
+			if !strings.Contains(script, "git config --global user.name "+quote("Author's Name")) || !strings.Contains(script, "git config --global user.email 'saved@example.test'") || strings.Contains(script, "Future Author") {
+				t.Fatal("checkout ignored saved author or failed to quote it")
+			}
+		}
+		if strings.Contains(script, "clone --no-checkout") {
+			io.WriteString(out, strings.Repeat("a", 40)+"\n")
+		}
+		return 0, nil
+	}), CheckoutConfig{Host: "github.internal", CACert: "fixture-ca", UseChatAuthor: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Checkout(ctx, chat, paths, "container"); err != nil {
+		t.Fatal(err)
+	}
+	if !configured {
+		t.Fatal("no author configured")
+	}
+}
+
 func TestCheckoutCoreCountsAndExtraMaterialization(t *testing.T) {
 	s, fixtureChat, b := fixture(t)
 	ctx := context.Background()

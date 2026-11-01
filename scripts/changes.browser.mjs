@@ -33,7 +33,7 @@ try {
   await review.getByText(/second repository review/).waitFor();
   assert.equal(await review.getByRole("list", { name: "Repository bases" }).getByRole("listitem").count(), 2);
   await review.locator("summary").filter({ hasText: "big.txt" }).click();
-  await review.getByText(/exceeds the 1 MiB inline limit/).waitFor();
+  await review.getByText(/exceeds the configured inline limit/).waitFor();
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     review.getByRole("link", { name: "Download full diff" }).click(),

@@ -23,6 +23,7 @@ type Executor interface {
 }
 
 type CheckoutConfig struct {
+	UseChatAuthor bool
 	// Host must resolve to the private TLS broker on port 443 from containers.
 	// Stock gh uses this hostname to match repository remotes to API credentials.
 	Host                    string
@@ -121,13 +122,18 @@ func (a *Access) Checkout(ctx context.Context, chat storage.Chat, paths storage.
 	}()
 	// Only the revocable credential enters the container. GitHub's token is
 	// retrieved by the host proxy, never included in scripts, env or config.
+	authorName, authorEmail := a.cfg.AuthorName, a.cfg.AuthorEmail
+	if a.cfg.UseChatAuthor {
+		r := chat.Configuration.RuntimeDefaults()
+		authorName, authorEmail = r.AuthorName, r.AuthorEmail
+	}
 	config := "set -eu\numask 077\nmkdir -p /home/flora/.config/gh\n" +
 		"printf '%s\\n' " + quote(a.cfg.CACert) + " > /home/flora/.flora-github-ca.pem\n" +
 		"if [ -r /etc/ssl/certs/ca-certificates.crt ]; then cat /etc/ssl/certs/ca-certificates.crt >> /home/flora/.flora-github-ca.pem; fi\n" +
 		"printf '%s\\n' " + quote("export GH_HOST="+quote(a.cfg.Host)+"\nexport SSL_CERT_FILE=/home/flora/.flora-github-ca.pem\nexport GH_PROMPT_DISABLED=1\nexport GIT_TERMINAL_PROMPT=0") + " > /home/flora/.flora-github.env\n" +
 		"printf '%s\\n' " + quote(a.cfg.Host+":\n    user: flora\n    oauth_token: "+credential+"\n    git_protocol: https") + " > /home/flora/.config/gh/hosts.yml\n" +
-		"git config --global user.name " + quote(a.cfg.AuthorName) + "\n" +
-		"git config --global user.email " + quote(a.cfg.AuthorEmail) + "\n" +
+		"git config --global user.name " + quote(authorName) + "\n" +
+		"git config --global user.email " + quote(authorEmail) + "\n" +
 		"git config --global " + quote("url.https://"+a.cfg.Host+"/.insteadOf") + " https://github.com/\n" +
 		"git config --global " + quote("http.https://"+a.cfg.Host+"/.sslCAInfo") + " /home/flora/.flora-github-ca.pem\n" +
 		"git config --global " + quote("credential.https://"+a.cfg.Host+".helper") + " '!gh auth git-credential'\n"

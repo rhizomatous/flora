@@ -41,7 +41,7 @@ unsupported newer schema prevents startup before HTTP begins listening.
 Neither Docker nor a model-provider credential is needed for these checks.
 
 Create the administrator before exposing a new installation to other people.
-Only the first account creation succeeds. Sessions expire seven days after login;
+Only the first account creation succeeds. Sessions expire seven days after login by default;
 logout immediately revokes that session on the server. All API data routes require
 authentication, except health and account status. Login and setup require the
 configured same-origin HTTPS address.
@@ -51,9 +51,25 @@ API key. Save validates the GitHub account and access to the chosen model throug
 the provider's model metadata endpoint. This initial account check does not
 validate repository permissions. Provider and model
 are fixed on first save; keys can be replaced later. Blank keys keep saved values.
-HTTP responses expose only the provider, model, and whether each key is saved.
+HTTP responses expose non-secret settings and whether each key is saved, never key values.
 Credentials are stored in the private SQLite database, not encrypted separately.
 Protect the storage directory and backups, and never mount them into agents.
+
+Installation settings also control container capacity, CPU/memory/process limits,
+setup and continuous-activity timeouts, inline diff and message sizes, absolute
+session lifetime, notification sound, and Git author. CPU, memory, processes,
+setup timeout and Git author are saved with each new chat. Existing chat snapshots
+are unchanged, including on restart. Older chats keep the original defaults.
+Capacity applies to future starts without stopping running containers. An explicit
+`-max-running` flag overrides the saved cap until removed and Flora restarted.
+Activity timeout changes apply to all active work at the next check. Message and
+diff limits apply to future submissions and views; saved full diffs remain available.
+Session lifetime changes affect new logins, never existing expiry times.
+
+**Check dependencies** probes storage, Docker, the local agent image and credential
+metadata without generating model responses, pulling images or writing to GitHub.
+Successful metadata validation does not establish inference quota or repository
+write access. Setup and runtime failures remain visible in each chat's saved activity.
 
 ### Enable chat execution
 
@@ -76,7 +92,7 @@ provider key and fixed model. Replacing a saved key does not change an existing
 container's environment. Follow-ups use the existing endpoint, workspace, and
 OpenCode session without rotating its git/gh capability.
 
-Messages accept up to 128 KiB of decoded UTF-8. An accepted request identity
+Messages accept up to 128 KiB of decoded UTF-8 by default, editable in settings. An accepted request identity
 deduplicates retries, including after completion. New requests during active
 work are rejected instead of queued. Browser disconnection does not cancel work;
 saved events replay in order on reconnect. OpenCode has no upstream replay cursor,

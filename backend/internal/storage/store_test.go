@@ -111,7 +111,7 @@ func TestDurableRecordsAndImmutableSnapshot(t *testing.T) {
 	s = openTest(t, root)
 	saved, err := s.Chat(ctx, c.ID)
 	must(t, err)
-	if !reflect.DeepEqual(saved.Configuration, p.Configuration) || saved.StartingCommits["flora"] != sha || saved.ImageDigest != image || saved.HarnessVersion != "opencode/1.2.27" || saved.ContainerID != "container-1" || saved.SessionID != "session-1" || saved.Status != Waiting || saved.ActiveMessageID != accepted.Message.ID {
+	if !reflect.DeepEqual(saved.Configuration, c.Configuration) || saved.StartingCommits["flora"] != sha || saved.ImageDigest != image || saved.HarnessVersion != "opencode/1.2.27" || saved.ContainerID != "container-1" || saved.SessionID != "session-1" || saved.Status != Waiting || saved.ActiveMessageID != accepted.Message.ID {
 		t.Fatalf("bad saved snapshot: %+v", saved)
 	}
 	savedProject, err := s.Project(ctx, p.ID)
@@ -166,7 +166,10 @@ func TestLegacyProjectConfigurationJSON(t *testing.T) {
 	}
 	chat, err := s.CreateChat(ctx, p.ID, "Legacy", image, "opencode/1")
 	must(t, err)
-	if !reflect.DeepEqual(chat.Configuration, p.Configuration) {
+	expected := p.Configuration
+	runtime := DefaultPreferences().RuntimeDefaults
+	expected.Runtime = &runtime
+	if !reflect.DeepEqual(chat.Configuration, expected) {
 		t.Fatal("legacy snapshot changed")
 	}
 }
@@ -423,6 +426,8 @@ func TestMigrationSafety(t *testing.T) {
 	must(t, s.Close())
 	brokenRoot := t.TempDir()
 	broken := openTest(t, brokenRoot)
+	_, err = broken.db.Exec("DROP TABLE installation_settings")
+	must(t, err)
 	_, err = broken.db.Exec("DROP TABLE chat_requests; DROP TABLE github_capabilities; DROP TABLE browser_sessions; DROP TABLE administrator; DROP TABLE installation_credentials; DROP TRIGGER immutable_chat_config; DROP TABLE starting_commits; DROP TABLE activity; DROP TABLE chats; DROP TABLE messages; DROP TABLE projects; CREATE TABLE chats (conflict TEXT); PRAGMA user_version=0")
 	must(t, err)
 	if err := broken.migrate(ctx); err == nil {

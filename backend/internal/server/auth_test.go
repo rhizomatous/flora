@@ -64,7 +64,7 @@ func TestAuthenticationBoundaries(t *testing.T) {
 		t.Fatal("missing cookie")
 	}
 	c := cookies[0]
-	if c.Name != cookieName || !c.HttpOnly || !c.Secure || c.Path != "/" || c.Domain != "" || c.SameSite != http.SameSiteStrictMode || c.MaxAge != 604800 {
+	if c.Name != cookieName || !c.HttpOnly || !c.Secure || c.Path != "/" || c.Domain != "" || c.SameSite != http.SameSiteStrictMode || c.MaxAge < 604798 || c.MaxAge > 604800 {
 		t.Fatalf("unsafe cookie: %+v", c)
 	}
 	cookie := c.Name + "=" + c.Value

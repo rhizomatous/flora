@@ -31,7 +31,7 @@ func chatError(w http.ResponseWriter, err error) {
 	case errors.Is(err, storage.ErrStale):
 		failure(w, 409, "This chat or question has changed. Refresh the chat before continuing.")
 	case errors.Is(err, storage.ErrInvalid):
-		failure(w, 400, "Provide a request identity and nonempty message of at most 128 KiB UTF-8. Titles must be 1 to 200 bytes.")
+		failure(w, 400, "Provide a request identity and nonempty UTF-8 message within the configured message limit in installation settings. Titles must be 1 to 200 bytes.")
 	default:
 		failure(w, 503, "Chat runtime or storage unavailable. Check runtime configuration, Docker and saved activity.")
 	}
@@ -39,15 +39,15 @@ func chatError(w http.ResponseWriter, err error) {
 
 // Check raw UTF-8 before decoding: encoding/json replaces invalid byte sequences.
 // JSON escaping can require six bytes per input byte, so the envelope limit is
-// deliberately separate from the decoded message's 128 KiB byte limit.
+// deliberately separate from the decoded message's configured byte limit.
 func decodeChat(w http.ResponseWriter, r *http.Request, v any) bool {
-	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 6*storage.MaxMessageBytes+4096))
+	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 6*storage.MaxAllowedMessageBytes+4096))
 	if err != nil || !utf8.Valid(raw) {
 		failure(w, 400, "Invalid UTF-8 or oversized chat request.")
 		return false
 	}
 	r.Body = io.NopCloser(bytes.NewReader(raw))
-	return decodeLimit(w, r, v, 6*storage.MaxMessageBytes+4096)
+	return decodeLimit(w, r, v, 6*storage.MaxAllowedMessageBytes+4096)
 }
 
 func (a *api) chatRoutes(mux *http.ServeMux) {

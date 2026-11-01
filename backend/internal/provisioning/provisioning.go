@@ -43,6 +43,10 @@ const (
 
 // Config is the narrow installation-level provisioning configuration.
 type Config struct {
+	// UseSettings reads live capacity/activity limits and new-chat runtime snapshots.
+	// Explicit MaxRunningOverride takes precedence over the saved container cap.
+	UseSettings        bool
+	MaxRunningOverride int
 	// ImageRef is the daemon-side reference used to pull or create containers.
 	// A name@sha256:... reference is pulled when absent. Any other reference
 	// (a local tag or ID) must already exist locally and requires ImageID;
@@ -185,6 +189,11 @@ type CapacityError struct {
 	Limit, Running int
 }
 
+// DependencyError contains only a fixed operator action, never a Docker response.
+type DependencyError struct{ Message string }
+
+func (e *DependencyError) Error() string { return e.Message }
+
 func (e *CapacityError) Error() string {
 	return fmt.Sprintf("container capacity full: %d of %d running; stop a chat to free capacity", e.Running, e.Limit)
 }
@@ -199,7 +208,10 @@ type SetupError struct {
 }
 
 func (e *SetupError) Error() string {
-	return fmt.Sprintf("setup failed with exit %d; fix the setup command and start the chat again to retry", e.ExitCode)
+	if e.ExitCode == 124 {
+		return "setup timed out; inspect saved setup output and dependencies, then retry. To change the setup timeout or command, create a new chat"
+	}
+	return fmt.Sprintf("setup failed with exit %d; inspect saved setup output and fix workspace dependencies, then retry. To change the setup command, create a new chat", e.ExitCode)
 }
 
 // StoppedError reports that a container exited before the runtime became
@@ -478,12 +490,12 @@ func (m *Manager) resolveImage(ctx context.Context) (string, error) {
 			return "", fmt.Errorf("provisioning: image %q is not present locally and the reference is not digest-pinned; refusing to pull a mutable tag", m.cfg.ImageRef)
 		}
 		if err := m.engine.ImagePull(ctx, m.cfg.ImageRef); err != nil {
-			return "", fmt.Errorf("pull agent image: %w", err)
+			return "", &DependencyError{"Agent image pull failed. Check registry access, host networking, disk space and the pinned image reference."}
 		}
 		img, err = m.engine.ImageInspect(ctx, m.cfg.ImageRef)
 	}
 	if err != nil {
-		return "", fmt.Errorf("inspect agent image: %w", err)
+		return "", &DependencyError{"Cannot inspect the agent image. Start Docker and check socket permissions and the installed image reference."}
 	}
 	if m.cfg.ImageID != "" && img.ID != m.cfg.ImageID {
 		return "", fmt.Errorf("provisioning: local image %q has ID %s, expected %s; rebuild or repin the image", m.cfg.ImageRef, img.ID, m.cfg.ImageID)
@@ -495,17 +507,34 @@ func (m *Manager) resolveImage(ctx context.Context) (string, error) {
 // count toward the limit. Callers hold the storage capacity lock across the check and
 // the subsequent create or start.
 func (m *Manager) checkCapacity(ctx context.Context) error {
+	limit := m.cfg.MaxRunning
+	if m.cfg.UseSettings {
+		p, err := m.store.Preferences(ctx)
+		if err != nil {
+			return err
+		}
+		limit = p.MaxRunning
+		if m.cfg.MaxRunningOverride > 0 {
+			limit = m.cfg.MaxRunningOverride
+		}
+	}
 	running, err := m.engine.ContainerList(ctx, true, map[string]string{labelManaged: "true"})
 	if err != nil {
 		return err
 	}
-	if len(running) >= m.cfg.MaxRunning {
-		return &CapacityError{Limit: m.cfg.MaxRunning, Running: len(running)}
+	if len(running) >= limit {
+		return &CapacityError{Limit: limit, Running: len(running)}
 	}
 	return nil
 }
 
 func (m *Manager) containerSpec(chat storage.Chat, paths storage.Paths, password string, uid, gid int) docker.ContainerSpec {
+	cfg := m.cfg
+	if cfg.UseSettings {
+		r := chat.Configuration.RuntimeDefaults()
+		cfg.NanoCPUs, cfg.MemoryBytes, cfg.PidsLimit = int64(r.CPUs*1e9), r.MemoryBytes, r.PidsLimit
+		cfg.SetupTimeout = time.Duration(r.SetupSeconds) * time.Second
+	}
 	env := []string{
 		"OPENCODE_SERVER_PASSWORD=" + password,
 		"FLORA_UID=" + strconv.Itoa(uid),
@@ -520,7 +549,7 @@ func (m *Manager) containerSpec(chat storage.Chat, paths storage.Paths, password
 	if chat.Configuration.SetupCommand != "" {
 		env = append(env, "SETUP_COMMAND="+chat.Configuration.SetupCommand)
 	}
-	env = append(env, "SETUP_TIMEOUT_SECONDS="+strconv.Itoa(int(m.cfg.SetupTimeout.Seconds())))
+	env = append(env, "SETUP_TIMEOUT_SECONDS="+strconv.Itoa(int(cfg.SetupTimeout.Seconds())))
 	env = append(env, "SETUP_KILL_GRACE_SECONDS="+strconv.Itoa(int(m.cfg.SetupKillGrace.Seconds())))
 	return docker.ContainerSpec{
 		Name:  containerName(chat.ID),
@@ -538,9 +567,9 @@ func (m *Manager) containerSpec(chat storage.Chat, paths storage.Paths, password
 			paths.RuntimeState + ":/home/flora",
 		},
 		LoopbackPort: runtimePort,
-		NanoCPUs:     m.cfg.NanoCPUs,
-		MemoryBytes:  m.cfg.MemoryBytes,
-		PidsLimit:    m.cfg.PidsLimit,
+		NanoCPUs:     cfg.NanoCPUs,
+		MemoryBytes:  cfg.MemoryBytes,
+		PidsLimit:    cfg.PidsLimit,
 	}
 }
 
@@ -548,7 +577,15 @@ func (m *Manager) containerSpec(chat storage.Chat, paths storage.Paths, password
 // container exits (setup failure or external stop), or the readiness bound
 // expires.
 func (m *Manager) awaitReady(ctx context.Context, chatID string, paths storage.Paths, containerID string) (Endpoint, error) {
-	ctx, cancel := context.WithTimeout(ctx, m.cfg.ReadyTimeout)
+	readyTimeout := m.cfg.ReadyTimeout
+	if m.cfg.UseSettings {
+		c, err := m.store.Chat(ctx, chatID)
+		if err != nil {
+			return Endpoint{}, err
+		}
+		readyTimeout = time.Duration(c.Configuration.RuntimeDefaults().SetupSeconds)*time.Second + time.Minute
+	}
+	ctx, cancel := context.WithTimeout(ctx, readyTimeout)
 	defer cancel()
 	for {
 		info, err := m.engine.ContainerInspect(ctx, containerID)
@@ -567,7 +604,7 @@ func (m *Manager) awaitReady(ctx context.Context, chatID string, paths storage.P
 		}
 		select {
 		case <-ctx.Done():
-			return Endpoint{}, fmt.Errorf("runtime did not become ready within %s: %w", m.cfg.ReadyTimeout, ctx.Err())
+			return Endpoint{}, fmt.Errorf("runtime did not become ready within %s: %w", readyTimeout, ctx.Err())
 		case <-time.After(readyPollStep):
 		}
 	}
@@ -704,10 +741,22 @@ func (m *Manager) Stop(ctx context.Context, chatID string) error {
 // ActivityExpired reports only observed continuous work, never idle time or
 // known question waits. Callers recheck it after serializing chat controls.
 func (m *Manager) ActivityExpired(containerID string) bool {
+	limit, err := m.activityLimit(context.Background())
+	if err != nil {
+		return false
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	since, ok := m.activeSince[containerID]
-	return ok && m.now().Sub(since) > m.cfg.ActivityTimeout
+	return ok && m.now().Sub(since) > limit
+}
+
+func (m *Manager) activityLimit(ctx context.Context) (time.Duration, error) {
+	if !m.cfg.UseSettings {
+		return m.cfg.ActivityTimeout, nil
+	}
+	p, err := m.store.Preferences(ctx)
+	return time.Duration(p.ActivitySeconds) * time.Second, err
 }
 
 // Endpoint recovers the private runtime address of a running chat container,
@@ -806,10 +855,14 @@ func (m *Manager) EndActivity(containerID string) {
 // SweepActivity stops containers whose continuous activity exceeds the
 // configured limit and returns their IDs.
 func (m *Manager) SweepActivity(ctx context.Context) ([]string, error) {
+	limit, err := m.activityLimit(ctx)
+	if err != nil {
+		return nil, err
+	}
 	m.mu.Lock()
 	var overdue []string
 	for id, since := range m.activeSince {
-		if m.now().Sub(since) > m.cfg.ActivityTimeout {
+		if m.now().Sub(since) > limit {
 			overdue = append(overdue, id)
 		}
 	}
@@ -820,7 +873,7 @@ func (m *Manager) SweepActivity(ctx context.Context) ([]string, error) {
 		// the first scan. Serialize the stop decision with Begin/EndActivity.
 		m.mu.Lock()
 		since, active := m.activeSince[id]
-		if !active || m.now().Sub(since) <= m.cfg.ActivityTimeout {
+		if !active || m.now().Sub(since) <= limit {
 			m.mu.Unlock()
 			continue
 		}

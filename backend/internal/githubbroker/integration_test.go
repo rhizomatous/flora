@@ -214,6 +214,11 @@ func TestCheckoutDocker(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 	s, chat, b := fixture(t)
+	prefs := storage.DefaultPreferences()
+	prefs.AuthorName, prefs.AuthorEmail = "Checkout Fixture", "checkout@example.test"
+	if err := s.SavePreferences(ctx, prefs); err != nil {
+		t.Fatal(err)
+	}
 	liveToken := os.Getenv("FLORA_BROKER_GH_TOKEN")
 	live := liveToken != ""
 	var expected string
@@ -258,7 +263,7 @@ func TestCheckoutDocker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	access, err := NewAccess(b, engine, CheckoutConfig{Host: host, CACert: ca, AuthorName: "Checkout Fixture", AuthorEmail: "checkout@example.test", Timeout: time.Minute})
+	access, err := NewAccess(b, engine, CheckoutConfig{Host: host, CACert: ca, UseChatAuthor: true, Timeout: time.Minute})
 	if err != nil {
 		t.Fatal(err)
 	}

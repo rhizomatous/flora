@@ -80,6 +80,9 @@ func validBranch(branch string) bool {
 // headers, and redirects, remote bodies, and transport errors never reach users.
 // A branch tip observed here is not the chat's starting commit; checkout records it.
 func (s *Service) Validate(ctx context.Context, in Input) (Input, error) {
+	if in.Configuration.Runtime != nil {
+		return in, invalid("Runtime defaults belong in installation settings, not project configuration.")
+	}
 	in.Name = strings.TrimSpace(in.Name)
 	if in.Name == "" || len(in.Name) > 200 {
 		return in, invalid("Enter a project name of at most 200 bytes.")

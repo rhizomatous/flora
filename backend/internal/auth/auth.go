@@ -85,7 +85,11 @@ func (s *Service) Bootstrap(ctx context.Context, password string) (string, time.
 		return "", time.Time{}, err
 	}
 	token := newToken()
-	expires := s.Now().Add(Lifetime).Truncate(time.Second)
+	p, err := s.Store.Preferences(ctx)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	expires := s.Now().Add(time.Duration(p.SessionSeconds) * time.Second).Truncate(time.Second)
 	err = s.Store.Bootstrap(ctx, hash, TokenHash(token), expires)
 	return token, expires, err
 }
@@ -102,7 +106,11 @@ func (s *Service) Login(ctx context.Context, password string) (string, time.Time
 		return "", time.Time{}, ErrLogin
 	}
 	token := newToken()
-	expires := s.Now().Add(Lifetime).Truncate(time.Second)
+	p, err := s.Store.Preferences(ctx)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	expires := s.Now().Add(time.Duration(p.SessionSeconds) * time.Second).Truncate(time.Second)
 	err = s.Store.CreateSession(ctx, TokenHash(token), expires)
 	return token, expires, err
 }

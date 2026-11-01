@@ -4,10 +4,13 @@ import { FlowerMark } from "@flora/florets";
 import { request } from "./request";
 import { Projects } from "./projects";
 import { Chats } from "./chats";
+import { PreferenceFields, readPreferences, type Preferences } from "./settings";
+import { useCompletionSound } from "./sound";
 import "@flora/florets/styles.css";
 
 type Status = { setupRequired: boolean; authenticated: boolean };
-type Settings = { provider: string; model: string; githubConfigured: boolean; providerConfigured: boolean };
+type Settings = { provider: string; model: string; githubConfigured: boolean; providerConfigured: boolean; preferences: Preferences; maxRunningOverride?: number };
+type Diagnostic = { name: string; ok: boolean; message: string };
 
 const control = "mt-2 w-full rounded-md border border-foreground/30 bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-foreground disabled:opacity-60";
 const button = "rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50";
@@ -18,6 +21,8 @@ function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>();
+  useCompletionSound(!!status?.authenticated && !!settings?.preferences.sound);
   const [path, setPath] = useState(window.location.hash.slice(1) || "chats");
   useEffect(() => {
     const changed = () => { setPath(window.location.hash.slice(1) || "chats"); setError(""); setNotice(""); };
@@ -47,7 +52,7 @@ function App() {
         form.reset();
         await refresh();
       } else {
-        const next = await request<Settings>("settings", "PUT", Object.fromEntries(fields));
+        const next = await request<Settings>("settings", "PUT", { provider: fields.get("provider") || "", model: fields.get("model") || "", githubToken: fields.get("githubToken"), providerKey: fields.get("providerKey"), preferences: readPreferences(fields) });
         setSettings(next);
         form.reset();
         setNotice("Settings saved. Credentials are not shown.");
@@ -78,7 +83,7 @@ function App() {
       {!status && <p role="status" className="text-muted-foreground">Loading…</p>}
       {status && !status.authenticated && <section aria-labelledby="account-heading">
         <h1 ref={heading} tabIndex={-1} id="account-heading" className="text-2xl font-semibold tracking-tight">{status.setupRequired ? "Create administrator" : "Log in"}</h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">{status.setupRequired ? "Create the single administrator account for this installation. Use a unique password of at least 12 characters." : "Enter your administrator password. Your session lasts seven days."}</p>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">{status.setupRequired ? "Create the single administrator account for this installation. Use a unique password of at least 12 characters." : "Enter your administrator password. Sessions expire at the absolute lifetime set by the administrator."}</p>
         <form className="mt-8 space-y-6" onSubmit={e => submit(e, "password")}>
           <label className="block text-sm font-medium">Password
             <input className={control} type="password" name="password" autoComplete={status.setupRequired ? "new-password" : "current-password"} minLength={status.setupRequired ? 12 : undefined} maxLength={1024} required disabled={busy} />
@@ -86,7 +91,7 @@ function App() {
           <button className={button} disabled={busy}>{busy ? "Please wait…" : status.setupRequired ? "Create administrator" : "Log in"}</button>
         </form>
       </section>}
-      {status?.authenticated && settings && path !== "settings" && (path.startsWith("chats") ? <Chats key={path} path={path} onExpired={() => { request<Status>("auth/status").then(setStatus).catch(() => {}); }} /> : <Projects key={path} path={path} onExpired={() => { request<Status>("auth/status").then(setStatus).catch(() => {}); }} />)}
+      {status?.authenticated && settings && path !== "settings" && (path.startsWith("chats") ? <Chats key={path} path={path} messageBytes={settings.preferences.messageBytes} onExpired={() => { request<Status>("auth/status").then(setStatus).catch(() => {}); }} /> : <Projects key={path} path={path} onExpired={() => { request<Status>("auth/status").then(setStatus).catch(() => {}); }} />)}
       {status?.authenticated && settings && path === "settings" && <section aria-labelledby="settings-heading">
         <h1 ref={heading} tabIndex={-1} id="settings-heading" className="text-2xl font-semibold tracking-tight">Installation settings</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">Choose one hosted provider and model for all chats. Once saved, the provider and model cannot be changed.</p>
@@ -101,7 +106,7 @@ function App() {
           <fieldset disabled={busy} className="space-y-6 border-t border-foreground/20 pt-6">
             <legend className="text-base font-semibold">Model provider</legend>
             <label className="block text-sm font-medium">Hosted provider
-              <select key={settings.provider} className={control} name="provider" defaultValue={settings.provider || "openai"} disabled={!!settings.provider}>
+              <select key={settings.provider} aria-label="Hosted provider" className={control} name="provider" defaultValue={settings.provider || "openai"} disabled={!!settings.provider}>
                 <option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="google">Google</option>
               </select>
             </label>
@@ -113,8 +118,20 @@ function App() {
             </label>
             <p id="provider-help" className="text-sm leading-6 text-muted-foreground">{settings.providerConfigured ? "An API key is saved. Leave blank to keep it." : "No API key saved."} Saved credentials are never displayed.</p>
           </fieldset>
-          <button className={button} disabled={busy}>{busy ? "Validating…" : "Validate and save"}</button>
+          <PreferenceFields value={settings.preferences} control={control} busy={busy} override={settings.maxRunningOverride} />
+          <button className={button} disabled={busy}>{busy ? "Saving…" : "Validate and save"}</button>
         </form>
+        <section className="mt-10 space-y-4 border-t border-foreground/20 pt-6" aria-labelledby="diagnostics-heading">
+          <h2 id="diagnostics-heading" className="font-semibold">Dependency checks</h2>
+          <p className="text-sm text-muted-foreground">Checks storage, Docker, the agent image and credential metadata. No model generation, image pull or GitHub write is performed. Provider keys reach only new containers; running and restarted containers keep their original key. GitHub rotation applies to future broker requests.</p>
+          <button type="button" className={button} disabled={busy} onClick={async () => {
+            setBusy(true); setError("");
+            try { setDiagnostics(await request<Diagnostic[]>("settings/diagnostics", "POST", {})); }
+            catch (e) { setError(e instanceof Error ? e.message : "Dependency check failed."); }
+            finally { setBusy(false); }
+          }}>Check dependencies</button>
+          {diagnostics && <ul aria-live="polite" className="space-y-3 text-sm">{diagnostics.map(d => <li key={d.name}><strong>{d.name}: {d.ok ? "OK" : "Needs attention"}</strong><p className="mt-1 text-muted-foreground">{d.message}</p></li>)}</ul>}
+        </section>
       </section>}
     </main>
   );

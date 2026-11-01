@@ -28,4 +28,4 @@ smoke: build
 	node --test scripts/smoke.test.mjs
 
 browser: web
-	FLORA_CHAT_BROWSER_TEST=1 go -C backend test -mod=readonly -count=1 -run 'Test(Chat|Changes|Projects)Browser' ./internal/server
+	FLORA_CHAT_BROWSER_TEST=1 go -C backend test -mod=readonly -count=1 -run 'Test(Chat|Changes|Projects|Settings)Browser' ./internal/server

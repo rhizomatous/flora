@@ -1,0 +1,86 @@
+import assert from "node:assert/strict";
+import { chromium } from "@playwright/test";
+
+const browser = await chromium.launch();
+try {
+  const page = await browser.newPage({ ignoreHTTPSErrors: true });
+  const errors = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.addInitScript(() => {
+    window.tones = 0;
+    window.AudioContext = class {
+      state = "running"; currentTime = 0; destination = {};
+      resume() { return Promise.resolve(); }
+      close() { return Promise.resolve(); }
+      createOscillator() { return { frequency: {}, connect() {}, start() { window.tones++; }, stop() {} }; }
+      createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} }; }
+    };
+  });
+  const origin = process.env.FLORA_BROWSER_URL;
+  await page.goto(origin);
+  await page.getByLabel("Password", { exact: true }).fill("browser test password");
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await page.getByRole("link", { name: "New chat", exact: true }).click();
+  await page.getByRole("combobox", { name: /^Project/ }).selectOption({ label: "Browser project" });
+  await page.getByLabel("Chat title", { exact: true }).fill("Settings sound fixture");
+  await page.getByLabel("Message", { exact: true }).fill("Sound enabled");
+  await page.getByRole("button", { name: "Start chat", exact: true }).click();
+  await page.getByRole("heading", { name: "Flora needs your answer", exact: true }).waitFor();
+  await page.waitForTimeout(1200);
+  assert.equal(await page.evaluate(() => window.tones), 0);
+  await page.getByRole("radio", { name: /^Yes/ }).check();
+  await page.getByRole("button", { name: "Answer and continue", exact: true }).click();
+  await page.waitForFunction(() => window.tones === 1);
+  await page.getByLabel("Follow-up", { exact: true }).fill("interrupt control work");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await page.getByLabel("Conversation").getByText("interrupt control work", { exact: true }).waitFor();
+  await page.waitForTimeout(1200);
+  await page.getByRole("button", { name: "Interrupt current work", exact: true }).click();
+  await page.getByText("Current work interrupted; send a new message to continue with saved context", { exact: true }).waitFor();
+  await page.waitForTimeout(1200);
+  assert.equal(await page.evaluate(() => window.tones), 1);
+  const chatURL = page.url();
+  await page.getByRole("link", { name: "Installation settings", exact: true }).click();
+  await page.getByRole("heading", { name: "Installation settings", exact: true }).waitFor().catch(async error => { console.error(page.url(), errors, await page.locator("body").innerText()); throw error; });
+  assert.equal(await page.getByLabel("Hosted provider", { exact: true }).isDisabled(), true);
+  assert.equal(await page.getByLabel("Model ID", { exact: true }).inputValue(), "model");
+  assert.equal(await page.getByLabel("Fine-grained personal access token", { exact: true }).inputValue(), "");
+  assert.equal(await page.getByLabel("CPUs per chat", { exact: true }).inputValue(), "2");
+  await page.getByText(/startup flag -max-running overrides the saved cap with 4/).waitFor();
+  await page.getByLabel("CPUs per chat", { exact: true }).fill("3");
+  await page.getByLabel("Maximum message text (UTF-8 bytes)", { exact: true }).fill("1024");
+  await page.getByLabel("Git author name", { exact: true }).fill("Browser Author");
+  await page.getByLabel("Git author email", { exact: true }).fill("browser@example.test");
+  await page.getByLabel("Play a sound when a chat finishes work", { exact: true }).uncheck();
+  await page.getByLabel("Provider API key", { exact: true }).fill("invalid-fixture-key");
+  await page.getByRole("button", { name: "Validate and save", exact: true }).click();
+  await page.getByRole("alert").filter({ hasText: "Anthropic rejected the credential" }).waitFor();
+  assert.equal(await page.getByLabel("CPUs per chat", { exact: true }).inputValue(), "3");
+  await page.getByLabel("Provider API key", { exact: true }).fill("rotated-fixture-key");
+  await page.getByRole("button", { name: "Validate and save", exact: true }).click();
+  await page.getByRole("status").filter({ hasText: "Settings saved" }).waitFor();
+  assert.equal(await page.getByLabel("Provider API key", { exact: true }).inputValue(), "");
+  await page.getByRole("button", { name: "Check dependencies", exact: true }).click();
+  await page.getByText(/Cannot reach Docker/).waitFor();
+  await page.getByText(/Image pull failed/).waitFor();
+  assert.doesNotMatch(await page.locator("body").innerText(), /rotated-fixture-key|github_pat_test-secret|provider-test-secret/);
+  await page.goto(chatURL);
+  await page.getByLabel("Follow-up", { exact: true }).fill("x".repeat(1025));
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await page.getByRole("alert").filter({ hasText: "1,024 UTF-8 bytes" }).waitFor();
+  await page.getByLabel("Follow-up", { exact: true }).fill("Sound disabled");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await page.getByText("Saved response 3", { exact: true }).waitFor();
+  await page.waitForTimeout(1200);
+  assert.equal(await page.evaluate(() => window.tones), 1);
+  await page.getByRole("link", { name: "Installation settings", exact: true }).click();
+  await page.reload();
+  await page.getByRole("heading", { name: "Installation settings", exact: true }).waitFor();
+  assert.equal(await page.getByLabel("CPUs per chat", { exact: true }).inputValue(), "3");
+  assert.equal(await page.getByLabel("Git author name", { exact: true }).inputValue(), "Browser Author");
+  assert.equal(await page.getByLabel("Play a sound when a chat finishes work", { exact: true }).isChecked(), false);
+  await page.setViewportSize({ width: 375, height: 812 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  assert.deepEqual(errors, []);
+  console.log("Chromium: real settings API, fixed model, atomic rejected rotation, blank secret preservation, saved limits after reload, effective message bound, safe dependency failures, enabled/disabled completion sound, no sound for interruption, and mobile width passed.");
+} finally { await browser.close(); }

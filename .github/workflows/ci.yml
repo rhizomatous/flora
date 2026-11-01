@@ -20,7 +20,7 @@ jobs:
       - name: Check Go and TypeScript; build and exercise the standalone binary
         run: nix develop --command make check smoke build-linux
       - name: Check offline admission, lifecycle, and storage races
-        run: nix develop --command go -C backend test -race -count=1 ./internal/storage ./internal/provisioning ./internal/chat
+        run: nix develop --command go -C backend test -race -count=1 ./internal/storage ./internal/settings ./internal/auth ./internal/server ./internal/provisioning ./internal/chat ./internal/changes ./internal/githubbroker
       - name: Install Chromium and check the browser chat workflow
         run: nix develop --command npx playwright install --with-deps chromium && nix develop --command make browser
 
@@ -36,7 +36,7 @@ jobs:
       - name: Build the pinned agent image
         run: docker build -t flora-agent-test:ci agent/image
       - name: Run live provisioning lifecycle tests against the daemon
-        run: FLORA_PROVISIONING_TEST_IMAGE=flora-agent-test:ci nix develop --command go -C backend test -race -count=1 -v -run TestProvisioningDocker ./internal/provisioning
+        run: FLORA_PROVISIONING_TEST_IMAGE=flora-agent-test:ci nix develop --command go -C backend test -race -count=1 -v -run '^Test(Provisioning|Settings)Docker$' ./internal/provisioning
       - name: Check container checkout against the local GitHub fixture
         env:
           FLORA_GITHUB_TEST_IMAGE: flora-agent-test:ci
