@@ -45,7 +45,7 @@ func TestProjectsBrowser(t *testing.T) {
 	})
 	srv.StartTLS()
 	defer srv.Close()
-	script, err := filepath.Abs("../../../scripts/projects.browser.mjs")
+	script, err := filepath.Abs("../../../scripts/projects.browser.ts")
 	if err != nil {
 		t.Fatal(err)
 	}

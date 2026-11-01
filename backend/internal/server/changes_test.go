@@ -119,7 +119,7 @@ func TestChangesBrowser(t *testing.T) {
 	srv.Config.Handler = New(webassets.FS(), auth, settings.New(store), "https://"+srv.Listener.Addr().String(), svc)
 	srv.StartTLS()
 	defer srv.Close()
-	script, err := filepath.Abs("../../../scripts/changes.browser.mjs")
+	script, err := filepath.Abs("../../../scripts/changes.browser.ts")
 	if err != nil {
 		t.Fatal(err)
 	}

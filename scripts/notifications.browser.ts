@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+
 import { chromium } from "@playwright/test";
 
 const browser = await chromium.launch();
@@ -16,20 +17,37 @@ try {
         if (window.audioDenied) throw new DOMException("Autoplay blocked", "NotAllowedError");
         this.state = "running";
       }
-      async close() { this.state = "closed"; }
-      createOscillator() {
-        return { frequency: {}, connect() {}, disconnect() {}, start() {
-          sessionStorage.setItem("tones", String(Number(sessionStorage.getItem("tones") || 0) + 1));
-        }, stop() {} };
+      async close() {
+        this.state = "closed";
       }
-      createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, disconnect() {} }; }
+      createOscillator() {
+        return {
+          frequency: {},
+          connect() {},
+          disconnect() {},
+          start() {
+            sessionStorage.setItem(
+              "tones",
+              String(Number(sessionStorage.getItem("tones") || 0) + 1),
+            );
+          },
+          stop() {},
+        };
+      }
+      createGain() {
+        return {
+          gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+          connect() {},
+          disconnect() {},
+        };
+      }
     };
   });
   const page = await context.newPage();
   const errors = [];
   const requests = [];
-  page.on("pageerror", e => errors.push(e.message));
-  page.on("request", r => requests.push(new URL(r.url()).pathname));
+  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("request", (r) => requests.push(new URL(r.url()).pathname));
   const tones = () => page.evaluate(() => Number(sessionStorage.getItem("tones") || 0));
   const toast = page.getByRole("complementary", { name: "Completion notifications" });
   const sound = page.getByRole("button", { name: "Enable notification sound", exact: true });
@@ -50,24 +68,38 @@ try {
   await page.getByRole("heading", { name: "Flora needs your answer", exact: true }).waitFor();
   await page.goto(`${process.env.FLORA_BROWSER_URL}/#chats/${process.env.FLORA_OTHER_CHAT}`);
   await page.getByRole("heading", { name: "Other conversation", exact: true }).waitFor();
-  const reply = await context.request.post(`${process.env.FLORA_BROWSER_URL}/api/chats/${chatID}/questions/que_browser/reply`, {
-    headers: { Origin: process.env.FLORA_BROWSER_URL }, data: { answers: [["Yes"]] },
-  });
+  const reply = await context.request.post(
+    `${process.env.FLORA_BROWSER_URL}/api/chats/${chatID}/questions/que_browser/reply`,
+    {
+      headers: { Origin: process.env.FLORA_BROWSER_URL },
+      data: { answers: [["Yes"]] },
+    },
+  );
   assert.equal(reply.status(), 200);
   await toast.getByRole("link", { name: "Background notification", exact: true }).waitFor();
-  assert.equal(await page.getByRole("heading", { name: "Other conversation", exact: true }).count(), 1);
+  assert.equal(
+    await page.getByRole("heading", { name: "Other conversation", exact: true }).count(),
+    1,
+  );
   assert.equal(await tones(), 0);
   await toast.getByRole("link").focus();
   await page.keyboard.press("Enter");
   await page.getByRole("heading", { name: "Background notification", exact: true }).waitFor();
   assert.equal(page.url(), chatURL);
-  assert.equal(await page.locator("h1").evaluate(el => el === document.activeElement), true);
+  assert.equal(await page.locator("h1").evaluate((el) => el === document.activeElement), true);
   await page.keyboard.press("Tab");
-  assert.equal(await page.getByRole("link", { name: "All chats", exact: true }).evaluate(el => el === document.activeElement), true);
+  assert.equal(
+    await page
+      .getByRole("link", { name: "All chats", exact: true })
+      .evaluate((el) => el === document.activeElement),
+    true,
+  );
   await toast.getByRole("button", { name: /^Dismiss/ }).focus();
   await page.keyboard.press("Enter");
-  assert.equal(await page.locator("h1").evaluate(el => el === document.activeElement), true);
-  await page.evaluate(() => { window.audioDenied = false; });
+  assert.equal(await page.locator("h1").evaluate((el) => el === document.activeElement), true);
+  await page.evaluate(() => {
+    window.audioDenied = false;
+  });
   await sound.focus();
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Sound enabled for this page", exact: true }).waitFor();
@@ -75,7 +107,10 @@ try {
 
   await page.getByLabel("Follow-up", { exact: true }).fill("Second quick turn");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Installation settings" }).click();
+  await page
+    .getByRole("navigation", { name: "Main" })
+    .getByRole("link", { name: "Installation settings" })
+    .click();
   await context.setOffline(true);
   await page.getByText(/Chat updates and completion notifications disconnected/).waitFor();
   await context.setOffline(false);
@@ -105,7 +140,11 @@ try {
   await page.getByLabel("Follow-up", { exact: true }).fill("interrupt control work");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await page.getByRole("button", { name: "Interrupt current work", exact: true }).click();
-  await page.getByText("Current work interrupted; send a new message to continue with saved context", { exact: true }).waitFor();
+  await page
+    .getByText("Current work interrupted; send a new message to continue with saved context", {
+      exact: true,
+    })
+    .waitFor();
   await page.waitForTimeout(1200);
   assert.equal(await toast.getByRole("link").count(), 0, "interruption was reported as completion");
   assert.equal(requests.includes("/api/chats"), false, "chat list has a duplicate poll");
@@ -122,9 +161,13 @@ try {
   await realPage.getByRole("button", { name: "Validate and save", exact: true }).click();
   await realPage.getByRole("button", { name: "Enable notification sound", exact: true }).focus();
   await realPage.keyboard.press("Enter");
-  await realPage.getByRole("button", { name: "Sound enabled for this page", exact: true }).waitFor();
+  await realPage
+    .getByRole("button", { name: "Sound enabled for this page", exact: true })
+    .waitFor();
   await realAudio.close();
-  console.log("Chromium: background completion, correct chat keyboard navigation/focus, denied audio guidance, gesture retry, missed completion on reconnect, no replay on reconnect/reload, muted toast, interruption exclusion and shared chat feed passed.");
+  console.log(
+    "Chromium: background completion, correct chat keyboard navigation/focus, denied audio guidance, gesture retry, missed completion on reconnect, no replay on reconnect/reload, muted toast, interruption exclusion and shared chat feed passed.",
+  );
 } finally {
   await browser.close();
 }

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+
 import { chromium } from "@playwright/test";
 
 const browser = await chromium.launch();
@@ -6,7 +7,7 @@ try {
   const context = await browser.newContext({ ignoreHTTPSErrors: true });
   const page = await context.newPage();
   const errors = [];
-  page.on("pageerror", e => errors.push(e.message));
+  page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(process.env.FLORA_BROWSER_URL);
   await page.getByLabel("Password", { exact: true }).fill("browser test password");
   await page.getByRole("button", { name: "Log in", exact: true }).click();
@@ -27,14 +28,31 @@ try {
     assert.match(await link.locator("..").textContent(), new RegExp(state));
   }
   await review.getByText(/Saved statuses may be out of date/).waitFor();
-  await review.locator("summary").filter({ hasText: "first/app" }).filter({ hasText: "src/hello.ts" }).focus();
+  await review
+    .locator("summary")
+    .filter({ hasText: "first/app" })
+    .filter({ hasText: "src/hello.ts" })
+    .focus();
   await page.keyboard.press("Enter");
   await review.getByText(/hello review/).waitFor();
   await review.getByLabel("Diff for src/hello.ts", { exact: true }).first().focus();
-  assert.equal(await review.getByLabel("Diff for src/hello.ts", { exact: true }).first().evaluate(el => el === document.activeElement), true);
-  await review.locator("summary").filter({ hasText: "second/app" }).filter({ hasText: "src/hello.ts" }).click();
+  assert.equal(
+    await review
+      .getByLabel("Diff for src/hello.ts", { exact: true })
+      .first()
+      .evaluate((el) => el === document.activeElement),
+    true,
+  );
+  await review
+    .locator("summary")
+    .filter({ hasText: "second/app" })
+    .filter({ hasText: "src/hello.ts" })
+    .click();
   await review.getByText(/second repository review/).waitFor();
-  assert.equal(await review.getByRole("list", { name: "Repository bases" }).getByRole("listitem").count(), 2);
+  assert.equal(
+    await review.getByRole("list", { name: "Repository bases" }).getByRole("listitem").count(),
+    2,
+  );
   await review.locator("summary").filter({ hasText: "big.txt" }).click();
   await review.getByText(/exceeds the configured inline limit/).waitFor();
   const [download] = await Promise.all([
@@ -43,7 +61,7 @@ try {
   ]);
   let bytes = 0;
   for await (const chunk of await download.createReadStream()) bytes += chunk.length;
-  assert.equal(bytes, 1200000);
+  assert.equal(bytes, 1_200_000);
   await review.getByText(/picture.png · Binary/).waitFor();
   await review.getByText(/removed.txt/).waitFor();
   await page.reload();
@@ -53,7 +71,9 @@ try {
   await page.setViewportSize({ width: 375, height: 812 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.deepEqual(errors, []);
-  console.log("Chromium: multiple saved PRs across repositories, exact links, draft/open/closed/merged statuses and outage warning after reload; saved diffs, download and mobile width passed.");
+  console.log(
+    "Chromium: multiple saved PRs across repositories, exact links, draft/open/closed/merged statuses and outage warning after reload; saved diffs, download and mobile width passed.",
+  );
 } finally {
   await browser.close();
 }

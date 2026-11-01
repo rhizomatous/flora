@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 100,
+  "sortImports": {
+    "internalPattern": ["@flora/"]
+  },
+  "sortTailwindcss": {
+    "stylesheet": "florets/src/styles.css"
+  },
+  "sortPackageJson": true,
+  "ignorePatterns": ["*.md", ".github/", "agent/", "backend/", "packaging/", "specs/"]
+}

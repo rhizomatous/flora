@@ -401,7 +401,7 @@ func TestChatBrowser(t *testing.T) {
 	srv.Config.Handler = New(webassets.FS(), authentication, settings.New(store), origin, svc)
 	srv.StartTLS()
 	defer srv.Close()
-	script, err := filepath.Abs("../../../scripts/chat.browser.mjs")
+	script, err := filepath.Abs("../../../scripts/chat.browser.ts")
 	if err != nil {
 		t.Fatal(err)
 	}
