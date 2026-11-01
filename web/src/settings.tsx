@@ -1,65 +1,14 @@
-export type Preferences = {
-  cpus: number;
-  memoryBytes: number;
-  pidsLimit: number;
-  setupSeconds: number;
-  authorName: string;
-  authorEmail: string;
-  maxRunning: number;
-  activitySeconds: number;
-  inlineDiffBytes: number;
-  messageBytes: number;
-  sessionSeconds: number;
-  sound: boolean;
-};
-
-const fields: {
-  name: keyof Preferences;
-  label: string;
-  min: number;
-  max: number;
-  step?: number;
-}[] = [
-  { name: "maxRunning", label: "Maximum running containers", min: 1, max: 1000 },
-  { name: "cpus", label: "CPUs per chat", min: 0.1, max: 256, step: 0.1 },
-  {
-    name: "memoryBytes",
-    label: "Memory per chat (bytes)",
-    min: 67_108_864,
-    max: 1_099_511_627_776,
-  },
-  { name: "pidsLimit", label: "Processes per chat", min: 16, max: 65_536 },
-  { name: "setupSeconds", label: "Setup timeout (seconds)", min: 1, max: 86_400 },
-  { name: "activitySeconds", label: "Continuous-activity timeout (seconds)", min: 1, max: 604_800 },
-  { name: "inlineDiffBytes", label: "Inline diff threshold (bytes)", min: 1024, max: 16_777_216 },
-  { name: "messageBytes", label: "Maximum message text (UTF-8 bytes)", min: 1024, max: 4_194_304 },
-  {
-    name: "sessionSeconds",
-    label: "Absolute browser session lifetime (seconds)",
-    min: 300,
-    max: 31_536_000,
-  },
-];
-
-export function readPreferences(form: FormData): Preferences {
-  const result: Record<string, unknown> = {};
-  for (const { name } of fields) result[name] = Number(form.get(name));
-  result.authorName = form.get("authorName");
-  result.authorEmail = form.get("authorEmail");
-  result.sound = form.has("sound");
-  return result as Preferences;
-}
+import { preferenceFields, type Preferences } from "./preferences";
+import { control } from "./ui";
 
 export function PreferenceFields({
   value,
-  control,
   busy,
   override,
 }: {
   value: Preferences;
-  control: string;
   busy: boolean;
-  override?: number;
+  override: number | undefined;
 }) {
   return (
     <fieldset disabled={busy} className="space-y-6 border-t border-foreground/20 pt-6">
@@ -79,14 +28,14 @@ export function PreferenceFields({
         extension on use. Existing sessions keep their expiry. To hear completion alerts, save sound
         as enabled and use the Enable notification sound button on each fresh page.
       </p>
-      {!!override && (
+      {override !== undefined && (
         <p role="note" className="text-sm">
           The startup flag -max-running overrides the saved cap with {override}. Remove the flag and
           restart Flora to use the saved cap.
         </p>
       )}
       <div className="grid gap-6 sm:grid-cols-2">
-        {fields.map((f) => (
+        {preferenceFields.map((f) => (
           <div key={f.name}>
             <label className="block text-sm font-medium" htmlFor={f.name}>
               {f.label}
@@ -100,8 +49,8 @@ export function PreferenceFields({
               required
               min={f.min}
               max={f.max}
-              step={f.step || 1}
-              defaultValue={Number(value[f.name])}
+              step={f.step ?? 1}
+              defaultValue={value[f.name]}
               aria-describedby={`${f.name}-range`}
             />
             <p id={`${f.name}-range`} className="mt-1 text-xs text-muted-foreground">

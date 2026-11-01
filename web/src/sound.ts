@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
+/**
+ * Plays a short tone for completed chats. Browsers allow audio only after a user gesture, so
+ * callers must invoke `enable` from a click or key press before `play` can be heard.
+ */
 export function useCompletionSound(enabled: boolean) {
   const audio = useRef<AudioContext | undefined>(undefined);
   const [ready, setReady] = useState(false);
@@ -10,9 +14,6 @@ export function useCompletionSound(enabled: boolean) {
     },
     [],
   );
-  useEffect(() => {
-    if (!enabled) setReady(false);
-  }, [enabled]);
 
   async function enable() {
     try {
@@ -39,10 +40,14 @@ export function useCompletionSound(enabled: boolean) {
       gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.2);
       tone.connect(gain);
       gain.connect(context.destination);
-      tone.onended = () => {
-        tone.disconnect();
-        gain.disconnect();
-      };
+      tone.addEventListener(
+        "ended",
+        () => {
+          tone.disconnect();
+          gain.disconnect();
+        },
+        { once: true },
+      );
       tone.start();
       tone.stop(context.currentTime + 0.2);
     } catch {
@@ -50,5 +55,6 @@ export function useCompletionSound(enabled: boolean) {
     }
   }
 
-  return { ready, enable, play };
+  // A page that already unlocked audio stays unlocked when the saved preference is turned back on.
+  return { ready: enabled && ready, enable, play };
 }

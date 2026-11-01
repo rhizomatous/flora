@@ -30,6 +30,13 @@
     "func-style": ["error", "declaration", { "allowArrowFunctions": true }],
     "one-var": ["error", "never"],
     "no-void": ["error", { "allowAsStatement": true }],
+    "prefer-destructuring": [
+      "error",
+      {
+        "VariableDeclarator": { "object": true, "array": false },
+        "AssignmentExpression": { "object": false, "array": false }
+      }
+    ],
     "no-use-before-define": ["error", { "functions": false }],
     "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
     "no-implicit-coercion": ["error", { "allow": ["!!"] }],
@@ -71,6 +78,7 @@
     "node/no-process-env": "off",
     "node/no-top-level-await": "off",
     "oxc/no-async-await": "off",
+    "oxc/no-map-spread": "off",
     "oxc/no-optional-chaining": "off",
     "oxc/no-rest-spread-properties": "off",
     "promise/avoid-new": "off",
@@ -81,6 +89,7 @@
     "react/no-multi-comp": "off",
     "react/react-in-jsx-scope": "off",
     "react/todo": "off",
+    "typescript/consistent-return": "off",
     "typescript/explicit-function-return-type": "off",
     "typescript/explicit-member-accessibility": "off",
     "typescript/explicit-module-boundary-types": "off",
