@@ -11,7 +11,7 @@ func TestGitHubCapabilitiesUpgradeAndRestart(t *testing.T) {
 	root := t.TempDir()
 	s := openTest(t, root)
 	_, chat := fixture(t, s)
-	_, err := s.db.Exec("DROP TABLE chat_requests; DROP TABLE github_capabilities; PRAGMA user_version=2")
+	_, err := s.db.Exec("DROP TABLE installation_settings; DROP TABLE chat_requests; DROP TABLE github_capabilities; PRAGMA user_version=2")
 	must(t, err)
 	must(t, s.Close())
 	s = openTest(t, root)

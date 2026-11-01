@@ -10,22 +10,28 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
 type Input struct {
-	Provider    string `json:"provider"`
-	Model       string `json:"model"`
-	GitHubToken string `json:"githubToken"`
-	ProviderKey string `json:"providerKey"`
+	// Preferences, when present, replaces the complete non-secret settings record.
+	// Omission preserves it. Blank credential fields preserve their saved values.
+	Preferences *storage.Preferences `json:"preferences,omitempty"`
+	Provider    string               `json:"provider"`
+	Model       string               `json:"model"`
+	GitHubToken string               `json:"githubToken"`
+	ProviderKey string               `json:"providerKey"`
 }
 type View struct {
-	Provider           string `json:"provider"`
-	Model              string `json:"model"`
-	GitHubConfigured   bool   `json:"githubConfigured"`
-	ProviderConfigured bool   `json:"providerConfigured"`
+	Preferences        storage.Preferences `json:"preferences"`
+	MaxRunningOverride int                 `json:"maxRunningOverride,omitempty"`
+	Provider           string              `json:"provider"`
+	Model              string              `json:"model"`
+	GitHubConfigured   bool                `json:"githubConfigured"`
+	ProviderConfigured bool                `json:"providerConfigured"`
 }
 type ValidationError struct{ Message string }
 
@@ -33,18 +39,58 @@ func (e *ValidationError) Error() string { return e.Message }
 func invalid(message string) error       { return &ValidationError{message} }
 
 type Service struct {
-	Store    *storage.Store
-	Validate func(context.Context, storage.Credentials) error
+	RuntimeDiagnostics func(context.Context) []Diagnostic
+	mu                 sync.Mutex
+	MaxRunningOverride int
+	Store              *storage.Store
+	Validate           func(context.Context, storage.Credentials) error
+}
+
+type Diagnostic struct {
+	Name    string `json:"name"`
+	OK      bool   `json:"ok"`
+	Message string `json:"message"`
+}
+
+// Diagnose checks only metadata endpoints, never generates model responses or
+// starts containers. Transport errors and vendor response bodies stay private.
+func (s *Service) Diagnose(ctx context.Context) []Diagnostic {
+	result := []Diagnostic{{"Storage", true, "Storage is writable."}}
+	if err := s.Store.CheckWritable(ctx); err != nil {
+		result[0] = Diagnostic{"Storage", false, "Storage is unavailable or unwritable. Check data directory ownership, permissions and free space."}
+	}
+	if s.RuntimeDiagnostics != nil {
+		result = append(result, s.RuntimeDiagnostics(ctx)...)
+	} else {
+		result = append(result, Diagnostic{"Runtime", false, "Chat execution is not configured. Set the pinned agent image and private GitHub transport startup options."})
+	}
+	c, err := s.Store.Credentials(ctx)
+	if err != nil {
+		return append(result, Diagnostic{"Credentials", false, "Save GitHub and hosted model credentials in installation settings."})
+	}
+	if err := s.Validate(ctx, c); err != nil {
+		message := "Credential validation failed. Check GitHub token permissions, provider key, model access and host networking."
+		var validation *ValidationError
+		if errors.As(err, &validation) {
+			message = validation.Message
+		}
+		return append(result, Diagnostic{"Credentials", false, message})
+	}
+	return append(result, Diagnostic{"Credentials", true, "GitHub and hosted model metadata are accessible. This does not check inference quota or repository write permissions."})
 }
 
 func New(store *storage.Store) *Service { return &Service{Store: store, Validate: ValidateRemote} }
 
 func (s *Service) View(ctx context.Context) (View, error) {
+	p, err := s.Store.Preferences(ctx)
+	if err != nil {
+		return View{}, err
+	}
 	c, err := s.Store.Credentials(ctx)
 	if errors.Is(err, storage.ErrNotFound) {
-		return View{}, nil
+		err = nil
 	}
-	return View{c.Provider, c.Model, c.GitHubToken != "", c.ProviderKey != ""}, err
+	return View{Provider: c.Provider, Model: c.Model, GitHubConfigured: c.GitHubToken != "", ProviderConfigured: c.ProviderKey != "", Preferences: p, MaxRunningOverride: s.MaxRunningOverride}, err
 }
 
 var modelID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$`)
@@ -52,6 +98,13 @@ var modelID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$`)
 // Save validates replacement keys before saving either one. Empty keys retain
 // saved values; the first save requires both. Provider/model can only be set once.
 func (s *Service) Save(ctx context.Context, in Input) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if in.Preferences != nil {
+		if err := in.Preferences.Validate(); err != nil {
+			return invalid(err.Error())
+		}
+	}
 	old, err := s.Store.Credentials(ctx)
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return err
@@ -81,10 +134,12 @@ func (s *Service) Save(ctx context.Context, in Input) error {
 		return invalid("Enter a model-provider API key without spaces or line breaks.")
 	}
 	c := storage.Credentials{Provider: in.Provider, Model: in.Model, GitHubToken: in.GitHubToken, ProviderKey: in.ProviderKey}
-	if err := s.Validate(ctx, c); err != nil {
-		return err
+	if old.Provider == "" || in.GitHubToken != old.GitHubToken || in.ProviderKey != old.ProviderKey {
+		if err := s.Validate(ctx, c); err != nil {
+			return err
+		}
 	}
-	if err := s.Store.SaveCredentials(ctx, c); errors.Is(err, storage.ErrConflict) {
+	if err := s.Store.SaveInstallation(ctx, c, in.Preferences); errors.Is(err, storage.ErrConflict) {
 		return invalid("Provider and model are already fixed for this installation.")
 	} else {
 		return err
@@ -133,6 +188,8 @@ func validateRemote(ctx context.Context, c storage.Credentials, client *http.Cli
 				return invalid("GitHub account validation failed. Check the token and account access.")
 			}
 			return invalid(fmt.Sprintf("%s could not find this model. Check the model ID and account access.", label))
+		case res.StatusCode == 429:
+			return invalid(fmt.Sprintf("%s quota or rate limit reached. Check account billing and limits, then retry.", label))
 		case res.StatusCode < 200 || res.StatusCode >= 300:
 			return invalid(fmt.Sprintf("%s validation is unavailable (HTTP %d). Try again later.", label, res.StatusCode))
 		}

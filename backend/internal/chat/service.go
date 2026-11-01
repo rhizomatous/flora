@@ -154,13 +154,22 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 	if err != nil {
 		var capacity *provisioning.CapacityError
 		var setup *provisioning.SetupError
+		var dependency *provisioning.DependencyError
+		var runtimeStart *provisioning.RuntimeStartError
+		var stopped *provisioning.StoppedError
 		switch {
+		case errors.As(err, &dependency):
+			fail(dependency.Error() + " No message was delivered.")
+		case errors.As(err, &runtimeStart):
+			fail(runtimeStart.Error() + " Check the pinned agent image and Docker logs. No message was delivered.")
+		case errors.As(err, &stopped):
+			fail(stopped.Error() + " Check Docker memory limits and host logs. No message was delivered.")
 		case errors.As(err, &capacity):
 			fail(capacity.Error() + ". No message was delivered.")
 		case errors.As(err, &setup):
 			fail(setup.Error() + ". No message was delivered.")
 		default:
-			fail("Environment unavailable. Check Docker, capacity, checkout and setup activity. No message was delivered.")
+			fail("Environment unavailable. Check Docker socket permissions, host disk space, container resource limits, checkout and setup activity. Run dependency checks in installation settings. No message was delivered.")
 		}
 		return
 	}
@@ -467,7 +476,7 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 				keepActivity = true
 				_ = s.transition(chatID, message.ID, storage.Waiting, "Runtime delivery or completion is uncertain. The accepted message will not be resent. Saved activity may be incomplete.")
 			} else if providerFailure || runtimeFailure.Load() {
-				fail("The model provider or runtime reported an error. Inspect the saved response and installation settings.")
+				fail("The model provider or runtime reported an error. Check the saved response, provider key, model access, account quota and billing in installation settings. A rotated provider key applies only to new containers.")
 			} else {
 				_ = s.transition(chatID, message.ID, storage.Idle, "Turn completed; ready for a follow-up")
 			}
@@ -665,6 +674,10 @@ func (s *Service) Reply(ctx context.Context, chatID, questionID string, answers 
 	if len(answers) != len(question.Questions) {
 		return storage.ErrInvalid
 	}
+	prefs, err := s.Store.Preferences(ctx)
+	if err != nil {
+		return err
+	}
 	total := 0
 	for i, group := range answers {
 		if len(group) == 0 {
@@ -675,7 +688,7 @@ func (s *Service) Reply(ctx context.Context, chatID, questionID string, answers 
 		}
 		for _, a := range group {
 			total += len(a)
-			if total > storage.MaxMessageBytes || strings.TrimSpace(a) == "" {
+			if total > prefs.MessageBytes || strings.TrimSpace(a) == "" {
 				return storage.ErrInvalid
 			}
 			if question.Questions[i].Custom != nil && !*question.Questions[i].Custom {

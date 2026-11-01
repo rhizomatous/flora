@@ -40,6 +40,12 @@ func main() {
 	githubHost := flag.String("github-host", "", "private TLS hostname on port 443 reachable from agent containers")
 	githubCA := flag.String("github-ca", "", "CA PEM file trusted by agent git/gh for the private GitHub transport")
 	flag.Parse()
+	maxOverride := 0
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "max-running" {
+			maxOverride = *maxRunning
+		}
+	})
 	if *maxRunning <= 0 {
 		slog.Error("Set -max-running to a positive number of chat containers")
 		os.Exit(1)
@@ -62,6 +68,8 @@ func main() {
 		}
 	}()
 	var chats *chat.Service
+	configuration := settings.New(store)
+	configuration.MaxRunningOverride = maxOverride
 	if *agentImage != "" {
 		if *githubListen == "" {
 			slog.Error("Chat execution requires -github-listen and private TLS transport settings")
@@ -78,6 +86,16 @@ func main() {
 			os.Exit(1)
 		}
 		defer engine.Close()
+		configuration.RuntimeDiagnostics = func(ctx context.Context) []settings.Diagnostic {
+			if _, err := engine.ContainerList(ctx, true, map[string]string{"flora.managed": "true"}); err != nil {
+				return []settings.Diagnostic{{Name: "Docker", Message: "Cannot reach Docker. Start Docker and check the configured socket and service-user permissions."}}
+			}
+			result := []settings.Diagnostic{{Name: "Docker", OK: true, Message: "Docker is reachable."}}
+			if _, err := engine.ImageInspect(ctx, *agentImage); err != nil {
+				return append(result, settings.Diagnostic{Name: "Agent image", Message: "Pinned image is unavailable locally. A chat start will pull a digest-pinned image. If that fails, check registry access, disk space and the installed image reference."})
+			}
+			return append(result, settings.Diagnostic{Name: "Agent image", OK: true, Message: "Agent image is available locally."})
+		}
 		reviewCtx, stopReview := context.WithCancel(ctx)
 		reviewDone := make(chan struct{})
 		go func() {
@@ -85,12 +103,12 @@ func main() {
 			changes.New(store, engine).Run(reviewCtx)
 		}()
 		defer func() { stopReview(); <-reviewDone }()
-		access, _, err := startGitHub(ctx, store, engine, githubbroker.CheckoutConfig{Host: *githubHost, CACert: string(ca)}, *githubListen, *githubCert, *githubKey)
+		access, _, err := startGitHub(ctx, store, engine, githubbroker.CheckoutConfig{Host: *githubHost, CACert: string(ca), UseChatAuthor: true}, *githubListen, *githubCert, *githubKey)
 		if err != nil {
 			slog.Error("Cannot configure container GitHub access", "error", err)
 			os.Exit(1)
 		}
-		manager, err := provisioning.New(engine, store, provisioning.Config{ImageRef: *agentImage, ImageDigest: *agentDigest, ImageID: *agentID, HarnessVersion: "1.2.27", MaxRunning: *maxRunning}, access)
+		manager, err := provisioning.New(engine, store, provisioning.Config{ImageRef: *agentImage, ImageDigest: *agentDigest, ImageID: *agentID, HarnessVersion: "1.2.27", MaxRunning: *maxRunning, UseSettings: true, MaxRunningOverride: maxOverride}, access)
 		if err != nil {
 			slog.Error("Cannot configure pinned agent runtime", "error", err)
 			os.Exit(1)
@@ -125,7 +143,7 @@ func main() {
 	}
 	srv := &http.Server{
 		Addr:              *addr,
-		Handler:           server.New(webassets.FS(), auth.New(store), settings.New(store), origin, chats),
+		Handler:           server.New(webassets.FS(), auth.New(store), configuration, origin, chats),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}

@@ -31,7 +31,7 @@ type Activity struct {
 // chat has active work. Callers must submit only new acceptances to the runtime
 // and reconcile uncertain delivery without automatically resending the message.
 func (s *Store) AcceptMessage(ctx context.Context, chatID, requestID, text string) (Acceptance, error) {
-	if requestID == "" || len(requestID) > 200 || strings.TrimSpace(text) == "" || !utf8.ValidString(text) || len(text) > MaxMessageBytes {
+	if requestID == "" || len(requestID) > 200 || strings.TrimSpace(text) == "" || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
 		return Acceptance{}, ErrInvalid
 	}
 	var a Acceptance
@@ -46,6 +46,13 @@ func (s *Store) AcceptMessage(ctx context.Context, chatID, requestID, text strin
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
+		}
+		prefs, err := readPreferences(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if len(text) > prefs.MessageBytes {
+			return ErrInvalid
 		}
 		var status Status
 		var active string

@@ -165,8 +165,9 @@ type Repository struct {
 	Role       string `json:"role"`
 }
 type Configuration struct {
-	Repositories []Repository `json:"repositories"`
-	SetupCommand string       `json:"setupCommand"`
+	Repositories []Repository     `json:"repositories"`
+	SetupCommand string           `json:"setupCommand"`
+	Runtime      *RuntimeDefaults `json:"runtime,omitempty"`
 }
 type Project struct {
 	ID            string        `json:"id"`
@@ -194,7 +195,7 @@ type Chat struct {
 }
 
 func configJSON(c Configuration) ([]byte, error) {
-	if len(c.Repositories) == 0 {
+	if len(c.Repositories) == 0 || c.Runtime != nil {
 		return nil, ErrInvalid
 	}
 	names := map[string]bool{}
@@ -292,7 +293,7 @@ func (s *Store) CreateChat(ctx context.Context, projectID, title, imageDigest, h
 // CreateChatRequest reserves a creation identity with the immutable first input.
 // A retry returns the same chat even if project settings have since changed.
 func (s *Store) CreateChatRequest(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string) (Chat, error) {
-	if requestID == "" || len(requestID) > 200 || strings.TrimSpace(text) == "" || !utf8.ValidString(text) || len(text) > MaxMessageBytes {
+	if requestID == "" || len(requestID) > 200 || strings.TrimSpace(text) == "" || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
 		return Chat{}, ErrInvalid
 	}
 	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, requestID, text)
@@ -322,8 +323,25 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 		if err := tx.QueryRowContext(ctx, "SELECT config FROM projects WHERE id=?", projectID).Scan(&config); err != nil {
 			return found(err)
 		}
+		prefs, err := readPreferences(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if len(text) > prefs.MessageBytes {
+			return ErrInvalid
+		}
+		var snapshot Configuration
+		if err := json.Unmarshal([]byte(config), &snapshot); err != nil {
+			return err
+		}
+		snapshot.Runtime = &prefs.RuntimeDefaults
+		encoded, err := json.Marshal(snapshot)
+		if err != nil {
+			return err
+		}
+		config = string(encoded)
 		stamp := now()
-		_, err := tx.ExecContext(ctx, `INSERT INTO chats (id,project_id,title,config,image_digest,harness_version,status,status_reason,created_at,updated_at) VALUES (?,?,?,?,?,?,'stopped','Not started',?,?)`, chatID, projectID, title, config, imageDigest, harnessVersion, stamp, stamp)
+		_, err = tx.ExecContext(ctx, `INSERT INTO chats (id,project_id,title,config,image_digest,harness_version,status,status_reason,created_at,updated_at) VALUES (?,?,?,?,?,?,'stopped','Not started',?,?)`, chatID, projectID, title, config, imageDigest, harnessVersion, stamp, stamp)
 		if err != nil {
 			return err
 		}

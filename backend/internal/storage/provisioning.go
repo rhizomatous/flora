@@ -20,6 +20,8 @@ func (s *Store) LockContainer(ctx context.Context, chatID string) (func(), error
 // LockContainerCapacity reserves the admission decision through Docker create
 // and start, never through checkout, readiness, or agent execution. Callers must
 // hold LockContainer first and release this lock before releasing that one.
+// Settings writes take only this lock so a lowered cap cannot commit between
+// admission and Docker start. They must never acquire a chat lock while holding it.
 // Docker's running set is authoritative, so process exit releases the lock
 // without leaving a persisted reservation to reclaim on restart.
 func (s *Store) LockContainerCapacity(ctx context.Context) (func(), error) {

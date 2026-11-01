@@ -29,7 +29,7 @@ function identity(scope: string, input: unknown) {
   return id;
 }
 
-export function Chats({ path, onExpired }: { path: string; onExpired: () => void }) {
+export function Chats({ path, onExpired, messageBytes }: { path: string; onExpired: () => void; messageBytes: number }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [list, setList] = useState<Chat[]>();
   const [detail, setDetail] = useState<Detail>();
@@ -111,7 +111,7 @@ export function Chats({ path, onExpired }: { path: string; onExpired: () => void
     const form = event.currentTarget;
     const fields = new FormData(form);
     const text = String(fields.get("text") || "");
-    if (!text.trim() || new TextEncoder().encode(text).length > 131072) { setError("Enter a message of at most 128 KiB UTF-8."); return; }
+    if (!text.trim() || new TextEncoder().encode(text).length > messageBytes) { setError(`Enter a message of at most ${messageBytes.toLocaleString()} UTF-8 bytes.`); return; }
     submitting.current = true; setBusy(true); setError("");
     try {
       const input = isNew ? { title: String(fields.get("title")), text } : { text };
@@ -160,7 +160,7 @@ export function Chats({ path, onExpired }: { path: string; onExpired: () => void
       {!projects.length && <p className="text-sm"><a href="#projects/new" className={link}>Connect a project</a> before starting a chat.</p>}
       <label className="block text-sm font-medium">Chat title<input name="title" className={control} required maxLength={200} disabled={busy} /></label>
       <label className="block text-sm font-medium">Message<textarea name="text" className={`${control} min-h-40`} required disabled={busy} aria-describedby="message-limit" /></label>
-      <p id="message-limit" className="text-sm text-muted-foreground">Up to 128 KiB UTF-8. Checkout and setup run before Flora starts work.</p>
+      <p id="message-limit" className="text-sm text-muted-foreground">Up to {messageBytes.toLocaleString()} UTF-8 bytes. Checkout and setup run before Flora starts work.</p>
       <button className={button} disabled={busy || !projects.length}>{busy ? "Starting…" : "Start chat"}</button>
     </form>}
     {id && !isNew && !detail && !error && <p role="status" className="mt-8">Loading…</p>}
@@ -183,7 +183,7 @@ export function Chats({ path, onExpired }: { path: string; onExpired: () => void
       {questions.map(q => <QuestionForm key={q.id} question={q} chatID={id} onError={report} onAnswered={() => setQuestions(rows => rows.filter(row => row.id !== q.id))} />)}
       <form onSubmit={send} className="mt-8 space-y-4">
         <label className="block text-sm font-medium">Follow-up<textarea className={`${control} min-h-28`} name="text" required disabled={busy || activeTurn || !!detail.continuationBlockedReason} aria-describedby="followup-help" /></label>
-        <p id="followup-help" className="text-sm text-muted-foreground">{detail.continuationBlockedReason ? "Continuation is unavailable. Saved conversation and workspace files are retained." : activeTurn ? "Wait for the current turn to finish or answer Flora’s question. Messages are not queued." : "Continue in the same workspace and conversation. Up to 128 KiB UTF-8."}</p>
+        <p id="followup-help" className="text-sm text-muted-foreground">{detail.continuationBlockedReason ? "Continuation is unavailable. Saved conversation and workspace files are retained." : activeTurn ? "Wait for the current turn to finish or answer Flora’s question. Messages are not queued." : `Continue in the same workspace and conversation. Up to ${messageBytes.toLocaleString()} UTF-8 bytes.`}</p>
         <button className={button} disabled={busy || activeTurn || !!detail.continuationBlockedReason}>{detail.continuationBlockedReason ? "Continuation unavailable" : busy ? "Working…" : detail.chat.Status === "stopped" ? "Resume with new message" : "Send message"}</button>
       </form>
       <details className="mt-10 rounded-md border border-foreground/20 p-4"><summary className="cursor-pointer text-sm font-medium">Full activity ({activity.length} saved events)</summary><p className="mt-3 text-sm text-muted-foreground">Setup activity contains bounded previews. After setup finishes, <a className={link} href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>download the full redacted setup log</a>. Any capture failure is shown in the final setup event.</p><ol className="mt-4 space-y-3">{activity.map(row => <li key={row.Sequence}><details><summary className="cursor-pointer break-words text-xs">{row.Kind} · <time dateTime={row.CreatedAt}>{new Date(row.CreatedAt).toLocaleTimeString()}</time> · #{row.Sequence}</summary><pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(row.Payload, null, 2)}</pre></details></li>)}</ol></details>

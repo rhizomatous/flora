@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -117,6 +118,11 @@ func decodeLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) boo
 }
 
 func (a *api) routes(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/settings/diagnostics", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+		jsonResponse(w, 200, a.settings.Diagnose(ctx))
+	})
 	mux.HandleFunc("GET /api/auth/status", func(w http.ResponseWriter, r *http.Request) {
 		_, err := a.auth.Store.AdministratorHash(r.Context())
 		if err != nil && !errors.Is(err, storage.ErrNotFound) {
@@ -169,7 +175,7 @@ func (a *api) routes(mux *http.ServeMux) {
 			case err != nil:
 				failure(w, 500, "Could not save the session. Check storage permissions and free space.")
 			default:
-				sessionCookie(w, value, expires, int(auth.Lifetime.Seconds()))
+				sessionCookie(w, value, expires, max(1, int(time.Until(expires).Seconds())))
 				jsonResponse(w, 200, map[string]bool{"authenticated": true})
 			}
 		})

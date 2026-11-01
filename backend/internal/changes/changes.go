@@ -416,9 +416,13 @@ func (s *Service) Read(ctx context.Context, id string, inline bool) (Review, err
 		r.Stale = c.Status == storage.Stopped || e != nil || time.Since(stamp) > 15*time.Second || r.Error != ""
 	}
 	if inline && r.Snapshot != nil {
+		prefs, err := s.Store.Preferences(ctx)
+		if err != nil {
+			return r, err
+		}
 		for i := range r.Snapshot.Files {
 			f := &r.Snapshot.Files[i]
-			if f.Bytes > InlineLimit {
+			if f.Bytes > prefs.InlineDiffBytes {
 				f.Diff = ""
 				f.Truncated = true
 			}

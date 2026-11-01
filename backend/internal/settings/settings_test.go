@@ -2,10 +2,12 @@ package settings
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/rhizomatous/flora/backend/internal/storage"
@@ -43,6 +45,90 @@ func TestVendorValidation(t *testing.T) {
 			}
 			if calls != 2 {
 				t.Fatalf("requests=%d", calls)
+			}
+		})
+	}
+}
+
+func TestConcurrentRotationAndLimitsPreserveBlankSecrets(t *testing.T) {
+	ctx := context.Background()
+	store, err := storage.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	initial := storage.Credentials{Provider: "openai", Model: "model", GitHubToken: "github_pat_fixture", ProviderKey: "provider-fixture"}
+	if err := store.SaveCredentials(ctx, initial); err != nil {
+		t.Fatal(err)
+	}
+	s := New(store)
+	entered, release := make(chan struct{}), make(chan struct{})
+	s.Validate = func(context.Context, storage.Credentials) error { close(entered); <-release; return nil }
+	var wg sync.WaitGroup
+	wg.Add(2)
+	results := make(chan error, 2)
+	go func() { defer wg.Done(); results <- s.Save(ctx, Input{ProviderKey: "rotated-fixture"}) }()
+	<-entered
+	p := storage.DefaultPreferences()
+	p.MaxRunning = 3
+	go func() { defer wg.Done(); results <- s.Save(ctx, Input{Preferences: &p}) }()
+	close(release)
+	wg.Wait()
+	close(results)
+	for err := range results {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	c, err := store.Credentials(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.ProviderKey != "rotated-fixture" || c.GitHubToken != initial.GitHubToken || c.Model != initial.Model {
+		t.Fatal("concurrent blank update reverted credentials")
+	}
+	view, err := s.View(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(view)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if view.Preferences.MaxRunning != 3 || strings.Contains(string(raw), "fixture") {
+		t.Fatal("view lost settings or exposed credentials")
+	}
+}
+
+func TestDiagnosticsRedactTransportAndVendorBodies(t *testing.T) {
+	ctx := context.Background()
+	store, err := storage.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	c := storage.Credentials{Provider: "openai", Model: "model", GitHubToken: "github_pat_fixture", ProviderKey: "provider-fixture"}
+	if err := store.SaveCredentials(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	s := New(store)
+	for _, code := range []int{0, 401, 403, 404, 429, 500} {
+		t.Run(http.StatusText(code), func(t *testing.T) {
+			s.Validate = func(ctx context.Context, c storage.Credentials) error {
+				return validateRemote(ctx, c, &http.Client{Transport: roundTrip(func(*http.Request) (*http.Response, error) {
+					if code == 0 {
+						return nil, errors.New(c.GitHubToken + " " + c.ProviderKey)
+					}
+					return &http.Response{StatusCode: code, Body: io.NopCloser(strings.NewReader(c.GitHubToken + " " + c.ProviderKey))}, nil
+				})})
+			}
+			results := s.Diagnose(ctx)
+			raw, err := json.Marshal(results)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(raw), "fixture") || results[len(results)-1].OK || results[len(results)-1].Message == "" {
+				t.Fatal("unsafe or unhelpful diagnostics")
 			}
 		})
 	}
