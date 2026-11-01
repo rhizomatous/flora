@@ -21,6 +21,8 @@ import tarfile
 import time
 import urllib.request
 
+from release_image import EngineError, ensure_image
+
 
 class UnixHTTP(http.client.HTTPConnection):
     def connect(self):
@@ -34,7 +36,8 @@ def engine(method, path, body=None):
               {'Content-Type': 'application/json'})
     r = c.getresponse()
     data = r.read()
-    assert r.status < 300, (method, path, r.status)  # never print secret bodies
+    if r.status >= 300:
+        raise EngineError(method, path, r.status)  # never print secret bodies
     return json.loads(data) if data and not path.startswith('/images/create') else None
 
 
@@ -73,9 +76,7 @@ for p in config.glob('transport*'):
     p.chmod(0o640)
 key_hash = hashlib.sha256((config / 'transport.key').read_bytes()).digest()
 image = os.environ.get('FLORA_RELEASE_LOCAL_IMAGE', identity['agent_image'])
-if image == identity['agent_image']:
-    engine('POST', '/images/create?fromImage=' + image)
-info = engine('GET', '/images/' + image + '/json')
+info = ensure_image(engine, image)
 image_id = info['Id']
 assert info['Config']['Env'] and 'OPENCODE_CONFIG=/etc/flora/opencode.json' in info['Config']['Env']
 

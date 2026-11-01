@@ -145,9 +145,14 @@ If GHCR denies an unauthenticated image pull, the repository administrator must
 make the agent package public or arrange registry authentication for the Engine.
 An interactive Docker CLI login for a different account does not automatically
 give Flora credentials. Public readability is the supported simple path. Release
-CI uses only its scoped `GITHUB_TOKEN` with packages/write and contents/write;
-organizations must permit package creation and link an existing package to this
-repository. It does not use a personal publishing token.
+CI uses only its scoped `GITHUB_TOKEN`: package write for the image build, package
+read for verification, and contents write only for release creation. It can verify
+a newly created private package by authenticating a CLI pull of the exact digest
+on each native runner; the fixture reuses that local identity without a second,
+unauthenticated pull. Credentials remain available through verification and are
+removed in an always-run cleanup step. Organizations must permit package creation
+and link an existing package to this repository. No personal publishing token is
+used. CI authentication does not make the package public for end users.
 
 ```sh
 sudo systemctl daemon-reload
@@ -203,7 +208,7 @@ Offline backup procedure, on this dedicated single-installation host:
    copy a live workspace.
 3. Keep a root-owned mode-0700 backup directory on encrypted offline storage. With
    `sudo -i` and `umask 077`, archive `/var/lib/flora`, `/etc/flora` and `/opt/flora`
-   together: `tar --numeric-owner -cpf /private/backup/flora.tar -C / var/lib/flora
+   together: `tar --numeric-owner -cpf /srv/flora-backups/flora.tar -C / var/lib/flora
    etc/flora opt/flora`. Include WAL/SHM if present. Save the service UID/GID,
    Docker version, DNS/firewall/proxy settings and `flora -version` identity.
 4. Preserve the same Docker daemon's stopped chat containers and image. Their
@@ -243,7 +248,17 @@ cross-release chat compatibility are outside this release.
 
 Only an explicit `vMAJOR.MINOR.PATCH` (optionally prerelease) tag runs
 `.github/workflows/release.yml`. Normal PRs do not publish images or releases.
+Before any image push, the workflow verifies repository access and checks for an
+existing release by tag. Only a release-endpoint 404 permits publication; an
+existing release, authentication failure, outage or unexpected response fails
+closed. Per-tag workflow concurrency prevents two runs from racing this check.
+Rerunning a completed release therefore stops before rebuilding or changing its
+image tag. Do not create a release manually while its tag workflow is running.
+
 The workflow publishes an image before building the binary because its actual
-registry digest is the build input. A later failed check can leave an unreferenced
-image tag, but no GitHub release. Do not retag or overwrite a published release.
-No release tag is created by the implementation or installer.
+registry digest is the build input. Native amd64 and arm64 jobs verify the same
+archived bytes and pinned image before a final job publishes those archives,
+without rebuilding. Source identity comes from `git rev-parse HEAD`, including
+for annotated tags. A failed verification can leave an unreferenced image tag,
+but no GitHub release. Do not retag or overwrite a published release. No release
+tag is created by the implementation or installer.

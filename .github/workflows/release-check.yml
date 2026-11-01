@@ -24,6 +24,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # v34
+      - name: Check publication guards and exact local-image reuse
+        run: python3 -m unittest discover -s scripts -p 'release_*_test.py'
       - name: Build local fixture image and record its actual registry digest
         run: |
           set -euo pipefail
@@ -37,7 +39,13 @@ jobs:
           nix develop --command make deps web
           nix develop --command bash scripts/package-release.sh v0.0.0-fixture "$FIXTURE_IMAGE"
       - name: Check archive as a non-root service account with real Docker
-        run: sudo bash scripts/check-release-linux.sh dist/flora-v0.0.0-fixture-linux-${{ matrix.arch }}.tar.gz
+        run: |
+          docker pull "$FIXTURE_IMAGE"
+          docker rm -f flora-release-registry
+          sudo bash scripts/check-release-linux.sh dist/flora-v0.0.0-fixture-linux-${{ matrix.arch }}.tar.gz
       - name: Remove only fixture registry
         if: always()
-        run: docker rm -f flora-release-registry
+        run: |
+          if docker container inspect flora-release-registry >/dev/null 2>&1; then
+            docker rm -f flora-release-registry
+          fi

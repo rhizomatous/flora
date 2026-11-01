@@ -12,46 +12,134 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
-      contents: write
+      contents: read
       packages: write
+    outputs:
+      image: ${{ steps.image.outputs.ref }}
+      commit: ${{ steps.source.outputs.commit }}
     steps:
+      - name: Use isolated registry configuration
+        run: echo "DOCKER_CONFIG=$RUNNER_TEMP/flora-docker" >> "$GITHUB_ENV"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - name: Validate explicit release tag
-        run: |
-          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]
+      - name: Refuse an existing release before any image push
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/release_guard.py "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME"
+      - name: Record canonical source commit
+        id: source
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # v34
       - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      - name: Check source
-        run: nix develop --command make deps check smoke build-linux
+      - name: Check source and publication guards
+        run: |
+          python3 -m unittest discover -s scripts -p 'release_*_test.py'
+          nix develop --command make deps check smoke build-linux
+      - name: Authenticate image publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          umask 077
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
       - name: Publish matching multi-platform image
+        id: image
+        env:
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}-agent"
+          docker buildx build --platform linux/amd64,linux/arm64 --push \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$SOURCE_COMMIT" \
+            --label "org.opencontainers.image.version=$GITHUB_REF_NAME" \
+            --tag "$image:$GITHUB_REF_NAME" --metadata-file "$RUNNER_TEMP/flora-image-build.json" agent/image
+          digest=$(jq -er '."containerimage.digest" | select(test("^sha256:[a-f0-9]{64}$"))' "$RUNNER_TEMP/flora-image-build.json")
+          echo "ref=$image@$digest" >> "$GITHUB_OUTPUT"
+      - name: Package binaries with the published image identity
+        env:
+          RELEASE_IMAGE: ${{ steps.image.outputs.ref }}
+        run: nix develop --command bash scripts/package-release.sh "$GITHUB_REF_NAME" "$RELEASE_IMAGE"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-release
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove registry authentication
+        if: always()
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/flora-docker
+        run: docker logout ghcr.io
+
+  verify:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    env:
+      RELEASE_IMAGE: ${{ needs.build.outputs.image }}
+    steps:
+      - name: Use isolated registry configuration
+        run: echo "DOCKER_CONFIG=$RUNNER_TEMP/flora-docker" >> "$GITHUB_ENV"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: linux-release
+          path: dist/
+      - name: Authenticate and pre-pull the exact image, including private packages
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          image="ghcr.io/${GITHUB_REPOSITORY,,}-agent"
+          umask 077
           printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          trap 'docker logout ghcr.io' EXIT
-          docker buildx build --platform linux/amd64,linux/arm64 --push \
-            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
-            --label "org.opencontainers.image.version=$GITHUB_REF_NAME" \
-            --tag "$image:$GITHUB_REF_NAME" --metadata-file "$RUNNER_TEMP/flora-image-build.json" agent/image
-          digest=$(jq -er '."containerimage.digest" | select(test("^sha256:[a-f0-9]{64}$"))' "$RUNNER_TEMP/flora-image-build.json")
-          echo "RELEASE_IMAGE=$image@$digest" >> "$GITHUB_ENV"
-      - name: Package binaries with the published image identity
-        run: nix develop --command bash scripts/package-release.sh "$GITHUB_REF_NAME" "$RELEASE_IMAGE"
-      - name: Exercise archived amd64 binary on Linux
-        run: sudo bash scripts/check-release-linux.sh "dist/flora-$GITHUB_REF_NAME-linux-amd64.tar.gz"
-      - name: Publish release assets only after verification
+          docker pull "$RELEASE_IMAGE"
+      - name: Exercise the archived binary on native Linux
+        run: |
+          (cd dist && sha256sum --check SHA256SUMS)
+          sudo bash scripts/check-release-linux.sh "dist/flora-$GITHUB_REF_NAME-linux-${{ matrix.arch }}.tar.gz"
+      - name: Remove registry authentication
+        if: always()
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/flora-docker
+        run: docker logout ghcr.io
+
+  publish:
+    needs: [build, verify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: linux-release
+          path: dist/
+      - name: Publish the verified archives without rebuilding
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_IMAGE: ${{ needs.build.outputs.image }}
+          SOURCE_COMMIT: ${{ needs.build.outputs.commit }}
         run: |
+          (cd dist && sha256sum --check SHA256SUMS)
           gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/SHA256SUMS \
-            --verify-tag --title "Flora $GITHUB_REF_NAME" \
-            --notes "Linux amd64 and arm64. See the installation guide in this tag. Agent: $RELEASE_IMAGE. OpenCode: 1.2.27. Existing-chat upgrades are not supported."
+            --repo "$GITHUB_REPOSITORY" --verify-tag --title "Flora $GITHUB_REF_NAME" \
+            --notes "Linux amd64 and arm64. Source: $SOURCE_COMMIT. See the installation guide in this tag. Agent: $RELEASE_IMAGE. OpenCode: 1.2.27. Existing-chat upgrades are not supported."
