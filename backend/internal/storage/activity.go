@@ -163,6 +163,19 @@ func (s *Store) SaveRuntimeMessage(ctx context.Context, eventID string, m Messag
 // message. Working and Waiting keep that message active; Idle, Failed, and Stopped
 // clear it. Callers must confirm completion, failure, or stop before clearing it.
 func (s *Store) Transition(ctx context.Context, chatID, expectedMessageID string, status Status, reason string) error {
+	return s.transition(ctx, chatID, expectedMessageID, status, reason, false)
+}
+
+// CompleteTurn records confirmed successful work together with the terminal status.
+// Interruptions and failures must use Transition so they cannot emit completion alerts.
+func (s *Store) CompleteTurn(ctx context.Context, chatID, messageID, reason string) error {
+	if messageID == "" {
+		return ErrInvalid
+	}
+	return s.transition(ctx, chatID, messageID, Idle, reason, true)
+}
+
+func (s *Store) transition(ctx context.Context, chatID, expectedMessageID string, status Status, reason string, completed bool) error {
 	switch status {
 	case Working, Waiting, Failed, Idle, Stopped:
 	default:
@@ -187,8 +200,55 @@ func (s *Store) Transition(ctx context.Context, chatID, expectedMessageID string
 			return err
 		}
 		payload, _ := json.Marshal(map[string]string{"status": string(status), "reason": reason, "message_id": active})
-		return addActivity(ctx, tx, chatID, id(), "status", payload)
+		if err := addActivity(ctx, tx, chatID, id(), "status", payload); err != nil {
+			return err
+		}
+		if completed {
+			return addActivity(ctx, tx, chatID, "completed:"+active, "turn.completed", payload)
+		}
+		return nil
 	})
+}
+
+// Completions starts at the current saved history when after is nil. A connected
+// browser keeps the returned cursor through failures to receive missed completions.
+// A fresh page starts silently rather than replaying old sounds and toasts.
+func (s *Store) Completions(ctx context.Context, after *int64) ([]Activity, int64, error) {
+	result := []Activity{}
+	if after == nil {
+		var cursor int64
+		err := s.db.QueryRowContext(ctx, "SELECT coalesce(max(sequence),0) FROM activity").Scan(&cursor)
+		return result, cursor, err
+	}
+	if *after < 0 {
+		return nil, 0, ErrInvalid
+	}
+	// Bound this page before reading it so later inserts cannot be skipped when
+	// the cursor advances past activity that does not contain a completion.
+	var upper int64
+	if err := s.db.QueryRowContext(ctx, "SELECT coalesce(max(sequence),0) FROM activity").Scan(&upper); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx, "SELECT sequence,chat_id,event_id,kind,payload,created_at FROM activity WHERE sequence>? AND sequence<=? AND kind='turn.completed' ORDER BY sequence LIMIT 100", *after, upper)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	cursor := *after
+	for rows.Next() {
+		var a Activity
+		var payload string
+		if err := rows.Scan(&a.Sequence, &a.ChatID, &a.EventID, &a.Kind, &payload, &a.CreatedAt); err != nil {
+			return nil, 0, err
+		}
+		a.Payload = json.RawMessage(payload)
+		result = append(result, a)
+		cursor = a.Sequence
+	}
+	if len(result) < 100 && upper > cursor {
+		cursor = upper
+	}
+	return result, cursor, rows.Err()
 }
 
 func activityExists(ctx context.Context, tx *sql.Tx, chatID, eventID, kind string, payload json.RawMessage) (bool, error) {

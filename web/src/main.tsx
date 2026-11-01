@@ -5,7 +5,7 @@ import { request } from "./request";
 import { Projects } from "./projects";
 import { Chats } from "./chats";
 import { PreferenceFields, readPreferences, type Preferences } from "./settings";
-import { useCompletionSound } from "./sound";
+import { CompletionToasts, useNotifications } from "./notifications";
 import "@flora/florets/styles.css";
 
 type Status = { setupRequired: boolean; authenticated: boolean };
@@ -22,7 +22,7 @@ function App() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>();
-  useCompletionSound(!!status?.authenticated && !!settings?.preferences.sound);
+  const notifications = useNotifications(!!status?.authenticated && !!settings, !!settings?.preferences.sound, () => { request<Status>("auth/status").then(setStatus).catch(() => {}); });
   const [path, setPath] = useState(window.location.hash.slice(1) || "chats");
   useEffect(() => {
     const changed = () => { setPath(window.location.hash.slice(1) || "chats"); setError(""); setNotice(""); };
@@ -80,7 +80,15 @@ function App() {
       {status?.authenticated && <nav aria-label="Main" className="mb-8 flex flex-wrap gap-6 text-sm"><a href="#chats" aria-current={path.startsWith("chats") ? "page" : undefined} className="underline underline-offset-4">Chats</a><a href="#projects" aria-current={path.startsWith("projects") ? "page" : undefined} className="underline underline-offset-4">Projects</a><a href="#settings" aria-current={path === "settings" ? "page" : undefined} className="underline underline-offset-4">Installation settings</a></nav>}
       {error && <p role="alert" className="mb-6 rounded-md border border-foreground/50 p-3 text-sm">{error}</p>}
       {notice && <p role="status" className="mb-6 rounded-md border p-3 text-sm">{notice}</p>}
-      {!status && <p role="status" className="text-muted-foreground">Loading…</p>}
+      {status?.authenticated && settings && <>
+        {notifications.error && <p role="status" className="mb-6 rounded-md border p-3 text-sm">{notifications.error}</p>}
+        {settings.preferences.sound && <div className="mb-6 text-sm">
+          <button type="button" className="underline underline-offset-4" onClick={notifications.audio.enable}>{notifications.audio.ready ? "Sound enabled for this page" : "Enable notification sound"}</button>
+          {!notifications.audio.ready && <p className="mt-2 text-muted-foreground">Use this button to allow audio in this browser. If sound stays blocked, allow sound or autoplay in site settings, then try again. Completion toasts still appear. Missed sounds are not replayed.</p>}
+        </div>}
+        <CompletionToasts toasts={notifications.toasts} dismiss={notifications.dismiss} />
+      </>}
+      {(!status || status.authenticated && !settings) && (error ? <button type="button" className={button} onClick={() => { setError(""); refresh().catch(e => setError(e.message)); }}>Retry loading Flora</button> : <p role="status" className="text-muted-foreground">Loading…</p>)}
       {status && !status.authenticated && <section aria-labelledby="account-heading">
         <h1 ref={heading} tabIndex={-1} id="account-heading" className="text-2xl font-semibold tracking-tight">{status.setupRequired ? "Create administrator" : "Log in"}</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">{status.setupRequired ? "Create the single administrator account for this installation. Use a unique password of at least 12 characters." : "Enter your administrator password. Sessions expire at the absolute lifetime set by the administrator."}</p>
@@ -91,7 +99,7 @@ function App() {
           <button className={button} disabled={busy}>{busy ? "Please wait…" : status.setupRequired ? "Create administrator" : "Log in"}</button>
         </form>
       </section>}
-      {status?.authenticated && settings && path !== "settings" && (path.startsWith("chats") ? <Chats key={path} path={path} messageBytes={settings.preferences.messageBytes} onExpired={() => { request<Status>("auth/status").then(setStatus).catch(() => {}); }} /> : <Projects key={path} path={path} onExpired={() => { request<Status>("auth/status").then(setStatus).catch(() => {}); }} />)}
+      {status?.authenticated && settings && path !== "settings" && (path.startsWith("chats") ? <Chats key={path} path={path} list={notifications.chats} listError={notifications.error} messageBytes={settings.preferences.messageBytes} onExpired={() => { request<Status>("auth/status").then(setStatus).catch(() => {}); }} /> : <Projects key={path} path={path} onExpired={() => { request<Status>("auth/status").then(setStatus).catch(() => {}); }} />)}
       {status?.authenticated && settings && path === "settings" && <section aria-labelledby="settings-heading">
         <h1 ref={heading} tabIndex={-1} id="settings-heading" className="text-2xl font-semibold tracking-tight">Installation settings</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">Choose one hosted provider and model for all chats. Once saved, the provider and model cannot be changed.</p>

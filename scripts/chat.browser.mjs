@@ -34,7 +34,7 @@ try {
   await page.getByText("Saved response 2", { exact: true }).waitFor();
   await page.getByRole("link", { name: "All chats", exact: true }).click();
   await page.getByRole("heading", { name: "Browser project", exact: true }).waitFor();
-  await page.getByRole("link", { name: "Browser persistence", exact: true }).click();
+  await page.getByRole("list").getByRole("link", { name: "Browser persistence", exact: true }).click();
   await page.getByText("Saved response 2", { exact: true }).waitFor();
   // Exercise a genuine EventSource reconnect without replacing app API routes.
   await context.setOffline(true);

@@ -301,7 +301,13 @@ func (s *Service) observeRecovery(ctx context.Context, c storage.Chat) {
 						if failure || runtimeFailure.Load() {
 							target, reason = storage.Failed, "The recovered response reports a provider or runtime failure. Inspect saved activity before sending new input."
 						}
-						if saveErr := s.transition(c.ID, c.ActiveMessageID, target, reason); saveErr == nil || errors.Is(saveErr, storage.ErrStale) {
+						var saveErr error
+						if target == storage.Idle {
+							saveErr = s.Store.CompleteTurn(ctx, c.ID, c.ActiveMessageID, reason)
+						} else {
+							saveErr = s.transition(c.ID, c.ActiveMessageID, target, reason)
+						}
+						if saveErr == nil || errors.Is(saveErr, storage.ErrStale) {
 							rt.client.CloseIdleConnections()
 							cancel()
 							return

@@ -26,4 +26,5 @@
 
 @layer base {
   body { @apply m-0 bg-background font-sans text-foreground antialiased; }
+  :where(a, button, input, select, textarea, summary, [tabindex="0"]):focus-visible { @apply outline-2 outline-offset-4 outline-foreground; }
 }
