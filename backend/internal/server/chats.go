@@ -52,6 +52,28 @@ func decodeChat(w http.ResponseWriter, r *http.Request, v any) bool {
 
 func (a *api) chatRoutes(mux *http.ServeMux) {
 	store := a.settings.Store
+	mux.HandleFunc("GET /api/notifications", func(w http.ResponseWriter, r *http.Request) {
+		var after *int64
+		if r.URL.Query().Has("after") {
+			cursor, err := strconv.ParseInt(r.URL.Query().Get("after"), 10, 64)
+			if err != nil || cursor < 0 {
+				failure(w, 400, "Invalid notification cursor.")
+				return
+			}
+			after = &cursor
+		}
+		events, cursor, err := store.Completions(r.Context(), after)
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		chats, err := store.Chats(r.Context())
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		jsonResponse(w, 200, map[string]any{"chats": chats, "completions": events, "cursor": cursor})
+	})
 	for _, action := range []string{"interrupt", "stop"} {
 		mux.HandleFunc("POST /api/chats/{id}/"+action, func(w http.ResponseWriter, r *http.Request) {
 			if a.chats == nil {

@@ -46,7 +46,7 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
         <details className="rounded-md border border-foreground/20 p-3">
           <summary className="cursor-pointer break-all text-sm"><span className="mr-2 font-mono">{f.status}</span>{f.repository && <span className="mr-2 text-muted-foreground">{f.repository}</span>}{f.previous && <>{f.previous} → </>}{f.path}{f.binary ? " · Binary" : f.undisplayable ? " · Cannot display contents" : ""}</summary>
           {f.truncated && <p className="mt-3 text-sm">Diff exceeds the configured inline limit ({f.bytes.toLocaleString()} bytes). <a className="underline underline-offset-4" href={`/api/chats/${encodeURIComponent(chatID)}/changes/${i}/diff?snapshot=${encodeURIComponent(snapshot.id)}`}>Download full diff</a></p>}
-          {f.diff && <pre className="mt-3 max-h-[32rem] overflow-auto whitespace-pre font-mono text-xs leading-5">{f.diff}</pre>}
+          {f.diff && <pre tabIndex={0} aria-label={`Diff for ${f.path}`} className="mt-3 max-h-[32rem] overflow-auto whitespace-pre font-mono text-xs leading-5">{f.diff}</pre>}
         </details>
       </li>)}</ul>
     </>}

@@ -20,6 +20,7 @@ try {
   await page.goto(origin);
   await page.getByLabel("Password", { exact: true }).fill("browser test password");
   await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await page.getByRole("button", { name: "Enable notification sound", exact: true }).click();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   await page.getByRole("combobox", { name: /^Project/ }).selectOption({ label: "Browser project" });
   await page.getByLabel("Chat title", { exact: true }).fill("Settings sound fixture");

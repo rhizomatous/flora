@@ -70,6 +70,11 @@ func TestRecoveryReconnectsWithoutSubmitting(t *testing.T) {
 			f.busy = false
 			f.mu.Unlock()
 			waitStatus(t, recovered, c.ID, storage.Idle)
+			after := int64(0)
+			completions, _, err := recovered.Store.Completions(ctx, &after)
+			if err != nil || len(completions) != 1 || completions[0].EventID != "completed:"+message.ID {
+				t.Fatal("recovered completion missing or duplicated", completions, err)
+			}
 			if f.prompts.Load() != 0 || f.sessions.Load() != 0 || p.starts.Load() != 0 {
 				t.Fatal("reconciliation mutated runtime execution")
 			}

@@ -515,12 +515,21 @@ func TestProviderFailureDoesNotPoisonNextTurn(t *testing.T) {
 	<-f.started
 	f.release <- true
 	waitStatus(t, s, c.ID, storage.Failed)
+	after := int64(0)
+	completions, _, err := s.Store.Completions(context.Background(), &after)
+	if err != nil || len(completions) != 0 {
+		t.Fatal("provider failure emitted completion", completions, err)
+	}
 	if _, err := s.Submit(context.Background(), c.ID, "second", "Try again"); err != nil {
 		t.Fatal(err)
 	}
 	<-f.started
 	f.release <- false
 	waitStatus(t, s, c.ID, storage.Idle)
+	completions, _, err = s.Store.Completions(context.Background(), &after)
+	if err != nil || len(completions) != 1 || completions[0].ChatID != c.ID {
+		t.Fatal("successful follow-up completion missing", completions, err)
+	}
 }
 
 func TestUncertainDeliveryNeverResends(t *testing.T) {

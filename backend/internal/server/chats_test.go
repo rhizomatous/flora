@@ -214,6 +214,7 @@ func TestChatAPIAuthenticationValidationAndReplay(t *testing.T) {
 		return b
 	}
 	for _, route := range []struct{ method, path string }{
+		{"GET", "/api/notifications"},
 		{"POST", "/api/chats/missing/interrupt"}, {"POST", "/api/chats/missing/stop"},
 		{"GET", "/api/chats"}, {"GET", "/api/chats/missing/setup-log"}, {"HEAD", "/api/chats/missing/setup-log"}, {"GET", "/api/chats/missing"}, {"GET", "/api/chats/missing/events"}, {"GET", "/api/chats/missing/questions"}, {"POST", "/api/projects/" + project.ID + "/chats"}, {"POST", "/api/chats/missing/messages"}, {"POST", "/api/chats/missing/questions/question/reply"},
 	} {

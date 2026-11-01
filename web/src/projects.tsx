@@ -16,9 +16,9 @@ function RepositoryFields({ repositories }: { repositories?: Repository[] }) {
       <label className="block text-sm font-medium">GitHub repository<input name="repository" className={control} defaultValue={repo.url} placeholder="owner/repository" required maxLength={300} /></label>
       <label className="block text-sm font-medium">Base branch<input name="baseBranch" className={control} defaultValue={repo.baseBranch} maxLength={255} placeholder="Repository default branch" /></label>
       <label className="block text-sm font-medium">Repository role<select aria-label="Repository role" name="role" className={control} defaultValue={repo.role}><option value="core">Core</option><option value="extra">Extra</option></select></label>
-      {rows.length > 1 && <button type="button" className="text-sm underline underline-offset-4" onClick={() => setRows(current => current.filter(row => row.key !== key))}>Remove repository {index + 1}</button>}
+      {rows.length > 1 && <button type="button" className="text-sm underline underline-offset-4" onClick={event => { const form = event.currentTarget.form; setRows(current => current.filter(row => row.key !== key)); requestAnimationFrame(() => form?.querySelector<HTMLButtonElement>("[data-add-repository]")?.focus()); }}>Remove repository {index + 1}</button>}
     </fieldset>)}
-    <button type="button" className="text-sm underline underline-offset-4" disabled={rows.length >= 100} onClick={() => { const key = nextKey.current++; setRows(current => [...current, { key, repo: { name: "", url: "", baseBranch: "", role: "core" } }]); }}>Add repository</button>
+    <button type="button" data-add-repository className="text-sm underline underline-offset-4" disabled={rows.length >= 100} onClick={event => { const form = event.currentTarget.form; const key = nextKey.current++; setRows(current => [...current, { key, repo: { name: "", url: "", baseBranch: "", role: "core" } }]); requestAnimationFrame(() => { const inputs = form?.querySelectorAll<HTMLInputElement>('input[name="repository"]'); inputs?.[inputs.length - 1]?.focus(); }); }}>Add repository</button>
   </div>;
 }
 

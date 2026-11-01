@@ -27,8 +27,11 @@ try {
     assert.match(await link.locator("..").textContent(), new RegExp(state));
   }
   await review.getByText(/Saved statuses may be out of date/).waitFor();
-  await review.locator("summary").filter({ hasText: "first/app" }).filter({ hasText: "src/hello.ts" }).click();
+  await review.locator("summary").filter({ hasText: "first/app" }).filter({ hasText: "src/hello.ts" }).focus();
+  await page.keyboard.press("Enter");
   await review.getByText(/hello review/).waitFor();
+  await review.getByLabel("Diff for src/hello.ts", { exact: true }).first().focus();
+  assert.equal(await review.getByLabel("Diff for src/hello.ts", { exact: true }).first().evaluate(el => el === document.activeElement), true);
   await review.locator("summary").filter({ hasText: "second/app" }).filter({ hasText: "src/hello.ts" }).click();
   await review.getByText(/second repository review/).waitFor();
   assert.equal(await review.getByRole("list", { name: "Repository bases" }).getByRole("listitem").count(), 2);

@@ -13,7 +13,9 @@ try {
   await page.goto(`${origin}/#projects/new`);
   await page.getByLabel("Project name", { exact: true }).fill("Collection");
   await page.getByLabel("GitHub repository", { exact: true }).fill("first/app");
-  await page.getByRole("button", { name: "Add repository", exact: true }).click();
+  await page.getByRole("button", { name: "Add repository", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => document.activeElement === document.querySelectorAll('input[name="repository"]')[1]);
   await page.getByLabel("GitHub repository", { exact: true }).nth(1).fill("second/app");
   await page.getByLabel("Base branch", { exact: true }).nth(1).fill("release");
   await page.getByRole("button", { name: "Add repository", exact: true }).click();
@@ -30,7 +32,9 @@ try {
   await page.getByRole("heading", { name: "Collection", exact: true }).waitFor();
   assert.deepEqual(await page.getByLabel("GitHub repository", { exact: true }).evaluateAll(inputs => inputs.map(input => input.value)), ["https://github.com/first/app.git", "https://github.com/second/app.git", "https://github.com/third/extra.git"]);
   assert.deepEqual(await page.getByLabel("Base branch", { exact: true }).evaluateAll(inputs => inputs.map(input => input.value)), ["main", "release", "next"]);
-  await page.getByRole("button", { name: "Remove repository 2", exact: true }).click();
+  await page.getByRole("button", { name: "Remove repository 2", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => document.activeElement?.hasAttribute("data-add-repository"));
   await page.getByRole("button", { name: "Add repository", exact: true }).click();
   await page.getByLabel("GitHub repository", { exact: true }).nth(2).fill("fourth/tools");
   await page.getByRole("button", { name: "Validate and save", exact: true }).click();

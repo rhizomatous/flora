@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { request, RequestError } from "./request";
 import { FlowerMark } from "@flora/florets";
 import { Changes } from "./changes";
+import type { Chat } from "./notifications";
 
-type Chat = { ID: string; ProjectID: string; Title: string; Status: "working" | "waiting" | "failed" | "idle" | "stopped"; StatusReason: string; UpdatedAt: string; ImageDigest: string; HarnessVersion: string; StartingCommits: Record<string, string> };
 type Part = { id?: string; type: string; text?: string; tool?: string; state?: { status: string; input?: unknown; output?: string; error?: string; title?: string } };
 type Message = { ID: string; Role: string; Text: string; Provider: string; Model: string; Payload: { parts?: Part[]; info?: { error?: unknown } } };
 type Activity = { ChatID: string; Sequence: number; Kind: string; CreatedAt: string; Payload: unknown };
@@ -29,9 +29,9 @@ function identity(scope: string, input: unknown) {
   return id;
 }
 
-export function Chats({ path, onExpired, messageBytes }: { path: string; onExpired: () => void; messageBytes: number }) {
+export function Chats({ path, onExpired, messageBytes, list, listError }: { path: string; onExpired: () => void; messageBytes: number; list: Chat[] | undefined; listError: string }) {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [list, setList] = useState<Chat[]>();
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [detail, setDetail] = useState<Detail>();
   const [activity, setActivity] = useState<Activity[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -54,13 +54,8 @@ export function Chats({ path, onExpired, messageBytes }: { path: string; onExpir
   useEffect(() => {
     let active = true;
     heading.current?.focus();
-    request<Project[]>("projects").then(p => { if (active) setProjects(p); }).catch(e => { if (active) report(e); });
-    if (!id) {
-      const load = () => request<Chat[]>("chats").then(c => { if (active) setList(c); }).catch(e => { if (active) report(e); });
-      load();
-      const timer = window.setInterval(load, 1000);
-      return () => { active = false; clearInterval(timer); };
-    }
+    request<Project[]>("projects").then(p => { if (active) { setProjects(p); setProjectsLoaded(true); } }).catch(e => { if (active) report(e); });
+    if (!id) return () => { active = false; };
     if (isNew) return () => { active = false; };
     let refreshing = false;
     let dirty = false;
@@ -154,10 +149,11 @@ export function Chats({ path, onExpired, messageBytes }: { path: string; onExpir
       const chats = list.filter(c => c.ProjectID === p.id);
       return chats.length > 0 && <section key={p.id} aria-labelledby={`project-${p.id}`}><h2 id={`project-${p.id}`} className="font-semibold"><a href={`#projects/${p.id}`} className={link}>{p.name}</a></h2><ul className="mt-3 divide-y divide-foreground/20">{chats.map(c => <li key={c.ID} className="flex flex-wrap items-start justify-between gap-3 py-4"><div className="min-w-0"><a href={`#chats/${c.ID}`} className={`${link} break-words font-medium`}>{c.Title}</a><p className="mt-1 text-sm text-muted-foreground">{statusName(c.Status)} · <time dateTime={c.UpdatedAt}>{new Date(c.UpdatedAt).toLocaleString()}</time></p></div><span className="max-w-md text-sm text-muted-foreground">{c.StatusReason}</span></li>)}</ul></section>;
     })}</div> : <p className="mt-8 text-sm text-muted-foreground">No chats yet. Start a chat in a connected project.</p>)}
-    {!id && !list && !error && <p role="status" className="mt-8">Loading…</p>}
+    {!id && !list && !error && !listError && <p role="status" className="mt-8">Loading…</p>}
     {isNew && <form onSubmit={send} className="mt-8 space-y-6">
       <label className="block text-sm font-medium">Project<select name="project" className={control} defaultValue={projectID} required disabled={busy}><option value="">Choose a project</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-      {!projects.length && <p className="text-sm"><a href="#projects/new" className={link}>Connect a project</a> before starting a chat.</p>}
+      {!projectsLoaded && !error && <p role="status" className="text-sm">Loading projects…</p>}
+      {projectsLoaded && !projects.length && <p className="text-sm"><a href="#projects/new" className={link}>Connect a project</a> before starting a chat.</p>}
       <label className="block text-sm font-medium">Chat title<input name="title" className={control} required maxLength={200} disabled={busy} /></label>
       <label className="block text-sm font-medium">Message<textarea name="text" className={`${control} min-h-40`} required disabled={busy} aria-describedby="message-limit" /></label>
       <p id="message-limit" className="text-sm text-muted-foreground">Up to {messageBytes.toLocaleString()} UTF-8 bytes. Checkout and setup run before Flora starts work.</p>

@@ -478,7 +478,7 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 			} else if providerFailure || runtimeFailure.Load() {
 				fail("The model provider or runtime reported an error. Check the saved response, provider key, model access, account quota and billing in installation settings. A rotated provider key applies only to new containers.")
 			} else {
-				_ = s.transition(chatID, message.ID, storage.Idle, "Turn completed; ready for a follow-up")
+				_ = s.Store.CompleteTurn(s.ctx, chatID, message.ID, "Turn completed; ready for a follow-up")
 			}
 			return
 		case <-ticker.C:
