@@ -1,0 +1,43 @@
+name: Release packaging check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # v34
+      - name: Build local fixture image and record its actual registry digest
+        run: |
+          set -euo pipefail
+          docker run -d --name flora-release-registry -p 127.0.0.1:51818:5000 registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+          docker build -t localhost:51818/flora-agent:fixture agent/image
+          docker push localhost:51818/flora-agent:fixture
+          image=$(docker inspect --format '{{index .RepoDigests 0}}' localhost:51818/flora-agent:fixture)
+          echo "FIXTURE_IMAGE=$image" >> "$GITHUB_ENV"
+      - name: Build both archived binaries
+        run: |
+          nix develop --command make deps web
+          nix develop --command bash scripts/package-release.sh v0.0.0-fixture "$FIXTURE_IMAGE"
+      - name: Check archive as a non-root service account with real Docker
+        run: sudo bash scripts/check-release-linux.sh dist/flora-v0.0.0-fixture-linux-${{ matrix.arch }}.tar.gz
+      - name: Remove only fixture registry
+        if: always()
+        run: docker rm -f flora-release-registry

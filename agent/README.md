@@ -44,7 +44,7 @@ container mounts. Only the public CA certificate is delivered to containers.
 
 Construct `githubbroker.NewAccess` with the broker, Docker client, private hostname,
 CA PEM, and optional commit author override, then pass it to `provisioning.New`.
-This is the provisioning checkout callback; browser chat startup is not wired yet.
+This is the provisioning checkout callback used by browser chat startup.
 It clones the initial core repository into `/workspace`, creates a chat branch,
 records the resolved starting SHA, and releases setup only after persistence
 succeeds. Checkout failure stops the container and retains bounded output in the

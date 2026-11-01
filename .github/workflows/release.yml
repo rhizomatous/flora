@@ -1,0 +1,57 @@
+name: Linux release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Validate explicit release tag
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]
+      - uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # v34
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Check source
+        run: nix develop --command make deps check smoke build-linux
+      - name: Publish matching multi-platform image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}-agent"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          docker buildx build --platform linux/amd64,linux/arm64 --push \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.version=$GITHUB_REF_NAME" \
+            --tag "$image:$GITHUB_REF_NAME" --metadata-file "$RUNNER_TEMP/flora-image-build.json" agent/image
+          digest=$(jq -er '."containerimage.digest" | select(test("^sha256:[a-f0-9]{64}$"))' "$RUNNER_TEMP/flora-image-build.json")
+          echo "RELEASE_IMAGE=$image@$digest" >> "$GITHUB_ENV"
+      - name: Package binaries with the published image identity
+        run: nix develop --command bash scripts/package-release.sh "$GITHUB_REF_NAME" "$RELEASE_IMAGE"
+      - name: Exercise archived amd64 binary on Linux
+        run: sudo bash scripts/check-release-linux.sh "dist/flora-$GITHUB_REF_NAME-linux-amd64.tar.gz"
+      - name: Publish release assets only after verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/SHA256SUMS \
+            --verify-tag --title "Flora $GITHUB_REF_NAME" \
+            --notes "Linux amd64 and arm64. See the installation guide in this tag. Agent: $RELEASE_IMAGE. OpenCode: 1.2.27. Existing-chat upgrades are not supported."

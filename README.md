@@ -13,6 +13,9 @@ and [product requirements](specs/PRD.md).
 
 ## Develop
 
+For a Linux service installation, see the [installation and operations guide](INSTALL.md).
+It covers release identities, private GitHub TLS/DNS, systemd, HTTPS, and offline recovery.
+
 Install [Nix](https://nixos.org/download/) with flakes and `nix-command` enabled.
 The committed `flake.lock` pins the development environment on Linux (x86-64 and
 ARM64) and macOS (ARM64): Go 1.26, Node.js 24 with npm, Make, Git, curl, jq, and
