@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { FlowerMark } from "@flora/florets";
 
 import { Changes } from "./changes";
 import type { Chat } from "./notifications";
-import { request, RequestError } from "./request";
+import { QuestionForm, type Question } from "./question";
+import { errorMessage, isExpired, request } from "./request";
+import { button, control, link, text } from "./ui";
 
 type Part = {
   id?: string;
@@ -30,31 +32,37 @@ type Activity = {
 };
 type Detail = { chat: Chat; messages: Message[]; continuationBlockedReason?: string };
 type Project = { id: string; name: string };
-type Question = {
-  id: string;
-  questions: {
-    question: string;
-    header: string;
-    multiple: boolean;
-    custom?: boolean;
-    options: { label: string; description: string }[];
-  }[];
-};
-const control =
-  "mt-2 w-full rounded-md border border-foreground/30 bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-foreground disabled:opacity-60";
-const button =
-  "rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50";
-const link = "underline underline-offset-4";
+
 const statusName = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+// Checks the fields the activity log depends on: Sequence deduplicates rows and Kind labels them.
+const isActivity = (value: unknown): value is Activity =>
+  typeof value === "object" &&
+  value !== null &&
+  "Sequence" in value &&
+  typeof value.Sequence === "number" &&
+  "Kind" in value &&
+  typeof value.Kind === "string";
+
+const requestKey = (scope: string) => `flora-request:${scope}`;
 
 // Keep the accepted identity across ambiguous responses and page reloads.
 // A changed input is a new request, never an edit to an accepted turn.
 function identity(scope: string, input: unknown) {
-  const key = `flora-request:${scope}`;
+  const key = requestKey(scope);
   const body = JSON.stringify(input);
   try {
-    const saved = JSON.parse(sessionStorage.getItem(key) || "null");
-    if (saved?.body === body) return saved.id as string;
+    const saved: unknown = JSON.parse(sessionStorage.getItem(key) ?? "null");
+    if (
+      typeof saved === "object" &&
+      saved !== null &&
+      "body" in saved &&
+      saved.body === body &&
+      "id" in saved &&
+      typeof saved.id === "string"
+    ) {
+      return saved.id;
+    }
   } catch {
     /* Invalid or unavailable session storage does not prevent sending. */
   }
@@ -65,6 +73,14 @@ function identity(scope: string, input: unknown) {
     /* Private browsing can disable storage. */
   }
   return id;
+}
+
+function forgetIdentity(scope: string) {
+  try {
+    sessionStorage.removeItem(requestKey(scope));
+  } catch {
+    /* Storage may be disabled. */
+  }
 }
 
 export function Chats({
@@ -80,8 +96,8 @@ export function Chats({
   list: Chat[] | undefined;
   listError: string;
 }) {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [projectsLoaded, setProjectsLoaded] = useState(false);
+  // Undefined until the project list loads.
+  const [projects, setProjects] = useState<Project[]>();
   const [detail, setDetail] = useState<Detail>();
   const [activity, setActivity] = useState<Activity[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -92,150 +108,162 @@ export function Chats({
   const submitting = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const id = path.startsWith("chats/") ? path.slice(6) : "";
-  const creating = id === "new";
-  const projectID = new URLSearchParams(path.split("?")[1]).get("project") || "";
-  const isNew = creating || id.startsWith("new?");
+  const isNew = id === "new" || id.startsWith("new?");
+  const projectID = new URLSearchParams(path.split("?")[1]).get("project") ?? "";
+  const chatPath = `chats/${encodeURIComponent(id)}`;
 
   function report(e: unknown) {
-    setError(e instanceof Error ? e.message : "Could not load chat.");
-    if (e instanceof RequestError && e.status === 401) onExpired();
+    setError(errorMessage(e, "Could not load chat."));
+    if (isExpired(e)) onExpired();
   }
+  const fail = useEffectEvent(report);
+  const expire = useEffectEvent(onExpired);
 
   useEffect(() => {
-    let active = true;
     heading.current?.focus();
-    request<Project[]>("projects")
-      .then((p) => {
-        if (active) {
-          setProjects(p);
-          setProjectsLoaded(true);
-        }
-      })
-      .catch((e) => {
-        if (active) report(e);
-      });
-    if (!id) {
-      return () => {
-        active = false;
-      };
-    }
-    if (isNew) {
-      return () => {
-        active = false;
-      };
-    }
-    let refreshing = false;
+    let active = true;
+    const load = async () => {
+      try {
+        const rows = await request<Project[]>("projects");
+        if (active) setProjects(rows);
+      } catch (e) {
+        if (active) fail(e);
+      }
+    };
+    void load();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (id === "" || isNew) return;
+    let active = true;
+    const base = `chats/${encodeURIComponent(id)}`;
+
+    // One detail load runs at a time. Refreshes requested meanwhile collapse into one more
+    // load, so the final state reflects every event seen so far.
+    let loading = false;
     let dirty = false;
     const refresh = async () => {
       dirty = true;
-      if (refreshing) return;
-      refreshing = true;
+      if (loading) return;
+      loading = true;
       try {
-        while (active && dirty) {
+        while (dirty) {
           dirty = false;
-          const d = await request<Detail>(`chats/${encodeURIComponent(id)}`);
-          if (active) setDetail(d);
+          // oxlint-disable-next-line no-await-in-loop -- Loads must run one after another so a stale response never overwrites a newer one.
+          const next = await request<Detail>(base);
+          if (!active) return;
+          setDetail(next);
         }
       } catch (e) {
-        if (active) report(e);
+        if (active) fail(e);
       } finally {
-        refreshing = false;
+        loading = false;
       }
     };
-    refresh();
-    const source = new EventSource(`/api/chats/${encodeURIComponent(id)}/events`);
-    source.onopen = () => {
-      if (active) setConnection("Live");
-    };
-    source.onerror = () => {
-      if (!active) return;
-      setConnection("Disconnected. Reconnecting to saved activity…");
-      request<{ authenticated: boolean }>("auth/status")
-        .then((s) => {
-          if (active && !s.authenticated) {
-            source.close();
-            onExpired();
-          }
-        })
-        .catch(() => {});
-    };
-    let debounce: ReturnType<typeof setTimeout> | undefined;
-    source.addEventListener("activity", (event) => {
-      if (!active) return;
+    void refresh();
+
+    const source = new EventSource(`/api/${base}/events`);
+    // EventSource reconnects on its own. A failure may mean the session ended, in which case
+    // retrying is pointless.
+    const checkSession = async () => {
       try {
-        const row: Activity = JSON.parse(event.data);
-        setActivity((rows) =>
-          rows.some((r) => r.Sequence === row.Sequence) ? rows : [...rows, row],
-        );
-        if (!debounce) {
-          debounce = setTimeout(() => {
-            debounce = undefined;
-            refresh();
-          }, 100);
+        const status = await request<{ authenticated: boolean }>("auth/status");
+        if (active && !status.authenticated) {
+          source.close();
+          expire();
         }
       } catch {
-        setError("Could not read saved activity. Reload to reconnect.");
-      }
-    });
-    const pollQuestions = async () => {
-      try {
-        const q = await request<Question[]>(`chats/${encodeURIComponent(id)}/questions`);
-        if (active) {
-          setQuestions(q);
-          setQuestionError("");
-        }
-      } catch (e) {
-        if (active) {
-          setQuestions([]);
-          setQuestionError("Live questions unavailable. Saved questions may no longer be pending.");
-          if (e instanceof RequestError && e.status === 401) onExpired();
-        }
+        /* The check is advisory. The EventSource keeps retrying. */
       }
     };
-    pollQuestions();
-    const timer = window.setInterval(pollQuestions, 1000);
+    // A burst of activity triggers one detail refresh 100 ms after its first event.
+    let debounce: ReturnType<typeof setTimeout> | undefined;
+    source.addEventListener("open", () => {
+      setConnection("Live");
+    });
+    source.addEventListener("error", () => {
+      setConnection("Disconnected. Reconnecting to saved activity…");
+      void checkSession();
+    });
+    source.addEventListener("activity", (event: MessageEvent<string>) => {
+      let row: unknown;
+      try {
+        row = JSON.parse(event.data);
+      } catch {
+        /* Reported below. */
+      }
+      if (!isActivity(row)) {
+        setError("Could not read saved activity. Reload to reconnect.");
+        return;
+      }
+      setActivity((rows) =>
+        rows.some((r) => r.Sequence === row.Sequence) ? rows : [...rows, row],
+      );
+      debounce ??= setTimeout(() => {
+        debounce = undefined;
+        void refresh();
+      }, 100);
+    });
+
+    const pollQuestions = async () => {
+      try {
+        const rows = await request<Question[]>(`${base}/questions`);
+        if (!active) return;
+        setQuestions(rows);
+        setQuestionError("");
+      } catch (e) {
+        if (!active) return;
+        setQuestions([]);
+        setQuestionError("Live questions unavailable. Saved questions may no longer be pending.");
+        if (isExpired(e)) expire();
+      }
+    };
+    void pollQuestions();
+    const timer = setInterval(() => {
+      void pollQuestions();
+    }, 1000);
+
     return () => {
       active = false;
       source.close();
       clearInterval(timer);
-      if (debounce) clearTimeout(debounce);
+      clearTimeout(debounce);
     };
   }, [id, isNew]);
 
-  async function send(event: FormEvent<HTMLFormElement>) {
+  async function send(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting.current) return;
     const form = event.currentTarget;
     const fields = new FormData(form);
-    const text = String(fields.get("text") || "");
-    if (!text.trim() || new TextEncoder().encode(text).length > messageBytes) {
+    const message = text(fields, "text");
+    if (message.trim() === "" || new TextEncoder().encode(message).length > messageBytes) {
       setError(`Enter a message of at most ${messageBytes.toLocaleString()} UTF-8 bytes.`);
       return;
     }
     submitting.current = true;
     setBusy(true);
     setError("");
+    const project = text(fields, "project");
+    const input = isNew ? { title: text(fields, "title"), text: message } : { text: message };
+    const scope = isNew ? `project:${project}` : `chat:${id}`;
     try {
-      const input = isNew ? { title: String(fields.get("title")), text } : { text };
-      const scope = isNew ? `project:${fields.get("project")}` : `chat:${id}`;
       const requestID = identity(scope, input);
       if (isNew) {
-        const c = await request<Chat>(
-          `projects/${encodeURIComponent(String(fields.get("project")))}/chats`,
-          "POST",
-          { ...input, requestID },
-        );
-        window.location.hash = `chats/${c.ID}`;
+        const chat = await request<Chat>(`projects/${encodeURIComponent(project)}/chats`, "POST", {
+          ...input,
+          requestID,
+        });
+        window.location.hash = `chats/${chat.ID}`;
       } else {
-        await request(`chats/${encodeURIComponent(id)}/messages`, "POST", { text, requestID });
+        await request(`${chatPath}/messages`, "POST", { text: message, requestID });
         form.reset();
-        setDetail(await request<Detail>(`chats/${encodeURIComponent(id)}`));
+        setDetail(await request<Detail>(chatPath));
       }
-      try {
-        sessionStorage.removeItem(`flora-request:${scope}`);
-      } catch {
-        /* Storage may be disabled. */
-      }
+      forgetIdentity(scope);
     } catch (e) {
       report(e);
     } finally {
@@ -250,22 +278,28 @@ export function Chats({
     setBusy(true);
     setError("");
     try {
-      await request(`chats/${encodeURIComponent(id)}/${action}`, "POST", {});
+      await request(`${chatPath}/${action}`, "POST", {});
       setQuestions([]);
     } catch (e) {
       report(e);
-    } finally {
-      try {
-        setDetail(await request<Detail>(`chats/${encodeURIComponent(id)}`));
-      } catch (e) {
-        report(e);
-      }
-      submitting.current = false;
-      setBusy(false);
     }
+    // Show the outcome whether or not the action succeeded.
+    try {
+      setDetail(await request<Detail>(chatPath));
+    } catch (e) {
+      report(e);
+    }
+    submitting.current = false;
+    setBusy(false);
   }
 
-  const activeTurn = detail?.chat.Status === "working" || detail?.chat.Status === "waiting";
+  function title() {
+    if (isNew) return "New chat";
+    if (id === "") return "Chats";
+    const saved = detail?.chat.Title ?? "";
+    return saved === "" ? "Chat" : saved;
+  }
+
   return (
     <section aria-labelledby="chats-heading" className="min-w-0">
       <div className="flex items-center justify-between gap-4">
@@ -275,74 +309,30 @@ export function Chats({
           tabIndex={-1}
           className="min-w-0 text-2xl font-semibold tracking-tight break-words"
         >
-          {isNew ? "New chat" : id ? detail?.chat.Title || "Chat" : "Chats"}
+          {title()}
         </h1>
-        <a className={`${link} shrink-0 text-sm`} href={id ? "#chats" : "#chats/new"}>
-          {id ? "All chats" : "New chat"}
+        <a className={`${link} shrink-0 text-sm`} href={id === "" ? "#chats/new" : "#chats"}>
+          {id === "" ? "New chat" : "All chats"}
         </a>
       </div>
-      {error && (
+      {error !== "" && (
         <p role="alert" className="mt-6 rounded-md border p-3 text-sm">
           {error}
         </p>
       )}
-      {!id &&
-        list &&
-        (list.length > 0 ? (
-          <div className="mt-8 space-y-8">
-            {projects.map((p) => {
-              const chats = list.filter((c) => c.ProjectID === p.id);
-              return (
-                chats.length > 0 && (
-                  <section key={p.id} aria-labelledby={`project-${p.id}`}>
-                    <h2 id={`project-${p.id}`} className="font-semibold">
-                      <a href={`#projects/${p.id}`} className={link}>
-                        {p.name}
-                      </a>
-                    </h2>
-                    <ul className="mt-3 divide-y divide-foreground/20">
-                      {chats.map((c) => (
-                        <li
-                          key={c.ID}
-                          className="flex flex-wrap items-start justify-between gap-3 py-4"
-                        >
-                          <div className="min-w-0">
-                            <a
-                              href={`#chats/${c.ID}`}
-                              className={`${link} font-medium break-words`}
-                            >
-                              {c.Title}
-                            </a>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              {statusName(c.Status)} ·{" "}
-                              <time dateTime={c.UpdatedAt}>
-                                {new Date(c.UpdatedAt).toLocaleString()}
-                              </time>
-                            </p>
-                          </div>
-                          <span className="max-w-md text-sm text-muted-foreground">
-                            {c.StatusReason}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                )
-              );
-            })}
-          </div>
-        ) : (
-          <p className="mt-8 text-sm text-muted-foreground">
-            No chats yet. Start a chat in a connected project.
-          </p>
-        ))}
-      {!id && !list && !error && !listError && (
+      {id === "" && list !== undefined && <ChatList list={list} projects={projects ?? []} />}
+      {id === "" && list === undefined && error === "" && listError === "" && (
         <p role="status" className="mt-8">
           Loading…
         </p>
       )}
       {isNew && (
-        <form onSubmit={send} className="mt-8 space-y-6">
+        <form
+          onSubmit={(event) => {
+            void send(event);
+          }}
+          className="mt-8 space-y-6"
+        >
           <label className="block text-sm font-medium">
             Project
             <select
@@ -353,19 +343,19 @@ export function Chats({
               disabled={busy}
             >
               <option value="">Choose a project</option>
-              {projects.map((p) => (
+              {projects?.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
               ))}
             </select>
           </label>
-          {!projectsLoaded && !error && (
+          {projects === undefined && error === "" && (
             <p role="status" className="text-sm">
               Loading projects…
             </p>
           )}
-          {projectsLoaded && projects.length === 0 && (
+          {projects?.length === 0 && (
             <p className="text-sm">
               <a href="#projects/new" className={link}>
                 Connect a project
@@ -391,97 +381,38 @@ export function Chats({
             Up to {messageBytes.toLocaleString()} UTF-8 bytes. Checkout and setup run before Flora
             starts work.
           </p>
-          <button className={button} disabled={busy || projects.length === 0}>
+          <button
+            type="submit"
+            className={button}
+            disabled={busy || projects === undefined || projects.length === 0}
+          >
             {busy ? "Starting…" : "Start chat"}
           </button>
         </form>
       )}
-      {id && !isNew && !detail && !error && (
+      {id !== "" && !isNew && detail === undefined && error === "" && (
         <p role="status" className="mt-8">
           Loading…
         </p>
       )}
       {detail && (
-        <>
-          <div
-            role="status"
-            className="mt-6 flex flex-wrap items-center gap-2 rounded-md border border-foreground/20 p-3 text-sm"
-          >
-            {detail.chat.Status === "working" && <FlowerMark />}
-            <strong>{statusName(detail.chat.Status)}</strong>
-            <span>{detail.chat.StatusReason}</span>
-          </div>
-          <p role="status" className="mt-2 text-xs text-muted-foreground">
-            {connection} · {projects.find((p) => p.id === detail.chat.ProjectID)?.name}
-          </p>
-          {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
-            <p role="note" className="mt-4 rounded-md border border-foreground/20 p-3 text-sm">
-              Some live activity could not be captured while Flora was disconnected from OpenCode.
-              Recovered message and tool snapshots are shown below. Transient output may be missing.
-              Reconnecting does not replay accepted messages or actions.
-            </p>
-          )}
-          {!detail.continuationBlockedReason && (
-            <div className="mt-4 flex flex-wrap gap-3" aria-label="Execution controls">
-              {activeTurn && (
-                <button
-                  type="button"
-                  className={button}
-                  disabled={busy}
-                  onClick={() => controlWork("interrupt")}
-                >
-                  Interrupt current work
-                </button>
-              )}
-              {detail.chat.Status !== "stopped" && (
-                <button
-                  type="button"
-                  className={button}
-                  disabled={busy}
-                  onClick={() => controlWork("stop")}
-                >
-                  Stop container
-                </button>
-              )}
-            </div>
-          )}
-          {!detail.continuationBlockedReason && (
-            <p className="mt-2 text-sm text-muted-foreground">
-              {detail.chat.Status === "stopped"
-                ? "Send a new message to restart this container with its saved workspace and conversation. Interrupted work is not replayed."
-                : "Interrupt keeps the container running. Stop frees container capacity. Both preserve saved work and conversation."}
-            </p>
-          )}
-          <ol aria-label="Conversation" className="mt-8 space-y-8">
-            {detail.messages.map((m) => (
-              <li key={m.ID} className="min-w-0 rounded-md border border-foreground/20 p-4">
-                <h2 className="text-sm font-semibold">
-                  {m.Role === "user" ? "You" : "Flora"}
-                  {m.Provider && (
-                    <span className="ml-2 font-normal break-all text-muted-foreground">
-                      {m.Provider}/{m.Model}
-                    </span>
-                  )}
-                </h2>
-                <div className="mt-3 space-y-4">
-                  {m.Payload.parts?.length ? (
-                    m.Payload.parts.map((p, i) => <MessagePart key={p.id || i} part={p} />)
-                  ) : (
-                    <pre className="font-sans text-sm leading-6 break-words whitespace-pre-wrap">
-                      {m.Text}
-                    </pre>
-                  )}
-                </div>
-                {m.Payload.info?.error != null && (
-                  <pre role="alert" className="mt-3 text-sm break-words whitespace-pre-wrap">
-                    {JSON.stringify(m.Payload.info.error, null, 2)}
-                  </pre>
-                )}
-              </li>
-            ))}
-          </ol>
-          <Changes key={id} chatID={id} onExpired={onExpired} />
-          {questionError && (
+        <ChatDetail
+          id={id}
+          detail={detail}
+          activity={activity}
+          connection={connection}
+          projectName={projects?.find((p) => p.id === detail.chat.ProjectID)?.name}
+          busy={busy}
+          messageBytes={messageBytes}
+          onExpired={onExpired}
+          onControl={(action) => {
+            void controlWork(action);
+          }}
+          onSend={(event) => {
+            void send(event);
+          }}
+        >
+          {questionError !== "" && (
             <p className="mt-6 text-sm" role="status">
               {questionError}
             </p>
@@ -497,84 +428,260 @@ export function Chats({
               }}
             />
           ))}
-          <form onSubmit={send} className="mt-8 space-y-4">
-            <label className="block text-sm font-medium">
-              Follow-up
-              <textarea
-                className={`${control} min-h-28`}
-                name="text"
-                required
-                disabled={busy || activeTurn || !!detail.continuationBlockedReason}
-                aria-describedby="followup-help"
-              />
-            </label>
-            <p id="followup-help" className="text-sm text-muted-foreground">
-              {detail.continuationBlockedReason
-                ? "Continuation is unavailable. Saved conversation and workspace files are retained."
-                : activeTurn
-                  ? "Wait for the current turn to finish or answer Flora’s question. Messages are not queued."
-                  : `Continue in the same workspace and conversation. Up to ${messageBytes.toLocaleString()} UTF-8 bytes.`}
-            </p>
-            <button
-              className={button}
-              disabled={busy || activeTurn || !!detail.continuationBlockedReason}
-            >
-              {detail.continuationBlockedReason
-                ? "Continuation unavailable"
-                : busy
-                  ? "Working…"
-                  : detail.chat.Status === "stopped"
-                    ? "Resume with new message"
-                    : "Send message"}
-            </button>
-          </form>
-          <details className="mt-10 rounded-md border border-foreground/20 p-4">
-            <summary className="cursor-pointer text-sm font-medium">
-              Full activity ({activity.length} saved events)
-            </summary>
-            <p className="mt-3 text-sm text-muted-foreground">
-              Setup activity contains bounded previews. After setup finishes,{" "}
-              <a className={link} href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>
-                download the full redacted setup log
-              </a>
-              . Any capture failure is shown in the final setup event.
-            </p>
-            <ol className="mt-4 space-y-3">
-              {activity.map((row) => (
-                <li key={row.Sequence}>
-                  <details>
-                    <summary className="cursor-pointer text-xs break-words">
-                      {row.Kind} ·{" "}
-                      <time dateTime={row.CreatedAt}>
-                        {new Date(row.CreatedAt).toLocaleTimeString()}
-                      </time>{" "}
-                      · #{row.Sequence}
-                    </summary>
-                    <pre className="mt-2 max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
-                      {JSON.stringify(row.Payload, null, 2)}
-                    </pre>
-                  </details>
-                </li>
-              ))}
-            </ol>
-          </details>
-          <details className="mt-4 rounded-md border border-foreground/20 p-4">
-            <summary className="cursor-pointer text-sm font-medium">Environment snapshot</summary>
-            <pre className="mt-3 overflow-auto text-xs break-all whitespace-pre-wrap">
-              {JSON.stringify(
-                {
-                  image: detail.chat.ImageDigest,
-                  OpenCode: detail.chat.HarnessVersion,
-                  startingCommits: detail.chat.StartingCommits,
-                },
-                null,
-                2,
-              )}
-            </pre>
-          </details>
-        </>
+        </ChatDetail>
       )}
     </section>
+  );
+}
+
+/** Lists chats grouped under their projects, in project order. */
+function ChatList({ list, projects }: { list: Chat[]; projects: Project[] }) {
+  if (list.length === 0) {
+    return (
+      <p className="mt-8 text-sm text-muted-foreground">
+        No chats yet. Start a chat in a connected project.
+      </p>
+    );
+  }
+  return (
+    <div className="mt-8 space-y-8">
+      {projects.map((p) => {
+        const chats = list.filter((c) => c.ProjectID === p.id);
+        return (
+          chats.length > 0 && (
+            <section key={p.id} aria-labelledby={`project-${p.id}`}>
+              <h2 id={`project-${p.id}`} className="font-semibold">
+                <a href={`#projects/${p.id}`} className={link}>
+                  {p.name}
+                </a>
+              </h2>
+              <ul className="mt-3 divide-y divide-foreground/20">
+                {chats.map((c) => (
+                  <li key={c.ID} className="flex flex-wrap items-start justify-between gap-3 py-4">
+                    <div className="min-w-0">
+                      <a href={`#chats/${c.ID}`} className={`${link} font-medium break-words`}>
+                        {c.Title}
+                      </a>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {statusName(c.Status)} ·{" "}
+                        <time dateTime={c.UpdatedAt}>{new Date(c.UpdatedAt).toLocaleString()}</time>
+                      </p>
+                    </div>
+                    <span className="max-w-md text-sm text-muted-foreground">{c.StatusReason}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )
+        );
+      })}
+    </div>
+  );
+}
+
+/** Shows one chat. `children` renders between the review of changes and the follow-up form. */
+function ChatDetail({
+  id,
+  detail,
+  activity,
+  connection,
+  projectName,
+  busy,
+  messageBytes,
+  onExpired,
+  onControl,
+  onSend,
+  children,
+}: {
+  id: string;
+  detail: Detail;
+  activity: Activity[];
+  connection: string;
+  projectName: string | undefined;
+  busy: boolean;
+  messageBytes: number;
+  onExpired: () => void;
+  onControl: (action: "interrupt" | "stop") => void;
+  onSend: (event: React.SubmitEvent<HTMLFormElement>) => void;
+  children: React.ReactNode;
+}) {
+  const { chat } = detail;
+  const activeTurn = chat.Status === "working" || chat.Status === "waiting";
+  const stopped = chat.Status === "stopped";
+  const blocked = (detail.continuationBlockedReason ?? "") !== "";
+
+  function followUpHelp() {
+    if (blocked) {
+      return "Continuation is unavailable. Saved conversation and workspace files are retained.";
+    }
+    if (activeTurn) {
+      return "Wait for the current turn to finish or answer Flora’s question. Messages are not queued.";
+    }
+    return `Continue in the same workspace and conversation. Up to ${messageBytes.toLocaleString()} UTF-8 bytes.`;
+  }
+
+  function sendLabel() {
+    if (blocked) return "Continuation unavailable";
+    if (busy) return "Working…";
+    return stopped ? "Resume with new message" : "Send message";
+  }
+
+  return (
+    <>
+      <div
+        role="status"
+        className="mt-6 flex flex-wrap items-center gap-2 rounded-md border border-foreground/20 p-3 text-sm"
+      >
+        {chat.Status === "working" && <FlowerMark />}
+        <strong>{statusName(chat.Status)}</strong>
+        <span>{chat.StatusReason}</span>
+      </div>
+      <p role="status" className="mt-2 text-xs text-muted-foreground">
+        {connection} · {projectName}
+      </p>
+      {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
+        <p role="note" className="mt-4 rounded-md border border-foreground/20 p-3 text-sm">
+          Some live activity could not be captured while Flora was disconnected from OpenCode.
+          Recovered message and tool snapshots are shown below. Transient output may be missing.
+          Reconnecting does not replay accepted messages or actions.
+        </p>
+      )}
+      {!blocked && (
+        <>
+          <div className="mt-4 flex flex-wrap gap-3" aria-label="Execution controls">
+            {activeTurn && (
+              <button
+                type="button"
+                className={button}
+                disabled={busy}
+                onClick={() => {
+                  onControl("interrupt");
+                }}
+              >
+                Interrupt current work
+              </button>
+            )}
+            {!stopped && (
+              <button
+                type="button"
+                className={button}
+                disabled={busy}
+                onClick={() => {
+                  onControl("stop");
+                }}
+              >
+                Stop container
+              </button>
+            )}
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {stopped
+              ? "Send a new message to restart this container with its saved workspace and conversation. Interrupted work is not replayed."
+              : "Interrupt keeps the container running. Stop frees container capacity. Both preserve saved work and conversation."}
+          </p>
+        </>
+      )}
+      <ol aria-label="Conversation" className="mt-8 space-y-8">
+        {detail.messages.map((m) => (
+          <ConversationMessage key={m.ID} message={m} />
+        ))}
+      </ol>
+      <Changes key={id} chatID={id} onExpired={onExpired} />
+      {children}
+      <form onSubmit={onSend} className="mt-8 space-y-4">
+        <label className="block text-sm font-medium">
+          Follow-up
+          <textarea
+            className={`${control} min-h-28`}
+            name="text"
+            required
+            disabled={busy || activeTurn || blocked}
+            aria-describedby="followup-help"
+          />
+        </label>
+        <p id="followup-help" className="text-sm text-muted-foreground">
+          {followUpHelp()}
+        </p>
+        <button type="submit" className={button} disabled={busy || activeTurn || blocked}>
+          {sendLabel()}
+        </button>
+      </form>
+      <details className="mt-10 rounded-md border border-foreground/20 p-4">
+        <summary className="cursor-pointer text-sm font-medium">
+          Full activity ({activity.length} saved events)
+        </summary>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Setup activity contains bounded previews. After setup finishes,{" "}
+          <a className={link} href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>
+            download the full redacted setup log
+          </a>
+          . Any capture failure is shown in the final setup event.
+        </p>
+        <ol className="mt-4 space-y-3">
+          {activity.map((row) => (
+            <li key={row.Sequence}>
+              <details>
+                <summary className="cursor-pointer text-xs break-words">
+                  {row.Kind} ·{" "}
+                  <time dateTime={row.CreatedAt}>
+                    {new Date(row.CreatedAt).toLocaleTimeString()}
+                  </time>{" "}
+                  · #{row.Sequence}
+                </summary>
+                <pre className="mt-2 max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
+                  {JSON.stringify(row.Payload, null, 2)}
+                </pre>
+              </details>
+            </li>
+          ))}
+        </ol>
+      </details>
+      <details className="mt-4 rounded-md border border-foreground/20 p-4">
+        <summary className="cursor-pointer text-sm font-medium">Environment snapshot</summary>
+        <pre className="mt-3 overflow-auto text-xs break-all whitespace-pre-wrap">
+          {JSON.stringify(
+            {
+              image: chat.ImageDigest,
+              OpenCode: chat.HarnessVersion,
+              startingCommits: chat.StartingCommits,
+            },
+            null,
+            2,
+          )}
+        </pre>
+      </details>
+    </>
+  );
+}
+
+function ConversationMessage({ message: m }: { message: Message }) {
+  const parts = m.Payload.parts ?? [];
+  const failure = m.Payload.info?.error ?? null;
+  return (
+    <li className="min-w-0 rounded-md border border-foreground/20 p-4">
+      <h2 className="text-sm font-semibold">
+        {m.Role === "user" ? "You" : "Flora"}
+        {m.Provider !== "" && (
+          <span className="ml-2 font-normal break-all text-muted-foreground">
+            {m.Provider}/{m.Model}
+          </span>
+        )}
+      </h2>
+      <div className="mt-3 space-y-4">
+        {parts.length > 0 ? (
+          parts.map((p, i) => <MessagePart key={p.id ?? i} part={p} />)
+        ) : (
+          <pre className="font-sans text-sm leading-6 break-words whitespace-pre-wrap">
+            {m.Text}
+          </pre>
+        )}
+      </div>
+      {failure !== null && (
+        <pre role="alert" className="mt-3 text-sm break-words whitespace-pre-wrap">
+          {JSON.stringify(failure, null, 2)}
+        </pre>
+      )}
+    </li>
   );
 }
 
@@ -593,6 +700,8 @@ function MessagePart({ part: p }: { part: Part }) {
     );
   }
   if (p.type === "tool") {
+    const output = p.state?.output ?? "";
+    const error = p.state?.error ?? "";
     return (
       <details open className="rounded-md border border-foreground/20 p-3">
         <summary className="cursor-pointer text-sm font-medium break-words">
@@ -601,14 +710,14 @@ function MessagePart({ part: p }: { part: Part }) {
         <pre className="mt-3 overflow-auto text-xs break-words whitespace-pre-wrap">
           {JSON.stringify(p.state?.input, null, 2)}
         </pre>
-        {p.state?.output && (
+        {output !== "" && (
           <pre className="mt-3 max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
-            {p.state.output}
+            {output}
           </pre>
         )}
-        {p.state?.error && (
+        {error !== "" && (
           <pre role="alert" className="mt-3 text-xs break-words whitespace-pre-wrap">
-            {p.state.error}
+            {error}
           </pre>
         )}
       </details>
@@ -621,79 +730,5 @@ function MessagePart({ part: p }: { part: Part }) {
         {JSON.stringify(p, null, 2)}
       </pre>
     </details>
-  );
-}
-
-function QuestionForm({
-  question: q,
-  chatID,
-  onError,
-  onAnswered,
-}: {
-  question: Question;
-  chatID: string;
-  onError: (e: unknown) => void;
-  onAnswered: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  async function answer(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (busy) return;
-    const fields = new FormData(e.currentTarget);
-    const answers = q.questions.map((_, i) => {
-      const custom = String(fields.get(`custom-${i}`) || "").trim();
-      return custom ? [custom] : fields.getAll(`option-${i}`).map(String);
-    });
-    if (answers.some((a) => a.length === 0)) {
-      onError(new Error("Answer each question before continuing."));
-      return;
-    }
-    setBusy(true);
-    try {
-      await request(
-        `chats/${encodeURIComponent(chatID)}/questions/${encodeURIComponent(q.id)}/reply`,
-        "POST",
-        { answers },
-      );
-      onAnswered();
-    } catch (e) {
-      onError(e);
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <form onSubmit={answer} className="mt-8 space-y-5 rounded-md border p-4">
-      <h2 className="font-semibold">Flora needs your answer</h2>
-      {q.questions.map((question, i) => (
-        <fieldset key={i} disabled={busy} className="space-y-3">
-          <legend className="mb-3 text-sm font-medium">
-            {question.header}: {question.question}
-          </legend>
-          {question.options.map((option) => (
-            <label key={option.label} className="flex gap-3 text-sm">
-              <input
-                type={question.multiple ? "checkbox" : "radio"}
-                name={`option-${i}`}
-                value={option.label}
-              />
-              <span>
-                {option.label}
-                <span className="block text-muted-foreground">{option.description}</span>
-              </span>
-            </label>
-          ))}
-          {question.custom !== false && (
-            <label className="block text-sm">
-              Other answer (replaces selected options)
-              <input name={`custom-${i}`} className={control} maxLength={8192} />
-            </label>
-          )}
-        </fieldset>
-      ))}
-      <button className={button} disabled={busy}>
-        {busy ? "Answering…" : "Answer and continue"}
-      </button>
-    </form>
   );
 }

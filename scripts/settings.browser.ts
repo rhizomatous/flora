@@ -2,15 +2,16 @@ import assert from "node:assert/strict";
 
 import { chromium } from "@playwright/test";
 
+import { assertFitsPhone, logIn, pageErrors } from "./browser.ts";
+
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ ignoreHTTPSErrors: true });
-  const errors = [];
-  page.on("pageerror", (error) => errors.push(error.message));
+  const errors = pageErrors(page);
   await page.addInitScript(() => {
     window.tones = 0;
-    window.AudioContext = class {
-      state = "running";
+    class FakeAudioContext {
+      state: AudioContextState = "running";
       currentTime = 0;
       destination = {};
       resume() {
@@ -23,6 +24,8 @@ try {
         return {
           frequency: {},
           connect() {},
+          disconnect() {},
+          addEventListener() {},
           start() {
             window.tones++;
           },
@@ -30,14 +33,18 @@ try {
         };
       }
       createGain() {
-        return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} };
+        return {
+          gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+          connect() {},
+          disconnect() {},
+        };
       }
-    };
+    }
+    // The fake implements only the members the app's completion sound uses.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Intentional partial fake of a DOM class.
+    window.AudioContext = FakeAudioContext as unknown as typeof AudioContext;
   });
-  const origin = process.env.FLORA_BROWSER_URL;
-  await page.goto(origin);
-  await page.getByLabel("Password", { exact: true }).fill("browser test password");
-  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await logIn(page);
   await page.getByRole("button", { name: "Enable notification sound", exact: true }).click();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   await page.getByRole("combobox", { name: /^Project/ }).selectOption({ label: "Browser project" });
@@ -70,7 +77,7 @@ try {
   await page
     .getByRole("heading", { name: "Installation settings", exact: true })
     .waitFor()
-    .catch(async (error) => {
+    .catch(async (error: unknown) => {
       console.error(page.url(), errors, await page.locator("body").innerText());
       throw error;
     });
@@ -123,8 +130,7 @@ try {
     await page.getByLabel("Play a sound when a chat finishes work", { exact: true }).isChecked(),
     false,
   );
-  await page.setViewportSize({ width: 375, height: 812 });
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await assertFitsPhone(page);
   assert.deepEqual(errors, []);
   console.log(
     "Chromium: real settings API, fixed model, atomic rejected rotation, blank secret preservation, saved limits after reload, effective message bound, safe dependency failures, enabled/disabled completion sound, no sound for interruption, and mobile width passed.",

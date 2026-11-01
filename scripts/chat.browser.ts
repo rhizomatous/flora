@@ -2,15 +2,14 @@ import assert from "node:assert/strict";
 
 import { chromium } from "@playwright/test";
 
+import { assertFitsPhone, logIn, pageErrors } from "./browser.ts";
+
 const browser = await chromium.launch();
 try {
   const context = await browser.newContext({ ignoreHTTPSErrors: true });
   const page = await context.newPage();
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto(process.env.FLORA_BROWSER_URL);
-  await page.getByLabel("Password", { exact: true }).fill("browser test password");
-  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  const errors = pageErrors(page);
+  await logIn(page);
   await page
     .getByRole("navigation", { name: "Main" })
     .getByRole("link", { name: "Chats", exact: true })
@@ -92,11 +91,7 @@ try {
       .count(),
     1,
   );
-  await page.setViewportSize({ width: 375, height: 812 });
-  assert.equal(
-    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-    true,
-  );
+  await assertFitsPhone(page);
   await page.getByRole("link", { name: "All chats", exact: true }).click();
   await page.getByRole("link", { name: "Missing container", exact: true }).click();
   await page.getByRole("button", { name: "Continuation unavailable", exact: true }).waitFor();

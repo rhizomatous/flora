@@ -121,6 +121,14 @@
         "no-bitwise": "off",
         "no-console": "off",
         "no-empty-function": "off",
+        "typescript/no-floating-promises": [
+          "error",
+          {
+            "allowForKnownSafeCalls": [
+              { "from": "package", "name": "test", "package": "node:test" }
+            ]
+          }
+        ],
         "unicorn/prefer-dom-node-text-content": "off"
       }
     }

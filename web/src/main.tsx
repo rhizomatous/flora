@@ -1,31 +1,87 @@
-import { StrictMode, useEffect, useRef, useState, type FormEvent } from "react";
+import { StrictMode, useEffect, useEffectEvent, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import { FlowerMark } from "@flora/florets";
 
 import { Chats } from "./chats";
-import { CompletionToasts, useNotifications } from "./notifications";
+import { Installation, type Settings } from "./installation";
+import { useNotifications } from "./notifications";
 import { Projects } from "./projects";
-import { request } from "./request";
-import { PreferenceFields, readPreferences, type Preferences } from "./settings";
+import { errorMessage, request } from "./request";
+import { CompletionToasts } from "./toasts";
+import { button, control, link, text } from "./ui";
 
 import "@flora/florets/styles.css";
 
 type Status = { setupRequired: boolean; authenticated: boolean };
-type Settings = {
-  provider: string;
-  model: string;
-  githubConfigured: boolean;
-  providerConfigured: boolean;
-  preferences: Preferences;
-  maxRunningOverride?: number;
-};
-type Diagnostic = { name: string; ok: boolean; message: string };
 
-const control =
-  "mt-2 w-full rounded-md border border-foreground/30 bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-foreground disabled:opacity-60";
-const button =
-  "rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50";
+const currentPath = () => window.location.hash.slice(1) || "chats";
+
+/** Creates the administrator on first run, otherwise logs in. */
+function Account({
+  setupRequired,
+  busy,
+  run,
+  onLogin,
+}: {
+  setupRequired: boolean;
+  busy: boolean;
+  run: (task: () => Promise<void>, fallback: string) => Promise<void>;
+  onLogin: () => Promise<void>;
+}) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.focus();
+  }, []);
+  const action = setupRequired ? "Create administrator" : "Log in";
+
+  function submit(event: React.SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const password = text(new FormData(form), "password");
+    void run(async () => {
+      await request(`auth/${setupRequired ? "bootstrap" : "login"}`, "POST", { password });
+      form.reset();
+      await onLogin();
+    }, "Request failed. Try again.");
+  }
+
+  return (
+    <section aria-labelledby="account-heading">
+      <h1
+        ref={heading}
+        tabIndex={-1}
+        id="account-heading"
+        className="text-2xl font-semibold tracking-tight"
+      >
+        {action}
+      </h1>
+      <p className="mt-3 text-sm leading-6 text-muted-foreground">
+        {setupRequired
+          ? "Create the single administrator account for this installation. Use a unique password of at least 12 characters."
+          : "Enter your administrator password. Sessions expire at the absolute lifetime set by the administrator."}
+      </p>
+      <form className="mt-8 space-y-6" onSubmit={submit}>
+        <label className="block text-sm font-medium">
+          Password
+          <input
+            className={control}
+            type="password"
+            name="password"
+            autoComplete={setupRequired ? "new-password" : "current-password"}
+            minLength={setupRequired ? 12 : undefined}
+            maxLength={1024}
+            required
+            disabled={busy}
+          />
+        </label>
+        <button type="submit" className={button} disabled={busy}>
+          {busy ? "Please wait…" : action}
+        </button>
+      </form>
+    </section>
+  );
+}
 
 function App() {
   const [status, setStatus] = useState<Status>();
@@ -33,20 +89,27 @@ function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>();
-  const notifications = useNotifications(
-    !!status?.authenticated && !!settings,
-    !!settings?.preferences.sound,
-    () => {
-      request<Status>("auth/status")
-        .then(setStatus)
-        .catch(() => {});
-    },
-  );
-  const [path, setPath] = useState(window.location.hash.slice(1) || "chats");
+  const [path, setPath] = useState(currentPath);
+  const ready = status?.authenticated === true && settings !== undefined;
+
+  // Re-reads the session so an expired one shows the login screen. A failure here keeps the
+  // current view; the action that prompted the check has already reported its own error.
+  async function recheckSession() {
+    try {
+      setStatus(await request<Status>("auth/status"));
+    } catch {
+      // Keep the last known status.
+    }
+  }
+  function onExpired() {
+    void recheckSession();
+  }
+
+  const notifications = useNotifications(ready, settings?.preferences.sound === true, onExpired);
+
   useEffect(() => {
     const changed = () => {
-      setPath(window.location.hash.slice(1) || "chats");
+      setPath(currentPath());
       setError("");
       setNotice("");
     };
@@ -55,81 +118,51 @@ function App() {
       window.removeEventListener("hashchange", changed);
     };
   }, []);
-  const heading = useRef<HTMLHeadingElement>(null);
-  const screen = status
-    ? status.authenticated
-      ? settings
-        ? path
-        : "loading"
-      : status.setupRequired
-        ? "setup"
-        : "login"
-    : "loading";
-
-  useEffect(() => {
-    heading.current?.focus();
-  }, [screen]);
 
   async function refresh() {
     const next = await request<Status>("auth/status");
     setStatus(next);
     setSettings(next.authenticated ? await request<Settings>("settings") : undefined);
   }
+  async function load() {
+    try {
+      await refresh();
+    } catch (e) {
+      setError(errorMessage(e, "Could not load Flora."));
+    }
+  }
+  const loadOnMount = useEffectEvent(load);
   useEffect(() => {
-    refresh().catch((e) => {
-      setError(e.message);
-    });
+    // oxlint-disable-next-line react/set-state-in-effect -- load sets state only after awaiting the request.
+    void loadOnMount();
   }, []);
 
-  async function submit(event: FormEvent<HTMLFormElement>, action: "password" | "settings") {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const fields = new FormData(form);
+  // Runs a user action with the busy flag set. On failure it shows the error and rechecks the
+  // session, so an expired one shows login. Unsaved settings are cleared on unmount.
+  async function run(task: () => Promise<void>, fallback: string) {
     setBusy(true);
     setError("");
     setNotice("");
     try {
-      if (action === "password") {
-        await request(`auth/${status?.setupRequired ? "bootstrap" : "login"}`, "POST", {
-          password: fields.get("password"),
-        });
-        form.reset();
-        await refresh();
-      } else {
-        const next = await request<Settings>("settings", "PUT", {
-          provider: fields.get("provider") || "",
-          model: fields.get("model") || "",
-          githubToken: fields.get("githubToken"),
-          providerKey: fields.get("providerKey"),
-          preferences: readPreferences(fields),
-        });
-        setSettings(next);
-        form.reset();
-        setNotice("Settings saved. Credentials are not shown.");
-      }
+      await task();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Request failed. Try again.");
-      // Show login after session expiry. Unsaved settings are cleared on unmount.
-      request<Status>("auth/status")
-        .then(setStatus)
-        .catch(() => {});
+      setError(errorMessage(e, fallback));
+      await recheckSession();
     } finally {
       setBusy(false);
     }
   }
 
-  async function logout() {
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
+  function logout() {
+    void run(async () => {
       await request("auth/logout", "POST");
       await refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Logout failed. Try again.");
-    } finally {
-      setBusy(false);
-    }
+    }, "Logout failed. Try again.");
+  }
+
+  function saved(next: Settings) {
+    setSettings(next);
+    setNotice("Settings saved. Credentials are not shown.");
   }
 
   return (
@@ -139,7 +172,7 @@ function App() {
           <FlowerMark />
           <span>Flora</span>
         </div>
-        {status?.authenticated && (
+        {status?.authenticated === true && (
           <button
             type="button"
             className="text-sm text-muted-foreground underline underline-offset-4"
@@ -150,44 +183,44 @@ function App() {
           </button>
         )}
       </header>
-      {status?.authenticated && (
+      {status?.authenticated === true && (
         <nav aria-label="Main" className="mb-8 flex flex-wrap gap-6 text-sm">
           <a
             href="#chats"
             aria-current={path.startsWith("chats") ? "page" : undefined}
-            className="underline underline-offset-4"
+            className={link}
           >
             Chats
           </a>
           <a
             href="#projects"
             aria-current={path.startsWith("projects") ? "page" : undefined}
-            className="underline underline-offset-4"
+            className={link}
           >
             Projects
           </a>
           <a
             href="#settings"
             aria-current={path === "settings" ? "page" : undefined}
-            className="underline underline-offset-4"
+            className={link}
           >
             Installation settings
           </a>
         </nav>
       )}
-      {error && (
+      {error !== "" && (
         <p role="alert" className="mb-6 rounded-md border border-foreground/50 p-3 text-sm">
           {error}
         </p>
       )}
-      {notice && (
+      {notice !== "" && (
         <p role="status" className="mb-6 rounded-md border p-3 text-sm">
           {notice}
         </p>
       )}
-      {status?.authenticated && settings && (
+      {ready && (
         <>
-          {notifications.error && (
+          {notifications.error !== "" && (
             <p role="status" className="mb-6 rounded-md border p-3 text-sm">
               {notifications.error}
             </p>
@@ -196,8 +229,10 @@ function App() {
             <div className="mb-6 text-sm">
               <button
                 type="button"
-                className="underline underline-offset-4"
-                onClick={notifications.audio.enable}
+                className={link}
+                onClick={() => {
+                  void notifications.audio.enable();
+                }}
               >
                 {notifications.audio.ready
                   ? "Sound enabled for this page"
@@ -215,62 +250,36 @@ function App() {
           <CompletionToasts toasts={notifications.toasts} dismiss={notifications.dismiss} />
         </>
       )}
-      {(!status || (status.authenticated && !settings)) &&
-        (error ? (
+      {(status === undefined || (status.authenticated && settings === undefined)) &&
+        (error === "" ? (
+          <p role="status" className="text-muted-foreground">
+            Loading…
+          </p>
+        ) : (
           <button
             type="button"
             className={button}
             onClick={() => {
               setError("");
-              refresh().catch((e) => {
-                setError(e.message);
-              });
+              void load();
             }}
           >
             Retry loading Flora
           </button>
-        ) : (
-          <p role="status" className="text-muted-foreground">
-            Loading…
-          </p>
         ))}
-      {status && !status.authenticated && (
-        <section aria-labelledby="account-heading">
-          <h1
-            ref={heading}
-            tabIndex={-1}
-            id="account-heading"
-            className="text-2xl font-semibold tracking-tight"
-          >
-            {status.setupRequired ? "Create administrator" : "Log in"}
-          </h1>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            {status.setupRequired
-              ? "Create the single administrator account for this installation. Use a unique password of at least 12 characters."
-              : "Enter your administrator password. Sessions expire at the absolute lifetime set by the administrator."}
-          </p>
-          <form className="mt-8 space-y-6" onSubmit={(e) => submit(e, "password")}>
-            <label className="block text-sm font-medium">
-              Password
-              <input
-                className={control}
-                type="password"
-                name="password"
-                autoComplete={status.setupRequired ? "new-password" : "current-password"}
-                minLength={status.setupRequired ? 12 : undefined}
-                maxLength={1024}
-                required
-                disabled={busy}
-              />
-            </label>
-            <button className={button} disabled={busy}>
-              {busy ? "Please wait…" : status.setupRequired ? "Create administrator" : "Log in"}
-            </button>
-          </form>
-        </section>
+      {status?.authenticated === false && (
+        <Account
+          key={String(status.setupRequired)}
+          setupRequired={status.setupRequired}
+          busy={busy}
+          run={run}
+          onLogin={refresh}
+        />
       )}
-      {status?.authenticated &&
-        settings &&
+      {ready && path === "settings" && (
+        <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
+      )}
+      {ready &&
         path !== "settings" &&
         (path.startsWith("chats") ? (
           <Chats
@@ -279,169 +288,18 @@ function App() {
             list={notifications.chats}
             listError={notifications.error}
             messageBytes={settings.preferences.messageBytes}
-            onExpired={() => {
-              request<Status>("auth/status")
-                .then(setStatus)
-                .catch(() => {});
-            }}
+            onExpired={onExpired}
           />
         ) : (
-          <Projects
-            key={path}
-            path={path}
-            onExpired={() => {
-              request<Status>("auth/status")
-                .then(setStatus)
-                .catch(() => {});
-            }}
-          />
+          <Projects key={path} path={path} onExpired={onExpired} />
         ))}
-      {status?.authenticated && settings && path === "settings" && (
-        <section aria-labelledby="settings-heading">
-          <h1
-            ref={heading}
-            tabIndex={-1}
-            id="settings-heading"
-            className="text-2xl font-semibold tracking-tight"
-          >
-            Installation settings
-          </h1>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Choose one hosted provider and model for all chats. Once saved, the provider and model
-            cannot be changed.
-          </p>
-          <form className="mt-8 space-y-6" onSubmit={(e) => submit(e, "settings")}>
-            <fieldset disabled={busy} className="space-y-6">
-              <legend className="mb-4 text-base font-semibold">GitHub</legend>
-              <label className="block text-sm font-medium">
-                Fine-grained personal access token
-                <input
-                  className={control}
-                  type="password"
-                  name="githubToken"
-                  autoComplete="off"
-                  required={!settings.githubConfigured}
-                  maxLength={4096}
-                  aria-describedby="github-help"
-                />
-              </label>
-              <p id="github-help" className="text-sm leading-6 text-muted-foreground">
-                Restrict the token to the repositories Flora will use.{" "}
-                {settings.githubConfigured
-                  ? "A token is saved. Leave blank to keep it."
-                  : "No token saved."}
-              </p>
-            </fieldset>
-            <fieldset disabled={busy} className="space-y-6 border-t border-foreground/20 pt-6">
-              <legend className="text-base font-semibold">Model provider</legend>
-              <label className="block text-sm font-medium">
-                Hosted provider
-                <select
-                  key={settings.provider}
-                  aria-label="Hosted provider"
-                  className={control}
-                  name="provider"
-                  defaultValue={settings.provider || "openai"}
-                  disabled={!!settings.provider}
-                >
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic</option>
-                  <option value="google">Google</option>
-                </select>
-              </label>
-              <label className="block text-sm font-medium">
-                Model ID
-                <input
-                  key={settings.model}
-                  className={control}
-                  name="model"
-                  defaultValue={settings.model}
-                  required
-                  maxLength={200}
-                  disabled={!!settings.model}
-                  placeholder="Exact model ID from your provider"
-                />
-              </label>
-              <label className="block text-sm font-medium">
-                Provider API key
-                <input
-                  className={control}
-                  type="password"
-                  name="providerKey"
-                  autoComplete="off"
-                  required={!settings.providerConfigured}
-                  maxLength={4096}
-                  aria-describedby="provider-help"
-                />
-              </label>
-              <p id="provider-help" className="text-sm leading-6 text-muted-foreground">
-                {settings.providerConfigured
-                  ? "An API key is saved. Leave blank to keep it."
-                  : "No API key saved."}{" "}
-                Saved credentials are never displayed.
-              </p>
-            </fieldset>
-            <PreferenceFields
-              value={settings.preferences}
-              control={control}
-              busy={busy}
-              override={settings.maxRunningOverride}
-            />
-            <button className={button} disabled={busy}>
-              {busy ? "Saving…" : "Validate and save"}
-            </button>
-          </form>
-          <section
-            className="mt-10 space-y-4 border-t border-foreground/20 pt-6"
-            aria-labelledby="diagnostics-heading"
-          >
-            <h2 id="diagnostics-heading" className="font-semibold">
-              Dependency checks
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Checks storage, Docker, the agent image and credential metadata. No model generation,
-              image pull or GitHub write is performed. Provider keys reach only new containers;
-              running and restarted containers keep their original key. GitHub rotation applies to
-              future broker requests.
-            </p>
-            <button
-              type="button"
-              className={button}
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                setError("");
-                try {
-                  setDiagnostics(await request<Diagnostic[]>("settings/diagnostics", "POST", {}));
-                } catch (e) {
-                  setError(e instanceof Error ? e.message : "Dependency check failed.");
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              Check dependencies
-            </button>
-            {diagnostics && (
-              <ul aria-live="polite" className="space-y-3 text-sm">
-                {diagnostics.map((d) => (
-                  <li key={d.name}>
-                    <strong>
-                      {d.name}: {d.ok ? "OK" : "Needs attention"}
-                    </strong>
-                    <p className="mt-1 text-muted-foreground">{d.message}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </section>
-      )}
     </main>
   );
 }
 
-createRoot(document.querySelector("#root")!).render(
+const root = document.querySelector("#root");
+if (root === null) throw new Error("Flora cannot start: index.html has no #root element.");
+createRoot(root).render(
   <StrictMode>
     <App />
   </StrictMode>,

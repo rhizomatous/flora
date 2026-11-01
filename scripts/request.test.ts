@@ -4,13 +4,14 @@ import { test } from "node:test";
 import { request, RequestError } from "../web/src/request.ts";
 
 test("API requests preserve method, credentials, and JSON body", async (t) => {
-  t.mock.method(globalThis, "fetch", async (url, options) => {
+  t.mock.method(globalThis, "fetch", (url: RequestInfo | URL, init?: RequestInit) => {
     assert.equal(url, "/api/auth/login");
-    assert.equal(options.method, "POST");
-    assert.equal(options.credentials, "same-origin");
-    assert.equal(options.headers["Content-Type"], "application/json");
-    assert.deepEqual(JSON.parse(options.body), { password: "test-password" });
-    return Response.json({ authenticated: true });
+    assert.equal(init?.method, "POST");
+    assert.equal(init.credentials, "same-origin");
+    assert.equal(new Headers(init.headers).get("Content-Type"), "application/json");
+    assert.ok(typeof init.body === "string");
+    assert.deepEqual(JSON.parse(init.body), { password: "test-password" });
+    return Promise.resolve(Response.json({ authenticated: true }));
   });
   assert.deepEqual(await request("auth/login", "POST", { password: "test-password" }), {
     authenticated: true,
@@ -18,8 +19,8 @@ test("API requests preserve method, credentials, and JSON body", async (t) => {
 });
 
 test("API failures keep safe JSON diagnostics", async (t) => {
-  t.mock.method(globalThis, "fetch", async () =>
-    Response.json({ error: "Password is incorrect." }, { status: 401 }),
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.resolve(Response.json({ error: "Password is incorrect." }, { status: 401 })),
   );
   await assert.rejects(request("auth/login"), {
     name: "RequestError",
@@ -29,8 +30,8 @@ test("API failures keep safe JSON diagnostics", async (t) => {
 });
 
 test("validation failures expose their HTTP status as an Error", async (t) => {
-  t.mock.method(globalThis, "fetch", async () =>
-    Response.json({ error: "Base branch was not found." }, { status: 400 }),
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.resolve(Response.json({ error: "Base branch was not found." }, { status: 400 })),
   );
   await assert.rejects(request("projects", "POST", {}), (error) => {
     assert.ok(error instanceof Error);
@@ -41,7 +42,7 @@ test("validation failures expose their HTTP status as an Error", async (t) => {
   });
 });
 
-for (const [name, body, contentType, status] of [
+const unsafeResponses = [
   ["HTML proxy error", "<html>INTERNAL_PRIVATE_DETAILS</html>", "text/html", 502],
   ["plain proxy error", "INTERNAL_PRIVATE_DETAILS", "text/plain", 503],
   ["malformed JSON", "INTERNAL_PRIVATE_DETAILS", "application/json", 502],
@@ -53,12 +54,12 @@ for (const [name, body, contentType, status] of [
     500,
   ],
   ["null JSON error", "null", "application/json", 500],
-]) {
+] as const;
+
+for (const [name, body, contentType, status] of unsafeResponses) {
   test(`${name} returns a useful status error without the response body`, async (t) => {
-    t.mock.method(
-      globalThis,
-      "fetch",
-      async () => new Response(body, { status, headers: { "Content-Type": contentType } }),
+    t.mock.method(globalThis, "fetch", () =>
+      Promise.resolve(new Response(body, { status, headers: { "Content-Type": contentType } })),
     );
     await assert.rejects(request("settings"), {
       name: "RequestError",

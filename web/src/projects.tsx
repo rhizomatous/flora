@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 
-import { request, RequestError } from "./request";
+import { errorMessage, isExpired, request } from "./request";
+import { button, control, link, text, texts } from "./ui";
 
 type Repository = { name: string; url: string; baseBranch: string; role: "core" | "extra" };
 type Project = {
@@ -8,23 +9,19 @@ type Project = {
   name: string;
   configuration: { repositories: Repository[]; setupCommand: string };
 };
-const control =
-  "mt-2 w-full rounded-md border border-foreground/30 bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-foreground disabled:opacity-60";
-const button =
-  "rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50";
 
-function RepositoryFields({ repositories }: { repositories?: Repository[] }) {
-  const [rows, setRows] = useState(() =>
-    (repositories || [{ name: "", url: "", baseBranch: "", role: "core" as const }]).map(
-      (repo, key) => ({ repo, key }),
-    ),
-  );
+const blankRepository: Repository = { name: "", url: "", baseBranch: "", role: "core" };
+
+function RepositoryFields({ repositories }: { repositories: Repository[] }) {
+  const [rows, setRows] = useState(() => repositories.map((repo, key) => ({ repo, key })));
   const nextKey = useRef(rows.length);
   const container = useRef<HTMLDivElement>(null);
   const addButton = useRef<HTMLButtonElement>(null);
   const pendingFocus = useRef<number | "add" | undefined>(undefined);
   // Move focus with the row commit. A deferred callback could otherwise run
   // after the user has moved to another field and redirect their typing.
+  // Only the add and remove handlers set pendingFocus, right before they update
+  // rows, so checking after every commit focuses exactly when the rows change.
   useLayoutEffect(() => {
     const target = pendingFocus.current;
     pendingFocus.current = undefined;
@@ -36,14 +33,11 @@ function RepositoryFields({ repositories }: { repositories?: Repository[] }) {
         )
         ?.focus();
     }
-  }, [rows]);
+  });
   function addRepository() {
     const key = nextKey.current++;
     pendingFocus.current = key;
-    setRows((current) => [
-      ...current,
-      { key, repo: { name: "", url: "", baseBranch: "", role: "core" } },
-    ]);
+    setRows((current) => [...current, { key, repo: blankRepository }]);
   }
   function removeRepository(key: number) {
     pendingFocus.current = "add";
@@ -99,7 +93,7 @@ function RepositoryFields({ repositories }: { repositories?: Repository[] }) {
           {rows.length > 1 && (
             <button
               type="button"
-              className="text-sm underline underline-offset-4"
+              className={`${link} text-sm`}
               onClick={() => {
                 removeRepository(key);
               }}
@@ -113,7 +107,7 @@ function RepositoryFields({ repositories }: { repositories?: Repository[] }) {
         type="button"
         ref={addButton}
         data-add-repository
-        className="text-sm underline underline-offset-4"
+        className={`${link} text-sm`}
         disabled={rows.length >= 100}
         onClick={addRepository}
       >
@@ -123,6 +117,24 @@ function RepositoryFields({ repositories }: { repositories?: Repository[] }) {
   );
 }
 
+/** Reads the project payload that the create and update endpoints accept. */
+function readProject(fields: FormData) {
+  const branches = texts(fields, "baseBranch");
+  const roles = texts(fields, "role");
+  return {
+    name: text(fields, "name"),
+    configuration: {
+      repositories: texts(fields, "repository").map((url, i) => ({
+        url,
+        baseBranch: branches[i],
+        role: roles[i],
+      })),
+      setupCommand: text(fields, "setupCommand"),
+    },
+  };
+}
+
+// The parent keys this component by path, so state starts empty for each route.
 export function Projects({ path, onExpired }: { path: string; onExpired: () => void }) {
   const [list, setList] = useState<Project[]>();
   const [project, setProject] = useState<Project>();
@@ -133,35 +145,36 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
   const heading = useRef<HTMLHeadingElement>(null);
   const id = path.startsWith("projects/") ? path.slice(9) : "";
   const creating = id === "new";
+  const expire = useEffectEvent(onExpired);
+
   useEffect(() => {
-    let active = true;
-    setError("");
-    setNotice("");
-    setProject(undefined);
-    setList(undefined);
     heading.current?.focus();
     if (creating) return;
-    const load = id
-      ? request<Project>(`projects/${encodeURIComponent(id)}`).then((p) => {
-          if (active) setProject(p);
-        })
-      : request<Project[]>("projects").then((p) => {
-          if (active) setList(p);
-        });
-    load.catch((e) => {
-      if (active) {
-        setError(e.message);
-        if (e instanceof RequestError && e.status === 401) onExpired();
+    let active = true;
+    const load = async () => {
+      try {
+        if (id === "") {
+          const projects = await request<Project[]>("projects");
+          if (active) setList(projects);
+        } else {
+          const loaded = await request<Project>(`projects/${encodeURIComponent(id)}`);
+          if (active) setProject(loaded);
+        }
+      } catch (e) {
+        if (!active) return;
+        setError(errorMessage(e, "Could not load projects. Try again."));
+        if (isExpired(e)) expire();
       }
-    });
+    };
+    void load();
     return () => {
       active = false;
     };
   }, [id, creating]);
 
-  async function save(event: FormEvent<HTMLFormElement>) {
+  async function save(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    const fields = new FormData(event.currentTarget);
+    const payload = readProject(new FormData(event.currentTarget));
     setBusy(true);
     setError("");
     setNotice("");
@@ -169,29 +182,25 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
       const saved = await request<Project>(
         creating ? "projects" : `projects/${encodeURIComponent(id)}`,
         creating ? "POST" : "PUT",
-        {
-          name: fields.get("name"),
-          configuration: {
-            repositories: fields.getAll("repository").map((url, i) => ({
-              url,
-              baseBranch: fields.getAll("baseBranch")[i],
-              role: fields.getAll("role")[i],
-            })),
-            setupCommand: fields.get("setupCommand"),
-          },
-        },
+        payload,
       );
       setProject(saved);
       setRevision((value) => value + 1);
       if (creating) window.location.hash = `projects/${saved.id}`;
       else setNotice("Project saved. Existing chats keep their original settings.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save project. Try again.");
-      if (e instanceof RequestError && e.status === 401) onExpired();
+      setError(errorMessage(e, "Could not save project. Try again."));
+      if (isExpired(e)) onExpired();
     } finally {
       setBusy(false);
     }
   }
+
+  let title = "Projects";
+  if (creating) title = "Connect project";
+  else if (id !== "") title = project?.name ?? "Project";
+  let submitLabel = creating ? "Validate and connect" : "Validate and save";
+  if (busy) submitLabel = "Validating…";
 
   return (
     <section aria-labelledby="projects-heading">
@@ -202,43 +211,42 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
           tabIndex={-1}
           className="min-w-0 text-2xl font-semibold tracking-tight break-words"
         >
-          {creating ? "Connect project" : id ? project?.name || "Project" : "Projects"}
+          {title}
         </h1>
-        {id ? (
-          <a href="#projects" className="shrink-0 text-sm underline underline-offset-4">
-            All projects
-          </a>
-        ) : (
+        {id === "" ? (
           <a href="#projects/new" className={`${button} shrink-0`}>
             Connect project
+          </a>
+        ) : (
+          <a href="#projects" className={`${link} shrink-0 text-sm`}>
+            All projects
           </a>
         )}
       </div>
       {project && (
         <a
-          className="mt-5 inline-block text-sm underline underline-offset-4"
+          className={`${link} mt-5 inline-block text-sm`}
           href={`#chats/new?project=${encodeURIComponent(project.id)}`}
         >
           Start chat
         </a>
       )}
-      {error && (
+      {error !== "" && (
         <p role="alert" className="mt-6 rounded-md border border-foreground/50 p-3 text-sm">
           {error}
         </p>
       )}
-      {notice && (
+      {notice !== "" && (
         <p role="status" className="mt-6 rounded-md border p-3 text-sm">
           {notice}
         </p>
       )}
-      {!id &&
-        list &&
+      {list &&
         (list.length > 0 ? (
           <ul className="mt-8 divide-y divide-foreground/20">
             {list.map((p) => (
               <li key={p.id} className="py-5">
-                <a className="font-medium underline underline-offset-4" href={`#projects/${p.id}`}>
+                <a className={`${link} font-medium`} href={`#projects/${p.id}`}>
                   {p.name}
                 </a>
                 <ul className="mt-2 text-sm break-words text-muted-foreground">
@@ -249,7 +257,7 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
                   ))}
                 </ul>
                 <a
-                  className="mt-3 inline-block text-sm underline underline-offset-4"
+                  className={`${link} mt-3 inline-block text-sm`}
                   href={`#chats/new?project=${encodeURIComponent(p.id)}`}
                 >
                   Start chat
@@ -262,16 +270,18 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
             No projects yet. Connect a GitHub repository to get started.
           </p>
         ))}
-      {!creating && !project && !list && !error && (
+      {!creating && !project && !list && error === "" && (
         <p role="status" className="mt-8 text-sm text-muted-foreground">
           Loading…
         </p>
       )}
       {(creating || project) && (
         <form
-          key={`${project?.id || "new"}-${revision}`}
+          key={`${project?.id ?? "new"}-${revision}`}
           className="mt-8 space-y-6"
-          onSubmit={save}
+          onSubmit={(event) => {
+            void save(event);
+          }}
         >
           {!creating && (
             <p className="text-sm text-muted-foreground">
@@ -290,7 +300,9 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
                 required
               />
             </label>
-            <RepositoryFields repositories={project?.configuration.repositories} />
+            <RepositoryFields
+              repositories={project?.configuration.repositories ?? [blankRepository]}
+            />
             <label className="block text-sm font-medium">
               Setup command (optional)
               <textarea
@@ -305,8 +317,8 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
               Runs inside the chat container before the agent starts.
             </p>
           </fieldset>
-          <button className={button} disabled={busy}>
-            {busy ? "Validating…" : creating ? "Validate and connect" : "Validate and save"}
+          <button type="submit" className={button} disabled={busy}>
+            {submitLabel}
           </button>
         </form>
       )}
