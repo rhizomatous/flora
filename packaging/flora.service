@@ -1,0 +1,27 @@
+[Unit]
+Description=Flora
+Requires=docker.service
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=flora
+Group=flora
+SupplementaryGroups=docker
+UMask=0077
+EnvironmentFile=/etc/flora/flora.env
+ExecStart=/opt/flora/flora -public-url ${FLORA_PUBLIC_URL} -data-dir /var/lib/flora -github-listen ${FLORA_GITHUB_LISTEN} -github-host ${FLORA_GITHUB_HOST} -github-ca /etc/flora/transport-ca.crt -github-tls-cert /etc/flora/transport.crt -github-tls-key /etc/flora/transport.key
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/flora
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

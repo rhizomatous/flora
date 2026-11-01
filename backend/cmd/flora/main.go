@@ -32,7 +32,7 @@ func main() {
 	githubListen := flag.String("github-listen", "", "optional private IP:port for container GitHub TLS transport")
 	githubCert := flag.String("github-tls-cert", "", "GitHub transport TLS certificate PEM file")
 	githubKey := flag.String("github-tls-key", "", "host-only GitHub transport TLS private key PEM file")
-	agentImage := flag.String("agent-image", "", "pinned Flora agent image reference; enables chat execution")
+	agentImage := flag.String("agent-image", releaseImage, "pinned Flora agent image reference; enables chat execution")
 	agentDigest := flag.String("agent-image-digest", "", "recorded name@sha256 image identity (defaults to agent-image)")
 	agentID := flag.String("agent-image-id", "", "expected sha256 content ID, required for a local image tag")
 	maxRunning := flag.Int("max-running", provisioning.DefaultMaxRunning, "maximum running chat containers, including idle; lowering it does not stop existing containers")
