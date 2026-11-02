@@ -10,7 +10,9 @@ Flora itself talks directly to the Engine API.
 
 ## Select a release
 
-Use a published `vX.Y.Z` release from this repository. Until an administrator tags
+Use a published `vX.Y.Z` release, or an explicitly labeled prerelease such as
+`v0.0.1-alpha.1`, from this repository. Prereleases are for early testing and do not
+establish completion of the v0.1 acceptance criteria. Until an administrator tags
 and publishes one, there is no released artifact to download. Do not substitute a
 development binary or guess an agent digest. The tag workflow builds the image for
 both architectures, gets its real registry index digest, and embeds that identity,
@@ -176,7 +178,7 @@ agent environments, clone URLs or service files. The broker holds it on the host
 Chat capabilities can use **all permissions of this token**, not just the chat's
 selected repository. Store only the least authority you intend to delegate.
 
-Run Settings **Check dependencies**. Create a project with exactly one core
+Run Settings **Check dependencies**. Create a project with at least one core
 repository, then start a chat and check setup, a follow-up and a stopped/resumed
 workspace. See [agent transport limits](agent/README.md). SSH, LFS and GitHub
 asset-download redirects are not implemented by the private broker. No provider
@@ -248,6 +250,7 @@ cross-release chat compatibility are outside this release.
 
 Only an explicit `vMAJOR.MINOR.PATCH` (optionally prerelease) tag runs
 `.github/workflows/release.yml`. Normal PRs do not publish images or releases.
+Prerelease tags publish with GitHub's prerelease flag and cannot become the latest release.
 Before any image push, the workflow verifies repository access and checks for an
 existing release by tag. Only a release-endpoint 404 permits publication; an
 existing release, authentication failure, outage or unexpected response fails

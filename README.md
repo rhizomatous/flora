@@ -6,8 +6,11 @@ return to review its changes and open a draft pull request.
 **Status:** authenticated projects and persistent browser chats with full activity,
 follow-ups, runtime questions, reconnectable saved events, and separate interrupt
 and container stop controls. Chat execution uses the pinned agent image and
-private host-side GitHub transport. Changes review and broad restart
-reconciliation are still separate work.
+private host-side GitHub transport. Changes review retains committed and uncommitted
+diffs and verified PR links. Restart reconciliation reconnects to surviving work;
+failed execution requires explicit new input and is never automatically replayed.
+Multi-repository projects, capacity controls, settings, and completion notifications
+are implemented. Release acceptance and publication are tracked on the roadmap.
 See [agent setup](agent/README.md), the [roadmap](https://github.com/rhizomatous/flora/issues/20)
 and [product requirements](specs/PRD.md).
 
@@ -220,8 +223,10 @@ missing frontend build.
 
 Vite outputs into `backend/internal/webassets/dist/`; Go embeds the complete build
 at compile time. Copying only `bin/flora-linux-amd64` (or the ARM64 equivalent) to
-a Linux host is sufficient to run the bootstrap. No Node.js, source tree, external
-asset directory, C runtime, or SQLite shared library is needed at runtime.
+a Linux host is sufficient to run the application. Chat execution also needs Docker,
+the pinned agent image, and the configuration in the installation guide. No Node.js,
+source tree, external asset directory, C runtime, or SQLite shared library is needed
+at runtime.
 
 SQLite uses [`modernc.org/sqlite`](https://pkg.go.dev/modernc.org/sqlite), a pure-Go
 `database/sql` driver. All production builds and checks use `CGO_ENABLED=0`.
