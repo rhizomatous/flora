@@ -8,7 +8,7 @@ from release_image import EngineError, ensure_image
 
 
 class ReleaseGuardTest(unittest.TestCase):
-    def run_guard(self, statuses):
+    def run_guard(self, statuses, tag='v1.2.3'):
         requests = []
 
         class Handler(http.server.BaseHTTPRequestHandler):
@@ -25,7 +25,7 @@ class ReleaseGuardTest(unittest.TestCase):
         thread = threading.Thread(target=server.serve_forever)
         thread.start()
         try:
-            require_unpublished('owner/repo', 'v1.2.3', 'fixture-token',
+            require_unpublished('owner/repo', tag, 'fixture-token',
                                 f'http://127.0.0.1:{server.server_port}')
         finally:
             server.shutdown()
@@ -35,6 +35,11 @@ class ReleaseGuardTest(unittest.TestCase):
 
     def test_only_release_404_permits_first_publication(self):
         self.run_guard([200, 404])
+
+    def test_alpha_tag_is_accepted_but_existing_release_is_not(self):
+        self.run_guard([200, 404], 'v0.0.1-alpha.1')
+        with self.assertRaisesRegex(RuntimeError, 'already has a release'):
+            self.run_guard([200, 200], 'v0.0.1-alpha.1')
 
     def test_existing_release_blocks_rerun(self):
         with self.assertRaisesRegex(RuntimeError, 'already has a release'):
