@@ -1,43 +1,63 @@
 import assert from "node:assert/strict";
+
 import { chromium } from "@playwright/test";
+
+import { assertFitsPhone, logIn, origin, pageErrors } from "./browser.ts";
 
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ ignoreHTTPSErrors: true });
-  const errors = [];
-  page.on("pageerror", error => errors.push(error.message));
-  const origin = process.env.FLORA_BROWSER_URL;
-  await page.goto(origin);
-  await page.getByLabel("Password", { exact: true }).fill("browser test password");
-  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  const errors = pageErrors(page);
+  await logIn(page);
   await page.goto(`${origin}/#projects/new`);
   await page.getByLabel("Project name", { exact: true }).fill("Collection");
   await page.getByLabel("GitHub repository", { exact: true }).fill("first/app");
   await page.getByRole("button", { name: "Add repository", exact: true }).focus();
   await page.keyboard.press("Enter");
-  await page.waitForFunction(() => document.activeElement === document.querySelectorAll('input[name="repository"]')[1]);
+  await page.waitForFunction(
+    () => document.activeElement === document.querySelectorAll('input[name="repository"]')[1],
+  );
   await page.getByLabel("GitHub repository", { exact: true }).nth(1).fill("second/app");
   await page.getByLabel("Base branch", { exact: true }).nth(1).fill("release");
   // Observe focus when the new input enters the DOM, before another interaction
   // can begin. A later animation-frame callback must not steal typing focus.
   await page.evaluate(() => {
-    window.repositoryFocusAtInsert = new Promise(resolve => {
+    const form = document.querySelector("form");
+    if (form === null) throw new Error("project form not found");
+    window.repositoryFocusAtInsert = new Promise((resolve) => {
       const observer = new MutationObserver(() => {
         const inputs = document.querySelectorAll('input[name="repository"]');
-        if (inputs.length !== 3) return;
+        const inserted = inputs[2];
+        if (inputs.length !== 3 || inserted === undefined) return;
         observer.disconnect();
-        const insertedFocused = document.activeElement === inputs[2];
-        const branch = inputs[2].closest("fieldset").querySelector('input[name="baseBranch"]');
-        branch.focus();
-        requestAnimationFrame(() => resolve({ insertedFocused, branchRetained: document.activeElement === branch }));
+        const insertedFocused = document.activeElement === inserted;
+        const branch =
+          inserted
+            .closest("fieldset")
+            ?.querySelector<HTMLInputElement>('input[name="baseBranch"]') ?? null;
+        branch?.focus();
+        requestAnimationFrame(() => {
+          resolve({
+            insertedFocused,
+            branchRetained: branch !== null && document.activeElement === branch,
+          });
+        });
       });
-      observer.observe(document.querySelector("form"), { childList: true, subtree: true });
+      observer.observe(form, { childList: true, subtree: true });
     });
   });
   await page.getByRole("button", { name: "Add repository", exact: true }).click();
   const focus = await page.evaluate(() => window.repositoryFocusAtInsert);
-  assert.equal(focus.branchRetained, true, "a pending focus callback must not redirect typing from the base branch");
-  assert.equal(focus.insertedFocused, true, "new repository must receive focus as its row is committed");
+  assert.equal(
+    focus.branchRetained,
+    true,
+    "a pending focus callback must not redirect typing from the base branch",
+  );
+  assert.equal(
+    focus.insertedFocused,
+    true,
+    "new repository must receive focus as its row is committed",
+  );
   await page.getByLabel("GitHub repository", { exact: true }).nth(2).fill("third/extra");
   await page.getByLabel("Base branch", { exact: true }).nth(2).fill("missing");
   await page.getByLabel("Repository role", { exact: true }).nth(2).selectOption("extra");
@@ -49,26 +69,52 @@ try {
   await page.getByRole("heading", { name: "Collection", exact: true }).waitFor();
   await page.reload();
   await page.getByRole("heading", { name: "Collection", exact: true }).waitFor();
-  assert.deepEqual(await page.getByLabel("GitHub repository", { exact: true }).evaluateAll(inputs => inputs.map(input => input.value)), ["https://github.com/first/app.git", "https://github.com/second/app.git", "https://github.com/third/extra.git"]);
-  assert.deepEqual(await page.getByLabel("Base branch", { exact: true }).evaluateAll(inputs => inputs.map(input => input.value)), ["main", "release", "next"]);
+  assert.deepEqual(
+    await page
+      .getByLabel("GitHub repository", { exact: true })
+      .evaluateAll((inputs: HTMLInputElement[]) => inputs.map((input) => input.value)),
+    [
+      "https://github.com/first/app.git",
+      "https://github.com/second/app.git",
+      "https://github.com/third/extra.git",
+    ],
+  );
+  assert.deepEqual(
+    await page
+      .getByLabel("Base branch", { exact: true })
+      .evaluateAll((inputs: HTMLInputElement[]) => inputs.map((input) => input.value)),
+    ["main", "release", "next"],
+  );
   await page.getByRole("button", { name: "Remove repository 2", exact: true }).focus();
   await page.keyboard.press("Enter");
-  await page.waitForFunction(() => document.activeElement?.hasAttribute("data-add-repository"));
+  await page.waitForFunction(
+    () => document.activeElement?.matches("[data-add-repository]") === true,
+  );
   await page.getByRole("button", { name: "Add repository", exact: true }).click();
   await page.getByLabel("GitHub repository", { exact: true }).nth(2).fill("fourth/tools");
   await page.getByRole("button", { name: "Validate and save", exact: true }).click();
-  await page.getByRole("status").filter({ hasText: "Existing chats keep their original settings" }).waitFor();
+  await page
+    .getByRole("status")
+    .filter({ hasText: "Existing chats keep their original settings" })
+    .waitFor();
   await page.reload();
   await page.getByRole("heading", { name: "Collection", exact: true }).waitFor();
-  assert.equal(await page.getByLabel("GitHub repository", { exact: true }).nth(1).inputValue(), "https://github.com/third/extra.git");
-  assert.equal(await page.getByLabel("Repository role", { exact: true }).nth(1).inputValue(), "extra");
-  await page.setViewportSize({ width: 375, height: 812 });
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  assert.equal(
+    await page.getByLabel("GitHub repository", { exact: true }).nth(1).inputValue(),
+    "https://github.com/third/extra.git",
+  );
+  assert.equal(
+    await page.getByLabel("Repository role", { exact: true }).nth(1).inputValue(),
+    "extra",
+  );
+  await assertFitsPhone(page);
   await page.getByRole("link", { name: "All projects", exact: true }).click();
   await page.getByText("first/app · main · core", { exact: true }).waitFor();
   await page.getByText("third/extra · next · extra", { exact: true }).waitFor();
   assert.deepEqual(errors, []);
-  console.log("Chromium: multi-repository create/edit, extra branch validation, add/remove field preservation, persisted roles/branches, project list, and mobile width passed.");
+  console.log(
+    "Chromium: multi-repository create/edit, extra branch validation, add/remove field preservation, persisted roles/branches, project list, and mobile width passed.",
+  );
 } finally {
   await browser.close();
 }
