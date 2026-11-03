@@ -1,9 +1,5 @@
 #!/bin/sh
 set -eu
-if [ "${1-}" = --ubuntu ]; then
-  shift
-  exec python3 "$(dirname "$0")/ubuntu.py" install "$@"
-fi
 [ "$(id -u)" = 0 ] || { printf '%s\n' 'Run as root on the Linux host.' >&2; exit 1; }
 [ "$(uname -s)" = Linux ] || exit 1
 cd "$(dirname "$0")"

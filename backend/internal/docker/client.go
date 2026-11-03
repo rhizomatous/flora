@@ -100,6 +100,24 @@ func (c *Client) Ping(ctx context.Context) error {
 	return err
 }
 
+// CheckLocalRuntime rejects unsupported daemon modes before deployment creates
+// any resources. The versioned Info request also checks the pinned API contract.
+func (c *Client) CheckLocalRuntime(ctx context.Context) error {
+	r, err := c.sdk.Info(ctx, client.InfoOptions{})
+	if err != nil {
+		return err
+	}
+	if r.Info.OSType != "linux" || !r.Info.MemoryLimit || !r.Info.PidsLimit || !r.Info.CPUCfsQuota {
+		return fmt.Errorf("local Linux Engine with memory, PID and CPU limits is required")
+	}
+	for _, option := range r.Info.SecurityOptions {
+		if strings.Contains(option, "rootless") || strings.Contains(option, "userns") {
+			return fmt.Errorf("rootless Docker and user namespace remapping are unsupported")
+		}
+	}
+	return nil
+}
+
 type NetworkInfo struct {
 	ID       string
 	Name     string
@@ -107,10 +125,19 @@ type NetworkInfo struct {
 	Internal bool
 	Labels   map[string]string
 	Gateways []string
+	Bridge   string
 }
 
-// NetworkInspect reads an existing network. Host provisioning owns creation and
-// removal; the application must never recreate a missing bridge under saved chats.
+// NetworkCreate lets the local Engine allocate a non-overlapping bridge subnet.
+// The caller persists the returned ID and must never recreate a recorded network.
+func (c *Client) NetworkCreate(ctx context.Context, name, owner string) (string, error) {
+	r, err := c.sdk.NetworkCreate(ctx, name, client.NetworkCreateOptions{
+		Driver: "bridge", Labels: map[string]string{"flora.deployment": owner},
+	})
+	return r.ID, err
+}
+
+// NetworkInspect reads the immutable identity and bridge used by the broker.
 func (c *Client) NetworkInspect(ctx context.Context, id string) (NetworkInfo, error) {
 	result, err := c.sdk.NetworkInspect(ctx, id, client.NetworkInspectOptions{})
 	if err != nil {
@@ -118,6 +145,10 @@ func (c *Client) NetworkInspect(ctx context.Context, id string) (NetworkInfo, er
 	}
 	n := result.Network
 	info := NetworkInfo{ID: n.ID, Name: n.Name, Driver: n.Driver, Internal: n.Internal, Labels: n.Labels}
+	info.Bridge = n.Options["com.docker.network.bridge.name"]
+	if info.Bridge == "" && len(n.ID) >= 12 {
+		info.Bridge = "br-" + n.ID[:12]
+	}
 	for _, subnet := range n.IPAM.Config {
 		info.Gateways = append(info.Gateways, subnet.Gateway.String())
 	}

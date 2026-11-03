@@ -10,7 +10,7 @@ import (
 
 // startGitHub wires checkout and on-demand fetching to the same broker before
 // the listener accepts requests. A nil executor enables git/gh proxying only.
-func startGitHub(ctx context.Context, store *storage.Store, engine githubbroker.Executor, cfg githubbroker.CheckoutConfig, addr, cert, key string) (*githubbroker.Access, net.Addr, error) {
+func startGitHub(ctx context.Context, store *storage.Store, engine githubbroker.Executor, cfg githubbroker.CheckoutConfig, addr, cert, key string, options ...brokerListenerConfig) (*githubbroker.Access, net.Addr, error) {
 	broker := githubbroker.New(store)
 	var access *githubbroker.Access
 	if engine != nil {
@@ -20,6 +20,6 @@ func startGitHub(ctx context.Context, store *storage.Store, engine githubbroker.
 			return nil, nil, err
 		}
 	}
-	listener, err := serveGitHub(ctx, broker, addr, cert, key)
+	listener, err := serveGitHub(ctx, broker, addr, cert, key, options...)
 	return access, listener, err
 }

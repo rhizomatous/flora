@@ -9,45 +9,6 @@ permissions:
   contents: read
 
 jobs:
-  installer-topology:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-24.04
-            arch: amd64
-          - runner: ubuntu-24.04-arm
-            arch: arm64
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # v34
-      - name: Build fixture binaries without publishing
-        env:
-          GOCACHE: ${{ runner.temp }}/flora-installer-go-cache
-          GOMODCACHE: ${{ runner.temp }}/flora-installer-go-modules
-          npm_config_cache: ${{ runner.temp }}/flora-installer-npm-cache
-        run: |
-          nix develop --command make deps build-linux
-          CGO_ENABLED=0 nix develop --command go -C backend test -c -o ../bin/docker-network-test ./internal/docker
-          CGO_ENABLED=0 nix develop --command go -C backend test -c -o ../bin/provisioning-test ./internal/provisioning
-      - name: Exercise owned bridge, scoped firewall, bound HTTP-01 and protected enrollment inside a disposable nested Engine
-        run: |
-          docker build -f scripts/installer-network.Dockerfile -t flora-installer-fixture:ci .
-          docker run --rm --privileged --label flora.fixture=installer -e FLORA_DISPOSABLE_FIXTURE=1 \
-            --mount type=bind,src="$PWD/bin/flora-linux-${{ matrix.arch }}",dst=/flora,readonly \
-            --mount type=bind,src="$PWD/bin/docker-network-test",dst=/docker-network-test,readonly \
-            flora-installer-fixture:ci
-      - name: Exercise complete install, resume and uninstall with real systemd in an owned container
-        env:
-          GOCACHE: ${{ runner.temp }}/flora-installer-go-cache
-          GOMODCACHE: ${{ runner.temp }}/flora-installer-go-modules
-          npm_config_cache: ${{ runner.temp }}/flora-installer-npm-cache
-        run: nix develop --command bash scripts/check-installer-systemd.sh flora-installer-fixture:ci ${{ matrix.arch }}
-
   archive:
     strategy:
       matrix:
@@ -82,6 +43,10 @@ jobs:
           docker pull "$FIXTURE_IMAGE"
           docker rm -f flora-release-registry
           sudo bash scripts/check-release-linux.sh dist/flora-v0.0.0-fixture-linux-${{ matrix.arch }}.tar.gz
+      - name: Check built-in HTTPS and private broker with a disposable Engine
+        run: |
+          nix develop --command make build-linux
+          nix develop --command bash scripts/check-deployment.sh ${{ matrix.arch }} localhost:51818/flora-agent:fixture
       - name: Remove only fixture registry
         if: always()
         run: |

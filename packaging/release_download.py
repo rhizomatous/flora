@@ -1,12 +1,15 @@
 """Stage an explicit GitHub release without trusting archive paths or file modes."""
 import hashlib
+import argparse
 import json
 import os
+import platform
 from pathlib import Path, PurePosixPath
 import re
 import shutil
 import subprocess
 import tarfile
+import tempfile
 import urllib.parse
 import urllib.request
 
@@ -87,15 +90,15 @@ def verify_identity(package, version, commit, arch):
     if identity.get("version") != version or identity.get("commit") != commit:
         raise ValueError("release metadata does not match the selected version/source")
     if identity.get("os") != "linux" or identity.get("arch") != arch:
-        raise ValueError("release lacks the expected Linux architecture identity; use a release supporting the Ubuntu installer")
+        raise ValueError("release lacks the expected Linux architecture identity")
     if not re.fullmatch(r"[a-z0-9./:_-]+@sha256:[a-f0-9]{64}", identity.get("agent_image", "")):
         raise ValueError("release does not record a digest-pinned agent image")
     actual = json.loads(subprocess.check_output([str(package / "flora"), "-version"], timeout=15))
     if actual != identity:
         raise ValueError("binary identity differs from release.json")
     help_result = subprocess.run([str(package / "flora"), "-help"], capture_output=True, text=True, timeout=15)
-    if "-enrollment-hash-file" not in help_result.stderr or "-agent-network-id" not in help_result.stderr:
-        raise ValueError("selected release does not support protected installer enrollment and owned networking")
+    if "-hostname" not in help_result.stderr:
+        raise ValueError("selected release does not support built-in HTTPS; use its manual installation instructions")
     return identity
 
 
@@ -134,3 +137,31 @@ def stage(root, version, arch, allow_prerelease=False):
     extract(root / archive, package)
     identity = verify_identity(package, version, ref["sha"], arch)
     return package, identity
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Verify a Linux release and place only its Flora binary. Docker must already be installed.")
+    parser.add_argument("version")
+    parser.add_argument("--allow-prerelease", action="store_true")
+    parser.add_argument("--output", type=Path, default=Path("flora"))
+    args = parser.parse_args()
+    arch = {"x86_64": "amd64", "aarch64": "arm64"}.get(platform.machine())
+    if platform.system() != "Linux" or not arch:
+        raise ValueError("Linux amd64/arm64 is required")
+    with tempfile.TemporaryDirectory(prefix=".flora-download-", dir=args.output.absolute().parent) as temporary:
+        package, identity = stage(Path(temporary), args.version, arch, args.allow_prerelease)
+        binary = package / "flora"
+        if args.output.exists() or args.output.is_symlink():
+            if args.output.is_symlink() or not args.output.is_file() or args.output.read_bytes() != binary.read_bytes():
+                raise ValueError("output exists with different contents; upgrades require an explicit backup and replacement")
+        else:
+            binary.chmod(0o755)
+            os.link(binary, args.output)
+        print(f"Verified {identity['version']} ({identity['commit']}, linux/{arch}). Run: sudo {args.output.absolute()} -hostname flora.example.com")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        raise SystemExit(f"Flora download stopped: {error}")

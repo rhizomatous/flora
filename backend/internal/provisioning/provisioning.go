@@ -48,6 +48,11 @@ type Config struct {
 	// preserve the manual installation's daemon-default network and DNS setup.
 	NetworkID     string
 	BrokerGateway string
+	// AgentUID/GID optionally pin the container's non-root identity for a root
+	// application process. Only new empty workspace/runtime directories are
+	// chowned; existing data must already have the recorded numeric ownership.
+	AgentUID int
+	AgentGID int
 	// UseSettings reads live capacity/activity limits and new-chat runtime snapshots.
 	// Explicit MaxRunningOverride takes precedence over the saved container cap.
 	UseSettings        bool
@@ -91,6 +96,9 @@ type Config struct {
 }
 
 func (c Config) withDefaults() (Config, error) {
+	if (c.AgentUID != 0 || c.AgentGID != 0) && (c.AgentUID <= 0 || c.AgentGID <= 0) {
+		return c, errors.New("provisioning: explicit agent UID and GID must both be positive")
+	}
 	if c.NetworkID != "" || c.BrokerGateway != "" {
 		ip := net.ParseIP(c.BrokerGateway)
 		if !hexHash(c.NetworkID) || ip == nil || ip.To4() == nil || !ip.IsPrivate() {
@@ -334,6 +342,13 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 	if err != nil {
 		return Endpoint{}, err
 	}
+	if m.cfg.AgentUID != 0 {
+		for _, path := range []string{paths.Workspace, paths.RuntimeState} {
+			if err := prepareAgentDirectory(path, m.cfg.AgentUID, m.cfg.AgentGID); err != nil {
+				return Endpoint{}, err
+			}
+		}
+	}
 	uid, gid, err := m.ownerOf(paths.Workspace)
 	if err != nil {
 		return Endpoint{}, err
@@ -493,6 +508,9 @@ func validateOwned(info docker.ContainerInfo, chat storage.Chat, paths storage.P
 
 // validateOwned also rejects network drift before adopting or operating a chat.
 func (m *Manager) validateOwned(info docker.ContainerInfo, chat storage.Chat, paths storage.Paths, imageID string) error {
+	if m.cfg.AgentUID != 0 && (info.EnvValue("FLORA_UID") != strconv.Itoa(m.cfg.AgentUID) || info.EnvValue("FLORA_GID") != strconv.Itoa(m.cfg.AgentGID)) {
+		return errors.New("provisioning: container numeric agent identity differs from saved deployment")
+	}
 	if err := validateOwned(info, chat, paths, imageID); err != nil {
 		return err
 	}
@@ -521,6 +539,24 @@ func (m *Manager) validateOwned(info docker.ContainerInfo, chat storage.Chat, pa
 		return errors.New("provisioning: container broker host mapping changed; refusing access")
 	}
 	return nil
+}
+
+func prepareAgentDirectory(path string, uid, gid int) error {
+	actualUID, actualGID, err := storageOwner(path)
+	if err != nil {
+		return err
+	}
+	if actualUID == uid && actualGID == gid {
+		return nil
+	}
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+	if os.Geteuid() != 0 || actualUID != 0 || len(entries) != 0 {
+		return errors.New("provisioning: restore recorded workspace/runtime numeric ownership; existing data will not be recursively changed")
+	}
+	return os.Chown(path, uid, gid)
 }
 
 // resolveImage returns the content ID of the configured image, pulling it
