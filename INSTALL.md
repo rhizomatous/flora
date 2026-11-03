@@ -59,6 +59,27 @@ IP. Wildcard, loopback and bridge addresses are refused. An occupied port causes
 a clear failure; Flora never stops an existing proxy. Certificate errors usually
 mean DNS, AAAA, NAT or inbound 80/443 needs fixing. Check the service journal.
 
+Public NIC addresses are saved and pinned across restarts. Prefer a static address
+or DHCP reservation: if an address changes, startup fails rather than choosing a
+different interface. `-public-listen` does not override a saved address list.
+To rebind after an intentional NIC or DHCP change:
+
+1. Stop Flora (`sudo systemctl stop flora` for the unit below) and ensure no other
+   Flora process is using this data directory.
+2. Make a root-owned, mode 0600 backup of `data-dir/deployment/deployment.json` in
+   a root-only directory such as `/root`. Keep the original file's ownership and
+   mode 0600, and its parent directory's mode 0700, when editing.
+3. Change **only** the case-sensitive `Addresses` field in that JSON object, for
+   example to `"Addresses":["10.0.0.3"]`, using a non-empty list of new assigned
+   local NIC IPs.
+   Preserve `Domain`, `Owner`, `NetworkID`, `Gateway`, `CAHash`, `AgentUID`,
+   `AgentGID`, and all certificate/key files. Do not delete or reset saved state.
+4. Remove an old `-public-listen` argument or update it to match the saved list
+   exactly. Adjust public DNS/NAT ingress as needed, then restart with the same
+   hostname and data directory. Startup checks that every saved address is still
+   assigned to an up, non-loopback, non-bridge interface on this host; wildcard
+   and duplicate addresses are rejected.
+
 The app creates one owner-labeled Docker bridge and saves its immutable identity.
 Docker chooses the subnet from its configured pools; configure those pools to
 avoid your LAN/VPN ranges before first startup. Each chat uses a hosts-file entry
@@ -80,6 +101,7 @@ root authority. A minimal optional systemd unit is:
 [Unit]
 Description=Flora
 Requires=docker.service
+Wants=network-online.target
 After=docker.service network-online.target
 
 [Service]
