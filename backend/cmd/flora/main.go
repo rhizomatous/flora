@@ -39,6 +39,9 @@ func main() {
 	dockerSocket := flag.String("docker-socket", docker.DefaultSocket, "Docker Engine socket on this host")
 	githubHost := flag.String("github-host", "", "private TLS hostname on port 443 reachable from agent containers")
 	githubCA := flag.String("github-ca", "", "CA PEM file trusted by agent git/gh for the private GitHub transport")
+	networkID := flag.String("agent-network-id", "", "immutable installer-owned Docker bridge ID")
+	brokerGateway := flag.String("agent-broker-gateway", "", "inspected private IPv4 bridge gateway for flora-github.internal")
+	enrollmentFile := flag.String("enrollment-hash-file", "", "private file containing the installer enrollment code SHA256 digest")
 	flag.Parse()
 	maxOverride := 0
 	flag.Visit(func(f *flag.Flag) {
@@ -86,6 +89,13 @@ func main() {
 			os.Exit(1)
 		}
 		defer engine.Close()
+		if *networkID != "" || *brokerGateway != "" {
+			n, err := engine.NetworkInspect(ctx, *networkID)
+			if err != nil || n.ID != *networkID || n.Driver != "bridge" || n.Internal || len(n.Gateways) != 1 || n.Gateways[0] != *brokerGateway || *githubHost != "flora-github.internal" || *githubListen != net.JoinHostPort(*brokerGateway, "443") {
+				slog.Error("Owned bridge or broker listener differs from installed configuration; restore the recorded network before starting Flora")
+				os.Exit(1)
+			}
+		}
 		configuration.RuntimeDiagnostics = func(ctx context.Context) []settings.Diagnostic {
 			if _, err := engine.ContainerList(ctx, true, map[string]string{"flora.managed": "true"}); err != nil {
 				return []settings.Diagnostic{{Name: "Docker", Message: "Cannot reach Docker. Start Docker and check the configured socket and service-user permissions."}}
@@ -108,7 +118,7 @@ func main() {
 			slog.Error("Cannot configure container GitHub access", "error", err)
 			os.Exit(1)
 		}
-		manager, err := provisioning.New(engine, store, provisioning.Config{ImageRef: *agentImage, ImageDigest: *agentDigest, ImageID: *agentID, HarnessVersion: "1.2.27", MaxRunning: *maxRunning, UseSettings: true, MaxRunningOverride: maxOverride}, access)
+		manager, err := provisioning.New(engine, store, provisioning.Config{NetworkID: *networkID, BrokerGateway: *brokerGateway, ImageRef: *agentImage, ImageDigest: *agentDigest, ImageID: *agentID, HarnessVersion: "1.2.27", MaxRunning: *maxRunning, UseSettings: true, MaxRunningOverride: maxOverride}, access)
 		if err != nil {
 			slog.Error("Cannot configure pinned agent runtime", "error", err)
 			os.Exit(1)
@@ -141,9 +151,16 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	authentication := auth.New(store)
+	if *enrollmentFile != "" {
+		if err := authentication.RequireEnrollment(*enrollmentFile); err != nil {
+			slog.Error("Cannot load installer enrollment digest; check file ownership, permissions and format")
+			os.Exit(1)
+		}
+	}
 	srv := &http.Server{
 		Addr:              *addr,
-		Handler:           server.New(webassets.FS(), auth.New(store), configuration, origin, chats),
+		Handler:           server.New(webassets.FS(), authentication, configuration, origin, chats),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}

@@ -11,6 +11,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -23,13 +25,47 @@ const iterations = 600000
 
 var ErrPassword = errors.New("Use a password between 12 and 1024 bytes.")
 var ErrLogin = errors.New("Password is incorrect.")
+var ErrEnrollment = errors.New("Installer enrollment code is incorrect.")
 
 type Service struct {
-	Store *storage.Store
-	Now   func() time.Time
+	Store          *storage.Store
+	Now            func() time.Time
+	enrollmentHash string
 }
 
 func New(store *storage.Store) *Service { return &Service{Store: store, Now: time.Now} }
+
+// RequireEnrollment reads a SHA256 digest, never the plaintext code. The file
+// must be private and non-symlinked, inside an administrator-controlled directory.
+// Call before serving requests. A configured but unreadable file fails closed.
+func (s *Service) RequireEnrollment(path string) error {
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() & ^os.FileMode(0640) != 0 || info.Size() != 64 {
+		return errors.New("enrollment digest must be a private regular file")
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return errors.New("cannot open enrollment digest")
+	}
+	defer f.Close()
+	opened, err := f.Stat()
+	if err != nil || !os.SameFile(info, opened) {
+		return errors.New("enrollment digest changed while opening")
+	}
+	var raw [65]byte
+	n, err := io.ReadFull(f, raw[:])
+	if err != io.ErrUnexpectedEOF || n != 64 {
+		return errors.New("enrollment digest must contain exactly 64 hexadecimal characters")
+	}
+	decoded, err := hex.DecodeString(string(raw[:64]))
+	if err != nil || len(decoded) != 32 {
+		return errors.New("invalid enrollment digest")
+	}
+	s.enrollmentHash = hex.EncodeToString(decoded)
+	return nil
+}
+
+func (s *Service) EnrollmentRequired() bool { return s.enrollmentHash != "" }
 
 func passwordHash(password string) (string, error) {
 	if len(password) < 12 || len(password) > 1024 {
@@ -79,7 +115,17 @@ func newToken() string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
-func (s *Service) Bootstrap(ctx context.Context, password string) (string, time.Time, error) {
+func (s *Service) Bootstrap(ctx context.Context, password string, code ...string) (string, time.Time, error) {
+	if s.enrollmentHash != "" {
+		if _, err := s.Store.AdministratorHash(ctx); err == nil {
+			return "", time.Time{}, storage.ErrConflict
+		} else if !errors.Is(err, storage.ErrNotFound) {
+			return "", time.Time{}, err
+		}
+		if len(code) != 1 || len(code[0]) > 256 || subtle.ConstantTimeCompare([]byte(TokenHash(code[0])), []byte(s.enrollmentHash)) != 1 {
+			return "", time.Time{}, ErrEnrollment
+		}
+	}
 	hash, err := passwordHash(password)
 	if err != nil {
 		return "", time.Time{}, err

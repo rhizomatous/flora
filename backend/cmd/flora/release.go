@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 )
 
 // Release builds embed the registry digest returned after publishing the image.
@@ -20,7 +21,9 @@ func init() {
 			Commit  string `json:"commit"`
 			Image   string `json:"agent_image"`
 			Harness string `json:"harness_version"`
-		}{releaseVersion, releaseCommit, releaseImage, "1.2.27"})
+			OS      string `json:"os"`
+			Arch    string `json:"arch"`
+		}{releaseVersion, releaseCommit, releaseImage, "1.2.27", runtime.GOOS, runtime.GOARCH})
 		if err != nil {
 			return err
 		}

@@ -108,6 +108,7 @@ test(
       }
       assert.deepEqual(await json(`${base}/api/auth/status`), {
         setupRequired: true,
+        enrollmentRequired: false,
         authenticated: false,
       });
       for (const path of [

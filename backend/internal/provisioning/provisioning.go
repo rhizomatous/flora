@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -43,6 +44,10 @@ const (
 
 // Config is the narrow installation-level provisioning configuration.
 type Config struct {
+	// NetworkID and BrokerGateway opt into an installer-owned bridge. Empty values
+	// preserve the manual installation's daemon-default network and DNS setup.
+	NetworkID     string
+	BrokerGateway string
 	// UseSettings reads live capacity/activity limits and new-chat runtime snapshots.
 	// Explicit MaxRunningOverride takes precedence over the saved container cap.
 	UseSettings        bool
@@ -86,6 +91,12 @@ type Config struct {
 }
 
 func (c Config) withDefaults() (Config, error) {
+	if c.NetworkID != "" || c.BrokerGateway != "" {
+		ip := net.ParseIP(c.BrokerGateway)
+		if !hexHash(c.NetworkID) || ip == nil || ip.To4() == nil || !ip.IsPrivate() {
+			return c, errors.New("provisioning: owned network requires its full network ID and private IPv4 broker gateway")
+		}
+	}
 	if c.ImageRef == "" || c.HarnessVersion == "" {
 		return c, errors.New("provisioning: image reference and harness version are required")
 	}
@@ -345,7 +356,7 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 		info, err := m.engine.ContainerInspect(ctx, containerName(chatID))
 		switch {
 		case err == nil:
-			if err := validateOwned(info, chat, paths, imageID); err != nil {
+			if err := m.validateOwned(info, chat, paths, imageID); err != nil {
 				return Endpoint{}, err
 			}
 			if m.access != nil && info.EnvValue("FLORA_CHECKOUT_REQUIRED") != "1" {
@@ -414,7 +425,7 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 		if err != nil {
 			return Endpoint{}, err
 		}
-		if err := validateOwned(info, chat, paths, imageID); err != nil {
+		if err := m.validateOwned(info, chat, paths, imageID); err != nil {
 			return Endpoint{}, err
 		}
 	}
@@ -476,6 +487,38 @@ func validateOwned(info docker.ContainerInfo, chat storage.Chat, paths storage.P
 		if !seen {
 			return fmt.Errorf("provisioning: container %s is missing mount %q; refusing access", info.Name, bind)
 		}
+	}
+	return nil
+}
+
+// validateOwned also rejects network drift before adopting or operating a chat.
+func (m *Manager) validateOwned(info docker.ContainerInfo, chat storage.Chat, paths storage.Paths, imageID string) error {
+	if err := validateOwned(info, chat, paths, imageID); err != nil {
+		return err
+	}
+	if m.cfg.NetworkID == "" {
+		return nil
+	}
+	if info.HostConfig.Privileged {
+		return errors.New("provisioning: owned-network container is privileged; refusing access")
+	}
+	for port, bindings := range info.NetworkSettings.Ports {
+		for _, binding := range bindings {
+			if port != "4096/tcp" || binding.HostIP != "127.0.0.1" {
+				return errors.New("provisioning: container runtime port is not loopback-only; refusing access")
+			}
+		}
+	}
+	if info.HostConfig.NetworkMode != m.cfg.NetworkID || len(info.NetworkSettings.Networks) != 1 {
+		return errors.New("provisioning: container network differs from the configured owned bridge; refusing access")
+	}
+	for _, id := range info.NetworkSettings.Networks {
+		if id != m.cfg.NetworkID {
+			return errors.New("provisioning: container network identity changed; refusing access")
+		}
+	}
+	if len(info.HostConfig.ExtraHosts) != 1 || info.HostConfig.ExtraHosts[0] != "flora-github.internal:"+m.cfg.BrokerGateway {
+		return errors.New("provisioning: container broker host mapping changed; refusing access")
 	}
 	return nil
 }
@@ -552,9 +595,11 @@ func (m *Manager) containerSpec(chat storage.Chat, paths storage.Paths, password
 	env = append(env, "SETUP_TIMEOUT_SECONDS="+strconv.Itoa(int(cfg.SetupTimeout.Seconds())))
 	env = append(env, "SETUP_KILL_GRACE_SECONDS="+strconv.Itoa(int(m.cfg.SetupKillGrace.Seconds())))
 	return docker.ContainerSpec{
-		Name:  containerName(chat.ID),
-		Image: m.cfg.ImageRef,
-		Env:   env,
+		NetworkID:  m.cfg.NetworkID,
+		ExtraHosts: m.brokerHosts(),
+		Name:       containerName(chat.ID),
+		Image:      m.cfg.ImageRef,
+		Env:        env,
 		Labels: map[string]string{
 			labelManaged: "true",
 			labelChatID:  chat.ID,
@@ -571,6 +616,13 @@ func (m *Manager) containerSpec(chat storage.Chat, paths storage.Paths, password
 		MemoryBytes:  cfg.MemoryBytes,
 		PidsLimit:    cfg.PidsLimit,
 	}
+}
+
+func (m *Manager) brokerHosts() []string {
+	if m.cfg.NetworkID == "" {
+		return nil
+	}
+	return []string{"flora-github.internal:" + m.cfg.BrokerGateway}
 }
 
 // awaitReady polls until the runtime answers authenticated health checks, the
@@ -694,7 +746,7 @@ func (m *Manager) Stop(ctx context.Context, chatID string) error {
 		if err != nil {
 			return err
 		}
-		if err := validateOwned(info, chat, paths, imageID); err != nil {
+		if err := m.validateOwned(info, chat, paths, imageID); err != nil {
 			return err
 		}
 		if err := m.store.BindRuntime(ctx, chatID, info.ID, ""); err != nil {
@@ -718,7 +770,7 @@ func (m *Manager) Stop(ctx context.Context, chatID string) error {
 	if err != nil {
 		return err
 	}
-	if err := validateOwned(info, chat, paths, imageID); err != nil {
+	if err := m.validateOwned(info, chat, paths, imageID); err != nil {
 		return err
 	}
 	if m.access != nil {
@@ -788,7 +840,7 @@ func (m *Manager) Endpoint(ctx context.Context, chatID string) (Endpoint, error)
 	if m.cfg.ImageID != "" && image.ID != m.cfg.ImageID {
 		return Endpoint{}, errors.New("configured runtime image identity changed")
 	}
-	if err := validateOwned(info, chat, paths, image.ID); err != nil {
+	if err := m.validateOwned(info, chat, paths, image.ID); err != nil {
 		return Endpoint{}, err
 	}
 	if chat.ContainerID == "" {

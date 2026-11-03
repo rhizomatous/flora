@@ -142,6 +142,8 @@ func TestPausedActivityDoesNotStopContainer(t *testing.T) {
 }
 
 type fakeContainer struct {
+	networkID         string
+	extraHosts        []string
 	id, name, imageID string
 	labels            map[string]string
 	binds             []string
@@ -204,6 +206,7 @@ func (f *fakeEngine) ContainerCreate(_ context.Context, spec docker.ContainerSpe
 	id := fmt.Sprintf("container-%d", f.nextID)
 	f.created = append(f.created, spec)
 	f.containers[id] = &fakeContainer{
+		networkID: spec.NetworkID, extraHosts: spec.ExtraHosts,
 		id: id, name: spec.Name, imageID: f.imageID, labels: spec.Labels,
 		binds: spec.Binds, env: spec.Env, port: "49152",
 	}
@@ -270,6 +273,11 @@ func (f *fakeEngine) ContainerInspect(_ context.Context, idOrName string) (docke
 	info.Config.Env = c.env
 	info.Config.Labels = c.labels
 	info.HostConfig.Binds = c.binds
+	info.HostConfig.NetworkMode = c.networkID
+	info.HostConfig.ExtraHosts = c.extraHosts
+	if c.networkID != "" {
+		info.NetworkSettings.Networks = map[string]string{"flora-test": c.networkID}
+	}
 	if c.port != "" {
 		info.NetworkSettings.Ports = map[string][]docker.PortBinding{"4096/tcp": {{HostIP: "127.0.0.1", HostPort: c.port}}}
 	}
