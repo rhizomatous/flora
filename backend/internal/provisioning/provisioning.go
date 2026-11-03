@@ -294,9 +294,8 @@ func New(engine Engine, store *storage.Store, cfg Config, access WorkspaceAccess
 	}, nil
 }
 
-// storageOwner reports the uid/gid owning a storage directory. The agent user
-// inside the container is mapped to this identity so the backend keeps
-// ownership of its files and the agent can edit them.
+// storageOwner reports the uid/gid owning a storage directory. The container's
+// agent user is mapped to that bind-mount identity so it can edit its own files.
 func storageOwner(path string) (int, int, error) {
 	info, err := os.Stat(path)
 	if err != nil {

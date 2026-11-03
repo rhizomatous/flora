@@ -102,6 +102,35 @@ func TestDeploymentEngine(t *testing.T) {
 			_ = cmd.Wait()
 		}
 	}()
+	plainTransport := &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, "tcp", net.JoinHostPort(d.Addresses[0], "80"))
+	}}
+	defer plainTransport.CloseIdleConnections()
+	plain := &http.Client{Transport: plainTransport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	redirect, err := plain.Get("http://" + browserDomain + "/onboarding?step=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = redirect.Body.Close()
+	if redirect.StatusCode != 308 || redirect.Header.Get("Location") != "https://"+browserDomain+"/onboarding?step=1" {
+		t.Fatal("public port 80 did not redirect to the allowed origin")
+	}
+	for _, path := range []string{"/proc/net/tcp", "/proc/net/tcp6"} {
+		sockets, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, line := range strings.Split(string(sockets), "\n") {
+			fields := strings.Fields(line)
+			if len(fields) < 4 || fields[3] != "0A" {
+				continue
+			}
+			address, port, ok := strings.Cut(fields[1], ":")
+			if ok && (port == "0050" || port == "01BB") && strings.Trim(address, "0") == "" {
+				t.Fatalf("wildcard public/challenge listener: %s", line)
+			}
+		}
+	}
 	request := func(path, origin, body string, cookie *http.Cookie) (*http.Response, []byte) {
 		t.Helper()
 		req, _ := http.NewRequest("POST", "https://"+browserDomain+path, strings.NewReader(body))

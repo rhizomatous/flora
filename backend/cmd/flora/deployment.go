@@ -39,8 +39,9 @@ type deployment struct {
 	AgentGID  int
 }
 
-// prepareDeployment persists only app-owned network identity. Missing recorded
-// networks fail closed, since saved containers still refer to their original ID.
+// prepareDeployment saves the app's bridge, public bindings and numeric agent
+// identity. Missing recorded networks fail closed, since saved containers still
+// refer to their original ID.
 // Docker allocates the subnet from its configured address pools. No daemon,
 // host DNS, firewall, package or service settings are changed.
 func prepareDeployment(ctx context.Context, engine *docker.Client, dir, domain, bindings string) (deployment, string, error) {

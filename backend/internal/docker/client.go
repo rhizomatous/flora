@@ -128,7 +128,7 @@ type NetworkInfo struct {
 	Bridge   string
 }
 
-// NetworkCreate lets the local Engine allocate a non-overlapping bridge subnet.
+// NetworkCreate lets the local Engine allocate a bridge subnet from its pools.
 // The caller persists the returned ID and must never recreate a recorded network.
 func (c *Client) NetworkCreate(ctx context.Context, name, owner string) (string, error) {
 	r, err := c.sdk.NetworkCreate(ctx, name, client.NetworkCreateOptions{
