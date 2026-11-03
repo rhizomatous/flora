@@ -457,6 +457,19 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 		if err != nil {
 			return Endpoint{}, err
 		}
+		// Docker fills endpoint network IDs only when a created container first
+		// starts. Verify resolved membership before delivering broker credentials.
+		info, err = m.engine.ContainerInspect(ctx, containerID)
+		if err != nil {
+			return Endpoint{}, err
+		}
+		imageID, err := m.resolveImage(ctx)
+		if err != nil {
+			return Endpoint{}, err
+		}
+		if err := m.validateOwned(info, chat, paths, imageID); err != nil {
+			return Endpoint{}, err
+		}
 	}
 	if m.access != nil {
 		if err := m.access.Checkout(ctx, chat, paths, containerID); err != nil {
@@ -525,6 +538,11 @@ func (m *Manager) validateOwned(info docker.ContainerInfo, chat storage.Chat, pa
 		return errors.New("provisioning: container network differs from the configured owned bridge; refusing access")
 	}
 	for _, id := range info.NetworkSettings.Networks {
+		// Before first start Docker leaves the endpoint ID empty. The exact
+		// immutable NetworkMode above still selects the bridge for that start.
+		if id == "" && info.State.Status == "created" && !info.State.Running {
+			continue
+		}
 		if id != m.cfg.NetworkID {
 			return errors.New("provisioning: container network identity changed; refusing access")
 		}

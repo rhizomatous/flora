@@ -83,6 +83,18 @@ func TestOwnedNetworkMembership(t *testing.T) {
 			t.Fatal("accepted changed membership")
 		}
 	}
+	info.NetworkSettings.Networks = map[string]string{"pending": ""}
+	if err := manager.validateOwned(info, chat, paths, testImageID); err == nil {
+		t.Fatal("running container accepted unresolved membership")
+	}
+	info.State.Running, info.State.Status = false, "created"
+	if err := manager.validateOwned(info, chat, paths, testImageID); err != nil {
+		t.Fatal("created container with exact NetworkMode rejected before endpoint allocation", err)
+	}
+	info.State.Status = "exited"
+	if err := manager.validateOwned(info, chat, paths, testImageID); err == nil {
+		t.Fatal("stopped container accepted unresolved membership")
+	}
 }
 
 func TestOwnedNetworkConfigRejectsPartialAndUnsafeValues(t *testing.T) {

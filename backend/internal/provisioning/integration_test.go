@@ -244,6 +244,7 @@ func TestProvisioningDocker(t *testing.T) {
 			t.Fatal(err)
 		}
 		orphanID, err := engine.ContainerCreate(ctx, docker.ContainerSpec{
+			NetworkID: cfg.NetworkID, ExtraHosts: []string{"flora-github.internal:" + cfg.BrokerGateway},
 			Name:  containerName(chat.ID),
 			Image: image,
 			Env: []string{
