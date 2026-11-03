@@ -45,6 +45,7 @@ def main():
         socket = f"unix://{root}/docker.sock"
         processes = []
         logs = []
+        code = None
 
         def start(name, *args):
             log = (root / f"{name}.log").open("w+")
@@ -81,7 +82,7 @@ def main():
             run("openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
                 "-subj", "/CN=Flora fixture CA", "-addext", "basicConstraints=critical,CA:TRUE",
                 "-keyout", str(root / "ca.key"), "-out", str(root / "ca.crt"))
-            for name in ("flora-github.internal", "flora.example.test"):
+            for name in ("flora-github.internal",):
                 run("openssl", "req", "-newkey", "rsa:2048", "-nodes", "-subj", f"/CN={name}",
                     "-keyout", str(root / f"{name}.key"), "-out", str(root / f"{name}.csr"))
                 (root / "extensions").write_text(f"subjectAltName=DNS:{name}\nextendedKeyUsage=serverAuth\n")
@@ -89,13 +90,16 @@ def main():
                     "-CAkey", str(root / "ca.key"), "-CAcreateserial", "-days", "2", "-extfile", str(root / "extensions"),
                     "-out", str(root / f"{name}.crt"))
             os.chmod(root / "ca.crt", 0o644)
+            transport = root / "transport.pem"
+            transport.write_bytes((root / "flora-github.internal.crt").read_bytes() + (root / "flora-github.internal.key").read_bytes())
+            transport.chmod(0o600)
             code = secrets.token_urlsafe(32)
             enrollment = root / "enrollment.sha256"
             enrollment.write_text(hashlib.sha256(code.encode()).hexdigest())
             os.chmod(enrollment, 0o600)
             start("flora", "/flora", "-data-dir", str(root / "data"), "-public-url", "https://flora.example.test",
-                  "-agent-image=", "-github-listen", f"{gateway}:443", "-github-tls-cert", str(root / "flora-github.internal.crt"),
-                  "-github-tls-key", str(root / "flora-github.internal.key"), "-enrollment-hash-file", str(enrollment))
+                  "-agent-image=", "-github-listen", f"{gateway}:443", "-github-tls-cert", str(transport),
+                  "-github-tls-key", str(transport), "-enrollment-hash-file", str(enrollment))
             wait_for(lambda: run("curl", "--fail", "--silent", "http://127.0.0.1:8080/api/health"))
             config = root / "Caddyfile"
             authority, directory, acme_state = installer_acme_fixture.start(root, external)
@@ -168,6 +172,10 @@ def main():
                             print(error.stderr)
                             raise
                         print(result)
+            for log in logs:
+                log.flush()
+                log.seek(0)
+                assert code not in log.read(), "enrollment code reached a service log"
             print(json.dumps({"broker_gateway": gateway, "browser_local_address": external, "network_id": network_id,
                               "diagnostic_image_id": image, "tls": "local ACME HTTP-01 fixture CA, not public ACME",
                               "result": "bound HTTP-01/browser TLS, bridge hostname/SAN/CA, broker 401, protected enrollment passed"}))
@@ -176,7 +184,8 @@ def main():
             for log in logs:
                 log.flush()
                 log.seek(0)
-                print(log.read())
+                contents = log.read()
+                print(contents.replace(code, "[redacted]") if code else contents)
             raise
         finally:
             for process in reversed(processes):
