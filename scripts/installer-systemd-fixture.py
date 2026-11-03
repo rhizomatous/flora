@@ -58,6 +58,13 @@ def guard():
 
 def prepare():
     wait(lambda: run("docker", "info"))
+    # Nested systemd must enable the pids controller in its own delegated slice
+    # before Docker can apply PidsLimit to a transient container scope.
+    run("systemctl", "set-property", "system.slice", "TasksAccounting=yes")
+    run("systemctl", "set-property", "docker.service", "TasksAccounting=yes")
+    def pids_ready():
+        assert "pids" in Path("/sys/fs/cgroup/system.slice/cgroup.subtree_control").read_text().split()
+    wait(pids_ready)
     ROOT.mkdir(mode=0o700)
     run("systemctl", "disable", "--now", "caddy.service")
     Path("/etc/systemd/system/fixture-nic.service").write_text(f"""[Unit]
