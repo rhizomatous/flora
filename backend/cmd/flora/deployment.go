@@ -30,16 +30,19 @@ const brokerName = "flora-github.internal"
 // A failed first startup may leave an empty database. Populated application data
 // must retain its deployment identity, so startup cannot replace saved trust.
 func requireDeploymentIdentity(ctx context.Context, store *storage.Store, dir string) error {
-	_, err := os.Lstat(filepath.Join(dir, "deployment.json"))
-	if !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
 	chats, chatErr := store.Chats(ctx)
 	projects, projectErr := store.Projects(ctx)
 	_, adminErr := store.AdministratorHash(ctx)
 	_, credentialErr := store.Credentials(ctx)
-	if chatErr != nil || projectErr != nil || len(chats) > 0 || len(projects) > 0 || !errors.Is(adminErr, storage.ErrNotFound) || !errors.Is(credentialErr, storage.ErrNotFound) {
-		return errors.New("existing application data has no managed deployment identity; restore the saved deployment directory before starting Flora")
+	if chatErr != nil || projectErr != nil || adminErr != nil && !errors.Is(adminErr, storage.ErrNotFound) || credentialErr != nil && !errors.Is(credentialErr, storage.ErrNotFound) {
+		return errors.New("cannot inspect saved application data before checking deployment identity")
+	}
+	if len(chats) > 0 || len(projects) > 0 || adminErr == nil || credentialErr == nil {
+		b, err := privateRead(filepath.Join(dir, "deployment.json"))
+		var d deployment
+		if err != nil || json.Unmarshal(b, &d) != nil || len(d.Owner) != 48 || d.NetworkID == "" || d.Gateway == "" || d.CAHash == "" || d.AgentUID <= 0 || d.AgentGID <= 0 {
+			return errors.New("existing application data has no complete managed deployment identity; restore the saved deployment directory before starting Flora")
+		}
 	}
 	return nil
 }

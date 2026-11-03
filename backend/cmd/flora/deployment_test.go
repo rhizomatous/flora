@@ -34,6 +34,23 @@ func TestMissingDeploymentIdentity(t *testing.T) {
 	if err := requireDeploymentIdentity(ctx, store, dir); err == nil {
 		t.Fatal("populated database accepted without saved deployment")
 	}
+	if err := privateDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	d := deployment{Owner: strings.Repeat("a", 48), AgentUID: 1000, AgentGID: 1000}
+	if err := saveJSON(filepath.Join(dir, "deployment.json"), d); err != nil {
+		t.Fatal(err)
+	}
+	if err := requireDeploymentIdentity(ctx, store, dir); err == nil {
+		t.Fatal("populated database accepted incomplete deployment and could replace saved network/trust")
+	}
+	d.NetworkID, d.Gateway, d.CAHash = strings.Repeat("b", 64), "172.29.80.1", strings.Repeat("c", 64)
+	if err := saveJSON(filepath.Join(dir, "deployment.json"), d); err != nil {
+		t.Fatal(err)
+	}
+	if err := requireDeploymentIdentity(ctx, store, dir); err != nil {
+		t.Fatal("complete saved identity rejected", err)
+	}
 	projects, err := store.Projects(ctx)
 	if err != nil || len(projects) != 1 {
 		t.Fatal("identity check changed retained data", err)
