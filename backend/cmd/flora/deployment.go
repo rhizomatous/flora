@@ -152,6 +152,10 @@ func publicAddresses(explicit string, saved []string) ([]string, error) {
 		}
 	}
 	selected := saved
+	return selectPublicAddresses(explicit, selected, assigned, candidates)
+}
+
+func selectPublicAddresses(explicit string, selected []string, assigned map[string]bool, candidates []string) ([]string, error) {
 	if explicit != "" {
 		selected = strings.Split(explicit, ",")
 	} else if len(selected) == 0 {

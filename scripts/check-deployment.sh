@@ -19,6 +19,8 @@ for attempt in $(seq 1 60); do
   if [ "$attempt" = 60 ]; then docker logs "$id"; exit 1; fi
   sleep 1
 done
+# Alpine splits git-http-backend out of the CLI package used by this test image.
+docker exec "$id" apk add --no-cache git-daemon
 docker image save "$image" | docker exec -i "$id" docker image load
 docker exec -e FLORA_DEPLOYMENT_TEST=1 -e "FLORA_TEST_IMAGE=$image" "$id" \
   /deployment-test -test.v -test.timeout=5m -test.run '^TestDeploymentEngine$'

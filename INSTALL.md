@@ -45,6 +45,7 @@ settings in the browser. Starting the process does not verify your credentials o
 make model calls or GitHub writes.
 
 Flora obtains and renews browser certificates with Let's Encrypt using HTTP-01.
+Running with `-hostname` accepts that certificate authority's subscriber terms.
 Its private certificate cache and broker CA live under `data-dir/deployment`.
 The app keeps the broker signing key online for automatic leaf renewal; agents
 receive only public CA trust and per-chat capabilities, never GitHub tokens or

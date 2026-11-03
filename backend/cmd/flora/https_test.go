@@ -315,6 +315,51 @@ func TestDomainAndHostIsolation(t *testing.T) {
 	}
 }
 
+func TestPublicAddressSelection(t *testing.T) {
+	assigned := map[string]bool{"10.0.0.2": true, "10.1.0.2": true, "2001:db8::2": true}
+	for _, test := range []struct {
+		explicit          string
+		saved, candidates []string
+		valid             bool
+	}{
+		{"", nil, []string{"10.0.0.2"}, true},
+		{"", nil, []string{"10.0.0.2", "10.1.0.2"}, false},
+		{"10.1.0.2,2001:db8::2", nil, nil, true},
+		{"203.0.113.5", nil, nil, false},
+		{"0.0.0.0", nil, nil, false},
+		{"::", nil, nil, false},
+		{"127.0.0.1", nil, nil, false},
+		{"172.17.0.1", nil, nil, false},
+		{"10.0.0.2,10.0.0.2", nil, nil, false},
+		{"", []string{"10.0.0.2"}, []string{"10.0.0.2", "10.1.0.2"}, true},
+	} {
+		if _, err := selectPublicAddresses(test.explicit, test.saved, assigned, test.candidates); (err == nil) != test.valid {
+			t.Errorf("%+v: %v", test, err)
+		}
+	}
+}
+
+func TestHTTPSIPv6(t *testing.T) {
+	l, err := net.Listen("tcp6", "[::1]:0")
+	if err != nil {
+		t.Skipf("IPv6 unavailable: %v", err)
+	}
+	defer l.Close()
+	cache := filepath.Join(t.TempDir(), "certificates")
+	roots := issueBrowserCertificate(t, cache)
+	_, secure, err := publicServers(browserDomain, cache, http.NotFoundHandler(), &autocert.Manager{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer secure.Close()
+	go func() { _ = secure.ServeTLS(l, "", "") }()
+	conn, err := tls.Dial("tcp", l.Addr().String(), &tls.Config{RootCAs: roots, ServerName: browserDomain})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = conn.Close()
+}
+
 func TestPrivateBrokerTrust(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.Chmod(dir, 0700); err != nil {

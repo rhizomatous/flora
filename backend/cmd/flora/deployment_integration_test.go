@@ -275,6 +275,45 @@ func TestDeploymentEngine(t *testing.T) {
 	if _, err := manager.Start(ctx, chat.ID); err == nil {
 		t.Fatal("extra network accepted")
 	}
+	if err := exec.CommandContext(ctx, "docker", "network", "disconnect", "bridge", endpoint.ContainerID).Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.Stop(ctx, chat.ID); err != nil {
+		t.Fatal(err)
+	}
+	stopBroker()
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		l, err := listenDevice(ctx, net.JoinHostPort(d.Gateway, "443"), device)
+		if err == nil {
+			_ = l.Close()
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("broker did not shut down", err)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	cmd = start()
+	stop(cmd)
+	retained, err := engine.ContainerInspect(ctx, endpoint.ContainerID)
+	if err != nil || retained.ID != endpoint.ContainerID || retained.State.Running {
+		t.Fatal("application restart changed retained stopped container", err)
+	}
+	// Removing a saved network must fail, never make a replacement. Removing
+	// only the fixture's container first also releases its writable layer.
+	if err := engine.ContainerRemove(ctx, endpoint.ContainerID, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := exec.CommandContext(ctx, "docker", "network", "rm", d.NetworkID).Run(); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := prepareDeployment(ctx, engine, dir, browserDomain, ""); err == nil {
+		t.Fatal("missing recorded network was recreated")
+	}
 	t.Log("Actual binary: protected HTTPS enrollment and restart. Production bridge/broker/manager: clone, fetch, stock gh, revocation, retained workspace/layer, foreign ingress and network drift checks passed.")
 }
 
