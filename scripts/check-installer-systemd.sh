@@ -22,6 +22,13 @@ fi
 if [[ -n ${RUNNER_TEMP:-} && ${GOCACHE:-} == "${RUNNER_TEMP:-}/flora-installer-go-cache" && ! -L ${GOCACHE:-} ]]; then
   rm -rf -- "$GOCACHE"
 fi
+if [[ ${GITHUB_ACTIONS:-} == true && -n ${RUNNER_TEMP:-} && ${npm_config_cache:-} == "${RUNNER_TEMP:-}/flora-installer-npm-cache" && ! -L ${npm_config_cache:-} ]]; then
+  # These outputs were built by this fresh-checkout job. The installed archive
+  # and the remaining provisioning-test binary do not load frontend build tools.
+  rm -rf -- "$npm_config_cache" node_modules
+  rm -f -- bin/flora-linux-amd64 bin/flora-linux-arm64 bin/docker-network-test \
+    dist/flora-v0.0.0-fixture-linux-amd64.tar.gz dist/flora-v0.0.0-fixture-linux-arm64.tar.gz
+fi
 docker exec -e "FLORA_FIXTURE_COMMIT=$(git rev-parse HEAD)" "$container" python3 /scripts/installer-systemd-fixture.py exercise
 docker restart "$container" >/dev/null
 docker exec "$container" python3 /scripts/installer-systemd-fixture.py verify-restart
