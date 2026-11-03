@@ -14,6 +14,11 @@ pin=$(docker exec "$container" python3 /scripts/installer-systemd-fixture.py pre
 printf 'Fixture agent image: %s\n' "$pin"
 bash scripts/package-release.sh v0.0.0-fixture "$pin"
 docker cp "dist/flora-v0.0.0-fixture-linux-$arch.tar.gz" "$container:/fixture-release.tar.gz"
+# Free only this job's private compilation cache after packaging. The real host
+# free-space requirement remains unchanged when the installer starts.
+if [[ -n ${RUNNER_TEMP:-} && ${GOCACHE:-} == "${RUNNER_TEMP:-}/flora-installer-go-cache" && ! -L ${GOCACHE:-} ]]; then
+  rm -rf -- "$GOCACHE"
+fi
 docker exec -e "FLORA_FIXTURE_COMMIT=$(git rev-parse HEAD)" "$container" python3 /scripts/installer-systemd-fixture.py exercise
 docker restart "$container" >/dev/null
 docker exec "$container" python3 /scripts/installer-systemd-fixture.py verify-restart

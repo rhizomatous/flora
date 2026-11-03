@@ -94,8 +94,6 @@ WantedBy=network-online.target
     run("docker", "build", "-t", "localhost:51848/flora-agent:fixture", "/agent-image")
     run("docker", "push", "localhost:51848/flora-agent:fixture")
     image = json.loads(run("docker", "image", "inspect", "localhost:51848/flora-agent:fixture"))[0]
-    print(json.dumps({"storage_filesystem": run("findmnt", "-n", "-o", "FSTYPE", "-T", "/var/lib"),
-                      "storage_free_bytes": shutil.disk_usage("/var/lib").free}), file=sys.stderr)
     print(image["RepoDigests"][0])
 
 
@@ -185,6 +183,8 @@ def fixture_install():
 
 
 def exercise():
+    print(json.dumps({"storage_filesystem": run("findmnt", "-n", "-o", "FSTYPE", "-T", "/var/lib"),
+                      "storage_free_bytes": shutil.disk_usage("/var/lib").free}))
     for command in ("renew", "enrollment-code"):
         refusal = subprocess.run([sys.executable, "/packaging/ubuntu.py", command], text=True, capture_output=True)
         assert refusal.returncode == 1 and "no recorded installer state" in refusal.stderr
