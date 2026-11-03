@@ -28,6 +28,7 @@ jobs:
         run: |
           nix develop --command make deps build-linux
           CGO_ENABLED=0 nix develop --command go -C backend test -c -o ../bin/docker-network-test ./internal/docker
+          CGO_ENABLED=0 nix develop --command go -C backend test -c -o ../bin/provisioning-test ./internal/provisioning
       - name: Exercise owned bridge, scoped firewall, bound HTTP-01 and protected enrollment inside a disposable nested Engine
         run: |
           docker build -f scripts/installer-network.Dockerfile -t flora-installer-fixture:ci .
@@ -35,6 +36,8 @@ jobs:
             --mount type=bind,src="$PWD/bin/flora-linux-${{ matrix.arch }}",dst=/flora,readonly \
             --mount type=bind,src="$PWD/bin/docker-network-test",dst=/docker-network-test,readonly \
             flora-installer-fixture:ci
+      - name: Exercise complete install, resume and uninstall with real systemd in an owned container
+        run: nix develop --command bash scripts/check-installer-systemd.sh flora-installer-fixture:ci ${{ matrix.arch }}
 
   archive:
     strategy:

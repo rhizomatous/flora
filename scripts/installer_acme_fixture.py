@@ -9,7 +9,7 @@ import subprocess
 import threading
 
 
-def start(root, external):
+def start(root, external, domain="flora.example.test"):
     state = {"validated": False, "certificate": None, "thumbprint": None}
     token = secrets.token_urlsafe(24)
 
@@ -47,19 +47,19 @@ def start(root, external):
                 self.reply({"status": "valid"}, 201, "/account/1")
             elif self.path in ("/order", "/order/1"):
                 order = {"status": "valid" if state["certificate"] else "ready" if state["validated"] else "pending",
-                         "identifiers": [{"type": "dns", "value": "flora.example.test"}],
+                         "identifiers": [{"type": "dns", "value": domain}],
                          "authorizations": [base + "/authz/1"], "finalize": base + "/finalize/1"}
                 if state["certificate"]:
                     order["certificate"] = base + "/certificate/1"
                 self.reply(order, 201 if self.path == "/order" else 200, "/order/1")
             elif self.path == "/authz/1":
                 self.reply({"status": "valid" if state["validated"] else "pending",
-                            "identifier": {"type": "dns", "value": "flora.example.test"},
+                            "identifier": {"type": "dns", "value": domain},
                             "challenges": [{"type": "http-01", "url": base + "/challenge/1", "token": token,
                                             "status": "valid" if state["validated"] else "pending"}]})
             elif self.path == "/challenge/1":
                 connection = http.client.HTTPConnection(external, 80, timeout=10)
-                connection.request("GET", f"/.well-known/acme-challenge/{token}", headers={"Host": "flora.example.test"})
+                connection.request("GET", f"/.well-known/acme-challenge/{token}", headers={"Host": domain})
                 response = connection.getresponse()
                 actual = response.read().decode()
                 connection.close()

@@ -84,6 +84,40 @@ class ReleaseTests(unittest.TestCase):
 
 
 class NetworkTests(unittest.TestCase):
+    def test_default_route_selects_host_nic_despite_docker_bridges_and_veths(self):
+        interfaces = [
+            {"ifname": "lo", "link_type": "loopback", "addr_info": [{"local": "127.0.0.1", "scope": "host"}]},
+            {"ifname": "ens5", "link_type": "ether", "addr_info": [{"local": "10.0.0.2", "scope": "global"}]},
+            {"ifname": "docker0", "linkinfo": {"info_kind": "bridge"}, "addr_info": [{"local": "172.17.0.1", "scope": "global"}]},
+            {"ifname": "br-abcdef", "linkinfo": {"info_kind": "bridge"}, "addr_info": [{"local": "172.30.64.1", "scope": "global"}]},
+            {"ifname": "custom-bridge", "linkinfo": {"info_kind": "bridge"}, "addr_info": [{"local": "10.99.0.1", "scope": "global"}]},
+            {"ifname": "custom-peer", "linkinfo": {"info_kind": "veth"}, "addr_info": [{"local": "10.98.0.1", "scope": "global"}]},
+        ]
+
+        def ip(*args):
+            if "address" in args:
+                return json.dumps(interfaces)
+            if "default" in args:
+                return json.dumps([{"dst": "default", "gateway": "10.0.0.1", "dev": "ens5"}])
+            return json.dumps([{"dst": "1.1.1.1", "gateway": "10.0.0.1", "dev": "ens5", "prefsrc": "10.0.0.2"}])
+
+        with patch.object(ubuntu, "run", side_effect=ip), patch.object(ubuntu.socket, "getaddrinfo", return_value=[(None, None, None, None, ("203.0.113.2", 443))]):
+            self.assertEqual(ubuntu.addresses(None, "flora.example.com"), ["10.0.0.2"])
+            for invalid in ("203.0.113.2", "0.0.0.0", "172.17.0.1", "10.99.0.1", "10.98.0.1"):
+                with self.assertRaisesRegex(ValueError, "assigned local NIC"):
+                    ubuntu.addresses([invalid], "flora.example.com")
+
+    def test_resource_failures_precede_release_download_and_execution(self):
+        args = SimpleNamespace(experimental=True, hostname="flora.example.com", version="v1.2.3")
+        installation = SimpleNamespace(state={}, verify_files=Mock())
+        for disk, filesystem, memory, error in ((0, "ext4", 4 * 1024**3, "free local disk"),
+                                                (20 * 1024**3, "nfs", 4 * 1024**3, "local ext4"),
+                                                (20 * 1024**3, "ext4", 1024**3, "host memory")):
+            with patch.object(ubuntu.shutil, "disk_usage", return_value=SimpleNamespace(free=disk)), patch.object(ubuntu, "run", return_value=filesystem), patch.object(ubuntu.os, "sysconf", side_effect=lambda key: memory if key == "SC_PHYS_PAGES" else 1), patch.object(ubuntu, "stage") as stage:
+                with self.assertRaisesRegex(ValueError, error):
+                    ubuntu.install(args, "amd64", installation)
+                stage.assert_not_called()
+
     def test_unsupported_hosts_fail_before_installer_state_is_created(self):
         with patch.object(ubuntu.os, "geteuid", return_value=0), patch.object(ubuntu.platform, "system", return_value="Linux"), patch.object(ubuntu.platform, "freedesktop_os_release", return_value={"ID": "ubuntu", "VERSION_ID": "22.04"}), patch.object(ubuntu, "Installation") as installation, patch.object(sys, "argv", ["ubuntu.py", "install", "--version", "v1.2.3", "--experimental"]):
             with self.assertRaisesRegex(ValueError, "24.04"):
@@ -112,7 +146,7 @@ class NetworkTests(unittest.TestCase):
                 ubuntu.hostname(value)
 
     def test_aaaa_without_ipv6_path_and_unassigned_nat_ip_fail(self):
-        interfaces = [{"addr_info": [{"local": "10.0.0.2", "scope": "global"}]}]
+        interfaces = [{"ifname": "ens5", "link_type": "ether", "addr_info": [{"local": "10.0.0.2", "scope": "global"}]}]
         dns = [(None, None, None, None, ("2001:db8::2", 443))]
         with patch.object(ubuntu, "run", return_value=json.dumps(interfaces)), patch.object(ubuntu.socket, "getaddrinfo", return_value=dns):
             with self.assertRaisesRegex(ValueError, "AAAA"):
@@ -150,6 +184,30 @@ class OwnershipTests(unittest.TestCase):
         target.chmod(0o644)
         with self.assertRaisesRegex(ValueError, "drift"):
             self.installation.verify_files()
+
+    def test_missing_state_commands_fail_without_creating_an_installation(self):
+        self.installation.lock.close()
+        missing = self.root / "missing-state"
+        with patch.object(ubuntu, "STATE", missing), patch.object(ubuntu, "platform_check", return_value="amd64"):
+            for command in ("renew", "enrollment-code"):
+                with patch.object(sys, "argv", ["ubuntu.py", command]):
+                    with self.assertRaisesRegex(ValueError, "no recorded installer state"):
+                        ubuntu.main()
+                self.assertFalse(missing.exists())
+
+    def test_probe_cleanup_requires_both_exact_name_and_owner_label(self):
+        name = ubuntu.probe_name(self.installation)
+        for actual_name, owner in ((name, "foreign"), ("foreign-name", self.installation.state["owner"])):
+            calls = []
+
+            def docker(*args):
+                calls.append(args)
+                return "candidate" if args[0] == "ps" else json.dumps([{"Id": "candidate", "Name": "/" + actual_name, "Config": {"Labels": {"flora.installer": owner}}}])
+
+            with patch.object(ubuntu, "docker", side_effect=docker):
+                with self.assertRaisesRegex(ValueError, "foreign container"):
+                    ubuntu.cleanup_probe(self.installation)
+            self.assertFalse(any("rm" in call for call in calls))
 
     def test_interrupted_atomic_private_key_change_recovers_one_pem(self):
         target = self.root / "transport.pem"

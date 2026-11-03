@@ -117,6 +117,9 @@ def main():
             assert acme_state["validated"] and acme_state["certificate"]
             authority.shutdown()
             assert status["setupRequired"] and status["enrollmentRequired"]
+            assert run("curl", "--noproxy", "*", "--silent", "--show-error", "--cacert", str(root / "ca.crt"),
+                       "--resolve", f"flora-github.internal:443:{gateway}", "--output", "/dev/null", "--write-out", "%{http_code}",
+                       "https://flora-github.internal/") == "401"
             body = json.dumps({"password": "fixture unique administrator password"})
             try:
                 browser("/api/auth/bootstrap", "-H", "Content-Type: application/json", "-H", "Origin: https://flora.example.test", "--data-binary", body)

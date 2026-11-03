@@ -126,14 +126,27 @@ def choose_subnet(routes, networks):
 
 
 def addresses(selected, domain):
-    interfaces = json.loads(run("ip", "-j", "address", "show"))
-    assigned = {entry["local"] for interface in interfaces for entry in interface["addr_info"]
-                if entry.get("scope") == "global" and not ipaddress.ip_address(entry["local"]).is_loopback}
+    interfaces = json.loads(run("ip", "-j", "-details", "address", "show"))
+    # A veth or bridge address is assigned too, but is not a browser NIC. Use
+    # link metadata as well as Docker's usual names, including custom bridges.
+    nics = {interface["ifname"]: interface for interface in interfaces
+            if interface.get("link_type") != "loopback"
+            and interface.get("linkinfo", {}).get("info_kind") not in ("bridge", "veth")
+            and not interface["ifname"].startswith(("docker", "br-", "veth"))}
+    assigned = {entry["local"] for interface in nics.values() for entry in interface["addr_info"]
+                if entry.get("scope") == "global" and not ipaddress.ip_address(entry["local"]).is_loopback
+                and not {"tentative", "dadfailed", "deprecated"}.intersection(entry.get("flags", []))}
     if not selected:
-        routes = json.loads(run("ip", "-j", "route", "get", "1.1.1.1"))
-        candidates = {route["prefsrc"] for route in routes if route.get("prefsrc") in assigned}
-        # A multi-homed host needs an explicit local address choice, including NAT.
-        if len(candidates) != 1 or len(assigned) != 1:
+        routes = json.loads(run("ip", "-j", "route", "show", "default"))
+        candidates = set()
+        for route in routes:
+            if route.get("dev") not in nics or route.get("type", "unicast") != "unicast":
+                continue
+            resolved = json.loads(run("ip", "-j", "route", "get", "1.1.1.1", "oif", route["dev"]))
+            for actual in resolved:
+                if actual.get("dev") == route["dev"] and actual.get("prefsrc") in assigned:
+                    candidates.add(actual["prefsrc"])
+        if len(candidates) != 1:
             raise ValueError("ambiguous external interface; pass --bind-address for each local NIC address serving browser traffic (not an unassigned NAT public IP)")
         selected = sorted(candidates)
     selected = [str(ipaddress.ip_address(value)) for value in selected]
@@ -172,8 +185,8 @@ https://{domain} {{
 
 
 class Installation:
-    def __init__(self, lock=True):
-        if not lock and not (STATE / "state.json").is_file():
+    def __init__(self, lock=True, existing=False):
+        if (existing or not lock) and not (STATE / "state.json").is_file():
             raise ValueError("no recorded installer state; install or restore the same-release state first")
         private_directory(STATE)
         if lock:
@@ -283,13 +296,15 @@ class Installation:
     def firewall(self):
         network = self.state["network"]
         chain = "FLORA_" + self.state["owner"][:12]
-        rules = [["-i", network["bridge"], "-j", "ACCEPT"], ["-j", "REJECT", "--reject-with", "icmp-port-unreachable"]]
+        scope = ["-d", network["gateway"] + "/32", "-p", "tcp", "-m", "tcp", "--dport", "443"]
+        rules = [[*scope[:2], "-i", interface, *scope[2:], "-j", "ACCEPT"] for interface in ("lo", network["bridge"])]
+        rules.append([*scope, "-j", "REJECT", "--reject-with", "icmp-port-unreachable"])
         result = subprocess.run(["iptables", "-w", "-S", chain], capture_output=True, text=True)
         expected = ["-N " + chain] + ["-A " + chain + " " + " ".join(rule) for rule in rules]
         if result.returncode == 0:
             actual = result.stdout.strip().splitlines()
             if actual != expected[:len(actual)] or len(actual) > len(expected):
-                raise ValueError("installer firewall chain differs from its two scoped rules")
+                raise ValueError("installer firewall chain differs from its scoped loopback/bridge rules")
             for rule in rules[max(0, len(actual) - 1):]:
                 run("iptables", "-w", "-A", chain, *rule)
         else:
@@ -372,6 +387,7 @@ def install(args, arch, installation):
     if state.get("version") and (state["version"] != args.version or state["hostname"] != domain):
         raise ValueError("refusing an implicit upgrade or hostname change")
     installation.verify_files()
+    resource_preflight()
     # No application changes before package integrity/identity verification.
     with tempfile.TemporaryDirectory(prefix="download-", dir=STATE) as temporary:
         package, identity = stage(Path(temporary), args.version, arch, args.allow_prerelease)
@@ -379,12 +395,6 @@ def install(args, arch, installation):
         bindings = addresses(args.bind_address or state.get("bindings"), domain)
         if state.get("bindings") and state["bindings"] != bindings:
             raise ValueError("refusing an implicit browser interface change")
-        if shutil.disk_usage("/var/lib").free < 10 * 1024**3:
-            raise ValueError("at least 10 GiB free local disk is required before installation; chats need additional space")
-        if run("findmnt", "-n", "-o", "FSTYPE", "-T", "/var/lib") not in ("ext4", "xfs", "btrfs", "zfs"):
-            raise ValueError("persistent local ext4, xfs, btrfs or zfs storage is required; remote/overlay filesystems are unsupported")
-        if os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") < 2 * 1024**3:
-            raise ValueError("at least 2 GiB host memory is required; each default chat allows 8 GiB and needs separate capacity planning")
         if not state.get("version"):
             for name in ("flora", "flora-proxy"):
                 try:
@@ -495,12 +505,19 @@ WantedBy=timers.target
         run("systemctl", "daemon-reload")
         run("systemctl", "enable", "--now", "flora-network.service", "flora.service", "flora-proxy.service", "flora-renew.timer")
         probe(installation)
-        state["ready"] = True
-        installation.save()
         print(f"Open https://{domain}. Complete administrator, GitHub and hosted-provider setup in the browser.")
         print("Verified private TLS route and runtime image only. Real checkout and paid model inference require your explicit browser actions.")
         print("Recovery: systemctl status flora flora-proxy; journalctl -u flora -u flora-proxy; rerun this same explicit version.")
         print("Private signing key is retained root-only for automated renewal. This is an online-key tradeoff, not encrypted-at-rest credential storage.")
+
+
+def resource_preflight():
+    if shutil.disk_usage("/var/lib").free < 10 * 1024**3:
+        raise ValueError("at least 10 GiB free local disk is required before installation; chats need additional space")
+    if run("findmnt", "-n", "-o", "FSTYPE", "-T", "/var/lib") not in ("ext4", "xfs", "btrfs", "zfs"):
+        raise ValueError("persistent local ext4, xfs, btrfs or zfs storage is required; remote/overlay filesystems are unsupported")
+    if os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") < 2 * 1024**3:
+        raise ValueError("at least 2 GiB host memory is required; each default chat allows 8 GiB and needs separate capacity planning")
 
 
 def pki(installation, gid, renew=False, directory=Path("/etc/flora")):
@@ -574,19 +591,8 @@ def probe(installation):
     state["image_id"] = actual["Id"]
     installation.save()
     gateway = state["network"]["gateway"]
-    name = "flora-install-probe-" + state["owner"]
-
-    def cleanup():
-        ids = docker("ps", "--all", "--quiet", "--filter", f"name=^/{name}$").splitlines()
-        for container_id in ids:
-            info = json.loads(docker("container", "inspect", container_id))[0]
-            if info["Name"] != "/" + name or info["Config"].get("Labels", {}).get("flora.installer") != state["owner"]:
-                raise ValueError("foreign container occupies the installer probe name; refusing cleanup")
-            docker("container", "rm", "--force", info["Id"])
-        state.pop("probe_id", None)
-        installation.save()
-
-    cleanup()
+    name = probe_name(installation)
+    cleanup_probe(installation)
     # No host keys, database, upstream credentials or Engine socket enter this
     # temporary runtime. Its endpoint password exists only in a private env file.
     environment = STATE / "probe.env"
@@ -615,7 +621,7 @@ def probe(installation):
                     raise ValueError("agent runtime did not become healthy within 60 seconds")
                 time.sleep(1)
     finally:
-        cleanup()
+        cleanup_probe(installation)
         environment.unlink(missing_ok=True)
     # Verify the local proxy, without requiring NAT hairpin routing or accepting
     # an unrelated host reached through a stale public DNS record.
@@ -632,6 +638,23 @@ def probe(installation):
                 time.sleep(1)
 
 
+def probe_name(installation):
+    return "flora-install-probe-" + installation.state["owner"]
+
+
+def cleanup_probe(installation):
+    name = probe_name(installation)
+    ids = docker("ps", "--all", "--quiet", "--filter", f"name=^/{name}$").splitlines()
+    for container_id in ids:
+        info = json.loads(docker("container", "inspect", container_id))[0]
+        if info["Name"] != "/" + name or info["Config"].get("Labels", {}).get("flora.installer") != installation.state["owner"]:
+            raise ValueError("foreign container occupies the installer probe name; refusing cleanup")
+        docker("container", "rm", "--force", info["Id"])
+    installation.state.pop("probe_id", None)
+    installation.save()
+    (STATE / "probe.env").unlink(missing_ok=True)
+
+
 def uninstall(args, installation):
     installation.verify_files()
     if not installation.state.get("version"):
@@ -646,16 +669,15 @@ def uninstall(args, installation):
         raise ValueError("running chats block uninstall; stop/revoke every chat through Flora first")
     if not args.yes and ask("Disable only Flora services, preserving data, keys, accounts, stopped containers, image and network? [yes/no] ") != "yes":
         raise ValueError("uninstall cancelled")
+    cleanup_probe(installation)
     for service in ("flora-proxy.service", "flora.service", "flora-renew.timer", "flora-network.service"):
         run("systemctl", "disable", "--now", service)
+    cleanup_probe(installation)
     if docker("ps", "--quiet", "--filter", "label=flora.managed=true"):
         run("systemctl", "enable", "--now", "flora-network.service", "flora.service", "flora-proxy.service", "flora-renew.timer")
         raise ValueError("a chat started during uninstall; Flora was re-enabled, stop/revoke chats through the browser before retrying")
     # Keep files and the private firewall protection for recoverable same-release
     # reinstall. Never remove Docker/Caddy packages, images or retained chat layers.
-    installation.state["ready"] = False
-    installation.state["disabled"] = True
-    installation.save()
     print("Flora services disabled. All installation data and runtime resources retained. Same-release install re-enables them. No purge is provided.")
 
 
@@ -682,7 +704,9 @@ def main():
     if args.command == "install" and not args.experimental:
         raise ValueError("--experimental is required for disposable evaluation; full host acceptance is outstanding")
     os.umask(0o077)
-    installation = Installation(lock=args.command not in ("check-network", "verify-network"))
+    installation = Installation(lock=args.command not in ("check-network", "verify-network"), existing=args.command != "install")
+    if args.command in ("renew", "enrollment-code") and not installation.state.get("flora"):
+        raise ValueError("installation has no recorded Flora account; finish or restore the same-release installation first")
     if args.command == "install":
         install(args, arch, installation)
     elif args.command == "uninstall":
