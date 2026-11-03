@@ -42,6 +42,18 @@ listener port while passing TLS through unchanged. Do not expose this listener
 through the public browser proxy. Keep its private key and the storage root out of
 container mounts. Only the public CA certificate is delivered to containers.
 
+The experimental Ubuntu installer instead owns a labeled user-defined bridge.
+`-agent-network-id FULL_ID -agent-broker-gateway PRIVATE_IPV4` requires its
+immutable ID and inspected gateway, attaches every chat to exactly that network,
+and adds `flora-github.internal:GATEWAY` to the container hosts file. Advertise
+`-github-host flora-github.internal` with that DNS SAN and bind the broker to
+gateway:443. No daemon-wide DNS or `host-gateway` substitution is used. The
+installer binds Caddy to separate local NIC addresses and installs scoped broker
+ingress rules. See [installation status and limits](../INSTALL.md). Network or
+alias drift blocks adoption, restart, stop and recovery; missing networks are not
+silently recreated under saved chats. With both optional settings absent, the
+manual/default-network behavior is unchanged.
+
 Construct `githubbroker.NewAccess` with the broker, Docker client, private hostname,
 CA PEM, and optional commit author override, then pass it to `provisioning.New`.
 This is the provisioning checkout callback used by browser chat startup.

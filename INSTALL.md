@@ -8,6 +8,101 @@ Node, Go, Nix, OpenCode installation, SQLite library or Docker CLI is required.
 The administrative examples below use the Docker CLI for inspection and backups;
 Flora itself talks directly to the Engine API.
 
+## Experimental Ubuntu host installer
+
+The opinionated installer is **not production-ready**. It requires
+`--experimental` for disposable evaluation. Full Ubuntu systemd installation,
+reboot/interruption recovery, uninstall/reinstall and public ACME acceptance are
+outstanding. The isolated Ubuntu topology fixture exercises a nested Engine, the
+actual Docker SDK, scoped broker firewall rules and Caddy HTTP-01 with a local test
+CA. That is not a fresh-host or public-CA acceptance result.
+
+This path targets Ubuntu 24.04 LTS amd64/arm64, systemd, persistent local storage,
+one rootful local Engine and a real domain. Public DNS and inbound TCP 80/443 must
+already reach the host. AAAA records need a working IPv6 path. Behind NAT, select
+the **assigned local NIC address**, not an unassigned public address. Private
+browser names and manually trusted browser CAs are not supported here.
+
+Use an explicit future published release containing these assets and Linux
+architecture metadata. **v0.0.1-alpha.1 does not contain them.** Nothing here
+publishes a release or makes a private GHCR package public. Do not guess an image
+digest or substitute a development build or stable `latest` endpoint.
+
+Download and review the entrypoint before running it:
+
+```sh
+VERSION=vX.Y.Z  # an actual published release supporting this installer
+curl --proto '=https' --proto-redir '=https' -fL \
+  "https://raw.githubusercontent.com/rhizomatous/flora/$VERSION/packaging/bootstrap.sh" \
+  -o flora-bootstrap.sh
+less flora-bootstrap.sh
+sudo sh flora-bootstrap.sh "$VERSION" flora.example.com --experimental
+```
+
+The last command verifies the selected architecture's archive and source identity,
+configures Flora and hands off to browser credential setup. Add
+`--allow-prerelease` for an explicit prerelease and `--install-dependencies` to
+consent to missing Docker/Caddy packages from authenticated Ubuntu apt repositories.
+It does not replace an incompatible Engine, restart an existing Engine, change
+daemon DNS or rewrite an existing proxy. An occupied 80/443/8080 listener stops
+installation. For ambiguous interfaces, supply `--bind-address LOCAL_IP` for each
+browser NIC address.
+
+The Flora binary still uses the Engine API directly. The installer's root-owned
+startup/network helper requires the administrative Docker CLI to remain installed.
+
+The entrypoint and Python helpers execute with root authority. Review the helpers
+at the same release tag too, or use a separately reviewed, commit-pinned source
+copy. HTTPS and same-release SHA256SUMS detect corruption, not a compromised
+release/bootstrap source. There is no independent signature/provenance guarantee.
+From an already verified archive, the equivalent entrypoint is:
+
+```sh
+sudo sh flora-release/install.sh --ubuntu --version "$VERSION" \
+  --hostname flora.example.com --experimental
+```
+
+The installer records a labeled bridge's subnet, gateway, interface and immutable
+ID. Each chat uses it and `flora-github.internal:GATEWAY` in its hosts file.
+Ordinary DNS and outbound NAT stay unchanged. The broker binds gateway:443 and
+Caddy binds only the selected NIC addresses. Scoped INPUT rules allow the owned
+bridge to the broker and reject other interfaces, including routed access. This
+is not an outbound sandbox.
+
+Enter the terminal's one-time enrollment code in the browser form, never in a URL
+or command argument. Only its SHA256 digest is saved. The database atomically
+admits one administrator, and enrollment cannot be replayed across restarts. To
+replace a lost code, run `sudo python3 /opt/flora/ubuntu.py enrollment-code` from a
+private terminal. This does not reopen an existing administrator account. Manual
+installations and local development retain their setup flow unless
+`-enrollment-hash-file` is explicitly configured.
+
+Ownership state lives in `/var/lib/flora-installer` (root-only 0700). Reruns accept
+the same release only and refuse file/network/identity drift. Interrupted account
+or CA creation can require manual inspection. Never delete retained state to
+silence an error. The root-only CA signer stays online there for renewal; only
+public trust enters chats. The leaf certificate/key share one atomic root:flora
+0640 PEM. A daily timer checks expiry and renews under the same CA, restarting
+Flora when necessary. An online signer is an automation tradeoff against the
+offline manual guide below. This does not add at-rest encryption for saved
+GitHub/provider credentials.
+
+The temporary image probe checks the private route, CA/SAN, broker rejection,
+outbound GitHub HTTPS and authenticated runtime health. Local browser TLS is
+checked on each selected NIC. These do not establish public reachability, real
+checkout, paid inference or capacity for ten 8-GiB chats. After onboarding, test
+your intended project and provider explicitly. The installer makes no model calls
+or GitHub writes.
+
+For data-preserving removal, stop every chat through Flora first, then run
+`sudo python3 /opt/flora/ubuntu.py uninstall --runtime retain`. It refuses running
+chats and disables only owned services, retaining files, numeric accounts, keys,
+data, stopped containers, their network and image. Same-release installation
+re-enables them. Shared Docker/Caddy packages are never removed. Destructive purge
+and cross-release upgrades are unsupported. Include `/var/lib/flora-installer` and
+`/var/lib/flora-proxy` in the recovery set below, preserving permissions and the
+same Docker state.
+
 ## Select a release
 
 Use a published `vX.Y.Z` release, or an explicitly labeled prerelease such as
@@ -70,7 +165,11 @@ Configure DNS used by the Docker daemon's containers so
 DNS server can serve an A record for this name; configure Docker's `dns` setting
 to that server if the host resolver is not reachable from containers. Merge with
 existing daemon configuration, then restart Docker during installation, before
-there are chats. Flora does not add host aliases. Verify DNS **from a container**.
+there are chats. This manual default-network path does not add host aliases.
+Alternatively, `-agent-network-id FULL_ID -agent-broker-gateway PRIVATE_IPV4`
+requires an inspected user-defined bridge and adds the fixed broker alias.
+Saved containers with different network membership or aliases are refused, not
+reconstructed or migrated. Verify DNS **from a container**.
 Do not publish this hostname in public DNS or expose the listener publicly.
 
 If you do not already run private DNS, a dedicated Debian/Ubuntu host can run

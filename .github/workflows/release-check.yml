@@ -9,6 +9,33 @@ permissions:
   contents: read
 
 jobs:
+  installer-topology:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # v34
+      - name: Build fixture binaries without publishing
+        run: |
+          nix develop --command make deps build-linux
+          CGO_ENABLED=0 nix develop --command go -C backend test -c -o ../bin/docker-network-test ./internal/docker
+      - name: Exercise owned bridge, scoped firewall, bound HTTP-01 and protected enrollment inside a disposable nested Engine
+        run: |
+          docker build -f scripts/installer-network.Dockerfile -t flora-installer-fixture:ci .
+          docker run --rm --privileged --label flora.fixture=installer -e FLORA_DISPOSABLE_FIXTURE=1 \
+            --mount type=bind,src="$PWD/bin/flora-linux-${{ matrix.arch }}",dst=/flora,readonly \
+            --mount type=bind,src="$PWD/bin/docker-network-test",dst=/docker-network-test,readonly \
+            flora-installer-fixture:ci
+
   archive:
     strategy:
       matrix:
