@@ -30,43 +30,14 @@ func main() {
 	addr := flag.String("listen", "127.0.0.1:8080", "HTTP listen address")
 	dataDir := flag.String("data-dir", "./flora-data", "private persistent storage directory (local filesystem)")
 	publicURL := flag.String("public-url", "", "required public HTTPS origin, for example https://flora.example.com")
-	githubListen := flag.String("github-listen", "", "optional private IP:port for container GitHub TLS transport")
-	githubCert := flag.String("github-tls-cert", "", "GitHub transport TLS certificate PEM file")
-	githubKey := flag.String("github-tls-key", "", "host-only GitHub transport TLS private key PEM file")
-	agentImage := flag.String("agent-image", releaseImage, "pinned Flora agent image reference; enables chat execution")
+	agentImage := flag.String("agent-image", releaseImage, "required pinned Flora agent image reference (embedded in release builds)")
 	agentDigest := flag.String("agent-image-digest", "", "recorded name@sha256 image identity (defaults to agent-image)")
 	agentID := flag.String("agent-image-id", "", "expected sha256 content ID, required for a local image tag")
 	maxRunning := flag.Int("max-running", provisioning.DefaultMaxRunning, "maximum running chat containers, including idle; lowering it does not stop existing containers")
 	dockerSocket := flag.String("docker-socket", docker.DefaultSocket, "Docker Engine socket on this host")
-	githubHost := flag.String("github-host", "", "private TLS hostname on port 443 reachable from agent containers")
-	githubCA := flag.String("github-ca", "", "CA PEM file trusted by agent git/gh for the private GitHub transport")
-	networkID := flag.String("agent-network-id", "", "immutable installer-owned Docker bridge ID")
-	brokerGateway := flag.String("agent-broker-gateway", "", "inspected private IPv4 bridge gateway for flora-github.internal")
-	enrollmentFile := flag.String("enrollment-hash-file", "", "private file containing the installer enrollment code SHA256 digest")
-	hostname := flag.String("hostname", "", "public DNS hostname; enables built-in HTTPS and app-managed private Docker networking (Linux)")
-	publicListen := flag.String("public-listen", "", "comma-separated assigned local NIC IPs for public 80/443; defaults to one unambiguous IPv4 NIC")
 	flag.Parse()
-	if *hostname != "" {
-		var err error
-		*hostname, err = domainName(*hostname)
-		if err != nil {
-			slog.Error("Invalid -hostname", "error", err)
-			os.Exit(1)
-		}
-		conflict := false
-		flag.Visit(func(f *flag.Flag) {
-			switch f.Name {
-			case "listen", "public-url", "github-listen", "github-host", "github-tls-cert", "github-tls-key", "github-ca", "agent-network-id", "agent-broker-gateway", "enrollment-hash-file":
-				conflict = true
-			}
-		})
-		if conflict || *agentImage == "" {
-			slog.Error("-hostname requires an agent image and cannot be combined with manual proxy, enrollment or broker settings; existing installs should keep their manual flags")
-			os.Exit(1)
-		}
-		*publicURL = "https://" + *hostname
-	} else if *publicListen != "" {
-		slog.Error("-public-listen requires -hostname")
+	if err := loopbackAddress(*addr); err != nil {
+		slog.Error("Invalid -listen", "error", err)
 		os.Exit(1)
 	}
 	maxOverride := 0
@@ -84,6 +55,10 @@ func main() {
 		slog.Error("Set -public-url to the public HTTPS origin, for example https://flora.example.com; configure your reverse proxy to forward to -listen")
 		os.Exit(1)
 	}
+	if *agentImage == "" {
+		slog.Error("An agent image is required for the managed private runtime")
+		os.Exit(1)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	store, err := storage.Open(ctx, *dataDir)
@@ -99,10 +74,11 @@ func main() {
 	var chats *chat.Service
 	configuration := settings.New(store)
 	configuration.MaxRunningOverride = maxOverride
-	var automatic *deployment
+	var automatic deployment
 	var brokerOptions []brokerListenerConfig
 	var automaticCA []byte
-	if *hostname != "" {
+	var enrollmentFile, networkID, brokerGateway, githubHost, githubListen string
+	{
 		engine, err := docker.New(*dockerSocket)
 		if err != nil {
 			slog.Error("Cannot initialize local Docker client", "error", err)
@@ -119,15 +95,11 @@ func main() {
 			os.Exit(1)
 		}
 		defer unlock()
-		if _, err := os.Lstat(filepath.Join(dir, "deployment.json")); errors.Is(err, os.ErrNotExist) {
-			saved, chatErr := store.Chats(ctx)
-			_, adminErr := store.AdministratorHash(ctx)
-			if chatErr != nil || len(saved) > 0 || !errors.Is(adminErr, storage.ErrNotFound) {
-				slog.Error("Existing application data has no automatic deployment identity; restore deployment state or keep the existing manual flags")
-				os.Exit(1)
-			}
+		if err := requireDeploymentIdentity(ctx, store, dir); err != nil {
+			slog.Error("Cannot use saved application data", "error", err)
+			os.Exit(1)
 		}
-		d, device, err := prepareDeployment(ctx, engine, dir, *hostname, *publicListen)
+		d, device, err := prepareDeployment(ctx, engine, dir)
 		_ = engine.Close()
 		if err != nil {
 			slog.Error("Automatic deployment failed", "error", err)
@@ -155,40 +127,28 @@ func main() {
 			slog.Error("Cannot persist broker trust identity", "error", err)
 			os.Exit(1)
 		}
-		*enrollmentFile, err = deploymentEnrollment(dir)
+		enrollmentFile, err = deploymentEnrollment(dir)
 		if err != nil {
 			slog.Error("Cannot prepare private administrator enrollment", "error", err)
 			os.Exit(1)
 		}
 		slog.Info("Administrator enrollment code is in a private file; it is accepted only before the first account exists", "file", filepath.Join(dir, "enrollment-code"))
-		automatic, automaticCA = &d, ca
-		*networkID, *brokerGateway = d.NetworkID, d.Gateway
-		*githubHost, *githubListen = brokerName, net.JoinHostPort(d.Gateway, "443")
+		automatic, automaticCA = d, ca
+		networkID, brokerGateway = d.NetworkID, d.Gateway
+		githubHost, githubListen = brokerName, net.JoinHostPort(d.Gateway, "443")
 		brokerOptions = []brokerListenerConfig{{Device: device, TLS: brokerTLS(cert, key)}}
 	}
-	if *agentImage != "" {
-		if *githubListen == "" {
-			slog.Error("Chat execution requires -github-listen and private TLS transport settings")
-			os.Exit(1)
-		}
+	{
 		ca := automaticCA
-		var err error
-		if automatic == nil {
-			ca, err = os.ReadFile(*githubCA)
-		}
-		if err != nil {
-			slog.Error("Cannot read -github-ca")
-			os.Exit(1)
-		}
 		engine, err := docker.New(*dockerSocket)
 		if err != nil {
 			slog.Error("Cannot initialize Docker client")
 			os.Exit(1)
 		}
 		defer engine.Close()
-		if *networkID != "" || *brokerGateway != "" {
-			n, err := engine.NetworkInspect(ctx, *networkID)
-			if err != nil || n.ID != *networkID || n.Driver != "bridge" || n.Internal || len(n.Gateways) != 1 || n.Gateways[0] != *brokerGateway || *githubHost != "flora-github.internal" || *githubListen != net.JoinHostPort(*brokerGateway, "443") {
+		{
+			n, err := engine.NetworkInspect(ctx, networkID)
+			if err != nil || n.ID != networkID || n.Driver != "bridge" || n.Internal || len(n.Gateways) != 1 || n.Gateways[0] != brokerGateway || githubHost != brokerName || githubListen != net.JoinHostPort(brokerGateway, "443") {
 				slog.Error("Owned bridge or broker listener differs from installed configuration; restore the recorded network before starting Flora")
 				os.Exit(1)
 			}
@@ -210,15 +170,13 @@ func main() {
 			changes.New(store, engine).Run(reviewCtx)
 		}()
 		defer func() { stopReview(); <-reviewDone }()
-		access, _, err := startGitHub(ctx, store, engine, githubbroker.CheckoutConfig{Host: *githubHost, CACert: string(ca), UseChatAuthor: true}, *githubListen, *githubCert, *githubKey, brokerOptions...)
+		access, _, err := startGitHub(ctx, store, engine, githubbroker.CheckoutConfig{Host: githubHost, CACert: string(ca), UseChatAuthor: true}, githubListen, "", "", brokerOptions...)
 		if err != nil {
 			slog.Error("Cannot configure container GitHub access", "error", err)
 			os.Exit(1)
 		}
-		cfg := provisioning.Config{NetworkID: *networkID, BrokerGateway: *brokerGateway, ImageRef: *agentImage, ImageDigest: *agentDigest, ImageID: *agentID, HarnessVersion: "1.2.27", MaxRunning: *maxRunning, UseSettings: true, MaxRunningOverride: maxOverride}
-		if automatic != nil {
-			cfg.AgentUID, cfg.AgentGID = automatic.AgentUID, automatic.AgentGID
-		}
+		cfg := provisioning.Config{NetworkID: networkID, BrokerGateway: brokerGateway, ImageRef: *agentImage, ImageDigest: *agentDigest, ImageID: *agentID, HarnessVersion: "1.2.27", MaxRunning: *maxRunning, UseSettings: true, MaxRunningOverride: maxOverride}
+		cfg.AgentUID, cfg.AgentGID = automatic.AgentUID, automatic.AgentGID
 		manager, err := provisioning.New(engine, store, cfg, access)
 		if err != nil {
 			slog.Error("Cannot configure pinned agent runtime", "error", err)
@@ -246,28 +204,12 @@ func main() {
 			}
 		}()
 	}
-	if *agentImage == "" && *githubListen != "" {
-		if _, _, err := startGitHub(ctx, store, nil, githubbroker.CheckoutConfig{}, *githubListen, *githubCert, *githubKey); err != nil {
-			slog.Error("GitHub transport startup failed; check private listen IP and TLS files", "error", err)
-			os.Exit(1)
-		}
-	}
 	authentication := auth.New(store)
-	if *enrollmentFile != "" {
-		if err := authentication.RequireEnrollment(*enrollmentFile); err != nil {
-			slog.Error("Cannot load installer enrollment digest; check file ownership, permissions and format")
-			os.Exit(1)
-		}
+	if err := authentication.RequireEnrollment(enrollmentFile); err != nil {
+		slog.Error("Cannot load enrollment digest; check file ownership, permissions and format")
+		os.Exit(1)
 	}
 	handler := server.New(webassets.FS(), authentication, configuration, origin, chats)
-	if automatic != nil {
-		slog.Info("Flora starting HTTPS; public DNS and inbound TCP 80/443 must reach this host", "url", *publicURL, "addresses", automatic.Addresses)
-		if err := servePublic(ctx, automatic.Domain, filepath.Join(*dataDir, "deployment", "certificates"), automatic.Addresses, handler); err != nil {
-			slog.Error("Public HTTPS failed", "error", err)
-			os.Exit(1)
-		}
-		return
-	}
 	srv := &http.Server{
 		Addr:              *addr,
 		Handler:           handler,

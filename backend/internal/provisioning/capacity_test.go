@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -44,7 +45,7 @@ func TestCapacityAcrossHandlesAndRestart(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { s.Close() })
-		m, err := New(held, s, Config{ImageRef: testDigest, HarnessVersion: "1.2.27", MaxRunning: limit}, nil)
+		m, err := New(held, s, Config{NetworkID: strings.Repeat("a", 64), BrokerGateway: "172.29.80.1", ImageRef: testDigest, HarnessVersion: "1.2.27", MaxRunning: limit}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

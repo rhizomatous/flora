@@ -98,7 +98,11 @@ func TestProvisioningDocker(t *testing.T) {
 		_, err := engine.Exec(ctx, id, "0", []string{"sh", "-c", ": > /home/flora/.flora-github.env; touch /var/lib/flora-checkout.ready"}, nil, io.Discard, io.Discard)
 		return err
 	})
-	cfg := Config{ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", MaxRunning: 2}
+	network, err := engine.NetworkInspect(ctx, "bridge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := Config{NetworkID: network.ID, BrokerGateway: network.Gateways[0], ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", MaxRunning: 2}
 	m, err := New(observedEngine{Engine: engine, t: t}, store, cfg, checkout)
 	if err != nil {
 		t.Fatal(err)
@@ -305,7 +309,7 @@ func TestProvisioningDocker(t *testing.T) {
 	})
 
 	t.Run("setup timeout", func(t *testing.T) {
-		short, err := New(engine, store, Config{ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", SetupTimeout: 3 * time.Second}, nil)
+		short, err := New(engine, store, Config{NetworkID: network.ID, BrokerGateway: network.Gateways[0], ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", SetupTimeout: 3 * time.Second}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -335,7 +339,7 @@ func TestProvisioningDocker(t *testing.T) {
 	})
 
 	t.Run("setup ignoring SIGTERM is killed", func(t *testing.T) {
-		bounded, err := New(engine, store, Config{ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", SetupTimeout: 2 * time.Second, SetupKillGrace: time.Second}, nil)
+		bounded, err := New(engine, store, Config{NetworkID: network.ID, BrokerGateway: network.Gateways[0], ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", SetupTimeout: 2 * time.Second, SetupKillGrace: time.Second}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

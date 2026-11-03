@@ -39,13 +39,13 @@ jobs:
         run: |
           nix develop --command make deps web
           nix develop --command bash scripts/package-release.sh v0.0.0-fixture "$FIXTURE_IMAGE"
-      - name: Check archive as a non-root service account with real Docker
+      - name: Check direct archived binary with managed private runtime
         run: |
           docker pull "$FIXTURE_IMAGE"
           docker rm -f flora-release-registry
           (cd dist && sha256sum --check SHA256SUMS)
           sudo bash scripts/check-release-linux.sh dist/flora-v0.0.0-fixture-linux-${{ matrix.arch }}.tar.gz "$(git rev-parse HEAD)"
-      - name: Check built-in HTTPS and private broker with a disposable Engine
+      - name: Check production app APIs and private broker with a disposable Engine
         env:
           RELEASE_ARCHIVE: dist/flora-v0.0.0-fixture-linux-${{ matrix.arch }}.tar.gz
         run: |

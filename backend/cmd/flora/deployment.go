@@ -17,37 +17,51 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/auth"
 	"github.com/rhizomatous/flora/backend/internal/docker"
+	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
 const brokerName = "flora-github.internal"
 
+// A failed first startup may leave an empty database. Populated application data
+// must retain its deployment identity, so startup cannot replace saved trust.
+func requireDeploymentIdentity(ctx context.Context, store *storage.Store, dir string) error {
+	_, err := os.Lstat(filepath.Join(dir, "deployment.json"))
+	if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	chats, chatErr := store.Chats(ctx)
+	projects, projectErr := store.Projects(ctx)
+	_, adminErr := store.AdministratorHash(ctx)
+	_, credentialErr := store.Credentials(ctx)
+	if chatErr != nil || projectErr != nil || len(chats) > 0 || len(projects) > 0 || !errors.Is(adminErr, storage.ErrNotFound) || !errors.Is(credentialErr, storage.ErrNotFound) {
+		return errors.New("existing application data has no managed deployment identity; restore the saved deployment directory before starting Flora")
+	}
+	return nil
+}
+
 type deployment struct {
-	Domain    string
 	Owner     string
 	NetworkID string
 	Gateway   string
-	Addresses []string
 	CAHash    string
 	AgentUID  int
 	AgentGID  int
 }
 
-// prepareDeployment saves the app's bridge, public bindings and numeric agent
+// prepareDeployment saves the app's bridge and numeric agent
 // identity. Missing recorded networks fail closed, since saved containers still
 // refer to their original ID.
 // Docker allocates the subnet from its configured address pools. No daemon,
 // host DNS, firewall, package or service settings are changed.
-func prepareDeployment(ctx context.Context, engine *docker.Client, dir, domain, bindings string) (deployment, string, error) {
+func prepareDeployment(ctx context.Context, engine *docker.Client, dir string) (deployment, string, error) {
 	var d deployment
 	if runtime.GOOS != "linux" {
-		return d, "", errors.New("-hostname deployment requires Linux and a local rootful Docker Engine; use manual flags for development")
+		return d, "", errors.New("Flora requires Linux and a local rootful Docker Engine")
 	}
 	if err := engine.Ping(ctx); err != nil {
 		return d, "", fmt.Errorf("Docker must already be installed and accessible at the configured local socket (API %s): %w", docker.APIVersion, err)
@@ -61,13 +75,12 @@ func prepareDeployment(ctx context.Context, engine *docker.Client, dir, domain, 
 	statePath := filepath.Join(dir, "deployment.json")
 	data, err := privateRead(statePath)
 	if err == nil {
-		if err := json.Unmarshal(data, &d); err != nil || d.Domain != domain || len(d.Owner) != 48 {
-			return d, "", errors.New("saved deployment is invalid or has a different hostname; restore it rather than replacing saved network/trust")
+		if err := json.Unmarshal(data, &d); err != nil || len(d.Owner) != 48 {
+			return d, "", errors.New("saved deployment is invalid; restore it rather than replacing saved network/trust")
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return d, "", err
 	} else {
-		d.Domain = domain
 		d.AgentUID, d.AgentGID = os.Geteuid(), os.Getegid()
 		if d.AgentUID == 0 {
 			// Only per-chat bind mounts use this identity. The storage root and
@@ -87,14 +100,6 @@ func prepareDeployment(ctx context.Context, engine *docker.Client, dir, domain, 
 	if d.AgentUID <= 0 || d.AgentGID <= 0 {
 		return d, "", errors.New("saved deployment has no non-root agent identity; restore it before starting chats")
 	}
-	addresses, err := publicAddresses(bindings, d.Addresses)
-	if err != nil {
-		return d, "", err
-	}
-	if len(d.Addresses) > 0 && !slices.Equal(addresses, d.Addresses) {
-		return d, "", errors.New("-public-listen differs from saved deployment; restore the recorded NIC addresses")
-	}
-	d.Addresses = addresses
 	name := "flora-" + d.Owner[:12]
 	lookup := d.NetworkID
 	if lookup == "" {
@@ -121,66 +126,23 @@ func prepareDeployment(ctx context.Context, engine *docker.Client, dir, domain, 
 	return d, n.Bridge, nil
 }
 
-// Select one unambiguous local IPv4 address. An explicit list also supports IPv6
-// and multi-homed hosts. Never bind wildcard sockets or infer a local IP from
-// public DNS, which often points to an unassigned address behind cloud NAT.
-func publicAddresses(explicit string, saved []string) ([]string, error) {
-	interfaces, err := net.Interfaces()
-	if err != nil {
-		return nil, err
-	}
-	assigned, candidates := map[string]bool{}, []string{}
-	for _, nic := range interfaces {
-		if nic.Flags&net.FlagUp == 0 || nic.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-		if _, err := os.Stat(filepath.Join("/sys/class/net", nic.Name, "bridge")); err == nil {
-			continue
-		}
-		addresses, err := nic.Addrs()
-		if err != nil {
-			return nil, err
-		}
-		for _, address := range addresses {
-			ip, _, err := net.ParseCIDR(address.String())
-			if err != nil || !ip.IsGlobalUnicast() {
-				continue
-			}
-			assigned[ip.String()] = true
-			if ip.To4() != nil && nic.Flags&net.FlagPointToPoint == 0 && !strings.HasPrefix(nic.Name, "veth") && !strings.HasPrefix(nic.Name, "docker") {
-				candidates = append(candidates, ip.String())
-			}
-		}
-	}
-	selected := saved
-	return selectPublicAddresses(explicit, selected, assigned, candidates)
-}
-
-func selectPublicAddresses(explicit string, selected []string, assigned map[string]bool, candidates []string) ([]string, error) {
-	if explicit != "" {
-		selected = strings.Split(explicit, ",")
-	} else if len(selected) == 0 {
-		if len(candidates) != 1 {
-			return nil, errors.New("ambiguous public NIC; set -public-listen to comma-separated assigned local IPs (not the NAT public IP)")
-		}
-		selected = candidates
-	}
-	seen := map[string]bool{}
-	for _, address := range selected {
-		if !assigned[address] || seen[address] {
-			return nil, errors.New("-public-listen must contain distinct assigned local NIC IPs, never wildcard, loopback or bridge addresses")
-		}
-		seen[address] = true
-	}
-	return selected, nil
-}
-
 func saveJSON(path string, value any) error {
 	b, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
 	return privateWrite(path, b)
+}
+
+func privateDir(path string) error {
+	if err := os.MkdirAll(path, 0700); err != nil {
+		return err
+	}
+	info, err := os.Lstat(path)
+	if err != nil || !info.IsDir() || info.Mode().Perm() != 0700 {
+		return fmt.Errorf("%s must be a private 0700 directory", filepath.Clean(path))
+	}
+	return nil
 }
 
 func privateWrite(path string, data []byte) error {
@@ -222,8 +184,8 @@ func privateRead(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-// Only the public CA leaves this private directory. Existing manual deployments
-// keep their supplied trust files; automatic mode never imports or rotates them.
+// Only the public CA leaves this private directory. Saved trust is never rotated
+// automatically because retained containers still use that CA.
 func brokerAuthority(dir string) ([]byte, *x509.Certificate, *ecdsa.PrivateKey, error) {
 	path := filepath.Join(dir, "broker-ca.pem")
 	data, err := privateRead(path)

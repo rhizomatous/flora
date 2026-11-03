@@ -46,7 +46,11 @@ func TestSettingsDocker(t *testing.T) {
 		_, err := engine.Exec(ctx, id, "0", []string{"sh", "-c", ": > /home/flora/.flora-github.env; touch /var/lib/flora-checkout.ready"}, nil, io.Discard, io.Discard)
 		return err
 	})
-	m, err := New(engine, s, Config{ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", UseSettings: true}, access)
+	network, err := engine.NetworkInspect(ctx, "bridge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := New(engine, s, Config{NetworkID: network.ID, BrokerGateway: network.Gateways[0], ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", UseSettings: true}, access)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Run only on a disposable Linux host. The installer uses its real absolute paths.
+# Run only on a disposable Linux host with a rootful Engine.
 set -euo pipefail
 [[ $(id -u) == 0 && $(uname -s) == Linux ]]
-[[ ! -e /opt/flora/flora && ! -e /var/lib/flora ]]
 archive=$(realpath "${1:?release archive required}")
 commit=${2:?expected source commit required}
 stage=$(mktemp -d)
@@ -27,7 +26,8 @@ assert re.fullmatch(r'[a-z0-9./:_-]+@sha256:[a-f0-9]{64}', identity['agent_image
 assert identity['harness_version'] == '1.2.27'
 assert json.loads(subprocess.check_output([str(stage / 'flora'), '-version'], timeout=15)) == identity
 help_result = subprocess.run([str(stage / 'flora'), '-help'], capture_output=True, text=True, timeout=15)
-assert '-hostname' in help_result.stderr
+assert '-public-url' in help_result.stderr
+assert '-hostname' not in help_result.stderr
+assert not (stage / 'install.sh').exists()
 PY
-sh "$stage/install.sh"
-python3 "$(dirname "$0")/release-fixture.py"
+python3 "$(dirname "$0")/release-fixture.py" "$stage"

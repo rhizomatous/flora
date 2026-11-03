@@ -184,7 +184,11 @@ func TestChatDocker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	manager, err := provisioning.New(providerEngine{engine, providerURL}, store, provisioning.Config{ImageRef: image, ImageDigest: testImage, ImageID: img.ID, HarnessVersion: "1.2.27", ActivityTimeout: 300 * time.Millisecond}, localCheckout{engine, store})
+	network, err := engine.NetworkInspect(ctx, "bridge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager, err := provisioning.New(providerEngine{engine, providerURL}, store, provisioning.Config{NetworkID: network.ID, BrokerGateway: network.Gateways[0], ImageRef: image, ImageDigest: testImage, ImageID: img.ID, HarnessVersion: "1.2.27", ActivityTimeout: 300 * time.Millisecond}, localCheckout{engine, store})
 	if err != nil {
 		t.Fatal(err)
 	}

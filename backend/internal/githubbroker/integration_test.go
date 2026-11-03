@@ -267,7 +267,11 @@ func TestCheckoutDocker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := provisioning.New(engine, s, provisioning.Config{ImageRef: image, ImageDigest: chat.ImageDigest, ImageID: img.ID, HarnessVersion: "1.2.27", ReadyTimeout: time.Minute}, access)
+	network, err := engine.NetworkInspect(ctx, "bridge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := provisioning.New(engine, s, provisioning.Config{NetworkID: network.ID, BrokerGateway: network.Gateways[0], ImageRef: image, ImageDigest: chat.ImageDigest, ImageID: img.ID, HarnessVersion: "1.2.27", ReadyTimeout: time.Minute}, access)
 	if err != nil {
 		t.Fatal(err)
 	}

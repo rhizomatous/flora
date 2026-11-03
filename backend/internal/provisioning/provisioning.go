@@ -44,8 +44,8 @@ const (
 
 // Config is the narrow installation-level provisioning configuration.
 type Config struct {
-	// NetworkID and BrokerGateway opt into an installer-owned bridge. Empty values
-	// preserve the manual installation's daemon-default network and DNS setup.
+	// NetworkID and BrokerGateway identify the managed bridge and its inspected
+	// private gateway. Both are required for every container operation.
 	NetworkID     string
 	BrokerGateway string
 	// AgentUID/GID optionally pin the container's non-root identity for a root
@@ -99,11 +99,9 @@ func (c Config) withDefaults() (Config, error) {
 	if (c.AgentUID != 0 || c.AgentGID != 0) && (c.AgentUID <= 0 || c.AgentGID <= 0) {
 		return c, errors.New("provisioning: explicit agent UID and GID must both be positive")
 	}
-	if c.NetworkID != "" || c.BrokerGateway != "" {
-		ip := net.ParseIP(c.BrokerGateway)
-		if !hexHash(c.NetworkID) || ip == nil || ip.To4() == nil || !ip.IsPrivate() {
-			return c, errors.New("provisioning: owned network requires its full network ID and private IPv4 broker gateway")
-		}
+	ip := net.ParseIP(c.BrokerGateway)
+	if !hexHash(c.NetworkID) || ip == nil || ip.To4() == nil || !ip.IsPrivate() {
+		return c, errors.New("provisioning: owned network requires its full network ID and private IPv4 broker gateway")
 	}
 	if c.ImageRef == "" || c.HarnessVersion == "" {
 		return c, errors.New("provisioning: image reference and harness version are required")
@@ -513,9 +511,6 @@ func (m *Manager) validateOwned(info docker.ContainerInfo, chat storage.Chat, pa
 	if err := validateOwned(info, chat, paths, imageID); err != nil {
 		return err
 	}
-	if m.cfg.NetworkID == "" {
-		return nil
-	}
 	if info.HostConfig.Privileged {
 		return errors.New("provisioning: owned-network container is privileged; refusing access")
 	}
@@ -654,9 +649,6 @@ func (m *Manager) containerSpec(chat storage.Chat, paths storage.Paths, password
 }
 
 func (m *Manager) brokerHosts() []string {
-	if m.cfg.NetworkID == "" {
-		return nil
-	}
 	return []string{"flora-github.internal:" + m.cfg.BrokerGateway}
 }
 

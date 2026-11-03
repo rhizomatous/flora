@@ -24,36 +24,18 @@ containers. Each chat receives a separate seven-day bearer credential. Every val
 credential can exercise all permissions of the saved token. GitHub enforces those
 permissions; project repository selection only chooses what to check out.
 
-The optional binary listener is separate from the browser server:
+Every startup creates or validates an app-owned labeled bridge, private CA and
+device-bound TLS broker on its inspected gateway port 443. Each agent joins exactly
+that bridge and receives `flora-github.internal:GATEWAY` in its hosts file and the
+public CA. No daemon DNS or public domain is needed. Network/alias drift blocks
+adoption, restart, stop and recovery; missing saved networks are never silently
+recreated. The online CA signer renews broker leaves under the same saved trust.
+Private keys and the storage root never enter container mounts.
 
-```sh
-./bin/flora -public-url https://flora.example.com \
-  -github-listen 172.17.0.1:443 \
-  -github-tls-cert /private/github-transport.crt \
-  -github-tls-key /private/github-transport.key
-```
-
-Use an actual private host address reachable from the Docker bridge. Configure a
-private hostname resolving to that address inside containers, with a matching TLS
-certificate. Stock `gh` needs the advertised hostname on port 443 to recognize Git
-remotes. Linux can grant the non-root service `CAP_NET_BIND_SERVICE` to bind this
-port. Alternatively a TCP-only relay can present private port 443 to a higher
-listener port while passing TLS through unchanged. Do not expose this listener
-through the public browser proxy. Keep its private key and the storage root out of
-container mounts. Only the public CA certificate is delivered to containers.
-
-The `-hostname` deployment creates an app-owned, labeled user-defined bridge.
-`-agent-network-id FULL_ID -agent-broker-gateway PRIVATE_IPV4` requires its
-immutable ID and inspected gateway, attaches every chat to exactly that network,
-and adds `flora-github.internal:GATEWAY` to the container hosts file. Advertise
-`-github-host flora-github.internal` with that DNS SAN and bind the broker to
-gateway:443. No daemon-wide DNS or `host-gateway` substitution is used. The
-app binds browser HTTPS to separate local NIC addresses and binds the broker
-socket to the bridge device, rejecting packets from other interfaces without
-host firewall changes. See [installation instructions](../INSTALL.md). Network or
-alias drift blocks adoption, restart, stop and recovery; missing networks are not
-silently recreated under saved chats. With both optional settings absent, the
-manual/default-network behavior is unchanged.
+Browser HTTP stays on loopback behind external HTTPS such as Tailscale Serve or an
+existing proxy. That choice does not change private runtime management. Linux root
+or `CAP_NET_RAW` plus `CAP_NET_BIND_SERVICE` is still needed for the private broker.
+See [installation instructions](../INSTALL.md).
 
 Construct `githubbroker.NewAccess` with the broker, Docker client, private hostname,
 CA PEM, and optional commit author override, then pass it to `provisioning.New`.

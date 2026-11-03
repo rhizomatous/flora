@@ -377,6 +377,9 @@ func newTestManager(t *testing.T, engine *fakeEngine, cfg Config, checkout Works
 	if cfg.HarnessVersion == "" {
 		cfg.HarnessVersion = "1.2.27"
 	}
+	if cfg.NetworkID == "" && cfg.BrokerGateway == "" {
+		cfg.NetworkID, cfg.BrokerGateway = strings.Repeat("a", 64), "172.29.80.1"
+	}
 	m, err := New(engine, store, cfg, checkout)
 	if err != nil {
 		t.Fatal(err)
@@ -420,11 +423,12 @@ func TestConfigDefaultsAndValidation(t *testing.T) {
 		"tag with bad image ID":    {ImageRef: "flora/agent:dev", ImageID: "not-a-sha", HarnessVersion: "1.2.27"},
 		"identity mismatch":        {ImageRef: testDigest, ImageDigest: "flora/agent@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", HarnessVersion: "1.2.27"},
 	} {
+		cfg.NetworkID, cfg.BrokerGateway = strings.Repeat("a", 64), "172.29.80.1"
 		if _, err := New(newFakeEngine(), store, cfg, nil); err == nil {
 			t.Errorf("%s: config must be rejected", name)
 		}
 	}
-	m, err := New(newFakeEngine(), store, Config{ImageRef: testDigest, HarnessVersion: "1.2.27"}, nil)
+	m, err := New(newFakeEngine(), store, Config{NetworkID: strings.Repeat("a", 64), BrokerGateway: "172.29.80.1", ImageRef: testDigest, HarnessVersion: "1.2.27"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -609,6 +613,7 @@ func TestStartAdoptsOwnedOrphan(t *testing.T) {
 		t.Fatal(err)
 	}
 	orphan := docker.ContainerSpec{
+		NetworkID: m.cfg.NetworkID, ExtraHosts: m.brokerHosts(),
 		Name:   containerName(chat.ID),
 		Image:  testDigest,
 		Env:    []string{"OPENCODE_SERVER_PASSWORD=orphan-secret"},
@@ -647,6 +652,7 @@ func TestStopAdoptsAndStopsOwnedOrphan(t *testing.T) {
 		t.Fatal(err)
 	}
 	id, err := engine.ContainerCreate(ctx, docker.ContainerSpec{
+		NetworkID: m.cfg.NetworkID, ExtraHosts: m.brokerHosts(),
 		Name: containerName(chat.ID), Image: testDigest,
 		Labels: map[string]string{labelManaged: "true", labelChatID: chat.ID},
 		Binds:  []string{paths.Workspace + ":/workspace", paths.RuntimeState + ":/home/flora"},

@@ -83,16 +83,11 @@ func TestOwnedNetworkMembership(t *testing.T) {
 			t.Fatal("accepted changed membership")
 		}
 	}
-	// Manual installations keep their existing Docker/default-DNS contract.
-	manager.cfg.NetworkID = ""
-	info.HostConfig.ExtraHosts = []string{"legacy.internal:172.17.0.1"}
-	if err := manager.validateOwned(info, chat, paths, testImageID); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func TestOwnedNetworkConfigRejectsPartialAndUnsafeValues(t *testing.T) {
 	for _, cfg := range []Config{
+		{},
 		{NetworkID: "named-network", BrokerGateway: "172.29.80.1"},
 		{NetworkID: strings.Repeat("a", 64)},
 		{BrokerGateway: "172.29.80.1"},

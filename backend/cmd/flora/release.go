@@ -9,7 +9,7 @@ import (
 )
 
 // Release builds embed the registry digest returned after publishing the image.
-// Development builds leave the runtime opt-in through -agent-image.
+// Development builds require an explicit -agent-image.
 var releaseVersion = "development"
 var releaseCommit = "unknown"
 var releaseImage = ""
