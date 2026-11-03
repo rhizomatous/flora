@@ -1,5 +1,7 @@
 import io
+import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 import tarfile
@@ -7,11 +9,35 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "packaging"))
 import release_download
 
 
 class ReleaseTests(unittest.TestCase):
+    @unittest.skipUnless(os.environ.get("FLORA_DOWNLOAD_TEST_ARCHIVE"), "requires a native Linux release archive")
+    def test_real_archive_binary_identity(self):
+        archive = Path(os.environ["FLORA_DOWNLOAD_TEST_ARCHIVE"])
+        with tarfile.open(archive, "r:gz") as tar:
+            identity = json.load(tar.extractfile("./release.json"))
+        digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+        with tempfile.TemporaryDirectory() as temporary:
+            def fetch(url, target, _limit):
+                self.assertTrue(url.startswith("https://"))
+                if target.name == "release-api.json":
+                    target.write_text(json.dumps({"tag_name": identity["version"], "draft": False, "prerelease": True}))
+                elif target.name == "ref.json":
+                    target.write_text(json.dumps({"object": {"type": "commit", "sha": identity["commit"]}}))
+                elif target.name == "SHA256SUMS":
+                    target.write_text(digest + "  " + archive.name + "\n")
+                else:
+                    self.assertTrue(url.endswith("/" + archive.name))
+                    target.write_bytes(archive.read_bytes())
+            with patch.object(release_download, "fetch", side_effect=fetch):
+                package, actual = release_download.stage(Path(temporary), identity["version"], identity["arch"], True)
+            self.assertEqual(actual, identity)
+            self.assertEqual((package / "flora").stat().st_mode & 0o777, 0o700)
+
     def test_archive_rejects_paths_links_and_duplicate_names_before_writing(self):
         for names, link in [(["../escape"], False), (["/escape"], False), (["flora", "flora"], False), (["key"], True)]:
             with self.subTest(names=names), tempfile.TemporaryDirectory() as temporary:

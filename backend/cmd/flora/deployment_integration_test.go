@@ -222,6 +222,9 @@ func TestDeploymentEngine(t *testing.T) {
 		return strings.TrimSpace(output.String())
 	}
 	run("git fetch origin && test -f hello.txt && printf retained > edit.txt && sudo sh -c 'printf layer > /owned-layer'")
+	if run("id -u") != fmt.Sprint(d.AgentUID) {
+		t.Fatal("agent did not run with its saved non-root identity")
+	}
 	if run("gh api repos/octo/demo --jq .private") != "true" {
 		t.Fatal("stock gh metadata failed")
 	}
@@ -259,7 +262,7 @@ func TestDeploymentEngine(t *testing.T) {
 	run("if gh api repos/octo/demo >/dev/null 2>&1; then exit 1; fi")
 	// Another network has a route to the private gateway, but not the bound
 	// ingress device. It must not reach even the broker's unauthenticated route.
-	out, err := exec.CommandContext(ctx, "docker", "run", "--rm", "--entrypoint", "curl", image, "--connect-timeout", "2", "--max-time", "3", "--insecure", "https://"+d.Gateway+"/").CombinedOutput()
+	out, err := exec.CommandContext(ctx, "docker", "run", "--rm", "--entrypoint", "curl", image, "--connect-timeout", "2", "--max-time", "3", "--insecure", "--resolve", brokerName+":443:"+d.Gateway, "https://"+brokerName+"/").CombinedOutput()
 	if err == nil {
 		t.Fatalf("foreign bridge reached private broker: %s", out)
 	}
