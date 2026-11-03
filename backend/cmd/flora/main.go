@@ -75,7 +75,7 @@ func main() {
 	configuration := settings.New(store)
 	configuration.MaxRunningOverride = maxOverride
 	var automatic deployment
-	var brokerOptions []brokerListenerConfig
+	var brokerOption brokerListenerConfig
 	var automaticCA []byte
 	var enrollmentFile, networkID, brokerGateway, githubHost, githubListen string
 	{
@@ -136,7 +136,7 @@ func main() {
 		automatic, automaticCA = d, ca
 		networkID, brokerGateway = d.NetworkID, d.Gateway
 		githubHost, githubListen = brokerName, net.JoinHostPort(d.Gateway, "443")
-		brokerOptions = []brokerListenerConfig{{Device: device, TLS: brokerTLS(cert, key)}}
+		brokerOption = brokerListenerConfig{Device: device, TLS: brokerTLS(cert, key)}
 	}
 	{
 		ca := automaticCA
@@ -170,7 +170,7 @@ func main() {
 			changes.New(store, engine).Run(reviewCtx)
 		}()
 		defer func() { stopReview(); <-reviewDone }()
-		access, _, err := startGitHub(ctx, store, engine, githubbroker.CheckoutConfig{Host: githubHost, CACert: string(ca), UseChatAuthor: true}, githubListen, "", "", brokerOptions...)
+		access, _, err := startGitHub(ctx, store, engine, githubbroker.CheckoutConfig{Host: githubHost, CACert: string(ca), UseChatAuthor: true}, githubListen, brokerOption)
 		if err != nil {
 			slog.Error("Cannot configure container GitHub access", "error", err)
 			os.Exit(1)
@@ -244,7 +244,7 @@ type brokerListenerConfig struct {
 	TLS    *tls.Config
 }
 
-func serveGitHub(ctx context.Context, broker *githubbroker.Broker, addr, certFile, keyFile string, options ...brokerListenerConfig) (net.Addr, error) {
+func serveGitHub(ctx context.Context, broker *githubbroker.Broker, addr string, option brokerListenerConfig) (net.Addr, error) {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, errors.New("GitHub listen address must be a private IP:port")
@@ -253,16 +253,8 @@ func serveGitHub(ctx context.Context, broker *githubbroker.Broker, addr, certFil
 	if ip == nil || (!ip.IsPrivate() && !ip.IsLoopback()) {
 		return nil, errors.New("GitHub listener must bind a private or loopback IP")
 	}
-	var option brokerListenerConfig
-	if len(options) > 0 {
-		option = options[0]
-	}
 	if option.TLS == nil {
-		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
-		if err != nil {
-			return nil, errors.New("cannot load GitHub TLS certificate and key")
-		}
-		option.TLS = &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}}
+		return nil, errors.New("private broker TLS configuration is required")
 	}
 	listener, err := listenDevice(ctx, addr, option.Device)
 	if err != nil {
