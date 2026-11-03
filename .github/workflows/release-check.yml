@@ -28,6 +28,7 @@ jobs:
       - name: Build fixture binaries without publishing
         env:
           GOCACHE: ${{ runner.temp }}/flora-installer-go-cache
+          GOMODCACHE: ${{ runner.temp }}/flora-installer-go-modules
         run: |
           nix develop --command make deps build-linux
           CGO_ENABLED=0 nix develop --command go -C backend test -c -o ../bin/docker-network-test ./internal/docker
@@ -42,6 +43,7 @@ jobs:
       - name: Exercise complete install, resume and uninstall with real systemd in an owned container
         env:
           GOCACHE: ${{ runner.temp }}/flora-installer-go-cache
+          GOMODCACHE: ${{ runner.temp }}/flora-installer-go-modules
         run: nix develop --command bash scripts/check-installer-systemd.sh flora-installer-fixture:ci ${{ matrix.arch }}
 
   archive:
