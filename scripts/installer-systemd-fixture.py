@@ -63,7 +63,9 @@ def prepare():
     run("systemctl", "set-property", "system.slice", "TasksAccounting=yes")
     run("systemctl", "set-property", "docker.service", "TasksAccounting=yes")
     def pids_ready():
-        assert "pids" in Path("/sys/fs/cgroup/system.slice/cgroup.subtree_control").read_text().split()
+        available = Path("/sys/fs/cgroup/cgroup.controllers").read_text().split()
+        active = Path("/sys/fs/cgroup/system.slice/cgroup.subtree_control").read_text().split()
+        assert "pids" in active, f"delegated controllers={available}, system.slice controllers={active}"
     wait(pids_ready)
     ROOT.mkdir(mode=0o700)
     run("systemctl", "disable", "--now", "caddy.service")

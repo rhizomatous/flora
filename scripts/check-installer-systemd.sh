@@ -2,7 +2,8 @@
 set -euo pipefail
 image=${1:?fixture container image required}
 arch=${2:?amd64 or arm64 required}
-container=$(docker run --detach --privileged --cgroupns=private --tmpfs /run --tmpfs /run/lock \
+# A parent PID limit makes the controller available in the private cgroup namespace.
+container=$(docker run --detach --privileged --cgroupns=private --pids-limit 8192 --tmpfs /run --tmpfs /run/lock \
   --add-host flora.example.invalid:192.0.2.48 \
   --mount type=volume,dst=/var/lib \
   --mount "type=bind,src=$PWD/agent/image,dst=/agent-image,readonly" \
