@@ -15,6 +15,7 @@ from pathlib import Path
 import pty
 import re
 import select
+import shutil
 import ssl
 import subprocess
 import sys
@@ -93,6 +94,8 @@ WantedBy=network-online.target
     run("docker", "build", "-t", "localhost:51848/flora-agent:fixture", "/agent-image")
     run("docker", "push", "localhost:51848/flora-agent:fixture")
     image = json.loads(run("docker", "image", "inspect", "localhost:51848/flora-agent:fixture"))[0]
+    print(json.dumps({"storage_filesystem": run("findmnt", "-n", "-o", "FSTYPE", "-T", "/var/lib"),
+                      "storage_free_bytes": shutil.disk_usage("/var/lib").free}), file=sys.stderr)
     print(image["RepoDigests"][0])
 
 
@@ -145,6 +148,8 @@ def cli(command, interrupt=False, failure=None, orphan_after_stop=False):
     secret = code[1] if code else None
     assert "Traceback" not in text
     if failure:
+        if child.returncode == 0 or failure not in text:
+            print(text.replace(secret, "[redacted]") if secret else text)
         assert child.returncode != 0 and failure in text, "expected installer refusal was missing"
     elif child.returncode not in (0, 75):
         print(text.replace(secret, "[redacted]") if secret else text)
