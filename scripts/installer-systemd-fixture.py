@@ -54,6 +54,9 @@ def wait(check):
 def guard():
     assert Path("/.dockerenv").exists() and Path("/proc/1/comm").read_text().strip() == "systemd"
     assert os.geteuid() == 0
+    # Docker exec starts at the delegated namespace root. Keep the fixture in
+    # init.scope so its process does not block systemd enabling domain controllers.
+    Path("/sys/fs/cgroup/init.scope/cgroup.procs").write_text(str(os.getpid()))
 
 
 def prepare():
