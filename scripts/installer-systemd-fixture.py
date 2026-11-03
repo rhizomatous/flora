@@ -7,16 +7,14 @@ The NIC is a test-only dummy interface, not a public ingress path or VM boot.
 """
 import fcntl
 import hashlib
+import io
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
-import platform
 import pty
 import re
 import select
-import shlex
-import socket
 import ssl
 import subprocess
 import sys
@@ -77,8 +75,6 @@ WantedBy=network-online.target
 """)
     run("systemctl", "daemon-reload")
     run("systemctl", "enable", "--now", "fixture-nic.service")
-    with Path("/etc/hosts").open("a") as out:
-        out.write(f"\n{ADDRESS} {DOMAIN}\n")
     # The registry and all published fixture bytes remain in this nested Engine.
     run("docker", "run", "-d", "--name", "fixture-registry", "-p", "127.0.0.1:51848:5000",
         "registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373")
@@ -101,7 +97,7 @@ def snapshot():
             "ca": state["ca"], "enrollment": Path("/etc/flora/enrollment.sha256").read_text()}
 
 
-def cli(command, interrupt=False):
+def cli(command, interrupt=False, failure=None, orphan_after_stop=False):
     master, slave = pty.openpty()
 
     def terminal():
@@ -109,7 +105,8 @@ def cli(command, interrupt=False):
         fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
 
     child = subprocess.Popen([sys.executable, __file__, command], stdin=slave, stdout=slave, stderr=slave,
-                             preexec_fn=terminal, env={**os.environ, "FLORA_FIXTURE_INTERRUPT": "1" if interrupt else "0"})
+                             preexec_fn=terminal, env={**os.environ, "FLORA_FIXTURE_INTERRUPT": "1" if interrupt else "0",
+                                                      "FLORA_FIXTURE_LATE_PROBE": "1" if orphan_after_stop else "0"})
     os.close(slave)
     output = bytearray()
     deadline = time.monotonic() + 600
@@ -134,7 +131,10 @@ def cli(command, interrupt=False):
     text = output.decode(errors="replace")
     code = re.search(r"enrollment code \(not a URL\):\s+([^\s]+)", text)
     secret = code[1] if code else None
-    if child.returncode not in (0, 75):
+    assert "Traceback" not in text
+    if failure:
+        assert child.returncode != 0 and failure in text, "expected installer refusal was missing"
+    elif child.returncode not in (0, 75):
         print(text.replace(secret, "[redacted]") if secret else text)
     return child.returncode, secret
 
@@ -213,7 +213,7 @@ def exercise():
         f"{release_download.REPOSITORY}/releases/download/{VERSION}/SHA256SUMS": "/SHA256SUMS",
         f"{release_download.REPOSITORY}/releases/download/{VERSION}/{filename}": "/archive"}}))
     Release.corrupt = True
-    assert cli("install")[0] != 0
+    assert cli("install", failure="checksum mismatch")[0] != 0
     assert not Path("/opt/flora").exists() and not Path("/etc/flora").exists()
     Release.corrupt = False
     status, code = cli("install", interrupt=True)
@@ -234,22 +234,31 @@ def exercise():
     assert run("curl", "--noproxy", "*", "--silent", "--cacert", "/etc/flora/transport-ca.crt", "--resolve", f"{ubuntu.ALIAS}:443:{gateway}",
                "--output", "/dev/null", "--write-out", "%{http_code}", f"https://{ubuntu.ALIAS}/") == "401"
     run_owned_lifecycle(identity, before)
+    retained = run("docker", "run", "-d", "--name", "retained-layer-fixture", "--network", before["network"]["id"],
+                   "--label", "flora.managed=true", "--entrypoint", "sh", identity["agent_image"],
+                   "-c", "printf retained-writable-layer >/tmp/retained-layer; sleep 300")
+    wait(lambda: run("docker", "exec", retained, "test", "-f", "/tmp/retained-layer"))
+    run("docker", "stop", "--time", "1", retained)
     owner = before["owner"]
     name = "flora-install-probe-" + owner
     foreign = run("docker", "run", "-d", "--name", name, "--entrypoint", "sleep", identity["agent_image"], "300")
-    assert cli("uninstall")[0] != 0
+    assert cli("uninstall", failure="foreign container")[0] != 0
     assert run("docker", "inspect", "--format", "{{.State.Running}}", foreign) == "true"
     assert browser("/api/health")["status"] == "ok"
     run("docker", "rm", "-f", foreign)
     orphan = run("docker", "run", "-d", "--name", name, "--label", f"flora.installer={owner}", "--entrypoint", "sleep", identity["agent_image"], "300")
-    assert cli("uninstall")[0] == 0
+    assert cli("uninstall", orphan_after_stop=True)[0] == 0
     assert not run("docker", "ps", "-aq", "--filter", f"id={orphan}")
+    assert not run("docker", "ps", "-aq", "--filter", "id=" + (ROOT / "late-probe-id").read_text())
+    assert retained_layer(retained) == b"retained-writable-layer"
     assert sentinel.read_text() == "preserved edits" and snapshot() == before
     assert cli("install")[0] == 0
     assert not browser("/api/auth/status")["setupRequired"] and snapshot() == before
+    assert retained_layer(retained) == b"retained-writable-layer"
     journal = run("journalctl", "-u", "flora", "-u", "flora-proxy", "--no-pager")
     assert code not in journal
     (ROOT / "snapshot.json").write_text(json.dumps(before))
+    (ROOT / "retained-id").write_text(retained)
     server.shutdown()
     authority.shutdown()
     print("Full orchestration passed: HTTPS release verification, interrupted placement/resume, real systemd/Docker/TLS probe, enrollment, same-version rerun, orphan-safe uninstall/reinstall.")
@@ -263,12 +272,37 @@ def run_owned_lifecycle(identity, state):
         "FLORA_OWNED_NETWORK_GATEWAY": state["network"]["gateway"]})
 
 
+def retained_layer(container_id):
+    assert run("docker", "inspect", "--format", "{{.State.Running}}", container_id) == "false"
+    raw = subprocess.check_output(["docker", "cp", container_id + ":/tmp/retained-layer", "-"])
+    with tarfile.open(fileobj=io.BytesIO(raw)) as archive:
+        return archive.extractfile("retained-layer").read()
+
+
+def fixture_uninstall():
+    original = ubuntu.run
+
+    def command(*args, **kwargs):
+        result = original(*args, **kwargs)
+        if args == ("systemctl", "disable", "--now", "flora.service") and os.environ.get("FLORA_FIXTURE_LATE_PROBE") == "1":
+            state = json.loads((ubuntu.STATE / "state.json").read_text())
+            orphan = run("docker", "run", "-d", "--name", "flora-install-probe-" + state["owner"],
+                         "--label", "flora.installer=" + state["owner"], "--entrypoint", "sleep", state["identity"]["agent_image"], "300")
+            (ROOT / "late-probe-id").write_text(orphan)
+        return result
+
+    sys.argv = ["ubuntu.py", "uninstall", "--yes"]
+    with patch.object(ubuntu, "run", side_effect=command):
+        ubuntu.main()
+
+
 def verify_restart():
     wait(lambda: run("systemctl", "is-active", "flora.service", "flora-proxy.service"))
     wait(lambda: browser("/api/health"))
     assert snapshot() == json.loads((ROOT / "snapshot.json").read_text())
     assert not browser("/api/auth/status")["setupRequired"]
     assert Path("/var/lib/flora/recovery-sentinel").read_text() == "preserved edits"
+    assert retained_layer((ROOT / "retained-id").read_text()) == b"retained-writable-layer"
     print("Systemd container restart preserved administrator, data, CA, numeric accounts and network identity. This is not a VM/host reboot.")
 
 
@@ -280,9 +314,16 @@ if __name__ == "__main__":
     elif command == "exercise":
         exercise()
     elif command == "install":
-        fixture_install()
+        try:
+            fixture_install()
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+            print(f"Flora installer stopped: {error}", file=sys.stderr)
+            sys.exit(1)
     elif command == "uninstall":
-        sys.argv = ["ubuntu.py", "uninstall", "--yes"]
-        ubuntu.main()
+        try:
+            fixture_uninstall()
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+            print(f"Flora installer stopped: {error}", file=sys.stderr)
+            sys.exit(1)
     elif command == "verify-restart":
         verify_restart()

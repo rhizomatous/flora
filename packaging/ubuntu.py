@@ -144,7 +144,8 @@ def addresses(selected, domain):
                 continue
             resolved = json.loads(run("ip", "-j", "route", "get", "1.1.1.1", "oif", route["dev"]))
             for actual in resolved:
-                if actual.get("dev") == route["dev"] and actual.get("prefsrc") in assigned:
+                sources = {entry["local"] for entry in nics[route["dev"]]["addr_info"]}
+                if actual.get("dev") == route["dev"] and actual.get("prefsrc") in assigned & sources:
                     candidates.add(actual["prefsrc"])
         if len(candidates) != 1:
             raise ValueError("ambiguous external interface; pass --bind-address for each local NIC address serving browser traffic (not an unassigned NAT public IP)")
