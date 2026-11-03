@@ -271,10 +271,17 @@ def exercise():
 
 def run_owned_lifecycle(identity, state):
     uid, gid = state["flora"]
-    run("setpriv", f"--reuid={uid}", f"--regid={gid}", "--groups=" + str(__import__("grp").getgrnam("docker").gr_gid),
-        "/provisioning-test", "-test.run=^TestProvisioningOwnedDocker$", "-test.v", env={**os.environ,
-        "FLORA_PROVISIONING_TEST_IMAGE": identity["agent_image"], "FLORA_OWNED_NETWORK_ID": state["network"]["id"],
-        "FLORA_OWNED_NETWORK_GATEWAY": state["network"]["gateway"]})
+    try:
+        run("setpriv", f"--reuid={uid}", f"--regid={gid}", "--groups=" + str(__import__("grp").getgrnam("docker").gr_gid),
+            "/provisioning-test", "-test.run=^TestProvisioningOwnedDocker$", "-test.v", env={**os.environ,
+            "HOME": "/var/lib/flora", "FLORA_PROVISIONING_TEST_IMAGE": identity["agent_image"], "FLORA_OWNED_NETWORK_ID": state["network"]["id"],
+            "FLORA_OWNED_NETWORK_GATEWAY": state["network"]["gateway"]})
+    except subprocess.CalledProcessError as error:
+        # This test carries no upstream keys or enrollment material.
+        print(error.stdout)
+        print(error.stderr)
+        print(run("docker", "info", "--format", "{{.CgroupDriver}} {{.CgroupVersion}} {{json .Warnings}}"))
+        raise
 
 
 def retained_layer(container_id):
