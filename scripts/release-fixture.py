@@ -124,6 +124,7 @@ with tempfile.TemporaryDirectory(prefix='flora-release-') as tmp:
         assert process.wait(timeout=20) == 0
 
     process = None
+    probe = None
     try:
         process = start()
         html, _ = request('/')
@@ -134,6 +135,24 @@ with tempfile.TemporaryDirectory(prefix='flora-release-') as tmp:
             assert request(asset.decode())[0]
         state = json.loads((data / 'deployment/deployment.json').read_text())
         ca = (data / 'deployment/broker-ca.pem').read_bytes()
+        public_ca = root / 'public-ca.pem'
+        public_ca.write_bytes(ca.split(b'-----END CERTIFICATE-----')[0] + b'-----END CERTIFICATE-----\n')
+        public_ca.chmod(0o644)
+        assert b'PRIVATE KEY' not in public_ca.read_bytes()
+        probe = engine('POST', '/containers/create', {
+            'Image': image, 'User': '1000:1000', 'Entrypoint': ['/bin/sh', '-c'],
+            'Cmd': ['test "$(curl --silent --show-error --max-time 5 --cacert /broker-ca.pem '
+                    '--output /dev/null --write-out "%{http_code}" https://flora-github.internal/)" = 401'],
+            'Labels': {'flora.release-fixture': state['Owner']},
+            'HostConfig': {'NetworkMode': state['NetworkID'],
+                           'ExtraHosts': ['flora-github.internal:' + state['Gateway']],
+                           'Binds': [str(public_ca) + ':/broker-ca.pem:ro'],
+                           'Memory': 256 * 1024**2, 'PidsLimit': 64}
+        })['Id']
+        engine('POST', '/containers/' + probe + '/start')
+        assert engine('POST', '/containers/' + probe + '/wait')['StatusCode'] == 0, 'private CA/SAN or unauthenticated broker rejection failed'
+        engine('DELETE', '/containers/' + probe)
+        probe = None
         code = (data / 'deployment/enrollment-code').read_text()
         password = secrets.token_urlsafe(24)
         body = {'password': password, 'enrollmentCode': code}
@@ -154,10 +173,13 @@ with tempfile.TemporaryDirectory(prefix='flora-release-') as tmp:
         assert (data / 'flora.db').stat().st_mode & 0o777 == 0o600
         print(json.dumps({'result': 'passed', 'identity': identity,
                           'checks': ['archive HTTP backend through HTTPS proxy', 'protected enrollment',
-                                     'secure login', 'restart keeps account, network and private trust']}))
+                                     'secure login', 'owned bridge private TLS and broker rejection',
+                                     'restart keeps account, network and private trust']}))
     finally:
         if process and process.poll() is None:
             stop(process)
+        if probe:
+            engine('DELETE', '/containers/' + probe + '?force=true')
         state_path = data / 'deployment/deployment.json'
         if state_path.exists():
             saved = json.loads(state_path.read_text())

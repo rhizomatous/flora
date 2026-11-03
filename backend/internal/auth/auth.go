@@ -25,7 +25,7 @@ const iterations = 600000
 
 var ErrPassword = errors.New("Use a password between 12 and 1024 bytes.")
 var ErrLogin = errors.New("Password is incorrect.")
-var ErrEnrollment = errors.New("Installer enrollment code is incorrect.")
+var ErrEnrollment = errors.New("Enrollment code is incorrect.")
 
 type Service struct {
 	Store          *storage.Store

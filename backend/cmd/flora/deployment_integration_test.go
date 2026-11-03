@@ -78,9 +78,10 @@ func TestDeploymentEngine(t *testing.T) {
 	defer proxy.Close()
 	client := proxy.Client()
 	client.Timeout = 30 * time.Second
+	publicURL := proxy.URL
 	var logs bytes.Buffer
 	start := func() *exec.Cmd {
-		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestDeploymentMain$", "--", "-public-url", proxy.URL, "-listen", backend, "-data-dir", data, "-agent-image", image, "-agent-image-id", img.ID, "-agent-image-digest", "fixture/agent@"+img.ID)
+		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestDeploymentMain$", "--", "-public-url", publicURL, "-listen", backend, "-data-dir", data, "-agent-image", image, "-agent-image-id", img.ID, "-agent-image-digest", "fixture/agent@"+img.ID)
 		cmd.Env = append(os.Environ(), "FLORA_DEPLOYMENT_HELPER=1", "FLORA_DEPLOYMENT_UPSTREAM="+upstream.Listener.Addr().String())
 		cmd.Stdout, cmd.Stderr = &logs, &logs
 		if err := cmd.Start(); err != nil {
@@ -229,13 +230,33 @@ func TestDeploymentEngine(t *testing.T) {
 		t.Fatalf("foreign bridge reached broker: %s", out)
 	}
 	request("POST", "/api/chats/"+chat.ID+"/stop", proxy.URL, `{}`, cookie, 200)
+	request("POST", "/api/chats/"+chat.ID+"/messages", proxy.URL, `{"requestID":"fixture-2","text":"resume fixture"}`, cookie, 202)
+	deadline = time.Now().Add(30 * time.Second)
+	for {
+		got, err := run("cat /workspace/edit.txt /owned-layer && gh api repos/octo/demo --jq .private")
+		if err == nil && got == "retainedlayertrue" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("resume lost edits, layer or renewed broker access: %s %v", got, err)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	request("POST", "/api/chats/"+chat.ID+"/stop", proxy.URL, `{}`, cookie, 200)
 	stop(cmd)
 	if bytes.Contains(logs.Bytes(), code) {
 		t.Fatal("enrollment code leaked to logs")
 	}
+	publicURL = "https://flora.changed.test"
 	cmd = start()
-	request("POST", "/api/auth/bootstrap", proxy.URL, body, nil, 409)
-	request("GET", "/api/settings", proxy.URL, "", cookie, 200)
+	request("POST", "/api/auth/login", proxy.URL, `{"password":"fixture-password-long"}`, nil, 403)
+	request("POST", "/api/auth/login", publicURL, `{"password":"fixture-password-long"}`, nil, 200)
+	request("POST", "/api/auth/bootstrap", publicURL, body, nil, 409)
+	request("GET", "/api/settings", publicURL, "", cookie, 200)
+	after, err := privateRead(filepath.Join(dir, "deployment.json"))
+	if err != nil || !bytes.Equal(saved, after) {
+		t.Fatal("browser URL change replaced private deployment identity", err)
+	}
 	retained, err := engine.ContainerInspect(ctx, container)
 	if err != nil || retained.ID != container || retained.State.Running {
 		t.Fatal("restart changed retained stopped container", err)

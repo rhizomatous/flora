@@ -15,10 +15,10 @@ try {
   await expect(page.getByRole("heading", { name: "Create administrator" })).toBeVisible();
   await assertFitsPhone(page);
   await page.getByLabel("Password", { exact: true }).fill("browser test password");
-  const code = page.getByLabel("Installer enrollment code", { exact: false });
+  const code = page.getByLabel("Enrollment code", { exact: false });
   await code.fill("wrong");
   await page.getByRole("button", { name: "Create administrator", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("Installer enrollment code is incorrect.");
+  await expect(page.getByRole("alert")).toContainText("Enrollment code is incorrect.");
   await code.fill("fixture-installer-enrollment-code");
   await page.getByRole("button", { name: "Create administrator", exact: true }).click();
   await expect(page.getByRole("button", { name: "Log out", exact: true })).toBeVisible();

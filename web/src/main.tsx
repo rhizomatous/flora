@@ -70,7 +70,7 @@ function Account({
       <form className="mt-8 space-y-6" onSubmit={submit}>
         {setupRequired && enrollmentRequired === true && (
           <label className="block text-sm font-medium">
-            Installer enrollment code
+            Enrollment code
             <input
               className={control}
               type="password"
@@ -81,7 +81,7 @@ function Account({
               disabled={busy}
             />
             <span className="mt-2 block text-muted-foreground">
-              Enter the one-time code shown by the installer on your host.
+              Enter the one-time code shown by Flora on your host.
             </span>
           </label>
         )}

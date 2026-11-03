@@ -3,13 +3,11 @@ set -euo pipefail
 arch=${1:-arm64}
 image=${2:-flora-agent-test:local}
 case "$arch" in amd64|arm64) ;; *) exit 1 ;; esac
-test -x "bin/flora-linux-$arch"
 test -d bin
 CGO_ENABLED=0 GOOS=linux GOARCH=$arch go -C backend test -c -o "../bin/deployment-test-linux-$arch" ./cmd/flora
 # This daemon has no host socket, published ports, credentials or shared storage.
 id=$(docker run -d --privileged --label flora.fixture=deployment \
   -e DOCKER_TLS_CERTDIR= \
-  --mount "type=bind,src=$PWD/bin/flora-linux-$arch,dst=/flora,readonly" \
   --mount "type=bind,src=$PWD/bin/deployment-test-linux-$arch,dst=/deployment-test,readonly" \
   docker:28-dind@sha256:2a232a42256f70d78e3cc5d2b5d6b3276710a0de0596c145f627ecfae90282ac \
   --host=unix:///var/run/docker.sock)
