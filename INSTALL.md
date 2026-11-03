@@ -17,24 +17,31 @@ record must have a working path. Allow outbound HTTPS to Let's Encrypt, GHCR,
 GitHub and your model provider. Plan capacity for your chats: defaults allow ten
 running containers, each with limits of 2 CPUs, 8 GiB and 512 processes.
 
-Download an explicit release, then run it with your domain:
+Download an explicit release for your Linux architecture, verify its checksum,
+and extract it into a new directory. Use curl, tar and sha256sum as your normal
+user, then run the binary with your domain:
 
 ```sh
 VERSION=vX.Y.Z # choose a published release with -hostname support
-curl --proto '=https' --proto-redir '=https' -fsSL \
-  "https://raw.githubusercontent.com/rhizomatous/flora/$VERSION/packaging/bootstrap.sh" | sh -s -- "$VERSION"
+ARCH=amd64     # use arm64 on aarch64 Linux
+mkdir flora-release
+cd flora-release
+curl --proto '=https' --proto-redir '=https' -fLO \
+  "https://github.com/rhizomatous/flora/releases/download/$VERSION/flora-$VERSION-linux-$ARCH.tar.gz"
+curl --proto '=https' --proto-redir '=https' -fLO \
+  "https://github.com/rhizomatous/flora/releases/download/$VERSION/SHA256SUMS"
+sha256sum --ignore-missing --check SHA256SUMS
+tar -xzf "flora-$VERSION-linux-$ARCH.tar.gz"
+./flora -version
 sudo ./flora -hostname flora.example.com -data-dir /var/lib/flora
 ```
 
-The downloader needs curl and Python 3.11+, verifies the archive checksum, source,
-architecture and embedded binary identity, and places only `./flora`. Add
-`--allow-prerelease` for an explicit prerelease. It never installs Docker, changes
-daemon settings, restarts services or overwrites a different binary. For a
-reviewable alternative, download the script and its `release_download.py` helper
-from a reviewed commit before executing, or verify an archive as shown below.
-HTTPS and same-release checksums detect corruption; they do not independently
-authenticate a compromised release or bootstrap source. The older
-`v0.0.1-alpha.1` release uses the manual path below and has no `-hostname` flag.
+Continue only if the selected archive reports `OK`. Compare `./flora -version`
+with the extracted `release.json`, including the version, source commit, Linux
+architecture and digest-pinned agent image. HTTPS and same-release checksums
+detect corruption; they do not independently authenticate a compromised release.
+The older `v0.0.1-alpha.1` release uses the manual path below and has no
+`-hostname` flag.
 
 Open `https://flora.example.com` and enter the one-time enrollment code printed to
 the controlling terminal. With a service or detached terminal, read it privately

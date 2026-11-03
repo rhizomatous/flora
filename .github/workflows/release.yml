@@ -115,7 +115,7 @@ jobs:
       - name: Exercise the archived binary on native Linux
         run: |
           (cd dist && sha256sum --check SHA256SUMS)
-          sudo bash scripts/check-release-linux.sh "dist/flora-$GITHUB_REF_NAME-linux-${{ matrix.arch }}.tar.gz"
+          sudo bash scripts/check-release-linux.sh "dist/flora-$GITHUB_REF_NAME-linux-${{ matrix.arch }}.tar.gz" "$(git rev-parse HEAD)"
       - name: Remove registry authentication
         if: always()
         env:

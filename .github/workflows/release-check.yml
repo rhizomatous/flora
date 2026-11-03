@@ -43,14 +43,14 @@ jobs:
         run: |
           docker pull "$FIXTURE_IMAGE"
           docker rm -f flora-release-registry
-          sudo bash scripts/check-release-linux.sh dist/flora-v0.0.0-fixture-linux-${{ matrix.arch }}.tar.gz
+          (cd dist && sha256sum --check SHA256SUMS)
+          sudo bash scripts/check-release-linux.sh dist/flora-v0.0.0-fixture-linux-${{ matrix.arch }}.tar.gz "$(git rev-parse HEAD)"
       - name: Check built-in HTTPS and private broker with a disposable Engine
         env:
-          FLORA_DOWNLOAD_TEST_ARCHIVE: dist/flora-v0.0.0-fixture-linux-${{ matrix.arch }}.tar.gz
+          RELEASE_ARCHIVE: dist/flora-v0.0.0-fixture-linux-${{ matrix.arch }}.tar.gz
         run: |
-          python3 -m unittest discover -s scripts -p 'release_download_test.py'
           mkdir -p bin
-          tar -xOf "$FLORA_DOWNLOAD_TEST_ARCHIVE" ./flora > bin/flora-linux-${{ matrix.arch }}
+          tar -xOf "$RELEASE_ARCHIVE" ./flora > bin/flora-linux-${{ matrix.arch }}
           chmod 755 bin/flora-linux-${{ matrix.arch }}
           nix develop --command bash scripts/check-deployment.sh ${{ matrix.arch }} localhost:51818/flora-agent:fixture
       - name: Remove only fixture registry

@@ -16,8 +16,13 @@ and [product requirements](specs/PRD.md).
 
 ## Develop
 
-For a Linux service installation, see the [installation and operations guide](INSTALL.md).
-It covers release identities, private GitHub TLS/DNS, systemd, HTTPS, and offline recovery.
+For Linux installation, download a published release archive for amd64 or arm64,
+check its SHA256SUMS entry, and extract it before running
+`sudo ./flora -hostname flora.example.com -data-dir /var/lib/flora`.
+See the [installation and operations guide](INSTALL.md) for Docker, DNS and port
+requirements, download commands, optional systemd, and offline recovery.
+The existing `v0.0.1-alpha.1` release has no `-hostname` flag; use its manual HTTPS
+proxy instructions instead.
 
 Install [Nix](https://nixos.org/download/) with flakes and `nix-command` enabled.
 The committed `flake.lock` pins the development environment on Linux (x86-64 and
