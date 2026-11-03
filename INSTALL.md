@@ -11,11 +11,18 @@ Flora itself talks directly to the Engine API.
 ## Experimental Ubuntu host installer
 
 The opinionated installer is **not production-ready**. It requires
-`--experimental` for disposable evaluation. Full Ubuntu systemd installation,
-reboot/interruption recovery, uninstall/reinstall and public ACME acceptance are
-outstanding. The isolated Ubuntu topology fixture exercises a nested Engine, the
-actual Docker SDK, scoped broker firewall rules and Caddy HTTP-01 with a local test
-CA. That is not a fresh-host or public-CA acceptance result.
+`--experimental` for disposable evaluation. The isolated Ubuntu fixture runs the
+whole installer with real systemd, accounts, private storage, Docker and TLS. It
+covers same-version reruns, interruption after service-file placement, owned-probe
+cleanup, uninstall/reinstall and a systemd container restart with retained data and
+stopped writable layers. Release downloads and ACME use local HTTPS/test authorities,
+and a synthetic NIC stands in for public ingress. Fresh Ubuntu VM/host boots, real
+public ACME, IPv6 ingress and arbitrary interruption points remain unverified.
+
+The release-check workflow builds its own digest-pinned image and archive for this
+exercise. It does not need a public release, publish to a public registry, or add
+insecure installer URL flags. Its real provisioning test uses the installed bridge
+to check stop/start, recovery, retained edits and rejection of extra-network drift.
 
 This path targets Ubuntu 24.04 LTS amd64/arm64, systemd, persistent local storage,
 one rootful local Engine and a real domain. Public DNS and inbound TCP 80/443 must
@@ -45,8 +52,9 @@ configures Flora and hands off to browser credential setup. Add
 consent to missing Docker/Caddy packages from authenticated Ubuntu apt repositories.
 It does not replace an incompatible Engine, restart an existing Engine, change
 daemon DNS or rewrite an existing proxy. An occupied 80/443/8080 listener stops
-installation. For ambiguous interfaces, supply `--bind-address LOCAL_IP` for each
-browser NIC address.
+installation. Automatic selection uses a unique default-route source on an eligible
+host NIC, ignoring Docker bridges and veths. For ambiguous routes, supply
+`--bind-address LOCAL_IP` for each browser NIC address.
 
 The Flora binary still uses the Engine API directly. The installer's root-owned
 startup/network helper requires the administrative Docker CLI to remain installed.
@@ -65,8 +73,9 @@ sudo sh flora-release/install.sh --ubuntu --version "$VERSION" \
 The installer records a labeled bridge's subnet, gateway, interface and immutable
 ID. Each chat uses it and `flora-github.internal:GATEWAY` in its hosts file.
 Ordinary DNS and outbound NAT stay unchanged. The broker binds gateway:443 and
-Caddy binds only the selected NIC addresses. Scoped INPUT rules allow the owned
-bridge to the broker and reject other interfaces, including routed access. This
+Caddy binds only the selected NIC addresses. Scoped INPUT rules allow the host's
+loopback path and owned bridge to gateway TCP 443, rejecting other interfaces,
+including routed access. This
 is not an outbound sandbox.
 
 Enter the terminal's one-time enrollment code in the browser form, never in a URL
@@ -96,7 +105,8 @@ or GitHub writes.
 
 For data-preserving removal, stop every chat through Flora first, then run
 `sudo python3 /opt/flora/ubuntu.py uninstall --runtime retain`. It refuses running
-chats and disables only owned services, retaining files, numeric accounts, keys,
+chats, cleans exact-name/owner-labeled installer probes before and after stopping
+services, and disables only owned services, retaining files, numeric accounts, keys,
 data, stopped containers, their network and image. Same-release installation
 re-enables them. Shared Docker/Caddy packages are never removed. Destructive purge
 and cross-release upgrades are unsupported. Include `/var/lib/flora-installer` and

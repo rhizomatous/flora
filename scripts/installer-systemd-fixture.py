@@ -168,6 +168,10 @@ def fixture_install():
 
 
 def exercise():
+    for command in ("renew", "enrollment-code"):
+        refusal = subprocess.run([sys.executable, "/packaging/ubuntu.py", command], text=True, capture_output=True)
+        assert refusal.returncode == 1 and "no recorded installer state" in refusal.stderr
+        assert "Traceback" not in refusal.stderr and not ubuntu.STATE.exists()
     run("openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2", "-subj", "/CN=Disposable fixture CA",
         "-addext", "basicConstraints=critical,CA:TRUE", "-keyout", str(ROOT / "ca.key"), "-out", str(ROOT / "ca.crt"))
     run("openssl", "req", "-newkey", "rsa:2048", "-nodes", "-subj", "/CN=localhost", "-keyout", str(ROOT / "server.key"), "-out", str(ROOT / "server.csr"))
@@ -234,6 +238,7 @@ def exercise():
     assert run("curl", "--noproxy", "*", "--silent", "--cacert", "/etc/flora/transport-ca.crt", "--resolve", f"{ubuntu.ALIAS}:443:{gateway}",
                "--output", "/dev/null", "--write-out", "%{http_code}", f"https://{ubuntu.ALIAS}/") == "401"
     run_owned_lifecycle(identity, before)
+    print("Real provisioning on the installed bridge preserved setup/edits across stop/start and recovery, and refused attached-network drift.")
     retained = run("docker", "run", "-d", "--name", "retained-layer-fixture", "--network", before["network"]["id"],
                    "--label", "flora.managed=true", "--entrypoint", "sh", identity["agent_image"],
                    "-c", "printf retained-writable-layer >/tmp/retained-layer; sleep 300")

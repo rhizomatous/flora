@@ -118,6 +118,21 @@ class NetworkTests(unittest.TestCase):
                     ubuntu.install(args, "amd64", installation)
                 stage.assert_not_called()
 
+    def test_multiple_real_default_sources_require_explicit_binding(self):
+        nics = [{"ifname": name, "addr_info": [{"local": address, "scope": "global"}]} for name, address in (("ens5", "10.0.0.2"), ("ens6", "10.1.0.2"))]
+
+        def ip(*args):
+            if "address" in args:
+                return json.dumps(nics)
+            if "default" in args:
+                return json.dumps([{"dev": nic["ifname"], "dst": "default"} for nic in nics])
+            return json.dumps([{"dev": args[-1], "prefsrc": next(nic["addr_info"][0]["local"] for nic in nics if nic["ifname"] == args[-1])}])
+
+        with patch.object(ubuntu, "run", side_effect=ip), patch.object(ubuntu.socket, "getaddrinfo", return_value=[(None, None, None, None, ("203.0.113.2", 443))]):
+            with self.assertRaisesRegex(ValueError, "ambiguous external interface"):
+                ubuntu.addresses(None, "flora.example.com")
+            self.assertEqual(ubuntu.addresses(["10.1.0.2"], "flora.example.com"), ["10.1.0.2"])
+
     def test_unsupported_hosts_fail_before_installer_state_is_created(self):
         with patch.object(ubuntu.os, "geteuid", return_value=0), patch.object(ubuntu.platform, "system", return_value="Linux"), patch.object(ubuntu.platform, "freedesktop_os_release", return_value={"ID": "ubuntu", "VERSION_ID": "22.04"}), patch.object(ubuntu, "Installation") as installation, patch.object(sys, "argv", ["ubuntu.py", "install", "--version", "v1.2.3", "--experimental"]):
             with self.assertRaisesRegex(ValueError, "24.04"):
