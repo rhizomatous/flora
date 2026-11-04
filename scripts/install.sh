@@ -1,6 +1,7 @@
 #!/bin/sh
 # Install a fresh release on a Linux systemd host with local rootful Docker.
 set -eu
+export LC_ALL=C
 umask 077
 die() { printf '%s\n' "flora installer: $*" >&2; exit 1; }
 version='' public_url=''
@@ -32,7 +33,8 @@ case $host in *.) die 'Trailing hostname dot is not supported' ;; esac
 if [ "$authority" != "$host" ]; then
     port=${authority#*:}
     case $port in ''|0*|*[!0-9]*) die 'Invalid HTTPS port' ;; esac
-    [ "${#port}" -le 5 ] && [ "$port" -le 65535 ] || die 'Invalid HTTPS port'
+    [ "${#port}" -le 5 ] || die 'Invalid HTTPS port'
+    [ "$port" -le 65535 ] || die 'Invalid HTTPS port'
     [ "$port" != 443 ] || public_url=https://$host
 fi
 [ "$(id -u)" = 0 ] || die 'Run as root (sudo sh -s -- ...)'
@@ -44,7 +46,9 @@ done
 [ -d /run/systemd/system ] || die 'A running systemd host is required'
 unit=/etc/systemd/system/flora.service
 for path in /opt/flora /var/lib/flora "$unit"; do
-    [ ! -e "$path" ] && [ ! -L "$path" ] || die "Existing installation path: $path. Refusing to overwrite or upgrade."
+    if [ -e "$path" ] || [ -L "$path" ]; then
+        die "Existing installation path: $path. Refusing to overwrite or upgrade."
+    fi
 done
 [ "$(systemctl show flora.service --property=LoadState --value)" = not-found ] || die 'An existing flora.service is registered'
 curl --disable --noproxy '*' --fail --silent --show-error --max-time 10 --unix-socket /var/run/docker.sock \
@@ -92,8 +96,10 @@ case $checksum in ''|*[!a-fA-F0-9]*) die 'Missing or invalid archive checksum' ;
 mkdir "$work/unpacked"
 # Extract only expected files from the verified, trusted release archive.
 tar -xzf "$work/$archive" -C "$work/unpacked" --no-same-owner --no-same-permissions ./flora ./release.json
-[ -f "$work/unpacked/flora" ] && [ ! -L "$work/unpacked/flora" ] || die 'Archive has no regular binary'
-[ -f "$work/unpacked/release.json" ] && [ ! -L "$work/unpacked/release.json" ] || die 'Archive has no release identity'
+for file in flora release.json; do
+    [ -f "$work/unpacked/$file" ] || die "Archive has no regular $file"
+    [ ! -L "$work/unpacked/$file" ] || die "Archive has a symlink for $file"
+done
 identity=$("$work/unpacked/flora" -version)
 printf '%s\n' "$identity" | cmp -s - "$work/unpacked/release.json" || die 'Binary and release identity differ'
 case $identity in
@@ -141,7 +147,8 @@ while [ "$attempt" -lt 30 ]; do
 done
 [ "$ready" = 1 ] || die 'Startup timed out. Inspect privately with: journalctl -u flora.service'
 code=/var/lib/flora/deployment/enrollment-code
-[ ! -L "$code" ] && [ "$(stat -c '%u:%a' "$code")" = 0:600 ] || die 'Enrollment file must be root-owned with mode 0600'
+[ ! -L "$code" ] || die 'Enrollment file must not be a symlink'
+[ "$(stat -c '%u:%a' "$code")" = 0:600 ] || die 'Enrollment file must be root-owned with mode 0600'
 success=1
 printf 'Flora is running. Open %s\n' "$public_url"
 printf 'Enrollment code is in %s (root-only).\n' "$code"
