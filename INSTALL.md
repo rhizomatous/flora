@@ -33,13 +33,13 @@ repository is currently private, so anonymous raw and release downloads return
 in these URLs or arguments.
 
 The candidate script is already committed at
-[`8b53d6b8989d6d25a4d2d66705bb754838790a4e`](https://github.com/rhizomatous/flora/blob/8b53d6b8989d6d25a4d2d66705bb754838790a4e/scripts/install.sh),
+[`b1be2fc820ad8d8cdad369a2cc43afdfb8fb27cd`](https://github.com/rhizomatous/flora/blob/b1be2fc820ad8d8cdad369a2cc43afdfb8fb27cd/scripts/install.sh),
 without needing a new release tag. Authorized maintainers can retrieve its exact
 source with their existing GitHub CLI login for inspection:
 
 ```sh
 gh api -H 'Accept: application/vnd.github.raw+json' \
-  'repos/rhizomatous/flora/contents/scripts/install.sh?ref=8b53d6b8989d6d25a4d2d66705bb754838790a4e' > install.sh
+  'repos/rhizomatous/flora/contents/scripts/install.sh?ref=b1be2fc820ad8d8cdad369a2cc43afdfb8fb27cd' > install.sh
 ```
 
 The script requires root and both flags. It detects amd64 or arm64, downloads only
