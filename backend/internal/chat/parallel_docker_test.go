@@ -85,7 +85,11 @@ func TestThreeChatsDocker(t *testing.T) {
 	if err := store.SaveCredentials(ctx, storage.Credentials{Provider: "anthropic", Model: "claude-sonnet-4-6", ProviderKey: "offline-test-key", GitHubToken: "github_pat_offline"}); err != nil {
 		t.Fatal(err)
 	}
-	cfg := provisioning.Config{ImageRef: image, ImageDigest: testImage, ImageID: img.ID, HarnessVersion: "1.2.27", MaxRunning: 3, NanoCPUs: 1e9, MemoryBytes: 1 << 30, PidsLimit: 128}
+	network, err := engine.NetworkInspect(ctx, "bridge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := provisioning.Config{NetworkID: network.ID, BrokerGateway: network.Gateways[0], ImageRef: image, ImageDigest: testImage, ImageID: img.ID, HarnessVersion: "1.2.27", MaxRunning: 3, NanoCPUs: 1e9, MemoryBytes: 1 << 30, PidsLimit: 128}
 	manager, err := provisioning.New(providerEngine{engine, url}, store, cfg, localCheckout{engine, store})
 	if err != nil {
 		t.Fatal(err)

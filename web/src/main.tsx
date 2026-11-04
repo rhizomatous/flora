@@ -13,18 +13,20 @@ import { button, control, link, text } from "./ui";
 
 import "@flora/florets/styles.css";
 
-type Status = { setupRequired: boolean; authenticated: boolean };
+type Status = { setupRequired: boolean; authenticated: boolean; enrollmentRequired?: boolean };
 
 const currentPath = () => window.location.hash.slice(1) || "chats";
 
 /** Creates the administrator on first run, otherwise logs in. */
 function Account({
   setupRequired,
+  enrollmentRequired,
   busy,
   run,
   onLogin,
 }: {
   setupRequired: boolean;
+  enrollmentRequired?: boolean;
   busy: boolean;
   run: (task: () => Promise<void>, fallback: string) => Promise<void>;
   onLogin: () => Promise<void>;
@@ -39,8 +41,12 @@ function Account({
     event.preventDefault();
     const form = event.currentTarget;
     const password = text(new FormData(form), "password");
+    const enrollmentCode = text(new FormData(form), "enrollmentCode");
     void run(async () => {
-      await request(`auth/${setupRequired ? "bootstrap" : "login"}`, "POST", { password });
+      await request(`auth/${setupRequired ? "bootstrap" : "login"}`, "POST", {
+        password,
+        enrollmentCode,
+      });
       form.reset();
       await onLogin();
     }, "Request failed. Try again.");
@@ -62,6 +68,23 @@ function Account({
           : "Enter your administrator password. Sessions expire at the absolute lifetime set by the administrator."}
       </p>
       <form className="mt-8 space-y-6" onSubmit={submit}>
+        {setupRequired && enrollmentRequired === true && (
+          <label className="block text-sm font-medium">
+            Enrollment code
+            <input
+              className={control}
+              type="password"
+              name="enrollmentCode"
+              autoComplete="off"
+              maxLength={256}
+              required
+              disabled={busy}
+            />
+            <span className="mt-2 block text-muted-foreground">
+              Enter the one-time code shown by Flora on your host.
+            </span>
+          </label>
+        )}
         <label className="block text-sm font-medium">
           Password
           <input
@@ -271,6 +294,7 @@ function App() {
         <Account
           key={String(status.setupRequired)}
           setupRequired={status.setupRequired}
+          enrollmentRequired={status.enrollmentRequired === true}
           busy={busy}
           run={run}
           onLogin={refresh}

@@ -1,7 +1,0 @@
-flora.example.com {
-	# Bind only the public host IP so the broker can own the private gateway:443.
-	# bind PUBLIC_HOST_IP
-	reverse_proxy 127.0.0.1:8080 {
-		flush_interval -1
-	}
-}

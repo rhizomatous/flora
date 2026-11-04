@@ -14,10 +14,9 @@ for arch in amd64 arm64; do
   GOOS=linux GOARCH=$arch go -C backend build -mod=readonly -trimpath -buildvcs=false \
     -ldflags "-buildid= -X main.releaseVersion=$version -X main.releaseCommit=$commit -X main.releaseImage=$image" \
     -o "$stage/flora" ./cmd/flora
-  jq -n --arg version "$version" --arg commit "$commit" --arg image "$image" \
-    '{version:$version,commit:$commit,agent_image:$image,harness_version:"1.2.27"}' > "$stage/release.json"
-  cp -R packaging/. "$stage/"
-  cp LICENSE INSTALL.md "$stage/"
+  jq -n --arg version "$version" --arg commit "$commit" --arg image "$image" --arg arch "$arch" \
+    '{version:$version,commit:$commit,agent_image:$image,harness_version:"1.2.27",os:"linux",arch:$arch}' > "$stage/release.json"
+  cp packaging/flora.service LICENSE README.md INSTALL.md "$stage/"
   tar -czf "dist/flora-$version-linux-$arch.tar.gz" -C "$stage" .
   rm -rf "$stage"
   trap - EXIT

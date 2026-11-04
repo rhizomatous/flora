@@ -134,12 +134,13 @@ func (a *api) routes(mux *http.ServeMux) {
 			failure(w, 500, "Session storage unavailable.")
 			return
 		}
-		jsonResponse(w, 200, map[string]bool{"setupRequired": errors.Is(err, storage.ErrNotFound), "authenticated": valid})
+		jsonResponse(w, 200, map[string]bool{"setupRequired": errors.Is(err, storage.ErrNotFound), "authenticated": valid, "enrollmentRequired": errors.Is(err, storage.ErrNotFound) && a.auth.EnrollmentRequired()})
 	})
 	for _, action := range []string{"bootstrap", "login"} {
 		mux.HandleFunc("POST /api/auth/"+action, func(w http.ResponseWriter, r *http.Request) {
 			var in struct {
-				Password string `json:"password"`
+				Password       string `json:"password"`
+				EnrollmentCode string `json:"enrollmentCode"`
 			}
 			if !decode(w, r, &in) {
 				return
@@ -161,11 +162,13 @@ func (a *api) routes(mux *http.ServeMux) {
 			var expires time.Time
 			var err error
 			if action == "bootstrap" {
-				value, expires, err = a.auth.Bootstrap(r.Context(), in.Password)
+				value, expires, err = a.auth.Bootstrap(r.Context(), in.Password, in.EnrollmentCode)
 			} else {
 				value, expires, err = a.auth.Login(r.Context(), in.Password)
 			}
 			switch {
+			case errors.Is(err, auth.ErrEnrollment):
+				failure(w, 403, auth.ErrEnrollment.Error())
 			case errors.Is(err, storage.ErrConflict):
 				failure(w, 409, "Administrator already exists. Log in instead.")
 			case errors.Is(err, auth.ErrPassword):

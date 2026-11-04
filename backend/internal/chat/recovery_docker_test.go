@@ -89,7 +89,11 @@ func TestRecoveryDocker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	config := provisioning.Config{ImageRef: image, ImageDigest: testImage, ImageID: img.ID, HarnessVersion: "1.2.27"}
+	network, err := engine.NetworkInspect(ctx, "bridge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := provisioning.Config{NetworkID: network.ID, BrokerGateway: network.Gateways[0], ImageRef: image, ImageDigest: testImage, ImageID: img.ID, HarnessVersion: "1.2.27"}
 	manager, err := provisioning.New(providerEngine{engine, providerURL}, store, config, localCheckout{engine, store})
 	if err != nil {
 		t.Fatal(err)

@@ -16,8 +16,14 @@ and [product requirements](specs/PRD.md).
 
 ## Develop
 
-For a Linux service installation, see the [installation and operations guide](INSTALL.md).
-It covers release identities, private GitHub TLS/DNS, systemd, HTTPS, and offline recovery.
+For Linux installation, download a published release archive for amd64 or arm64,
+check its SHA256SUMS entry, and extract it before running
+`sudo ./flora -public-url https://flora.example.com -data-dir /var/lib/flora`.
+Put Tailscale Serve or an existing HTTPS proxy in front of loopback HTTP 8080.
+See the [installation and operations guide](INSTALL.md) for Docker and privilege
+requirements, download commands, optional systemd, and offline recovery.
+Older experimental archives do not include managed private networking; use the
+instructions shipped with those archives.
 
 Install [Nix](https://nixos.org/download/) with flakes and `nix-command` enabled.
 The committed `flake.lock` pins the development environment on Linux (x86-64 and
@@ -32,7 +38,8 @@ Go/TypeScript source tree. The scripts do not require these last three tools.
 nix develop
 make deps
 make check smoke build-linux
-./bin/flora -public-url https://flora.example.com
+# On Linux with Docker and a locally built agent image:
+sudo ./bin/flora -public-url https://flora.example.com -agent-image IMAGE@sha256:DIGEST
 ```
 
 Put an HTTPS reverse proxy in front of <http://127.0.0.1:8080> and open the
@@ -44,9 +51,11 @@ Storage defaults to `./flora-data`; set `-data-dir /absolute/path/to/private/dat
 for a stable service location. Keep this directory on persistent local storage,
 owned by the application user, outside any agent mount. Unusable storage or an
 unsupported newer schema prevents startup before HTTP begins listening.
-Neither Docker nor a model-provider credential is needed for these checks.
+Unit checks do not need Docker or provider credentials. Running the app requires
+Linux, local rootful Docker and a pinned agent image.
 
-Create the administrator before exposing a new installation to other people.
+Create the administrator with the private enrollment code from the terminal or
+`data-dir/deployment/enrollment-code`.
 Only the first account creation succeeds. Sessions expire seven days after login by default;
 logout immediately revokes that session on the server. All API data routes require
 authentication, except health and account status. Login and setup require the
@@ -86,11 +95,11 @@ Build the pinned image as described in `agent/README.md`, then supply
 fixed to the image's OpenCode 1.2.27. Docker must run on the same host as Flora's
 storage. `-docker-socket` defaults to `/var/run/docker.sock`.
 
-Enable the private GitHub listener with `-github-listen`, `-github-tls-cert`, and
-`-github-tls-key`. Supply `-github-host` with its private hostname, reachable on
-port 443 from containers, and `-github-ca` with the trusted CA PEM file. Keep this
-listener separate from the browser origin. The administrator's GitHub token
-stays on the host. See the agent setup for the transport and DNS requirements.
+Every app startup manages an owned private Docker bridge and broker CA, independent
+of browser HTTPS. The broker uses the bridge gateway on TCP 443 and binds to the
+bridge device, requiring root or CAP_NET_RAW plus CAP_NET_BIND_SERVICE. Agents
+receive the private hostname mapping and public CA automatically. The
+administrator's GitHub token stays on the host. See the installation guide.
 
 After saving installation credentials and connecting a project with one core
 repository, choose **Start chat**. New containers receive the installation's

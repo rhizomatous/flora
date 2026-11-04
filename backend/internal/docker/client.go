@@ -100,6 +100,61 @@ func (c *Client) Ping(ctx context.Context) error {
 	return err
 }
 
+// CheckLocalRuntime rejects unsupported daemon modes before deployment creates
+// any resources. The versioned Info request also checks the pinned API contract.
+func (c *Client) CheckLocalRuntime(ctx context.Context) error {
+	r, err := c.sdk.Info(ctx, client.InfoOptions{})
+	if err != nil {
+		return err
+	}
+	if r.Info.OSType != "linux" || !r.Info.MemoryLimit || !r.Info.PidsLimit || !r.Info.CPUCfsQuota {
+		return fmt.Errorf("local Linux Engine with memory, PID and CPU limits is required")
+	}
+	for _, option := range r.Info.SecurityOptions {
+		if strings.Contains(option, "rootless") || strings.Contains(option, "userns") {
+			return fmt.Errorf("rootless Docker and user namespace remapping are unsupported")
+		}
+	}
+	return nil
+}
+
+type NetworkInfo struct {
+	ID       string
+	Name     string
+	Driver   string
+	Internal bool
+	Labels   map[string]string
+	Gateways []string
+	Bridge   string
+}
+
+// NetworkCreate lets the local Engine allocate a bridge subnet from its pools.
+// The caller persists the returned ID and must never recreate a recorded network.
+func (c *Client) NetworkCreate(ctx context.Context, name, owner string) (string, error) {
+	r, err := c.sdk.NetworkCreate(ctx, name, client.NetworkCreateOptions{
+		Driver: "bridge", Labels: map[string]string{"flora.deployment": owner},
+	})
+	return r.ID, err
+}
+
+// NetworkInspect reads the immutable identity and bridge used by the broker.
+func (c *Client) NetworkInspect(ctx context.Context, id string) (NetworkInfo, error) {
+	result, err := c.sdk.NetworkInspect(ctx, id, client.NetworkInspectOptions{})
+	if err != nil {
+		return NetworkInfo{}, err
+	}
+	n := result.Network
+	info := NetworkInfo{ID: n.ID, Name: n.Name, Driver: n.Driver, Internal: n.Internal, Labels: n.Labels}
+	info.Bridge = n.Options["com.docker.network.bridge.name"]
+	if info.Bridge == "" && len(n.ID) >= 12 {
+		info.Bridge = "br-" + n.ID[:12]
+	}
+	for _, subnet := range n.IPAM.Config {
+		info.Gateways = append(info.Gateways, subnet.Gateway.String())
+	}
+	return info, nil
+}
+
 type Image struct {
 	ID          string
 	RepoTags    []string
@@ -126,12 +181,14 @@ func (c *Client) ImagePull(ctx context.Context, ref string) error {
 }
 
 // ContainerSpec contains only the settings Flora supplies. The daemon keeps
-// privileged mode off and uses its default capabilities and bridge network.
+// privileged mode off and uses its default capabilities.
 type ContainerSpec struct {
-	Name   string
-	Image  string
-	Env    []string
-	Labels map[string]string
+	NetworkID  string
+	ExtraHosts []string
+	Name       string
+	Image      string
+	Env        []string
+	Labels     map[string]string
 	// Binds must contain only this chat's workspace and runtime-state paths.
 	Binds []string
 	// LoopbackPort publishes an ephemeral loopback-only TCP port. Zero disables it.
@@ -144,8 +201,10 @@ type ContainerSpec struct {
 func (c *Client) ContainerCreate(ctx context.Context, spec ContainerSpec) (string, error) {
 	config := &container.Config{Image: spec.Image, Env: spec.Env, Labels: spec.Labels}
 	host := &container.HostConfig{
-		Binds:     spec.Binds,
-		Resources: container.Resources{NanoCPUs: spec.NanoCPUs, Memory: spec.MemoryBytes, PidsLimit: &spec.PidsLimit},
+		NetworkMode: container.NetworkMode(spec.NetworkID),
+		ExtraHosts:  spec.ExtraHosts,
+		Binds:       spec.Binds,
+		Resources:   container.Resources{NanoCPUs: spec.NanoCPUs, Memory: spec.MemoryBytes, PidsLimit: &spec.PidsLimit},
 	}
 	if spec.LoopbackPort != 0 {
 		port, err := network.ParsePort(strconv.Itoa(spec.LoopbackPort) + "/tcp")
@@ -211,14 +270,17 @@ type ContainerInfo struct {
 		Labels map[string]string
 	}
 	HostConfig struct {
-		Binds      []string
-		Privileged bool
-		NanoCPUs   int64
-		Memory     int64
-		PidsLimit  int64
+		NetworkMode string
+		ExtraHosts  []string
+		Binds       []string
+		Privileged  bool
+		NanoCPUs    int64
+		Memory      int64
+		PidsLimit   int64
 	}
 	NetworkSettings struct {
-		Ports map[string][]PortBinding
+		Networks map[string]string // network name to immutable network ID
+		Ports    map[string][]PortBinding
 	}
 }
 
@@ -237,6 +299,8 @@ func (c *Client) ContainerInspect(ctx context.Context, id string) (ContainerInfo
 		info.Config.Env, info.Config.Labels = inspected.Config.Env, inspected.Config.Labels
 	}
 	if host := inspected.HostConfig; host != nil {
+		info.HostConfig.NetworkMode = string(host.NetworkMode)
+		info.HostConfig.ExtraHosts = host.ExtraHosts
 		info.HostConfig.Binds, info.HostConfig.Privileged = host.Binds, host.Privileged
 		info.HostConfig.NanoCPUs, info.HostConfig.Memory = host.NanoCPUs, host.Memory
 		if host.PidsLimit != nil {
@@ -244,7 +308,13 @@ func (c *Client) ContainerInspect(ctx context.Context, id string) (ContainerInfo
 		}
 	}
 	info.NetworkSettings.Ports = make(map[string][]PortBinding)
+	info.NetworkSettings.Networks = make(map[string]string)
 	if inspected.NetworkSettings != nil {
+		for name, endpoint := range inspected.NetworkSettings.Networks {
+			if endpoint != nil {
+				info.NetworkSettings.Networks[name] = endpoint.NetworkID
+			}
+		}
 		for port, bindings := range inspected.NetworkSettings.Ports {
 			for _, binding := range bindings {
 				hostIP := ""

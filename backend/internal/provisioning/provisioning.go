@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -43,6 +44,15 @@ const (
 
 // Config is the narrow installation-level provisioning configuration.
 type Config struct {
+	// NetworkID and BrokerGateway identify the managed bridge and its inspected
+	// private gateway. Both are required for every container operation.
+	NetworkID     string
+	BrokerGateway string
+	// AgentUID/GID optionally pin the container's non-root identity for a root
+	// application process. Only new empty workspace/runtime directories are
+	// chowned; existing data must already have the recorded numeric ownership.
+	AgentUID int
+	AgentGID int
 	// UseSettings reads live capacity/activity limits and new-chat runtime snapshots.
 	// Explicit MaxRunningOverride takes precedence over the saved container cap.
 	UseSettings        bool
@@ -86,6 +96,13 @@ type Config struct {
 }
 
 func (c Config) withDefaults() (Config, error) {
+	if (c.AgentUID != 0 || c.AgentGID != 0) && (c.AgentUID <= 0 || c.AgentGID <= 0) {
+		return c, errors.New("provisioning: explicit agent UID and GID must both be positive")
+	}
+	ip := net.ParseIP(c.BrokerGateway)
+	if !hexHash(c.NetworkID) || ip == nil || ip.To4() == nil || !ip.IsPrivate() {
+		return c, errors.New("provisioning: owned network requires its full network ID and private IPv4 broker gateway")
+	}
 	if c.ImageRef == "" || c.HarnessVersion == "" {
 		return c, errors.New("provisioning: image reference and harness version are required")
 	}
@@ -275,9 +292,8 @@ func New(engine Engine, store *storage.Store, cfg Config, access WorkspaceAccess
 	}, nil
 }
 
-// storageOwner reports the uid/gid owning a storage directory. The agent user
-// inside the container is mapped to this identity so the backend keeps
-// ownership of its files and the agent can edit them.
+// storageOwner reports the uid/gid owning a storage directory. The container's
+// agent user is mapped to that bind-mount identity so it can edit its own files.
 func storageOwner(path string) (int, int, error) {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -323,6 +339,13 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 	if err != nil {
 		return Endpoint{}, err
 	}
+	if m.cfg.AgentUID != 0 {
+		for _, path := range []string{paths.Workspace, paths.RuntimeState} {
+			if err := prepareAgentDirectory(path, m.cfg.AgentUID, m.cfg.AgentGID); err != nil {
+				return Endpoint{}, err
+			}
+		}
+	}
 	uid, gid, err := m.ownerOf(paths.Workspace)
 	if err != nil {
 		return Endpoint{}, err
@@ -345,7 +368,7 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 		info, err := m.engine.ContainerInspect(ctx, containerName(chatID))
 		switch {
 		case err == nil:
-			if err := validateOwned(info, chat, paths, imageID); err != nil {
+			if err := m.validateOwned(info, chat, paths, imageID); err != nil {
 				return Endpoint{}, err
 			}
 			if m.access != nil && info.EnvValue("FLORA_CHECKOUT_REQUIRED") != "1" {
@@ -414,7 +437,7 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 		if err != nil {
 			return Endpoint{}, err
 		}
-		if err := validateOwned(info, chat, paths, imageID); err != nil {
+		if err := m.validateOwned(info, chat, paths, imageID); err != nil {
 			return Endpoint{}, err
 		}
 	}
@@ -432,6 +455,19 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 		}
 		release()
 		if err != nil {
+			return Endpoint{}, err
+		}
+		// Docker fills endpoint network IDs only when a created container first
+		// starts. Verify resolved membership before delivering broker credentials.
+		info, err = m.engine.ContainerInspect(ctx, containerID)
+		if err != nil {
+			return Endpoint{}, err
+		}
+		imageID, err := m.resolveImage(ctx)
+		if err != nil {
+			return Endpoint{}, err
+		}
+		if err := m.validateOwned(info, chat, paths, imageID); err != nil {
 			return Endpoint{}, err
 		}
 	}
@@ -478,6 +514,61 @@ func validateOwned(info docker.ContainerInfo, chat storage.Chat, paths storage.P
 		}
 	}
 	return nil
+}
+
+// validateOwned also rejects network drift before adopting or operating a chat.
+func (m *Manager) validateOwned(info docker.ContainerInfo, chat storage.Chat, paths storage.Paths, imageID string) error {
+	if m.cfg.AgentUID != 0 && (info.EnvValue("FLORA_UID") != strconv.Itoa(m.cfg.AgentUID) || info.EnvValue("FLORA_GID") != strconv.Itoa(m.cfg.AgentGID)) {
+		return errors.New("provisioning: container numeric agent identity differs from saved deployment")
+	}
+	if err := validateOwned(info, chat, paths, imageID); err != nil {
+		return err
+	}
+	if info.HostConfig.Privileged {
+		return errors.New("provisioning: owned-network container is privileged; refusing access")
+	}
+	for port, bindings := range info.NetworkSettings.Ports {
+		for _, binding := range bindings {
+			if port != "4096/tcp" || binding.HostIP != "127.0.0.1" {
+				return errors.New("provisioning: container runtime port is not loopback-only; refusing access")
+			}
+		}
+	}
+	if info.HostConfig.NetworkMode != m.cfg.NetworkID || len(info.NetworkSettings.Networks) != 1 {
+		return errors.New("provisioning: container network differs from the configured owned bridge; refusing access")
+	}
+	for _, id := range info.NetworkSettings.Networks {
+		// Before first start Docker leaves the endpoint ID empty. The exact
+		// immutable NetworkMode above still selects the bridge for that start.
+		if id == "" && info.State.Status == "created" && !info.State.Running {
+			continue
+		}
+		if id != m.cfg.NetworkID {
+			return errors.New("provisioning: container network identity changed; refusing access")
+		}
+	}
+	if len(info.HostConfig.ExtraHosts) != 1 || info.HostConfig.ExtraHosts[0] != "flora-github.internal:"+m.cfg.BrokerGateway {
+		return errors.New("provisioning: container broker host mapping changed; refusing access")
+	}
+	return nil
+}
+
+func prepareAgentDirectory(path string, uid, gid int) error {
+	actualUID, actualGID, err := storageOwner(path)
+	if err != nil {
+		return err
+	}
+	if actualUID == uid && actualGID == gid {
+		return nil
+	}
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+	if os.Geteuid() != 0 || actualUID != 0 || len(entries) != 0 {
+		return errors.New("provisioning: restore recorded workspace/runtime numeric ownership; existing data will not be recursively changed")
+	}
+	return os.Chown(path, uid, gid)
 }
 
 // resolveImage returns the content ID of the configured image, pulling it
@@ -552,9 +643,11 @@ func (m *Manager) containerSpec(chat storage.Chat, paths storage.Paths, password
 	env = append(env, "SETUP_TIMEOUT_SECONDS="+strconv.Itoa(int(cfg.SetupTimeout.Seconds())))
 	env = append(env, "SETUP_KILL_GRACE_SECONDS="+strconv.Itoa(int(m.cfg.SetupKillGrace.Seconds())))
 	return docker.ContainerSpec{
-		Name:  containerName(chat.ID),
-		Image: m.cfg.ImageRef,
-		Env:   env,
+		NetworkID:  m.cfg.NetworkID,
+		ExtraHosts: m.brokerHosts(),
+		Name:       containerName(chat.ID),
+		Image:      m.cfg.ImageRef,
+		Env:        env,
 		Labels: map[string]string{
 			labelManaged: "true",
 			labelChatID:  chat.ID,
@@ -571,6 +664,10 @@ func (m *Manager) containerSpec(chat storage.Chat, paths storage.Paths, password
 		MemoryBytes:  cfg.MemoryBytes,
 		PidsLimit:    cfg.PidsLimit,
 	}
+}
+
+func (m *Manager) brokerHosts() []string {
+	return []string{"flora-github.internal:" + m.cfg.BrokerGateway}
 }
 
 // awaitReady polls until the runtime answers authenticated health checks, the
@@ -694,7 +791,7 @@ func (m *Manager) Stop(ctx context.Context, chatID string) error {
 		if err != nil {
 			return err
 		}
-		if err := validateOwned(info, chat, paths, imageID); err != nil {
+		if err := m.validateOwned(info, chat, paths, imageID); err != nil {
 			return err
 		}
 		if err := m.store.BindRuntime(ctx, chatID, info.ID, ""); err != nil {
@@ -718,7 +815,7 @@ func (m *Manager) Stop(ctx context.Context, chatID string) error {
 	if err != nil {
 		return err
 	}
-	if err := validateOwned(info, chat, paths, imageID); err != nil {
+	if err := m.validateOwned(info, chat, paths, imageID); err != nil {
 		return err
 	}
 	if m.access != nil {
@@ -788,7 +885,7 @@ func (m *Manager) Endpoint(ctx context.Context, chatID string) (Endpoint, error)
 	if m.cfg.ImageID != "" && image.ID != m.cfg.ImageID {
 		return Endpoint{}, errors.New("configured runtime image identity changed")
 	}
-	if err := validateOwned(info, chat, paths, image.ID); err != nil {
+	if err := m.validateOwned(info, chat, paths, image.ID); err != nil {
 		return Endpoint{}, err
 	}
 	if chat.ContainerID == "" {
