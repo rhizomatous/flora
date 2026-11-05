@@ -7,7 +7,9 @@ die() { printf '%s\n' "flora installer: $*" >&2; exit 1; }
 version='' public_url=''
 while [ "$#" -gt 0 ]; do
     case $1 in
-        --version) [ "$#" -ge 2 ] && [ -n "$2" ] || die 'Missing --version value'; version=$2; shift 2 ;;
+        --version)
+            [ "$#" -ge 2 ] || die 'Missing --version value'
+            version=$2; [ -n "$version" ] || die 'Missing --version value'; shift 2 ;;
         --public-url) [ "$#" -ge 2 ] || die 'Missing --public-url value'; public_url=$2; shift 2 ;;
         *) die 'Usage: sh install.sh --public-url https://HOST[:PORT] [--version vX.Y.Z]' ;;
     esac
