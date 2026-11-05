@@ -28,7 +28,7 @@ assert json.loads(subprocess.check_output([str(stage / 'flora'), '-version'], ti
 help_result = subprocess.run([str(stage / 'flora'), '-help'], capture_output=True, text=True, timeout=15)
 assert '-public-url' in help_result.stderr
 assert '-hostname' not in help_result.stderr
-assert (stage / 'install.sh').read_bytes() == Path('scripts/install.sh').read_bytes()
+assert not (stage / 'install.sh').exists()
 PY
 python3 "$(dirname "$0")/release-fixture.py" "$stage"
 python3 "$(dirname "$0")/installer-smoke.py" "$archive" "$stage"

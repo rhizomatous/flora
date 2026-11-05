@@ -17,7 +17,6 @@ for arch in amd64 arm64; do
   jq -cn --arg version "$version" --arg commit "$commit" --arg image "$image" --arg arch "$arch" \
     '{version:$version,commit:$commit,agent_image:$image,harness_version:"1.2.27",os:"linux",arch:$arch}' > "$stage/release.json"
   cp packaging/flora.service LICENSE README.md INSTALL.md "$stage/"
-  cp scripts/install.sh "$stage/"
   tar -czf "dist/flora-$version-linux-$arch.tar.gz" -C "$stage" .
   rm -rf "$stage"
   trap - EXIT

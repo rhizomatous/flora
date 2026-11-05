@@ -1,7 +1,7 @@
 """Run only on a disposable native Linux CI runner with systemd and Docker.
 
-Only release downloads are substituted with the already verified local archive.
-The archived installer, installed binary, host paths and systemd are real.
+Release lookup and downloads use the already verified local archive's identity.
+The checkout's installer, installed binary, host paths and systemd are real.
 """
 import http.client
 import json
@@ -44,8 +44,11 @@ with tempfile.TemporaryDirectory(prefix='flora-installer-smoke-') as tmp:
     root = Path(tmp)
     wrapper = root / 'curl'
     wrapper.write_text('''#!/usr/bin/env python3
-import os, pathlib, shutil, sys
+import json, os, pathlib, shutil, sys
 args = sys.argv[1:]
+if args[-1] == 'https://api.github.com/repos/rhizomatous/flora/releases?per_page=1':
+    print(json.dumps([dict(tag_name=os.environ['INSTALLER_VERSION'], draft=False, prerelease=True)], indent=2))
+    sys.exit(0)
 prefix = 'https://github.com/rhizomatous/flora/releases/download/' + os.environ['INSTALLER_VERSION'] + '/'
 urls = [arg for arg in args if arg.startswith(prefix)]
 if urls:
@@ -62,10 +65,10 @@ else:
     env = dict(os.environ, INSTALLER_VERSION=version, INSTALLER_ARCHIVE=str(archive),
                INSTALLER_CURL=shutil.which('curl'), PATH=tmp + os.pathsep + os.environ['PATH'])
 
-    def install():
-        return subprocess.run(['sh', '-s', '--', '--version', version,
-                               '--public-url', 'https://flora.example.test'],
-                              input=(stage / 'install.sh').read_text(), text=True,
+    def install(explicit=False):
+        return subprocess.run(['sh', '-s', '--', '--public-url', 'https://flora.example.test'] +
+                              (['--version', version] if explicit else []),
+                              input=Path(__file__).with_name('install.sh').read_text(), text=True,
                               capture_output=True, start_new_session=True, timeout=180, env=env)
 
     try:
@@ -82,7 +85,7 @@ else:
         assert data.stat().st_mode & 0o777 == 0o700
         assert (deployment / 'enrollment-code').stat().st_mode & 0o777 == 0o600
         assert (deployment / 'enrollment-code').stat().st_uid == 0
-        repeat = install()
+        repeat = install(explicit=True)
         assert repeat.returncode != 0 and 'Refusing to overwrite' in repeat.stderr
         subprocess.run(['systemctl', 'restart', 'flora.service'], check=True)
         for _ in range(60):

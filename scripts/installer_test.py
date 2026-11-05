@@ -39,9 +39,14 @@ elif name == 'curl':
     if args[-1] == 'http://127.0.0.1:8080/api/health':
         sys.exit(0 if mode == 'occupied' or ((p/'started').exists() and mode != 'unhealthy') else 7)
     assert args[:9] == ['--disable', '--proto', '=https', '--proto-redir', '=https', '--fail', '--silent', '--show-error', '--location'], args
+    if args[-1] == 'https://api.github.com/repos/rhizomatous/flora/releases?per_page=1':
+        assert args[-3:-1] == ['-H', 'Accept: application/vnd.github+json'], args
+        if mode == 'lookup-fail': sys.exit(22)
+        sys.stdout.write((p/'releases.json').read_text())
+        sys.exit(0)
     assert args[-2] == '-o', args
     url = args[-3]
-    assert url.startswith('https://github.com/rhizomatous/flora/releases/download/v1.2.3/'), url
+    assert url.startswith('https://github.com/rhizomatous/flora/releases/download/' + os.environ['RELEASE_TAG'] + '/'), url
     if mode == 'download-fail': sys.exit(22)
     shutil.copyfile(p/'assets'/url.rsplit('/', 1)[-1], args[-1])
 elif name == 'systemctl':
@@ -79,13 +84,22 @@ class InstallerTest(unittest.TestCase):
                          ('/tmp/flora-install.', '/tmp/flora-install.')]:
             self.source = self.source.replace(old, str(self.root) + new)
         self.assets()
+        self.releases()
 
-    def assets(self, arch='amd64', version='v1.2.3', mismatch=False):
+    def releases(self, version='v1.2.3', draft=False, prerelease=False):
+        (self.root / 'releases.json').write_text(json.dumps([
+            dict(tag_name=version, draft=draft, prerelease=prerelease,
+                 body='Text with "tag_name": "v9.9.9" and a newline\n    "draft": false,',
+                 assets=[dict(name='nested', label='tag_name')])], indent=2) + '\n')
+
+    def assets(self, arch='amd64', version='v1.2.3', mismatch=False, legacy=False, tag='v1.2.3'):
+        self.tag = tag
         identity = json.dumps(dict(version=version, commit='a' * 40,
                                    agent_image='example/agent@sha256:' + 'b' * 64,
                                    harness_version='1.2.27', os='linux', arch=arch), separators=(',', ':'))
-        binary = f"#!/bin/sh\n[ \"$1\" = -version ] || exit 1\nprintf '%s\\n' '{identity}'\n".encode()
-        archive = self.root / 'assets' / f'flora-v1.2.3-linux-{arch}.tar.gz'
+        help_text = '-hostname string' if legacy else '-public-url string'
+        binary = f"#!/bin/sh\nif [ \"$1\" = -help ]; then printf '%s\\n' '  {help_text}' >&2; exit 0; fi\n[ \"$1\" = -version ] || exit 1\nprintf '%s\\n' '{identity}'\n".encode()
+        archive = self.root / 'assets' / f'flora-{tag}-linux-{arch}.tar.gz'
         with tarfile.open(archive, 'w:gz') as tar:
             for name, content, mode in [('./flora', binary, 0o755),
                                         ('./release.json', (identity + (' ' if mismatch else '') + '\n').encode(), 0o644)]:
@@ -95,7 +109,7 @@ class InstallerTest(unittest.TestCase):
             hashlib.sha256(archive.read_bytes()).hexdigest() + '  ' + archive.name + '\n')
 
     def run_installer(self, mode='', args=None, tty=False):
-        env = dict(os.environ, FIXTURE=str(self.root), MODE=mode,
+        env = dict(os.environ, FIXTURE=str(self.root), MODE=mode, RELEASE_TAG=self.tag,
                    PATH=str(self.root / 'bin') + os.pathsep + os.environ['PATH'])
         command = ['sh', '-s', '--'] + (args if args is not None else [
             '--public-url', 'https://flora.example.com:8443', '--version', 'v1.2.3'])
@@ -150,6 +164,54 @@ class InstallerTest(unittest.TestCase):
         result, _ = self.run_installer('arm')
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_default_release(self):
+        for prerelease in (False, True):
+            with self.subTest(prerelease=prerelease):
+                tag = 'v1.2.3-alpha.1' if prerelease else 'v1.2.3'
+                self.assets(version=tag, tag=tag)
+                self.releases(version=tag, prerelease=prerelease)
+                result, _ = self.run_installer(args=['--public-url', 'https://flora.example.com'])
+                self.assertEqual(result.returncode, 0, result.stderr)
+                import shutil
+                for name in ('opt', 'data'):
+                    shutil.rmtree(self.root / name)
+                (self.root / 'unit').unlink()
+                (self.root / 'started').unlink()
+        self.assertEqual(sum('https://api.github.com/' in ' '.join(args) for _, args in self.calls()), 2)
+
+    def test_explicit_version_skips_lookup(self):
+        result, _ = self.run_installer('lookup-fail')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(any('https://api.github.com/' in ' '.join(args) for _, args in self.calls()))
+
+    def test_bad_release_lookup(self):
+        responses = ['[]', '{}', 'not JSON', json.dumps({'message': 'API rate limit exceeded'})]
+        for version, draft in [('v1.2.3', True), ('v1.2.3/../../x', False),
+                               ('v1.2.3\nmalicious', False), ('v1.2.3;touch x', False)]:
+            self.releases(version=version, draft=draft)
+            responses.append((self.root / 'releases.json').read_text())
+        self.releases()
+        responses.append((self.root / 'releases.json').read_text().replace(
+            '    "tag_name": "v1.2.3",', '    "tag_name": "v1.2.3",\n    "tag_name": "v1.2.4",'))
+        for response in responses:
+            with self.subTest(response=response):
+                (self.root / 'releases.json').write_text(response)
+                result, _ = self.run_installer(args=['--public-url', 'https://flora.example.com'])
+                self.assertNotEqual(result.returncode, 0)
+                self.assert_clean()
+        result, _ = self.run_installer('lookup-fail', args=['--public-url', 'https://flora.example.com'])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Release lookup failed', result.stderr)
+        self.assert_clean()
+        self.assertFalse(any('releases/download/' in ' '.join(args) for _, args in self.calls()))
+
+    def test_legacy_release(self):
+        self.assets(legacy=True)
+        result, _ = self.run_installer()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('predates the installer', result.stderr)
+        self.assert_clean()
+
     @unittest.skipUnless(platform.system() == 'Linux', 'controlling-terminal fixture requires Linux')
     def test_tty(self):
         result, terminal = self.run_installer(tty=True)
@@ -172,7 +234,7 @@ class InstallerTest(unittest.TestCase):
                 result, _ = self.run_installer(args=['--version', 'v1.2.3', '--public-url', url])
                 self.assertNotEqual(result.returncode, 0)
                 self.assert_clean()
-        for args in [[], ['--version'], ['--public-url'], ['--what'],
+        for args in [[], ['--version'], ['--version', ''], ['--public-url'], ['--what'],
                      ['--version', 'v1.2.3/../../x', '--public-url', 'https://x']]:
             self.assertNotEqual(self.run_installer(args=args)[0].returncode, 0)
         self.assertEqual(self.calls(), [])

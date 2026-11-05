@@ -10,56 +10,46 @@ their own containers. Do not share the host with untrusted workloads.
 ## One-command installation
 
 Before installing, provide a Linux systemd host, local rootful Docker Engine 25+,
-`curl`, GNU `tar`, `sha256sum` and the usual coreutils. Configure browser HTTPS
+`curl`, GNU `tar`, `sed`, `sha256sum` and the usual coreutils. Configure browser HTTPS
 first, using Tailscale Serve or your existing proxy as described below. Arrange
 DNS, HTTPS certificates and any firewall access for that endpoint yourself. The
 installer does not install packages, Docker, Tailscale or a proxy, or change DNS
 or firewall rules. It needs no Python, jq, Go or Node.
 
-Choose an explicit compatible published release, including prerelease tags:
+Run the installer from its stable URL:
 
 ```sh
-VERSION=vX.Y.Z # replace with a published compatible release tag
 curl --disable --proto '=https' --proto-redir '=https' -fsSL \
-  "https://raw.githubusercontent.com/rhizomatous/flora/$VERSION/scripts/install.sh" |
-  sudo sh -s -- --public-url https://flora.example.com --version "$VERSION"
+  https://raw.githubusercontent.com/rhizomatous/flora/main/scripts/install.sh |
+  sudo sh -s -- --public-url https://flora.example.com
 ```
 
-**Availability:** no compatible installer release has been published yet. Older
-alpha archives have a different startup contract and cannot be used here. The
-command above needs a publicly readable source tag and release assets. This
-repository is currently private, so anonymous raw and release downloads return
-404. The installer deliberately has no GitHub token handling. Do not put tokens
-in these URLs or arguments.
+The default is the most recent release listed by GitHub, including alpha and other
+prereleases but never drafts. Add `--version vX.Y.Z` to choose a specific published
+release instead. This bypasses the release lookup if GitHub's API is rate-limited.
 
-The candidate script is already committed at
-[`b1be2fc820ad8d8cdad369a2cc43afdfb8fb27cd`](https://github.com/rhizomatous/flora/blob/b1be2fc820ad8d8cdad369a2cc43afdfb8fb27cd/scripts/install.sh),
-without needing a new release tag. Authorized maintainers can retrieve its exact
-source with their existing GitHub CLI login for inspection:
+**Availability:** anonymous installation requires this repository, its release
+assets and the pinned agent image to be publicly readable. No compatible release
+has been published yet; `v0.0.1-alpha.1` predates this installer. The installer does
+not handle GitHub credentials. Do not put tokens in the command or URLs.
 
-```sh
-gh api -H 'Accept: application/vnd.github.raw+json' \
-  'repos/rhizomatous/flora/contents/scripts/install.sh?ref=b1be2fc820ad8d8cdad369a2cc43afdfb8fb27cd' > install.sh
-```
-
-The script requires root and both flags. It detects amd64 or arm64, downloads only
-the selected release archive and its checksums over HTTPS, verifies the checksum
+The script requires root and `--public-url`. It detects amd64 or arm64, downloads
+only the selected release archive and its checksums over HTTPS, verifies the checksum
 and embedded binary identity, then installs `/opt/flora/flora` and starts a small
 root-run `flora.service` with private `/var/lib/flora` storage. Root is needed for
 the managed private broker and local Docker. It enables the service for boot and
 waits for loopback health and the private enrollment file before reporting success.
 The code goes only to `/dev/tty`; without a controlling terminal, only its file
-path is printed. No credentials are requested by the script.
+path is printed. Open the displayed HTTPS URL and use that code to create the
+administrator account, then configure credentials and connect a project in the
+browser. No credentials are requested by the script.
 
 Existing binary, data or service paths are refused, including repeat invocations.
 This is a fresh-install command, not an upgrade command. A failed installation
 removes only its newly installed binary and service. Any generated application
 data and Docker state are retained for inspection and same-release recovery.
 
-To inspect before running, download the script to a file and run
-`sudo sh install.sh --public-url https://flora.example.com --version "$VERSION"`
-after reading it. Same-release checksums detect corruption, not compromise of the
-source you chose to trust.
+Same-release checksums detect corruption, not compromise of the release source.
 
 ## Manual download and run
 
@@ -87,8 +77,8 @@ sudo ./flora -public-url https://flora.example.com -data-dir /var/lib/flora
 Continue only when the selected archive reports `OK`. Compare `-version` against
 `release.json`, including source commit, architecture and digest-pinned image.
 Same-release checksums detect corruption, not compromise of the release source.
-The archive contains the binary, release identity, license, guides, `install.sh`
-and an optional systemd example. Manual startup does not install a service.
+The archive contains the binary, release identity, license, guides and an optional
+systemd example. Manual startup does not install a service.
 
 ## Browser HTTPS
 

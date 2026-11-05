@@ -7,14 +7,17 @@ die() { printf '%s\n' "flora installer: $*" >&2; exit 1; }
 version='' public_url=''
 while [ "$#" -gt 0 ]; do
     case $1 in
-        --version) [ "$#" -ge 2 ] || die 'Missing --version value'; version=$2; shift 2 ;;
+        --version) [ "$#" -ge 2 ] && [ -n "$2" ] || die 'Missing --version value'; version=$2; shift 2 ;;
         --public-url) [ "$#" -ge 2 ] || die 'Missing --public-url value'; public_url=$2; shift 2 ;;
-        *) die 'Usage: sh install.sh --version vX.Y.Z --public-url https://HOST[:PORT]' ;;
+        *) die 'Usage: sh install.sh --public-url https://HOST[:PORT] [--version vX.Y.Z]' ;;
     esac
 done
 # Only release-tag characters and literal DNS origins can enter URLs or the unit.
-case $version in v[0-9]*.[0-9]*.[0-9]*) ;; *) die 'An explicit release tag is required' ;; esac
-case $version in *[!a-zA-Z0-9.-]*) die 'Invalid release tag' ;; esac
+validate_version() {
+    case $version in v[0-9]*.[0-9]*.[0-9]*) ;; *) die 'Invalid release tag' ;; esac
+    case $version in *[!a-zA-Z0-9.-]*) die 'Invalid release tag' ;; esac
+}
+[ -z "$version" ] || validate_version
 case $public_url in https://*) authority=${public_url#https://} ;; *) die 'An HTTPS origin is required' ;; esac
 host=${authority%%:*}
 case $host in ''|*[!a-z0-9.-]*) die 'Use a lowercase DNS hostname without a path' ;; esac
@@ -40,7 +43,7 @@ fi
 [ "$(id -u)" = 0 ] || die 'Run as root (sudo sh -s -- ...)'
 [ "$(uname -s)" = Linux ] || die 'Only Linux is supported'
 case $(uname -m) in x86_64) arch=amd64 ;; aarch64|arm64) arch=arm64 ;; *) die 'Only amd64 and arm64 are supported' ;; esac
-for command in curl tar sha256sum systemctl mktemp cmp stat install mkdir rm rmdir cat sleep; do
+for command in curl tar sha256sum systemctl mktemp cmp stat install mkdir rm rmdir cat sleep sed; do
     command -v "$command" >/dev/null 2>&1 || die "Required command is missing: $command"
 done
 [ -d /run/systemd/system ] || die 'A running systemd host is required'
@@ -76,6 +79,17 @@ cleanup() {
 }
 trap cleanup 0
 trap 'exit 1' HUP INT TERM
+if [ -z "$version" ]; then
+    # Anonymous release listings exclude drafts and include prereleases, unlike /latest.
+    metadata=$(curl --disable --proto '=https' --proto-redir '=https' --fail --silent --show-error --location \
+        --connect-timeout 15 --max-time 60 -H 'Accept: application/vnd.github+json' \
+        'https://api.github.com/repos/rhizomatous/flora/releases?per_page=1') || die 'Release lookup failed; retry or use --version'
+    # Read only the top-level release fields in GitHub's formatted JSON. Reject unexpected responses.
+    draft=$(printf '%s\n' "$metadata" | sed -n 's/^    "draft": \(false\),$/\1/p')
+    version=$(printf '%s\n' "$metadata" | sed -n 's/^    "tag_name": "\([^"\\]*\)",$/\1/p')
+    [ "$draft" = false ] || die 'No published release found; use --version to select a release'
+    validate_version
+fi
 archive=flora-$version-linux-$arch.tar.gz
 base=https://github.com/rhizomatous/flora/releases/download/$version
 curl --disable --proto '=https' --proto-redir '=https' --fail --silent --show-error --location \
@@ -106,6 +120,9 @@ case $identity in
     '{"version":"'"$version"'","commit":'*'"os":"linux","arch":"'"$arch"'"}') ;;
     *) die 'Binary version or platform differs from requested release' ;;
 esac
+if "$work/unpacked/flora" -help 2>&1 | sed -n '/^  -public-url /p' | cmp -s - /dev/null; then
+    die 'This release predates the installer; select a newer release with --version'
+fi
 printf 'Verified release: %s\n' "$identity"
 
 # mkdir and exclusive unit creation protect against concurrent installer runs.
