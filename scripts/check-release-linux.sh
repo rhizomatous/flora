@@ -31,3 +31,4 @@ assert '-hostname' not in help_result.stderr
 assert not (stage / 'install.sh').exists()
 PY
 python3 "$(dirname "$0")/release-fixture.py" "$stage"
+python3 "$(dirname "$0")/installer-smoke.py" "$archive" "$stage"

@@ -16,14 +16,12 @@ and [product requirements](specs/PRD.md).
 
 ## Develop
 
-For Linux installation, download a published release archive for amd64 or arm64,
-check its SHA256SUMS entry, and extract it before running
-`sudo ./flora -public-url https://flora.example.com -data-dir /var/lib/flora`.
-Put Tailscale Serve or an existing HTTPS proxy in front of loopback HTTP 8080.
-See the [installation and operations guide](INSTALL.md) for Docker and privilege
-requirements, download commands, optional systemd, and offline recovery.
-Older experimental archives do not include managed private networking; use the
-instructions shipped with those archives.
+For Linux installation, provide local rootful Docker and Tailscale Serve or an
+existing HTTPS proxy in front of loopback HTTP 8080. The POSIX shell installer
+downloads the most recent published release for amd64 or arm64, including
+prereleases, verifies it, installs Flora and starts a systemd service. An explicit
+version is optional. See the [installation and operations guide](INSTALL.md) for
+the one-command install, prerequisites, release availability and offline recovery.
 
 Install [Nix](https://nixos.org/download/) with flakes and `nix-command` enabled.
 The committed `flake.lock` pins the development environment on Linux (x86-64 and

@@ -7,7 +7,51 @@ remapping, network storage and native macOS are not supported production setups.
 Docker access is effectively root authority. Agents have passwordless sudo inside
 their own containers. Do not share the host with untrusted workloads.
 
-## Download and run
+## One-command installation
+
+Before installing, provide a Linux systemd host, local rootful Docker Engine 25+,
+`curl`, GNU `tar`, `sed`, `sha256sum` and the usual coreutils. Configure browser HTTPS
+first, using Tailscale Serve or your existing proxy as described below. Arrange
+DNS, HTTPS certificates and any firewall access for that endpoint yourself. The
+installer does not install packages, Docker, Tailscale or a proxy, or change DNS
+or firewall rules. It needs no Python, jq, Go or Node.
+
+Run the installer from its stable URL:
+
+```sh
+curl --disable --proto '=https' --proto-redir '=https' -fsSL \
+  https://raw.githubusercontent.com/rhizomatous/flora/main/scripts/install.sh |
+  sudo sh -s -- --public-url https://flora.example.com
+```
+
+The default is the most recent release listed by GitHub, including alpha and other
+prereleases but never drafts. Add `--version vX.Y.Z` to choose a specific published
+release instead. This bypasses the release lookup if GitHub's API is rate-limited.
+
+**Availability:** anonymous installation requires this repository, its release
+assets and the pinned agent image to be publicly readable. No compatible release
+has been published yet; `v0.0.1-alpha.1` predates this installer. The installer does
+not handle GitHub credentials. Do not put tokens in the command or URLs.
+
+The script requires root and `--public-url`. It detects amd64 or arm64, downloads
+only the selected release archive and its checksums over HTTPS, verifies the checksum
+and embedded binary identity, then installs `/opt/flora/flora` and starts a small
+root-run `flora.service` with private `/var/lib/flora` storage. Root is needed for
+the managed private broker and local Docker. It enables the service for boot and
+waits for loopback health and the private enrollment file before reporting success.
+The code goes only to `/dev/tty`; without a controlling terminal, only its file
+path is printed. Open the displayed HTTPS URL and use that code to create the
+administrator account, then configure credentials and connect a project in the
+browser. No credentials are requested by the script.
+
+Existing binary, data or service paths are refused, including repeat invocations.
+This is a fresh-install command, not an upgrade command. A failed installation
+removes only its newly installed binary and service. Any generated application
+data and Docker state are retained for inspection and same-release recovery.
+
+Same-release checksums detect corruption, not compromise of the release source.
+
+## Manual download and run
 
 Choose an explicit published release with `-public-url` and managed private
 networking support. Older experimental releases use different startup contracts.
@@ -34,7 +78,7 @@ Continue only when the selected archive reports `OK`. Compare `-version` against
 `release.json`, including source commit, architecture and digest-pinned image.
 Same-release checksums detect corruption, not compromise of the release source.
 The archive contains the binary, release identity, license, guides and an optional
-systemd example. There is no installer or downloader script.
+systemd example. Manual startup does not install a service.
 
 ## Browser HTTPS
 
@@ -47,10 +91,10 @@ For an already configured Tailscale host, an administrator can use Tailscale Ser
 
 ```sh
 sudo tailscale serve --bg --https=443 http://127.0.0.1:8080
-sudo ./flora -public-url https://your-host.your-tailnet.ts.net -data-dir /var/lib/flora
 ```
 
-Use the actual HTTPS URL printed by Serve. See the
+Use the actual HTTPS URL printed by Serve as the installer's `--public-url` (or
+the binary's `-public-url` for manual startup). See the
 [Serve command reference](https://tailscale.com/kb/1242/tailscale-serve).
 Flora has no Tailscale dependency and does not trust Tailscale identity headers.
 An existing generic HTTPS proxy is equally supported. On the same host, bind its
@@ -104,13 +148,14 @@ token. Run Check dependencies, then create a project and chat. Metadata checks d
 not prove inference quota or repository writes. Startup performs no paid inference
 or GitHub writes. See [agent transport limits](agent/README.md).
 
-## Optional service and recovery
+## Service and recovery
 
-Copy the verified binary to `/opt/flora/flora`. Adapt `flora.service` with your
+The installer creates and enables the service for you. For a manual installation,
+copy the verified binary to `/opt/flora/flora`. Adapt `flora.service` with your
 canonical URL and install it yourself at `/etc/systemd/system/flora.service`.
 The example runs as root. A non-root service needs Docker socket access, the two
 network capabilities above and writable private storage; Docker remains root
-authority. Flora never installs, enables or changes host services.
+authority. The binary itself never installs, enables or changes host services.
 
 ```sh
 sudo systemctl daemon-reload
