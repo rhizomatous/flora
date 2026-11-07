@@ -9,3 +9,4 @@
 env.test.sh
 flora-data/
 /florets/docs-dist/
+/.nx/

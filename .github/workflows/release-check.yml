@@ -1,16 +1,14 @@
 name: Release packaging check
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  NX_DAEMON: 'false'
+  GOTOOLCHAIN: local
 
 jobs:
   archive:
@@ -39,40 +37,7 @@ jobs:
           key: build-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('flake.lock', 'backend/go.sum', 'package-lock.json') }}-${{ github.sha }}
           restore-keys: |
             build-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('flake.lock', 'backend/go.sum', 'package-lock.json') }}-
-      - name: Check publication guards and exact local-image reuse
-        if: matrix.arch == 'amd64'
-        run: python3 -m unittest discover -s scripts -p 'release_*_test.py'
-      - name: Check POSIX installer and failure fixtures
-        if: matrix.arch == 'amd64'
-        run: |
-          sh -n scripts/install.sh
-          shellcheck --shell=sh scripts/install.sh
-          python3 -m unittest discover -s scripts -p 'installer_test.py' -v
-      - name: Build local fixture image and record its actual registry digest
-        run: |
-          set -euo pipefail
-          docker run -d --name flora-release-registry -p 127.0.0.1:51818:5000 registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
-          docker build -t localhost:51818/flora-agent:fixture agent/image
-          docker push localhost:51818/flora-agent:fixture
-          image=$(docker inspect --format '{{index .RepoDigests 0}}' localhost:51818/flora-agent:fixture)
-          echo "FIXTURE_IMAGE=$image" >> "$GITHUB_ENV"
-      - name: Build the native archive
-        run: |
-          nix develop --command make deps web
-          nix develop --command bash scripts/package-release.sh v0.0.0-fixture "$FIXTURE_IMAGE" ${{ matrix.arch }}
-      - name: Check archived binary and installer with real systemd
-        run: |
-          docker pull "$FIXTURE_IMAGE"
-          docker rm -f flora-release-registry
-          (cd dist && sha256sum --check SHA256SUMS)
-          sudo bash scripts/check-release-linux.sh dist/flora-v0.0.0-fixture-linux-${{ matrix.arch }}.tar.gz "$(git rev-parse HEAD)"
-      - name: Check production app APIs and private broker with a disposable Engine
-        run: |
-          mkdir -p bin
-          nix develop --command bash scripts/check-deployment.sh ${{ matrix.arch }} localhost:51818/flora-agent:fixture
-      - name: Remove only fixture registry
-        if: always()
-        run: |
-          if docker container inspect flora-release-registry >/dev/null 2>&1; then
-            docker rm -f flora-release-registry
-          fi
+      - name: Install locked dependencies
+        run: nix develop --command make deps
+      - name: Exercise the native package and deployment
+        run: nix develop --command npx nx run packaging:package-check --output-style=static --args="${{ matrix.arch }}"

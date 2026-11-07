@@ -1,0 +1,12 @@
+{
+  "name": "agent",
+  "targets": {
+    "container-check": {
+      "inputs": [
+        "go",
+        "image"
+      ],
+      "command": "bash scripts/check-agent.sh"
+    }
+  }
+}

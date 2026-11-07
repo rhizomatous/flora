@@ -25,5 +25,21 @@
   "peerDependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
+  },
+  "nx": {
+    "includedScripts": [],
+    "targets": {
+      "styleguide": {
+        "cache": true,
+        "inputs": [
+          "shared",
+          "{projectRoot}/**/*"
+        ],
+        "outputs": [
+          "{workspaceRoot}/florets/docs-dist"
+        ],
+        "command": "npm run docs:build"
+      }
+    }
   }
 }
