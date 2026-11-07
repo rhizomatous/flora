@@ -1,4 +1,4 @@
-import { FieldSet, FieldDescription, FieldLabel, FieldLegend, Input } from "@flora/florets";
+import { FieldDescription, FieldLabel, FieldLegend, FieldSet, Input, Text } from "@flora/florets";
 
 import { preferenceFields, type Preferences } from "./preferences";
 
@@ -30,10 +30,10 @@ export function PreferenceFields({
         as enabled and use the Enable notification sound button on each fresh page.
       </FieldDescription>
       {override !== undefined && (
-        <p role="note" className="text-sm">
+        <Text role="note">
           The startup flag -max-running overrides the saved cap with {override}. Remove the flag and
           restart Flora to use the saved cap.
-        </p>
+        </Text>
       )}
       <div className="grid gap-6 sm:grid-cols-2">
         {preferenceFields.map((f) => (
@@ -52,9 +52,9 @@ export function PreferenceFields({
               defaultValue={value[f.name]}
               aria-describedby={`${f.name}-range`}
             />
-            <p id={`${f.name}-range`} className="mt-1 text-xs text-muted-foreground">
+            <Text size="xs" tone="muted" id={`${f.name}-range`} className="mt-1">
               {f.min.toLocaleString()} to {f.max.toLocaleString()}
-            </p>
+            </Text>
           </div>
         ))}
       </div>

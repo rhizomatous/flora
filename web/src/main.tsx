@@ -5,13 +5,11 @@ import {
   Alert,
   Button,
   FieldLabel,
+  Heading,
   Input,
   Link,
   LoadingStatus,
-  Page,
-  PageDescription,
-  PageHeader,
-  PageTitle,
+  Text,
   Wordmark,
 } from "@flora/florets";
 
@@ -66,14 +64,14 @@ function Account({
 
   return (
     <section aria-labelledby="account-heading">
-      <PageTitle ref={heading} tabIndex={-1} id="account-heading">
+      <Heading level={1} ref={heading} tabIndex={-1} id="account-heading">
         {action}
-      </PageTitle>
-      <PageDescription>
+      </Heading>
+      <Text tone="muted" className="mt-3">
         {setupRequired
           ? "Create the single administrator account for this installation. Use a unique password of at least 12 characters."
           : "Enter your administrator password. Sessions expire at the absolute lifetime set by the administrator."}
-      </PageDescription>
+      </Text>
       <form className="mt-8 space-y-6" onSubmit={submit}>
         {setupRequired && enrollmentRequired === true && (
           <FieldLabel>
@@ -196,15 +194,15 @@ function App() {
   }
 
   return (
-    <Page className="max-w-4xl">
-      <PageHeader>
+    <main className="mx-auto min-h-svh max-w-4xl px-6 py-10 sm:px-10">
+      <header className="mb-14 flex items-center justify-between gap-4">
         <Wordmark />
         {status?.authenticated === true && (
           <Button variant="link" size="inline" type="button" disabled={busy} onClick={logout}>
             Log out
           </Button>
         )}
-      </PageHeader>
+      </header>
       {status?.authenticated === true && (
         <nav aria-label="Main" className="mb-8 flex flex-wrap gap-6 text-sm">
           <Link href="#chats" aria-current={path.startsWith("chats") ? "page" : undefined}>
@@ -251,11 +249,11 @@ function App() {
                   : "Enable notification sound"}
               </Button>
               {!notifications.audio.ready && (
-                <p className="mt-2 text-muted-foreground">
+                <Text tone="muted" className="mt-2">
                   Use this button to allow audio in this browser. If sound stays blocked, allow
                   sound or autoplay in site settings, then try again. Completion toasts still
                   appear. Missed sounds are not replayed.
-                </p>
+                </Text>
               )}
             </div>
           )}
@@ -303,7 +301,7 @@ function App() {
         ) : (
           <Projects key={path} path={path} onExpired={onExpired} />
         ))}
-    </Page>
+    </main>
   );
 }
 

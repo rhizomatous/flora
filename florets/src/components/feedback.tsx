@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react";
 
 import { cn } from "../lib/utils";
+import { Text } from "./typography";
 
 export function Alert({
   className,
@@ -24,8 +25,8 @@ export function Alert({
 
 export function LoadingStatus({ className, children = "Loading…", ...props }: ComponentProps<"p">) {
   return (
-    <p role="status" className={cn("text-muted-foreground", className)} {...props}>
+    <Text size="md" tone="muted" role="status" className={className} {...props}>
       {children}
-    </p>
+    </Text>
   );
 }

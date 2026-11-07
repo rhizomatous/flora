@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { FieldSet, Button, FieldLabel, Input } from "@flora/florets";
+import { Button, FieldLabel, FieldSet, Heading, Input } from "@flora/florets";
 
 import { request } from "./request";
 import { text, texts } from "./ui";
@@ -64,7 +64,7 @@ export function QuestionForm({
       }}
       className="mt-8 space-y-5 rounded-md border p-4"
     >
-      <h2 className="font-semibold">Flora needs your answer</h2>
+      <Heading level={2}>Flora needs your answer</Heading>
       {q.questions.map((question, i) => (
         // oxlint-disable-next-line react/no-array-index-key -- Questions have no id, and the list never changes for one request because the form is keyed by the request id.
         <FieldSet key={i} disabled={busy} className="space-y-3">

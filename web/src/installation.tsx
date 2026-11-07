@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
-  FieldSet,
   Button,
   FieldDescription,
   FieldLabel,
   FieldLegend,
+  FieldSet,
+  Heading,
   Input,
   NativeSelect,
-  PageDescription,
-  PageTitle,
+  Text,
 } from "@flora/florets";
 
 import { readPreferences, type Preferences } from "./preferences";
@@ -72,13 +72,13 @@ export function Installation({
 
   return (
     <section aria-labelledby="settings-heading">
-      <PageTitle ref={heading} tabIndex={-1} id="settings-heading">
+      <Heading level={1} ref={heading} tabIndex={-1} id="settings-heading">
         Installation settings
-      </PageTitle>
-      <PageDescription>
+      </Heading>
+      <Text tone="muted" className="mt-3">
         Choose one hosted provider and model for all chats. Once saved, the provider and model
         cannot be changed.
-      </PageDescription>
+      </Text>
       <form className="mt-8 space-y-6" onSubmit={save}>
         <FieldSet disabled={busy}>
           <FieldLegend>GitHub</FieldLegend>
@@ -163,15 +163,15 @@ export function Installation({
         className="mt-10 space-y-4 border-t border-foreground/20 pt-6"
         aria-labelledby="diagnostics-heading"
       >
-        <h2 id="diagnostics-heading" className="font-semibold">
+        <Heading level={2} id="diagnostics-heading">
           Dependency checks
-        </h2>
-        <p className="text-sm text-muted-foreground">
+        </Heading>
+        <Text tone="muted">
           Checks storage, Docker, the agent image and credential metadata. No model generation,
           image pull or GitHub write is performed. Provider keys reach only new containers; running
           and restarted containers keep their original key. GitHub rotation applies to future broker
           requests.
-        </p>
+        </Text>
         <Button type="button" disabled={busy} onClick={diagnose}>
           Check dependencies
         </Button>
@@ -182,7 +182,9 @@ export function Installation({
                 <strong>
                   {d.name}: {d.ok ? "OK" : "Needs attention"}
                 </strong>
-                <p className="mt-1 text-muted-foreground">{d.message}</p>
+                <Text tone="muted" className="mt-1">
+                  {d.message}
+                </Text>
               </li>
             ))}
           </ul>
