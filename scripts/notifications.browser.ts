@@ -64,9 +64,11 @@ try {
   await logIn(page, "enter");
   await sound.focus();
   await page.keyboard.press("Enter");
-  await page.getByText(/If sound stays blocked/).waitFor();
+  await page.getByText("Sound help", { exact: true }).click();
+  await page.getByText(/Allow sound or autoplay/).waitFor();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   await page.getByRole("combobox", { name: /^Project/ }).selectOption({ label: "Browser project" });
+  await page.getByText("Chat title (optional)", { exact: true }).click();
   await page.getByLabel("Chat title", { exact: true }).fill("Background notification");
   await page.getByLabel("Message", { exact: true }).fill("Complete after I switch conversations");
   await page.getByRole("button", { name: "Start chat", exact: true }).click();
@@ -97,9 +99,7 @@ try {
   assert.equal(await page.locator("h1").evaluate((el) => el === document.activeElement), true);
   await page.keyboard.press("Tab");
   assert.equal(
-    await page
-      .getByRole("link", { name: "All chats", exact: true })
-      .evaluate((el) => el === document.activeElement),
+    await page.locator("main").evaluate((el) => el.contains(document.activeElement)),
     true,
   );
   await toast.getByRole("button", { name: /^Dismiss/ }).focus();
@@ -117,7 +117,7 @@ try {
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await page
     .getByRole("navigation", { name: "Main" })
-    .getByRole("link", { name: "Installation settings" })
+    .getByRole("link", { name: "Settings" })
     .click();
   await context.setOffline(true);
   await page.getByText(/Chat updates and completion notifications disconnected/).waitFor();
@@ -161,7 +161,7 @@ try {
   const realAudio = await browser.newContext({ ignoreHTTPSErrors: true });
   const realPage = await realAudio.newPage();
   await logIn(realPage, "enter");
-  await realPage.getByRole("link", { name: "Installation settings", exact: true }).click();
+  await realPage.getByRole("link", { name: "Settings", exact: true }).click();
   await realPage.getByLabel("Play a sound when a chat finishes work").check();
   await realPage.getByRole("button", { name: "Validate and save", exact: true }).click();
   await realPage.getByRole("button", { name: "Enable notification sound", exact: true }).focus();

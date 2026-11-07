@@ -21,6 +21,11 @@ try {
   await expect(page.getByRole("alert")).toContainText("Enrollment code is incorrect.");
   await code.fill("fixture-installer-enrollment-code");
   await page.getByRole("button", { name: "Create administrator", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Connect your first project", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start chat", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
   await expect(page.getByRole("button", { name: "Log out", exact: true })).toBeVisible();
   await expect(code).toHaveCount(0);
   await page.getByRole("button", { name: "Log out", exact: true }).click();

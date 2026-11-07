@@ -3,6 +3,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
   Alert,
   Button,
+  ButtonLink,
   FieldLabel,
   FlowerMark,
   Heading,
@@ -259,7 +260,12 @@ export function Chats({
     setBusy(true);
     setError("");
     const project = text(fields, "project");
-    const input = isNew ? { title: text(fields, "title"), text: message } : { text: message };
+    // Forty-five Unicode code points fit within the server's 200-byte title limit.
+    const chatTitle =
+      text(fields, "title").trim() ||
+      // oxlint-disable-next-line typescript/no-misused-spread -- Bound code points to stay below the UTF-8 byte limit without splitting surrogate pairs.
+      [...message.trim().replaceAll(/\s+/gu, " ")].slice(0, 45).join("");
+    const input = isNew ? { title: chatTitle, text: message } : { text: message };
     const scope = isNew ? `project:${project}` : `chat:${id}`;
     try {
       const requestID = identity(scope, input);
@@ -312,8 +318,8 @@ export function Chats({
   }
 
   return (
-    <section aria-labelledby="chats-heading" className="min-w-0">
-      <div className="flex items-center justify-between gap-4">
+    <section aria-labelledby="chats-heading" className={isNew ? "new-chat" : "min-w-0"}>
+      <div className={isNew ? "sr-only" : "flex items-center justify-between gap-4"}>
         <Heading
           level={1}
           id="chats-heading"
@@ -323,9 +329,6 @@ export function Chats({
         >
           {title()}
         </Heading>
-        <Link className="shrink-0 text-sm" href={id === "" ? "#chats/new" : "#chats"}>
-          {id === "" ? "New chat" : "All chats"}
-        </Link>
       </div>
       {error !== "" && (
         <Alert role="alert" className="mt-6">
@@ -338,57 +341,75 @@ export function Chats({
           Loading…
         </Text>
       )}
-      {isNew && (
+      {isNew && projects === undefined && error === "" && (
+        <Text role="status">Loading projects…</Text>
+      )}
+      {isNew && projects?.length === 0 && (
+        <div className="space-y-5">
+          <Heading level={2}>Connect your first project</Heading>
+          <Text tone="muted">Choose a GitHub repository so Flora can start working.</Text>
+          <ButtonLink href="#projects/new">Connect a project</ButtonLink>
+        </div>
+      )}
+      {isNew && projects !== undefined && projects.length > 0 && (
         <form
           onSubmit={(event) => {
             void send(event);
           }}
-          className="mt-8 space-y-6"
+          className="space-y-4"
         >
-          <FieldLabel>
-            Project
+          <Heading level={2}>What are we working on?</Heading>
+          <div className="flex flex-wrap items-center gap-3">
+            <FieldLabel htmlFor="new-chat-project">Project</FieldLabel>
             <NativeSelect
+              id="new-chat-project"
               name="project"
-              className="mt-2"
-              defaultValue={projectID}
+              className="w-auto max-w-full"
+              defaultValue={projectID || projects[0]?.id}
               required
               disabled={busy}
             >
-              <option value="">Choose a project</option>
-              {projects?.map((p) => (
+              {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
               ))}
             </NativeSelect>
-          </FieldLabel>
-          {projects === undefined && error === "" && <Text role="status">Loading projects…</Text>}
-          {projects?.length === 0 && (
-            <Text>
-              <Link href="#projects/new">Connect a project</Link> before starting a chat.
-            </Text>
-          )}
-          <FieldLabel>
-            Chat title
-            <Input name="title" className="mt-2" required maxLength={200} disabled={busy} />
-          </FieldLabel>
-          <FieldLabel>
-            Message
+          </div>
+          <div className="rounded-xl border border-input bg-background p-3 sm:p-4">
+            <FieldLabel className="sr-only" htmlFor="new-chat-message">
+              Message
+            </FieldLabel>
             <Textarea
+              id="new-chat-message"
               name="text"
-              className="mt-2 min-h-40"
+              className="min-h-36 resize-y border-0 bg-transparent"
+              placeholder="Describe a task…"
               required
               disabled={busy}
-              aria-describedby="message-limit"
             />
-          </FieldLabel>
-          <Text tone="muted" id="message-limit">
-            Up to {messageBytes.toLocaleString()} UTF-8 bytes. Checkout and setup run before Flora
-            starts work.
-          </Text>
-          <Button type="submit" disabled={busy || projects === undefined || projects.length === 0}>
-            {busy ? "Starting…" : "Start chat"}
-          </Button>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <Text tone="muted" size="xs">
+                Uses project setup
+              </Text>
+              <Button type="submit" disabled={busy}>
+                {busy ? "Starting…" : "Start chat"}
+              </Button>
+            </div>
+          </div>
+          <details className="text-sm text-muted-foreground">
+            <summary>Chat title (optional)</summary>
+            <FieldLabel className="mt-3">
+              Chat title
+              <Input
+                name="title"
+                className="mt-2"
+                maxLength={200}
+                disabled={busy}
+                placeholder="Named from your first message"
+              />
+            </FieldLabel>
+          </details>
         </form>
       )}
       {id !== "" && !isNew && detail === undefined && error === "" && (

@@ -1,2 +1,113 @@
 @import "@flora/florets/styles.css";
 @source "./";
+
+.workspace {
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  min-height: 100svh;
+}
+.workspace-sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100svh;
+  padding: 1.5rem 1rem;
+  border-right: 1px solid var(--border);
+  background: var(--background);
+}
+.sidebar-navigation {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  margin-top: 2rem;
+  gap: 0.5rem;
+}
+.sidebar-new,
+.sidebar-link,
+.sidebar-chat {
+  display: block;
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.5rem;
+  text-decoration: none;
+}
+.sidebar-new {
+  border: 1px solid var(--border);
+  background: var(--muted);
+}
+.sidebar-chat:hover,
+.sidebar-link:hover,
+.sidebar-chat[aria-current="page"],
+.sidebar-link[aria-current="page"] {
+  background: var(--muted);
+}
+.sidebar-project {
+  display: block;
+  padding: 0 0.75rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+.sidebar-chats {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 0.75rem 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+}
+.sidebar-footer > a {
+  text-decoration: none;
+}
+.sidebar-toggle {
+  display: none;
+}
+.workspace-content {
+  min-width: 0;
+  width: 100%;
+  max-width: 76rem;
+  margin-inline: auto;
+  padding: 2.5rem;
+}
+.new-chat {
+  max-width: 48rem;
+  margin: clamp(3rem, 18svh, 12rem) auto 3rem;
+}
+@media (max-width: 767px) {
+  .workspace {
+    display: block;
+  }
+  .workspace-sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 1rem;
+  }
+  .sidebar-toggle {
+    display: inline-flex;
+  }
+  .sidebar-navigation {
+    display: none;
+  }
+  .sidebar-navigation.is-open {
+    display: flex;
+  }
+  .sidebar-chats {
+    overflow: visible;
+  }
+  .workspace-content {
+    padding: 1.5rem 1rem;
+  }
+  .new-chat {
+    margin-top: 2.5rem;
+  }
+}

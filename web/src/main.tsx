@@ -1,3 +1,4 @@
+/* oxlint-disable import/max-dependencies -- App composes workspace navigation alongside its routed views. */
 import { StrictMode, useEffect, useEffectEvent, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -18,6 +19,7 @@ import { Installation, type Settings } from "./installation";
 import { useNotifications } from "./notifications";
 import { Projects } from "./projects";
 import { errorMessage, request } from "./request";
+import { Sidebar } from "./sidebar";
 import { CompletionToasts } from "./toasts";
 import { text } from "./ui";
 
@@ -25,7 +27,7 @@ import "./styles.css";
 
 type Status = { setupRequired: boolean; authenticated: boolean; enrollmentRequired?: boolean };
 
-const currentPath = () => window.location.hash.slice(1) || "chats";
+const currentPath = () => window.location.hash.slice(1) || "chats/new";
 
 /** Creates the administrator on first run, otherwise logs in. */
 function Account({
@@ -194,52 +196,21 @@ function App() {
   }
 
   return (
-    <main className="mx-auto min-h-svh max-w-4xl px-6 py-10 sm:px-10">
-      <header className="mb-14 flex items-center justify-between gap-4">
-        <Wordmark />
-        {status?.authenticated === true && (
-          <Button variant="link" size="inline" type="button" disabled={busy} onClick={logout}>
-            Log out
-          </Button>
-        )}
-      </header>
-      {status?.authenticated === true && (
-        <nav aria-label="Main" className="mb-8 flex flex-wrap gap-6 text-sm">
-          <Link href="#chats" aria-current={path.startsWith("chats") ? "page" : undefined}>
-            Chats
-          </Link>
+    <div className={ready ? "workspace" : "mx-auto min-h-svh max-w-4xl px-6 py-10 sm:px-10"}>
+      {ready ? (
+        <Sidebar path={path} chats={notifications.chats} onExpired={onExpired}>
           <Link href="#projects" aria-current={path.startsWith("projects") ? "page" : undefined}>
             Projects
           </Link>
           <Link href="#settings" aria-current={path === "settings" ? "page" : undefined}>
-            Installation settings
+            Settings
           </Link>
-        </nav>
-      )}
-      {error !== "" && (
-        <Alert variant="destructive" role="alert" className="mb-6">
-          {error}
-        </Alert>
-      )}
-      {notice !== "" && (
-        <Alert role="status" className="mb-6">
-          {notice}
-        </Alert>
-      )}
-      {ready && (
-        <>
-          {notifications.error !== "" && (
-            <Alert role="status" className="mb-6">
-              {notifications.error}
-            </Alert>
-          )}
           {settings.preferences.sound && (
-            <div className="mb-6 text-sm">
+            <div>
               <Button
                 variant="link"
                 size="inline"
                 type="button"
-                className="text-foreground"
                 onClick={() => {
                   void notifications.audio.enable();
                 }}
@@ -249,59 +220,89 @@ function App() {
                   : "Enable notification sound"}
               </Button>
               {!notifications.audio.ready && (
-                <Text tone="muted" className="mt-2">
-                  Use this button to allow audio in this browser. If sound stays blocked, allow
-                  sound or autoplay in site settings, then try again. Completion toasts still
-                  appear. Missed sounds are not replayed.
-                </Text>
+                <details className="mt-2 text-xs text-muted-foreground">
+                  <summary>Sound help</summary>
+                  <p className="mt-2">
+                    Allow sound or autoplay in your browser, then try again. Completion toasts still
+                    appear. Missed sounds are not replayed.
+                  </p>
+                </details>
               )}
             </div>
           )}
-          <CompletionToasts toasts={notifications.toasts} dismiss={notifications.dismiss} />
-        </>
-      )}
-      {(status === undefined || (status.authenticated && settings === undefined)) &&
-        (error === "" ? (
-          <LoadingStatus />
-        ) : (
-          <Button
-            type="button"
-            onClick={() => {
-              setError("");
-              void load();
-            }}
-          >
-            Retry loading Flora
+          <Button variant="link" size="inline" type="button" disabled={busy} onClick={logout}>
+            Log out
           </Button>
-        ))}
-      {status?.authenticated === false && (
-        <Account
-          key={String(status.setupRequired)}
-          setupRequired={status.setupRequired}
-          enrollmentRequired={status.enrollmentRequired === true}
-          busy={busy}
-          run={run}
-          onLogin={refresh}
-        />
+        </Sidebar>
+      ) : (
+        <header className="mb-14">
+          <Wordmark />
+        </header>
       )}
-      {ready && path === "settings" && (
-        <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
-      )}
-      {ready &&
-        path !== "settings" &&
-        (path.startsWith("chats") ? (
-          <Chats
-            key={path}
-            path={path}
-            list={notifications.chats}
-            listError={notifications.error}
-            messageBytes={settings.preferences.messageBytes}
-            onExpired={onExpired}
+      <main id="main-content" tabIndex={-1} className={ready ? "workspace-content" : undefined}>
+        {error !== "" && (
+          <Alert variant="destructive" role="alert" className="mb-6">
+            {error}
+          </Alert>
+        )}
+        {notice !== "" && (
+          <Alert role="status" className="mb-6">
+            {notice}
+          </Alert>
+        )}
+        {ready && (
+          <>
+            {notifications.error !== "" && (
+              <Alert role="status" className="mb-6">
+                {notifications.error}
+              </Alert>
+            )}
+            <CompletionToasts toasts={notifications.toasts} dismiss={notifications.dismiss} />
+          </>
+        )}
+        {(status === undefined || (status.authenticated && settings === undefined)) &&
+          (error === "" ? (
+            <LoadingStatus />
+          ) : (
+            <Button
+              type="button"
+              onClick={() => {
+                setError("");
+                void load();
+              }}
+            >
+              Retry loading Flora
+            </Button>
+          ))}
+        {status?.authenticated === false && (
+          <Account
+            key={String(status.setupRequired)}
+            setupRequired={status.setupRequired}
+            enrollmentRequired={status.enrollmentRequired === true}
+            busy={busy}
+            run={run}
+            onLogin={refresh}
           />
-        ) : (
-          <Projects key={path} path={path} onExpired={onExpired} />
-        ))}
-    </main>
+        )}
+        {ready && path === "settings" && (
+          <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
+        )}
+        {ready &&
+          path !== "settings" &&
+          (path.startsWith("chats") ? (
+            <Chats
+              key={path}
+              path={path}
+              list={notifications.chats}
+              listError={notifications.error}
+              messageBytes={settings.preferences.messageBytes}
+              onExpired={onExpired}
+            />
+          ) : (
+            <Projects key={path} path={path} onExpired={onExpired} />
+          ))}
+      </main>
+    </div>
   );
 }
 
