@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@source "../../web/src";
 @source "./";
 
 /* Semantic tokens follow the shadcn naming convention. */
@@ -8,6 +7,7 @@
   --background: oklch(0.98 0.005 155);
   --foreground: oklch(0.2 0.005 155);
   --muted-foreground: oklch(0.44 0.008 155);
+  --muted: oklch(0.93 0.005 155);
 }
 
 .dark {
@@ -15,12 +15,29 @@
   --background: oklch(0.16 0.005 155);
   --foreground: oklch(0.95 0.005 155);
   --muted-foreground: oklch(0.7 0.008 155);
+  --muted: oklch(0.24 0.005 155);
+}
+
+:root, .dark {
+  --primary: var(--foreground);
+  --primary-foreground: var(--background);
+  --border: color-mix(in oklch, var(--foreground) 20%, transparent);
+  --input: color-mix(in oklch, var(--foreground) 30%, transparent);
+  --ring: var(--foreground);
+  --destructive: color-mix(in oklch, var(--foreground) 50%, transparent);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
   --font-sans: ui-sans-serif, system-ui, sans-serif;
 }
 
