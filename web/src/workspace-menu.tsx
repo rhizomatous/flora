@@ -50,7 +50,7 @@ export function WorkspaceMenu({
       <DropdownMenuContent
         side="top"
         align="start"
-        className="w-64"
+        className="w-[var(--radix-dropdown-menu-trigger-width)]"
         onCloseAutoFocus={(event) => {
           if (navigated.current) event.preventDefault();
           navigated.current = false;

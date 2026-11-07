@@ -20,7 +20,7 @@
 
 :root,
 .dark {
-  --popover: color-mix(in oklch, var(--background), var(--muted) 70%);
+  --popover: var(--muted);
   --popover-foreground: var(--foreground);
   --primary: var(--foreground);
   --primary-foreground: var(--background);

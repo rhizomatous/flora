@@ -23,7 +23,7 @@ export function DropdownMenuContent({
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
         className={cn(
-          "z-50 min-w-48 max-w-[calc(100vw-1rem)] max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg outline-none",
+          "z-50 min-w-48 max-w-[calc(100vw-1rem)] max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto rounded-xl border border-border/50 bg-popover p-1 text-popover-foreground shadow-lg outline-none",
           className,
         )}
         {...props}
@@ -37,7 +37,7 @@ export function DropdownMenuItem({ className, ...props }: ComponentProps<typeof 
     <Item
       data-slot="dropdown-menu-item"
       className={cn(
-        "flex cursor-default items-center gap-3 rounded-md px-3 py-2 text-sm outline-none data-[highlighted]:bg-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground",
+        "flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-[13px] leading-5 outline-none data-[highlighted]:bg-foreground/8 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground",
         className,
       )}
       {...props}
@@ -46,9 +46,11 @@ export function DropdownMenuItem({ className, ...props }: ComponentProps<typeof 
 }
 
 export function DropdownMenuSeparator({ className, ...props }: ComponentProps<typeof Separator>) {
-  return <Separator className={cn("-mx-1.5 my-1.5 h-px bg-border", className)} {...props} />;
+  return <Separator className={cn("-mx-1 my-1 h-px bg-border/50", className)} {...props} />;
 }
 
 export function DropdownMenuLabel({ className, ...props }: ComponentProps<typeof Label>) {
-  return <Label className={cn("px-3 py-2 text-xs text-muted-foreground", className)} {...props} />;
+  return (
+    <Label className={cn("px-2 py-1.5 text-xs text-muted-foreground", className)} {...props} />
+  );
 }
