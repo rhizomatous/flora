@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 import { chromium } from "@playwright/test";
 
-import { assertFitsPhone, logIn, pageErrors } from "./browser.ts";
+import { openWorkspaceMenu, assertFitsPhone, logIn, pageErrors } from "./browser.ts";
 
 const browser = await chromium.launch();
 try {
@@ -110,7 +110,8 @@ try {
     /Send a new message to restart|Send new input to continue/,
   );
   await page.getByRole("button", { name: "Menu", exact: true }).click();
-  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await openWorkspaceMenu(page);
+  await page.getByRole("menuitem", { name: "Log out", exact: true }).click();
   await page.goto(chatURL);
   await page.getByRole("heading", { name: "Log in", exact: true }).waitFor();
   assert.deepEqual(errors, []);

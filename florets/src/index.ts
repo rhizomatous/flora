@@ -15,3 +15,13 @@ export { Alert, LoadingStatus } from "./components/feedback";
 export { Heading, Text } from "./components/typography";
 export type { HeadingProps, TextProps } from "./components/typography";
 export { FlowerMark, Wordmark } from "./components/brand";
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+  DropdownMenuGroup,
+} from "./components/dropdown-menu";
+export { GearIcon, SpeakerLoudIcon, ExitIcon, ChevronUpIcon } from "@radix-ui/react-icons";

@@ -172,8 +172,15 @@ export function Sidebar({
             </section>
           ))}
         </div>
-        <div className="sidebar-footer">{children}</div>
+        <Link
+          href="#projects"
+          className="sidebar-link"
+          aria-current={path.startsWith("projects") ? "page" : undefined}
+        >
+          Projects
+        </Link>
       </nav>
+      <div className="sidebar-footer">{children}</div>
     </aside>
   );
 }
