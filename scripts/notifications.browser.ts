@@ -76,8 +76,6 @@ try {
   await page.getByText(/Allow sound or autoplay/).waitFor();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   await page.getByRole("combobox", { name: /^Project/ }).selectOption({ label: "Browser project" });
-  await page.getByText("Chat title (optional)", { exact: true }).click();
-  await page.getByLabel("Chat title", { exact: true }).fill("Background notification");
   await page.getByLabel("Message", { exact: true }).fill("Complete after I switch conversations");
   await page.getByRole("button", { name: "Start chat", exact: true }).click();
   await page.waitForURL(/#chats\/(?!new)/);
@@ -94,7 +92,9 @@ try {
     },
   );
   assert.equal(reply.status(), 200);
-  await toast.getByRole("link", { name: "Background notification", exact: true }).waitFor();
+  await toast
+    .getByRole("link", { name: "Complete after I switch conversations", exact: true })
+    .waitFor();
   assert.equal(
     await page.getByRole("heading", { name: "Other conversation", exact: true }).count(),
     1,
@@ -102,7 +102,9 @@ try {
   assert.equal(await tones(), 0);
   await toast.getByRole("link").focus();
   await page.keyboard.press("Enter");
-  await page.getByRole("heading", { name: "Background notification", exact: true }).waitFor();
+  await page
+    .getByRole("heading", { name: "Complete after I switch conversations", exact: true })
+    .waitFor();
   assert.equal(page.url(), chatURL);
   assert.equal(await page.locator("h1").evaluate((el) => el === document.activeElement), true);
   await page.keyboard.press("Tab");
@@ -128,7 +130,9 @@ try {
   await context.setOffline(true);
   await page.getByText(/Chat updates and completion notifications disconnected/).waitFor();
   await context.setOffline(false);
-  await toast.getByRole("link", { name: "Background notification", exact: true }).waitFor();
+  await toast
+    .getByRole("link", { name: "Complete after I switch conversations", exact: true })
+    .waitFor();
   assert.equal(await tones(), 1);
   await context.setOffline(true);
   await page.getByText(/Chat updates and completion notifications disconnected/).waitFor();
