@@ -9,9 +9,12 @@ import { fileURLToPath } from "node:url";
 const binary = fileURLToPath(new URL("../bin/flora", import.meta.url));
 const image = `fixture/agent@sha256:${"a".repeat(64)}`;
 
-function run(args: string[]): Promise<{ status: number | null; stdout: string; stderr: string }> {
+function run(
+  args: string[],
+  executable = binary,
+): Promise<{ status: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(binary, args, { cwd: tmpdir(), timeout: 5000 });
+    const child = spawn(executable, args, { cwd: tmpdir(), timeout: 5000 });
     let stdout = "";
     let stderr = "";
     child.stdout.setEncoding("utf8").on("data", (data: string) => {
@@ -21,11 +24,25 @@ function run(args: string[]): Promise<{ status: number | null; stdout: string; s
       stderr += data;
     });
     child.once("error", reject);
-    child.once("exit", (status) => {
+    // Process exit can precede the last stdout/stderr data events.
+    child.once("close", (status) => {
       resolve({ status, stdout, stderr });
     });
   });
 }
+
+test("captured output includes data arriving after process exit", async () => {
+  // The child outlives its parent while retaining the parent's output pipes.
+  const writer =
+    'setTimeout(() => { process.stdout.write("last stdout"); process.stderr.write("last stderr"); }, 100);';
+  const parent = `const { spawn } = require("node:child_process");
+    spawn(process.execPath, ["-e", ${JSON.stringify(writer)}], { stdio: ["ignore", 1, 2] }).unref();
+    process.exit(0);`;
+  const result = await run(["-e", parent], process.execPath);
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, "last stdout");
+  assert.equal(result.stderr, "last stderr");
+});
 
 test("version and help work without initializing storage or Docker", async () => {
   const version = await run(["-version"]);

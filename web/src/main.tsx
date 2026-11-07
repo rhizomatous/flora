@@ -206,7 +206,8 @@ function App() {
             Settings
           </Link>
           {settings.preferences.sound && (
-            <div>
+            <details className="sound-options">
+              <summary>Sound</summary>
               <Button
                 variant="link"
                 size="inline"
@@ -220,15 +221,12 @@ function App() {
                   : "Enable notification sound"}
               </Button>
               {!notifications.audio.ready && (
-                <details className="mt-2 text-xs text-muted-foreground">
-                  <summary>Sound help</summary>
-                  <p className="mt-2">
-                    Allow sound or autoplay in your browser, then try again. Completion toasts still
-                    appear. Missed sounds are not replayed.
-                  </p>
-                </details>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Allow sound or autoplay in your browser, then try again. Completion toasts still
+                  appear. Missed sounds are not replayed.
+                </p>
               )}
-            </div>
+            </details>
           )}
           <Button variant="link" size="inline" type="button" disabled={busy} onClick={logout}>
             Log out

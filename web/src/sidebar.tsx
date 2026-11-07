@@ -124,7 +124,7 @@ export function Sidebar({
             </Text>
           )}
           {projects.map((project) => (
-            <section key={project.id} className="mt-5" aria-label={project.name}>
+            <section key={project.id} className="mt-3" aria-label={project.name}>
               <Link
                 onClick={() => {
                   setOpen(false);
@@ -134,7 +134,7 @@ export function Sidebar({
               >
                 {project.name}
               </Link>
-              <ul className="mt-2 space-y-1">
+              <ul className="mt-1">
                 {chats
                   ?.filter((chat) => chat.ProjectID === project.id)
                   .map((chat) => (
@@ -145,10 +145,11 @@ export function Sidebar({
                         }}
                         href={`#chats/${chat.ID}`}
                         className="sidebar-chat"
+                        title={chat.Title}
                         aria-current={path === `chats/${chat.ID}` ? "page" : undefined}
                       >
-                        <span className="block truncate">{chat.Title}</span>
-                        <span className="mt-1 block text-xs text-muted-foreground">
+                        <span className="min-w-0 flex-1 truncate">{chat.Title}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
                           {chat.Status === "working" ? "✿ " : ""}
                           {chat.Status.charAt(0).toUpperCase() + chat.Status.slice(1)}
                         </span>
