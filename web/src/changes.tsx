@@ -1,7 +1,8 @@
 import { useEffect, useEffectEvent, useState } from "react";
 
+import { Link } from "@flora/florets";
+
 import { isExpired, request } from "./request";
-import { link } from "./ui";
 
 type FileChange = {
   repository?: string;
@@ -90,9 +91,9 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
         <ul aria-label="Pull requests" className="mt-3 space-y-2 text-sm">
           {pulls.map((p) => (
             <li key={p.url} className="break-words">
-              <a className={link} href={p.url} target="_blank" rel="noreferrer">
+              <Link href={p.url} target="_blank" rel="noreferrer">
                 {p.repository ?? p.url.split("/").slice(3, 5).join("/")} PR #{p.number}
-              </a>{" "}
+              </Link>{" "}
               · {pullState(p)}
             </li>
           ))}
@@ -168,12 +169,11 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
                   {f.truncated && (
                     <p className="mt-3 text-sm">
                       Diff exceeds the configured inline limit ({f.bytes.toLocaleString()} bytes).{" "}
-                      <a
-                        className={link}
+                      <Link
                         href={`/api/chats/${encodeURIComponent(chatID)}/changes/${i}/diff?snapshot=${encodeURIComponent(snapshot.id)}`}
                       >
                         Download full diff
-                      </a>
+                      </Link>
                     </p>
                   )}
                   {f.diff !== "" && (

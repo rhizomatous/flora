@@ -1,7 +1,19 @@
 import { StrictMode, useEffect, useEffectEvent, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
-import { FlowerMark } from "@flora/florets";
+import {
+  Alert,
+  Button,
+  FieldLabel,
+  Input,
+  Link,
+  LoadingStatus,
+  Page,
+  PageDescription,
+  PageHeader,
+  PageTitle,
+  Wordmark,
+} from "@flora/florets";
 
 import { Chats } from "./chats";
 import { Installation, type Settings } from "./installation";
@@ -9,9 +21,9 @@ import { useNotifications } from "./notifications";
 import { Projects } from "./projects";
 import { errorMessage, request } from "./request";
 import { CompletionToasts } from "./toasts";
-import { button, control, link, text } from "./ui";
+import { text } from "./ui";
 
-import "@flora/florets/styles.css";
+import "./styles.css";
 
 type Status = { setupRequired: boolean; authenticated: boolean; enrollmentRequired?: boolean };
 
@@ -54,25 +66,20 @@ function Account({
 
   return (
     <section aria-labelledby="account-heading">
-      <h1
-        ref={heading}
-        tabIndex={-1}
-        id="account-heading"
-        className="text-2xl font-semibold tracking-tight"
-      >
+      <PageTitle ref={heading} tabIndex={-1} id="account-heading">
         {action}
-      </h1>
-      <p className="mt-3 text-sm leading-6 text-muted-foreground">
+      </PageTitle>
+      <PageDescription>
         {setupRequired
           ? "Create the single administrator account for this installation. Use a unique password of at least 12 characters."
           : "Enter your administrator password. Sessions expire at the absolute lifetime set by the administrator."}
-      </p>
+      </PageDescription>
       <form className="mt-8 space-y-6" onSubmit={submit}>
         {setupRequired && enrollmentRequired === true && (
-          <label className="block text-sm font-medium">
+          <FieldLabel>
             Enrollment code
-            <input
-              className={control}
+            <Input
+              className="mt-2"
               type="password"
               name="enrollmentCode"
               autoComplete="off"
@@ -83,12 +90,12 @@ function Account({
             <span className="mt-2 block text-muted-foreground">
               Enter the one-time code shown by Flora on your host.
             </span>
-          </label>
+          </FieldLabel>
         )}
-        <label className="block text-sm font-medium">
+        <FieldLabel>
           Password
-          <input
-            className={control}
+          <Input
+            className="mt-2"
             type="password"
             name="password"
             autoComplete={setupRequired ? "new-password" : "current-password"}
@@ -97,10 +104,10 @@ function Account({
             required
             disabled={busy}
           />
-        </label>
-        <button type="submit" className={button} disabled={busy}>
+        </FieldLabel>
+        <Button type="submit" disabled={busy}>
           {busy ? "Please wait…" : action}
-        </button>
+        </Button>
       </form>
     </section>
   );
@@ -189,70 +196,52 @@ function App() {
   }
 
   return (
-    <main className="mx-auto min-h-svh max-w-4xl px-6 py-10 sm:px-10">
-      <header className="mb-14 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-lg font-semibold">
-          <FlowerMark />
-          <span>Flora</span>
-        </div>
+    <Page className="max-w-4xl">
+      <PageHeader>
+        <Wordmark />
         {status?.authenticated === true && (
-          <button
-            type="button"
-            className="text-sm text-muted-foreground underline underline-offset-4"
-            disabled={busy}
-            onClick={logout}
-          >
+          <Button variant="link" size="inline" type="button" disabled={busy} onClick={logout}>
             Log out
-          </button>
+          </Button>
         )}
-      </header>
+      </PageHeader>
       {status?.authenticated === true && (
         <nav aria-label="Main" className="mb-8 flex flex-wrap gap-6 text-sm">
-          <a
-            href="#chats"
-            aria-current={path.startsWith("chats") ? "page" : undefined}
-            className={link}
-          >
+          <Link href="#chats" aria-current={path.startsWith("chats") ? "page" : undefined}>
             Chats
-          </a>
-          <a
-            href="#projects"
-            aria-current={path.startsWith("projects") ? "page" : undefined}
-            className={link}
-          >
+          </Link>
+          <Link href="#projects" aria-current={path.startsWith("projects") ? "page" : undefined}>
             Projects
-          </a>
-          <a
-            href="#settings"
-            aria-current={path === "settings" ? "page" : undefined}
-            className={link}
-          >
+          </Link>
+          <Link href="#settings" aria-current={path === "settings" ? "page" : undefined}>
             Installation settings
-          </a>
+          </Link>
         </nav>
       )}
       {error !== "" && (
-        <p role="alert" className="mb-6 rounded-md border border-foreground/50 p-3 text-sm">
+        <Alert variant="destructive" role="alert" className="mb-6">
           {error}
-        </p>
+        </Alert>
       )}
       {notice !== "" && (
-        <p role="status" className="mb-6 rounded-md border p-3 text-sm">
+        <Alert role="status" className="mb-6">
           {notice}
-        </p>
+        </Alert>
       )}
       {ready && (
         <>
           {notifications.error !== "" && (
-            <p role="status" className="mb-6 rounded-md border p-3 text-sm">
+            <Alert role="status" className="mb-6">
               {notifications.error}
-            </p>
+            </Alert>
           )}
           {settings.preferences.sound && (
             <div className="mb-6 text-sm">
-              <button
+              <Button
+                variant="link"
+                size="inline"
                 type="button"
-                className={link}
+                className="text-foreground"
                 onClick={() => {
                   void notifications.audio.enable();
                 }}
@@ -260,7 +249,7 @@ function App() {
                 {notifications.audio.ready
                   ? "Sound enabled for this page"
                   : "Enable notification sound"}
-              </button>
+              </Button>
               {!notifications.audio.ready && (
                 <p className="mt-2 text-muted-foreground">
                   Use this button to allow audio in this browser. If sound stays blocked, allow
@@ -275,20 +264,17 @@ function App() {
       )}
       {(status === undefined || (status.authenticated && settings === undefined)) &&
         (error === "" ? (
-          <p role="status" className="text-muted-foreground">
-            Loading…
-          </p>
+          <LoadingStatus />
         ) : (
-          <button
+          <Button
             type="button"
-            className={button}
             onClick={() => {
               setError("");
               void load();
             }}
           >
             Retry loading Flora
-          </button>
+          </Button>
         ))}
       {status?.authenticated === false && (
         <Account
@@ -317,7 +303,7 @@ function App() {
         ) : (
           <Projects key={path} path={path} onExpired={onExpired} />
         ))}
-    </main>
+    </Page>
   );
 }
 

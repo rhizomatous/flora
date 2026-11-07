@@ -1,7 +1,20 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 
+import {
+  FieldSet,
+  Alert,
+  Button,
+  ButtonLink,
+  FieldLabel,
+  Input,
+  Link,
+  NativeSelect,
+  PageTitle,
+  Textarea,
+} from "@flora/florets";
+
 import { errorMessage, isExpired, request } from "./request";
-import { button, control, link, text, texts } from "./ui";
+import { text, texts } from "./ui";
 
 type Repository = { name: string; url: string; baseBranch: string; role: "core" | "extra" };
 type Project = {
@@ -51,68 +64,72 @@ function RepositoryFields({ repositories }: { repositories: Repository[] }) {
         before setup; extra repositories are fetched on demand.
       </p>
       {rows.map(({ repo, key }, index) => (
-        <fieldset
+        <FieldSet
           key={key}
           data-repository-key={key}
           className="space-y-4 rounded-md border border-foreground/20 p-4"
         >
           <legend className="px-1 text-sm font-medium">Repository {index + 1}</legend>
-          <label className="block text-sm font-medium">
+          <FieldLabel>
             GitHub repository
-            <input
+            <Input
               name="repository"
-              className={control}
+              className="mt-2"
               defaultValue={repo.url}
               placeholder="owner/repository"
               required
               maxLength={300}
             />
-          </label>
-          <label className="block text-sm font-medium">
+          </FieldLabel>
+          <FieldLabel>
             Base branch
-            <input
+            <Input
               name="baseBranch"
-              className={control}
+              className="mt-2"
               defaultValue={repo.baseBranch}
               maxLength={255}
               placeholder="Repository default branch"
             />
-          </label>
-          <label className="block text-sm font-medium">
+          </FieldLabel>
+          <FieldLabel>
             Repository role
-            <select
+            <NativeSelect
               aria-label="Repository role"
               name="role"
-              className={control}
+              className="mt-2"
               defaultValue={repo.role}
             >
               <option value="core">Core</option>
               <option value="extra">Extra</option>
-            </select>
-          </label>
+            </NativeSelect>
+          </FieldLabel>
           {rows.length > 1 && (
-            <button
+            <Button
+              variant="link"
+              size="inline"
               type="button"
-              className={`${link} text-sm`}
+              className="text-sm text-foreground"
               onClick={() => {
                 removeRepository(key);
               }}
             >
               Remove repository {index + 1}
-            </button>
+            </Button>
           )}
-        </fieldset>
+        </FieldSet>
       ))}
-      <button
+      <Button
+        variant="link"
+        size="inline"
         type="button"
         ref={addButton}
         data-add-repository
-        className={`${link} text-sm`}
+        className="text-sm text-foreground"
         disabled={rows.length >= 100}
         onClick={addRepository}
       >
         Add repository
-      </button>
+      </Button>
     </div>
   );
 }
@@ -205,50 +222,50 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
   return (
     <section aria-labelledby="projects-heading">
       <div className="flex items-center justify-between gap-4">
-        <h1
+        <PageTitle
           id="projects-heading"
           ref={heading}
           tabIndex={-1}
-          className="min-w-0 text-2xl font-semibold tracking-tight break-words"
+          className="min-w-0 break-words"
         >
           {title}
-        </h1>
+        </PageTitle>
         {id === "" ? (
-          <a href="#projects/new" className={`${button} shrink-0`}>
+          <ButtonLink href="#projects/new" className="shrink-0">
             Connect project
-          </a>
+          </ButtonLink>
         ) : (
-          <a href="#projects" className={`${link} shrink-0 text-sm`}>
+          <Link href="#projects" className="shrink-0 text-sm">
             All projects
-          </a>
+          </Link>
         )}
       </div>
       {project && (
-        <a
-          className={`${link} mt-5 inline-block text-sm`}
+        <Link
+          className="mt-5 inline-block text-sm"
           href={`#chats/new?project=${encodeURIComponent(project.id)}`}
         >
           Start chat
-        </a>
+        </Link>
       )}
       {error !== "" && (
-        <p role="alert" className="mt-6 rounded-md border border-foreground/50 p-3 text-sm">
+        <Alert variant="destructive" role="alert" className="mt-6">
           {error}
-        </p>
+        </Alert>
       )}
       {notice !== "" && (
-        <p role="status" className="mt-6 rounded-md border p-3 text-sm">
+        <Alert role="status" className="mt-6">
           {notice}
-        </p>
+        </Alert>
       )}
       {list &&
         (list.length > 0 ? (
           <ul className="mt-8 divide-y divide-foreground/20">
             {list.map((p) => (
               <li key={p.id} className="py-5">
-                <a className={`${link} font-medium`} href={`#projects/${p.id}`}>
+                <Link className="font-medium" href={`#projects/${p.id}`}>
                   {p.name}
-                </a>
+                </Link>
                 <ul className="mt-2 text-sm break-words text-muted-foreground">
                   {p.configuration.repositories.map((repo) => (
                     <li key={repo.name}>
@@ -256,12 +273,12 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
                     </li>
                   ))}
                 </ul>
-                <a
-                  className={`${link} mt-3 inline-block text-sm`}
+                <Link
+                  className="mt-3 inline-block text-sm"
                   href={`#chats/new?project=${encodeURIComponent(p.id)}`}
                 >
                   Start chat
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
@@ -288,38 +305,38 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
               Changes apply only to new chats. Existing chats keep their original settings.
             </p>
           )}
-          <fieldset disabled={busy} className="space-y-6">
+          <FieldSet disabled={busy}>
             <legend className="sr-only">Project settings</legend>
-            <label className="block text-sm font-medium">
+            <FieldLabel>
               Project name
-              <input
+              <Input
                 name="name"
-                className={control}
+                className="mt-2"
                 defaultValue={project?.name}
                 maxLength={200}
                 required
               />
-            </label>
+            </FieldLabel>
             <RepositoryFields
               repositories={project?.configuration.repositories ?? [blankRepository]}
             />
-            <label className="block text-sm font-medium">
+            <FieldLabel>
               Setup command (optional)
-              <textarea
+              <Textarea
                 name="setupCommand"
-                className={`${control} min-h-28 font-mono`}
+                className="mt-2 min-h-28 font-mono"
                 defaultValue={project?.configuration.setupCommand}
                 maxLength={8192}
                 aria-describedby="setup-help"
               />
-            </label>
+            </FieldLabel>
             <p id="setup-help" className="text-sm text-muted-foreground">
               Runs inside the chat container before the agent starts.
             </p>
-          </fieldset>
-          <button type="submit" className={button} disabled={busy}>
+          </FieldSet>
+          <Button type="submit" disabled={busy}>
             {submitLabel}
-          </button>
+          </Button>
         </form>
       )}
     </section>

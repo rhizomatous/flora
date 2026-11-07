@@ -1,5 +1,6 @@
+import { Button, Link } from "@flora/florets";
+
 import type { Toast } from "./notifications";
-import { link } from "./ui";
 
 export function CompletionToasts({
   toasts,
@@ -21,21 +22,23 @@ export function CompletionToasts({
           className="rounded-md border border-foreground/40 bg-background p-4 shadow-lg"
         >
           <p className="text-sm break-words">
-            <a className={`${link} font-medium`} href={`#chats/${encodeURIComponent(t.ChatID)}`}>
+            <Link className="font-medium" href={`#chats/${encodeURIComponent(t.ChatID)}`}>
               {t.title}
-            </a>{" "}
+            </Link>{" "}
             finished work.
           </p>
-          <button
+          <Button
+            variant="link"
+            size="inline"
             type="button"
-            className={`${link} mt-3 text-sm`}
+            className="mt-3 text-sm text-foreground"
             aria-label={`Dismiss completion for ${t.title}`}
             onClick={() => {
               dismiss(t.Sequence);
             }}
           >
             Dismiss
-          </button>
+          </Button>
         </div>
       ))}
     </aside>

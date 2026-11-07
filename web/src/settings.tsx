@@ -1,5 +1,6 @@
+import { FieldSet, FieldDescription, FieldLabel, FieldLegend, Input } from "@flora/florets";
+
 import { preferenceFields, type Preferences } from "./preferences";
-import { control } from "./ui";
 
 export function PreferenceFields({
   value,
@@ -11,23 +12,23 @@ export function PreferenceFields({
   override: number | undefined;
 }) {
   return (
-    <fieldset disabled={busy} className="space-y-6 border-t border-foreground/20 pt-6">
-      <legend className="text-base font-semibold">Defaults and limits</legend>
-      <p className="text-sm leading-6 text-muted-foreground">
+    <FieldSet disabled={busy} className="border-t border-border pt-6">
+      <FieldLegend className="mb-0">Defaults and limits</FieldLegend>
+      <FieldDescription>
         CPU, memory, processes, setup timeout and Git author apply only to new chats. Existing chats
         keep their saved values, including when restarted. Older chats keep the original defaults.
-      </p>
-      <p className="text-sm leading-6 text-muted-foreground">
+      </FieldDescription>
+      <FieldDescription>
         Capacity applies to future starts, including stopped chats. Lowering it never stops running
         containers. Activity timeout applies at the next check to all active work, including work
         already in progress. Idle time and user-question waits do not count.
-      </p>
-      <p className="text-sm leading-6 text-muted-foreground">
+      </FieldDescription>
+      <FieldDescription>
         Message limits apply to new submissions. Diff thresholds apply when viewing saved diffs;
         full downloads remain available. Session lifetime applies at the next login, with no
         extension on use. Existing sessions keep their expiry. To hear completion alerts, save sound
         as enabled and use the Enable notification sound button on each fresh page.
-      </p>
+      </FieldDescription>
       {override !== undefined && (
         <p role="note" className="text-sm">
           The startup flag -max-running overrides the saved cap with {override}. Remove the flag and
@@ -37,13 +38,11 @@ export function PreferenceFields({
       <div className="grid gap-6 sm:grid-cols-2">
         {preferenceFields.map((f) => (
           <div key={f.name}>
-            <label className="block text-sm font-medium" htmlFor={f.name}>
-              {f.label}
-            </label>
-            <input
+            <FieldLabel htmlFor={f.name}>{f.label}</FieldLabel>
+            <Input
               id={f.name}
               key={String(value[f.name])}
-              className={control}
+              className="mt-2"
               name={f.name}
               type="number"
               required
@@ -59,29 +58,29 @@ export function PreferenceFields({
           </div>
         ))}
       </div>
-      <label className="block text-sm font-medium">
+      <FieldLabel>
         Git author name
-        <input
+        <Input
           key={value.authorName}
-          className={control}
+          className="mt-2"
           name="authorName"
           required
           maxLength={200}
           defaultValue={value.authorName}
         />
-      </label>
-      <label className="block text-sm font-medium">
+      </FieldLabel>
+      <FieldLabel>
         Git author email
-        <input
+        <Input
           key={value.authorEmail}
-          className={control}
+          className="mt-2"
           name="authorEmail"
           type="email"
           required
           maxLength={254}
           defaultValue={value.authorEmail}
         />
-      </label>
+      </FieldLabel>
       <label className="flex items-center gap-3 text-sm">
         <input
           key={String(value.sound)}
@@ -91,6 +90,6 @@ export function PreferenceFields({
         />
         Play a sound when a chat finishes work
       </label>
-    </fieldset>
+    </FieldSet>
   );
 }

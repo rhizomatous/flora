@@ -1,9 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 
+import {
+  FieldSet,
+  Button,
+  FieldDescription,
+  FieldLabel,
+  FieldLegend,
+  Input,
+  NativeSelect,
+  PageDescription,
+  PageTitle,
+} from "@flora/florets";
+
 import { readPreferences, type Preferences } from "./preferences";
 import { request } from "./request";
 import { PreferenceFields } from "./settings";
-import { button, control, text } from "./ui";
+import { text } from "./ui";
 
 export type Settings = {
   provider: string;
@@ -60,25 +72,20 @@ export function Installation({
 
   return (
     <section aria-labelledby="settings-heading">
-      <h1
-        ref={heading}
-        tabIndex={-1}
-        id="settings-heading"
-        className="text-2xl font-semibold tracking-tight"
-      >
+      <PageTitle ref={heading} tabIndex={-1} id="settings-heading">
         Installation settings
-      </h1>
-      <p className="mt-3 text-sm leading-6 text-muted-foreground">
+      </PageTitle>
+      <PageDescription>
         Choose one hosted provider and model for all chats. Once saved, the provider and model
         cannot be changed.
-      </p>
+      </PageDescription>
       <form className="mt-8 space-y-6" onSubmit={save}>
-        <fieldset disabled={busy} className="space-y-6">
-          <legend className="mb-4 text-base font-semibold">GitHub</legend>
-          <label className="block text-sm font-medium">
+        <FieldSet disabled={busy}>
+          <FieldLegend>GitHub</FieldLegend>
+          <FieldLabel>
             Fine-grained personal access token
-            <input
-              className={control}
+            <Input
+              className="mt-2"
               type="password"
               name="githubToken"
               autoComplete="off"
@@ -86,22 +93,22 @@ export function Installation({
               maxLength={4096}
               aria-describedby="github-help"
             />
-          </label>
-          <p id="github-help" className="text-sm leading-6 text-muted-foreground">
+          </FieldLabel>
+          <FieldDescription id="github-help">
             Restrict the token to the repositories Flora will use.{" "}
             {settings.githubConfigured
               ? "A token is saved. Leave blank to keep it."
               : "No token saved."}
-          </p>
-        </fieldset>
-        <fieldset disabled={busy} className="space-y-6 border-t border-foreground/20 pt-6">
-          <legend className="text-base font-semibold">Model provider</legend>
-          <label className="block text-sm font-medium">
+          </FieldDescription>
+        </FieldSet>
+        <FieldSet disabled={busy} className="border-t border-border pt-6">
+          <FieldLegend className="mb-0">Model provider</FieldLegend>
+          <FieldLabel>
             Hosted provider
-            <select
+            <NativeSelect
               key={settings.provider}
               aria-label="Hosted provider"
-              className={control}
+              className="mt-2"
               name="provider"
               defaultValue={settings.provider === "" ? "openai" : settings.provider}
               disabled={settings.provider !== ""}
@@ -109,13 +116,13 @@ export function Installation({
               <option value="openai">OpenAI</option>
               <option value="anthropic">Anthropic</option>
               <option value="google">Google</option>
-            </select>
-          </label>
-          <label className="block text-sm font-medium">
+            </NativeSelect>
+          </FieldLabel>
+          <FieldLabel>
             Model ID
-            <input
+            <Input
               key={settings.model}
-              className={control}
+              className="mt-2"
               name="model"
               defaultValue={settings.model}
               required
@@ -123,11 +130,11 @@ export function Installation({
               disabled={settings.model !== ""}
               placeholder="Exact model ID from your provider"
             />
-          </label>
-          <label className="block text-sm font-medium">
+          </FieldLabel>
+          <FieldLabel>
             Provider API key
-            <input
-              className={control}
+            <Input
+              className="mt-2"
               type="password"
               name="providerKey"
               autoComplete="off"
@@ -135,22 +142,22 @@ export function Installation({
               maxLength={4096}
               aria-describedby="provider-help"
             />
-          </label>
-          <p id="provider-help" className="text-sm leading-6 text-muted-foreground">
+          </FieldLabel>
+          <FieldDescription id="provider-help">
             {settings.providerConfigured
               ? "An API key is saved. Leave blank to keep it."
               : "No API key saved."}{" "}
             Saved credentials are never displayed.
-          </p>
-        </fieldset>
+          </FieldDescription>
+        </FieldSet>
         <PreferenceFields
           value={settings.preferences}
           busy={busy}
           override={settings.maxRunningOverride}
         />
-        <button type="submit" className={button} disabled={busy}>
+        <Button type="submit" disabled={busy}>
           {busy ? "Saving…" : "Validate and save"}
-        </button>
+        </Button>
       </form>
       <section
         className="mt-10 space-y-4 border-t border-foreground/20 pt-6"
@@ -165,9 +172,9 @@ export function Installation({
           and restarted containers keep their original key. GitHub rotation applies to future broker
           requests.
         </p>
-        <button type="button" className={button} disabled={busy} onClick={diagnose}>
+        <Button type="button" disabled={busy} onClick={diagnose}>
           Check dependencies
-        </button>
+        </Button>
         {diagnostics !== undefined && (
           <ul aria-live="polite" className="space-y-3 text-sm">
             {diagnostics.map((d) => (

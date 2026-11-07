@@ -1,12 +1,22 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { FlowerMark } from "@flora/florets";
+import {
+  Alert,
+  Button,
+  FieldLabel,
+  FlowerMark,
+  Input,
+  Link,
+  NativeSelect,
+  PageTitle,
+  Textarea,
+} from "@flora/florets";
 
 import { Changes } from "./changes";
 import type { Chat } from "./notifications";
 import { QuestionForm, type Question } from "./question";
 import { errorMessage, isExpired, request } from "./request";
-import { button, control, link, text } from "./ui";
+import { text } from "./ui";
 
 type Part = {
   id?: string;
@@ -303,22 +313,17 @@ export function Chats({
   return (
     <section aria-labelledby="chats-heading" className="min-w-0">
       <div className="flex items-center justify-between gap-4">
-        <h1
-          id="chats-heading"
-          ref={heading}
-          tabIndex={-1}
-          className="min-w-0 text-2xl font-semibold tracking-tight break-words"
-        >
+        <PageTitle id="chats-heading" ref={heading} tabIndex={-1} className="min-w-0 break-words">
           {title()}
-        </h1>
-        <a className={`${link} shrink-0 text-sm`} href={id === "" ? "#chats/new" : "#chats"}>
+        </PageTitle>
+        <Link className="shrink-0 text-sm" href={id === "" ? "#chats/new" : "#chats"}>
           {id === "" ? "New chat" : "All chats"}
-        </a>
+        </Link>
       </div>
       {error !== "" && (
-        <p role="alert" className="mt-6 rounded-md border p-3 text-sm">
+        <Alert role="alert" className="mt-6">
           {error}
-        </p>
+        </Alert>
       )}
       {id === "" && list !== undefined && <ChatList list={list} projects={projects ?? []} />}
       {id === "" && list === undefined && error === "" && listError === "" && (
@@ -333,11 +338,11 @@ export function Chats({
           }}
           className="mt-8 space-y-6"
         >
-          <label className="block text-sm font-medium">
+          <FieldLabel>
             Project
-            <select
+            <NativeSelect
               name="project"
-              className={control}
+              className="mt-2"
               defaultValue={projectID}
               required
               disabled={busy}
@@ -348,8 +353,8 @@ export function Chats({
                   {p.name}
                 </option>
               ))}
-            </select>
-          </label>
+            </NativeSelect>
+          </FieldLabel>
           {projects === undefined && error === "" && (
             <p role="status" className="text-sm">
               Loading projects…
@@ -357,37 +362,30 @@ export function Chats({
           )}
           {projects?.length === 0 && (
             <p className="text-sm">
-              <a href="#projects/new" className={link}>
-                Connect a project
-              </a>{" "}
-              before starting a chat.
+              <Link href="#projects/new">Connect a project</Link> before starting a chat.
             </p>
           )}
-          <label className="block text-sm font-medium">
+          <FieldLabel>
             Chat title
-            <input name="title" className={control} required maxLength={200} disabled={busy} />
-          </label>
-          <label className="block text-sm font-medium">
+            <Input name="title" className="mt-2" required maxLength={200} disabled={busy} />
+          </FieldLabel>
+          <FieldLabel>
             Message
-            <textarea
+            <Textarea
               name="text"
-              className={`${control} min-h-40`}
+              className="mt-2 min-h-40"
               required
               disabled={busy}
               aria-describedby="message-limit"
             />
-          </label>
+          </FieldLabel>
           <p id="message-limit" className="text-sm text-muted-foreground">
             Up to {messageBytes.toLocaleString()} UTF-8 bytes. Checkout and setup run before Flora
             starts work.
           </p>
-          <button
-            type="submit"
-            className={button}
-            disabled={busy || projects === undefined || projects.length === 0}
-          >
+          <Button type="submit" disabled={busy || projects === undefined || projects.length === 0}>
             {busy ? "Starting…" : "Start chat"}
-          </button>
+          </Button>
         </form>
       )}
       {id !== "" && !isNew && detail === undefined && error === "" && (
@@ -451,17 +449,15 @@ function ChatList({ list, projects }: { list: Chat[]; projects: Project[] }) {
           chats.length > 0 && (
             <section key={p.id} aria-labelledby={`project-${p.id}`}>
               <h2 id={`project-${p.id}`} className="font-semibold">
-                <a href={`#projects/${p.id}`} className={link}>
-                  {p.name}
-                </a>
+                <Link href={`#projects/${p.id}`}>{p.name}</Link>
               </h2>
               <ul className="mt-3 divide-y divide-foreground/20">
                 {chats.map((c) => (
                   <li key={c.ID} className="flex flex-wrap items-start justify-between gap-3 py-4">
                     <div className="min-w-0">
-                      <a href={`#chats/${c.ID}`} className={`${link} font-medium break-words`}>
+                      <Link href={`#chats/${c.ID}`} className="font-medium break-words">
                         {c.Title}
-                      </a>
+                      </Link>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {statusName(c.Status)} ·{" "}
                         <time dateTime={c.UpdatedAt}>{new Date(c.UpdatedAt).toLocaleString()}</time>
@@ -540,38 +536,36 @@ function ChatDetail({
         {connection} · {projectName}
       </p>
       {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
-        <p role="note" className="mt-4 rounded-md border border-foreground/20 p-3 text-sm">
+        <Alert role="note" className="mt-4 rounded-md border border-foreground/20 p-3 text-sm">
           Some live activity could not be captured while Flora was disconnected from OpenCode.
           Recovered message and tool snapshots are shown below. Transient output may be missing.
           Reconnecting does not replay accepted messages or actions.
-        </p>
+        </Alert>
       )}
       {!blocked && (
         <>
           <div className="mt-4 flex flex-wrap gap-3" aria-label="Execution controls">
             {activeTurn && (
-              <button
+              <Button
                 type="button"
-                className={button}
                 disabled={busy}
                 onClick={() => {
                   onControl("interrupt");
                 }}
               >
                 Interrupt current work
-              </button>
+              </Button>
             )}
             {!stopped && (
-              <button
+              <Button
                 type="button"
-                className={button}
                 disabled={busy}
                 onClick={() => {
                   onControl("stop");
                 }}
               >
                 Stop container
-              </button>
+              </Button>
             )}
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -589,22 +583,22 @@ function ChatDetail({
       <Changes key={id} chatID={id} onExpired={onExpired} />
       {children}
       <form onSubmit={onSend} className="mt-8 space-y-4">
-        <label className="block text-sm font-medium">
+        <FieldLabel>
           Follow-up
-          <textarea
-            className={`${control} min-h-28`}
+          <Textarea
+            className="mt-2 min-h-28"
             name="text"
             required
             disabled={busy || activeTurn || blocked}
             aria-describedby="followup-help"
           />
-        </label>
+        </FieldLabel>
         <p id="followup-help" className="text-sm text-muted-foreground">
           {followUpHelp()}
         </p>
-        <button type="submit" className={button} disabled={busy || activeTurn || blocked}>
+        <Button type="submit" disabled={busy || activeTurn || blocked}>
           {sendLabel()}
-        </button>
+        </Button>
       </form>
       <details className="mt-10 rounded-md border border-foreground/20 p-4">
         <summary className="cursor-pointer text-sm font-medium">
@@ -612,9 +606,9 @@ function ChatDetail({
         </summary>
         <p className="mt-3 text-sm text-muted-foreground">
           Setup activity contains bounded previews. After setup finishes,{" "}
-          <a className={link} href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>
+          <Link href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>
             download the full redacted setup log
-          </a>
+          </Link>
           . Any capture failure is shown in the final setup event.
         </p>
         <ol className="mt-4 space-y-3">

@@ -102,7 +102,10 @@
   "overrides": [
     {
       "files": ["web/src/**", "florets/src/**"],
-      "rules": { "import/no-nodejs-modules": "error" }
+      "rules": {
+        "import/no-nodejs-modules": "error",
+        "react/forbid-component-props": ["error", { "forbid": ["style"] }]
+      }
     },
     {
       "files": ["*.config.ts"],
