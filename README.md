@@ -211,6 +211,16 @@ your environment when you leave; nix-direnv caches it for faster re-entry.
 Local `.direnv/` state is ignored. Re-run `direnv allow` after approving changes
 to `.envrc`. Manual `nix develop` and CI do not need direnv or any host hook.
 
+### Florets component guide
+
+Run `npm run docs:dev` to browse the component guide at <http://127.0.0.1:5176>.
+The guide lives in `florets/docs/` and imports the library directly. It includes
+live examples, usage snippets, and a light/dark theme switch. It needs no backend.
+Use `npm run docs:build` to produce a standalone static site in `florets/docs-dist/`,
+and `npm run docs:preview` to preview that build. `make check` builds the guide too.
+After building, run `npm run docs:test` for its Chromium checks; `make browser`
+also includes them. Install Chromium with `npx playwright install chromium` first.
+
 ## Repository layout
 
 - `backend/`: Go module, HTTP server, executable, and embedded web assets.
