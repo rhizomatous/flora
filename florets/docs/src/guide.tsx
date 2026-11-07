@@ -4,6 +4,12 @@ import {
   Alert,
   Button,
   ButtonLink,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
   Field,
   FieldDescription,
   FieldGroup,
@@ -24,6 +30,7 @@ import {
 const sections = [
   { id: "typography", label: "Typography" },
   { id: "buttons", label: "Buttons & links" },
+  { id: "menus", label: "Menus" },
   { id: "forms", label: "Form controls" },
   { id: "feedback", label: "Feedback" },
   { id: "identity", label: "Identity" },
@@ -137,6 +144,41 @@ function FormExample() {
         </FieldGroup>
       </FieldSet>
     </form>
+  );
+}
+
+function MenuExample() {
+  const [selected, setSelected] = useState("No action selected");
+  return (
+    <div className="space-y-4">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline">Open menu</Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuLabel>Workspace</DropdownMenuLabel>
+          <DropdownMenuItem
+            onSelect={() => {
+              setSelected("Settings selected");
+            }}
+          >
+            Settings
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled>Unavailable action</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={() => {
+              setSelected("Log out selected");
+            }}
+          >
+            Log out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Text role="status" tone="muted">
+        {selected}
+      </Text>
+    </div>
   );
 }
 
@@ -324,6 +366,21 @@ export function Guide() {
                   <Link href="#forms">Form controls</Link>
                   <ButtonLink href="#forms">Explore forms</ButtonLink>
                 </div>
+              </Example>
+            </Section>
+            <Section
+              id="menus"
+              title="Menus"
+              description="Keyboard-accessible actions with arrow-key navigation, typeahead, and Escape dismissal."
+            >
+              <Example
+                title="Workspace actions"
+                description="Use asChild for an existing trigger or a menu item that navigates through a link. Content is portaled and stays within the viewport."
+                code={
+                  "<DropdownMenu>\n  <DropdownMenuTrigger asChild><Button>Open menu</Button></DropdownMenuTrigger>\n  <DropdownMenuContent>\n    <DropdownMenuItem onSelect={openSettings}>Settings</DropdownMenuItem>\n  </DropdownMenuContent>\n</DropdownMenu>"
+                }
+              >
+                <MenuExample />
               </Example>
             </Section>
             <Section

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 import { chromium } from "@playwright/test";
 
-import { assertFitsPhone, logIn, pageErrors } from "./browser.ts";
+import { openWorkspaceMenu, assertFitsPhone, logIn, pageErrors } from "./browser.ts";
 
 const browser = await chromium.launch();
 try {
@@ -16,7 +16,15 @@ try {
     .click();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   await page.getByRole("combobox", { name: /^Project/ }).selectOption({ label: "Browser project" });
-  await page.getByLabel("Message", { exact: true }).fill("First browser prompt 🌸");
+  await assertFitsPhone(page);
+  const message = page.getByLabel("Message", { exact: true });
+  const compactHeight = await message.evaluate((element) => element.getBoundingClientRect().height);
+  await message.fill("A longer task description.\n".repeat(12));
+  assert.ok(
+    (await message.evaluate((element) => element.getBoundingClientRect().height)) > compactHeight,
+  );
+  await message.fill("First browser prompt 🌸");
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole("button", { name: "Start chat", exact: true }).click();
   await page.waitForURL(/#chats\/(?!new)/);
   const chatURL = page.url();
@@ -110,7 +118,8 @@ try {
     /Send a new message to restart|Send new input to continue/,
   );
   await page.getByRole("button", { name: "Menu", exact: true }).click();
-  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await openWorkspaceMenu(page);
+  await page.getByRole("menuitem", { name: "Log out", exact: true }).click();
   await page.goto(chatURL);
   await page.getByRole("heading", { name: "Log in", exact: true }).waitFor();
   assert.deepEqual(errors, []);

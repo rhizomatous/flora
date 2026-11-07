@@ -2,7 +2,15 @@ import assert from "node:assert/strict";
 
 import { chromium } from "@playwright/test";
 
-import { assertFitsPhone, logIn, origin, pageErrors, requiredEnv } from "./browser.ts";
+import {
+  openWorkspaceMenu,
+  openSettings,
+  assertFitsPhone,
+  logIn,
+  origin,
+  pageErrors,
+  requiredEnv,
+} from "./browser.ts";
 
 const browser = await chromium.launch();
 try {
@@ -60,16 +68,14 @@ try {
   });
   const tones = () => page.evaluate(() => Number(sessionStorage.getItem("tones") ?? 0));
   const toast = page.getByRole("complementary", { name: "Completion notifications" });
-  const sound = page.getByRole("button", { name: "Enable notification sound", exact: true });
+  const sound = page.getByRole("menuitem", { name: "Enable notification sound", exact: true });
   await logIn(page, "enter");
+  await openWorkspaceMenu(page);
   await sound.focus();
   await page.keyboard.press("Enter");
-  await page.getByText("Sound help", { exact: true }).click();
   await page.getByText(/Allow sound or autoplay/).waitFor();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   await page.getByRole("combobox", { name: /^Project/ }).selectOption({ label: "Browser project" });
-  await page.getByText("Chat title (optional)", { exact: true }).click();
-  await page.getByLabel("Chat title", { exact: true }).fill("Background notification");
   await page.getByLabel("Message", { exact: true }).fill("Complete after I switch conversations");
   await page.getByRole("button", { name: "Start chat", exact: true }).click();
   await page.waitForURL(/#chats\/(?!new)/);
@@ -86,7 +92,9 @@ try {
     },
   );
   assert.equal(reply.status(), 200);
-  await toast.getByRole("link", { name: "Background notification", exact: true }).waitFor();
+  await toast
+    .getByRole("link", { name: "Complete after I switch conversations", exact: true })
+    .waitFor();
   assert.equal(
     await page.getByRole("heading", { name: "Other conversation", exact: true }).count(),
     1,
@@ -94,7 +102,9 @@ try {
   assert.equal(await tones(), 0);
   await toast.getByRole("link").focus();
   await page.keyboard.press("Enter");
-  await page.getByRole("heading", { name: "Background notification", exact: true }).waitFor();
+  await page
+    .getByRole("heading", { name: "Complete after I switch conversations", exact: true })
+    .waitFor();
   assert.equal(page.url(), chatURL);
   assert.equal(await page.locator("h1").evaluate((el) => el === document.activeElement), true);
   await page.keyboard.press("Tab");
@@ -108,21 +118,21 @@ try {
   await page.evaluate(() => {
     window.audioDenied = false;
   });
+  await openWorkspaceMenu(page);
   await sound.focus();
   await page.keyboard.press("Enter");
-  await page.getByRole("button", { name: "Sound enabled for this page", exact: true }).waitFor();
+  await page.getByRole("menuitem", { name: "Sound enabled for this page", exact: true }).waitFor();
   assert.equal(await tones(), 0, "enabling sound must not replay blocked notifications");
 
   await page.getByLabel("Follow-up", { exact: true }).fill("Second quick turn");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
-  await page
-    .getByRole("navigation", { name: "Main" })
-    .getByRole("link", { name: "Settings" })
-    .click();
+  await openSettings(page);
   await context.setOffline(true);
   await page.getByText(/Chat updates and completion notifications disconnected/).waitFor();
   await context.setOffline(false);
-  await toast.getByRole("link", { name: "Background notification", exact: true }).waitFor();
+  await toast
+    .getByRole("link", { name: "Complete after I switch conversations", exact: true })
+    .waitFor();
   assert.equal(await tones(), 1);
   await context.setOffline(true);
   await page.getByText(/Chat updates and completion notifications disconnected/).waitFor();
@@ -131,6 +141,7 @@ try {
   assert.equal(await tones(), 1, "reconnect replayed audio");
   assert.equal(await toast.getByRole("link").count(), 1);
   await page.reload();
+  await openWorkspaceMenu(page);
   await sound.waitFor();
   await page.waitForTimeout(1200);
   assert.equal(await toast.getByRole("link").count(), 0, "reload replayed a toast");
@@ -161,13 +172,14 @@ try {
   const realAudio = await browser.newContext({ ignoreHTTPSErrors: true });
   const realPage = await realAudio.newPage();
   await logIn(realPage, "enter");
-  await realPage.getByRole("link", { name: "Settings", exact: true }).click();
+  await openSettings(realPage);
   await realPage.getByLabel("Play a sound when a chat finishes work").check();
   await realPage.getByRole("button", { name: "Validate and save", exact: true }).click();
-  await realPage.getByRole("button", { name: "Enable notification sound", exact: true }).focus();
+  await openWorkspaceMenu(realPage);
+  await realPage.getByRole("menuitem", { name: "Enable notification sound", exact: true }).focus();
   await realPage.keyboard.press("Enter");
   await realPage
-    .getByRole("button", { name: "Sound enabled for this page", exact: true })
+    .getByRole("menuitem", { name: "Sound enabled for this page", exact: true })
     .waitFor();
   await realAudio.close();
   console.log(

@@ -8,7 +8,6 @@ import {
   FieldLabel,
   Heading,
   Input,
-  Link,
   LoadingStatus,
   Text,
   Wordmark,
@@ -22,6 +21,7 @@ import { errorMessage, request } from "./request";
 import { Sidebar } from "./sidebar";
 import { CompletionToasts } from "./toasts";
 import { text } from "./ui";
+import { WorkspaceMenu } from "./workspace-menu";
 
 import "./styles.css";
 
@@ -199,40 +199,12 @@ function App() {
     <div className={ready ? "workspace" : "mx-auto min-h-svh max-w-4xl px-6 py-10 sm:px-10"}>
       {ready ? (
         <Sidebar path={path} chats={notifications.chats} onExpired={onExpired}>
-          <Link href="#projects" aria-current={path.startsWith("projects") ? "page" : undefined}>
-            Projects
-          </Link>
-          <Link href="#settings" aria-current={path === "settings" ? "page" : undefined}>
-            Settings
-          </Link>
-          {settings.preferences.sound && (
-            <div>
-              <Button
-                variant="link"
-                size="inline"
-                type="button"
-                onClick={() => {
-                  void notifications.audio.enable();
-                }}
-              >
-                {notifications.audio.ready
-                  ? "Sound enabled for this page"
-                  : "Enable notification sound"}
-              </Button>
-              {!notifications.audio.ready && (
-                <details className="mt-2 text-xs text-muted-foreground">
-                  <summary>Sound help</summary>
-                  <p className="mt-2">
-                    Allow sound or autoplay in your browser, then try again. Completion toasts still
-                    appear. Missed sounds are not replayed.
-                  </p>
-                </details>
-              )}
-            </div>
-          )}
-          <Button variant="link" size="inline" type="button" disabled={busy} onClick={logout}>
-            Log out
-          </Button>
+          <WorkspaceMenu
+            sound={settings.preferences.sound}
+            audio={notifications.audio}
+            busy={busy}
+            onLogout={logout}
+          />
         </Sidebar>
       ) : (
         <header className="mb-14">

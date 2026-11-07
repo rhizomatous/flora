@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 
-import { assertFitsPhone, logIn, pageErrors } from "./browser.ts";
+import { openWorkspaceMenu, openSettings, assertFitsPhone, logIn, pageErrors } from "./browser.ts";
 
 const browser = await chromium.launch();
 try {
@@ -45,11 +45,23 @@ try {
     window.AudioContext = FakeAudioContext as unknown as typeof AudioContext;
   });
   await logIn(page);
-  await page.getByRole("button", { name: "Enable notification sound", exact: true }).click();
+  const workspaceMenu = page.getByRole("button", { name: "Workspace menu", exact: true });
+  await workspaceMenu.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("menuitem", { name: "Settings", exact: true })).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(page.getByRole("menuitem", { name: "Log out", exact: true })).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(page.getByRole("menuitem", { name: "Settings", exact: true })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(workspaceMenu).toBeFocused();
+  await openWorkspaceMenu(page);
+  await page.getByLabel("Message", { exact: true }).click();
+  assert.equal(await page.getByRole("menu").count(), 0);
+  await openWorkspaceMenu(page);
+  await page.getByRole("menuitem", { name: "Enable notification sound", exact: true }).click();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   await page.getByRole("combobox", { name: /^Project/ }).selectOption({ label: "Browser project" });
-  await page.getByText("Chat title (optional)", { exact: true }).click();
-  await page.getByLabel("Chat title", { exact: true }).fill("Settings sound fixture");
   await page.getByLabel("Message", { exact: true }).fill("Sound enabled");
   await page.getByRole("button", { name: "Start chat", exact: true }).click();
   await page.getByRole("heading", { name: "Flora needs your answer", exact: true }).waitFor();
@@ -74,7 +86,10 @@ try {
   await page.waitForTimeout(1200);
   assert.equal(await page.evaluate(() => window.tones), 1);
   const chatURL = page.url();
-  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await openSettings(page);
+  await expect(
+    page.getByRole("heading", { name: "Installation settings", exact: true }),
+  ).toBeFocused();
   await page
     .getByRole("heading", { name: "Installation settings", exact: true })
     .waitFor()
@@ -119,7 +134,7 @@ try {
   await page.getByText("Saved response 3", { exact: true }).waitFor();
   await page.waitForTimeout(1200);
   assert.equal(await page.evaluate(() => window.tones), 1);
-  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await openSettings(page);
   await page.reload();
   await page.getByRole("heading", { name: "Installation settings", exact: true }).waitFor();
   assert.equal(await page.getByLabel("CPUs per chat", { exact: true }).inputValue(), "3");
