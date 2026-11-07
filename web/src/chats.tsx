@@ -7,7 +7,6 @@ import {
   FieldLabel,
   FlowerMark,
   Heading,
-  Input,
   Link,
   NativeSelect,
   Text,
@@ -262,7 +261,6 @@ export function Chats({
     const project = text(fields, "project");
     // Forty-five Unicode code points fit within the server's 200-byte title limit.
     const chatTitle =
-      text(fields, "title").trim() ||
       // oxlint-disable-next-line typescript/no-misused-spread -- Bound code points to stay below the UTF-8 byte limit without splitting surrogate pairs.
       [...message.trim().replaceAll(/\s+/gu, " ")].slice(0, 45).join("");
     const input = isNew ? { title: chatTitle, text: message } : { text: message };
@@ -356,15 +354,16 @@ export function Chats({
           onSubmit={(event) => {
             void send(event);
           }}
-          className="space-y-4"
+          className="space-y-1"
         >
-          <Heading level={2}>What are we working on?</Heading>
           <div className="flex flex-wrap items-center gap-3">
-            <FieldLabel htmlFor="new-chat-project">Project</FieldLabel>
+            <FieldLabel className="sr-only" htmlFor="new-chat-project">
+              Project
+            </FieldLabel>
             <NativeSelect
               id="new-chat-project"
               name="project"
-              className="w-auto max-w-full"
+              className="project-picker"
               defaultValue={projectID || projects[0]?.id}
               required
               disabled={busy}
@@ -376,40 +375,24 @@ export function Chats({
               ))}
             </NativeSelect>
           </div>
-          <div className="rounded-xl border border-input bg-background p-3 sm:p-4">
+          <div className="chat-composer">
             <FieldLabel className="sr-only" htmlFor="new-chat-message">
               Message
             </FieldLabel>
             <Textarea
               id="new-chat-message"
               name="text"
-              className="min-h-36 resize-y border-0 bg-transparent"
-              placeholder="Describe a task…"
+              className="composer-message"
+              placeholder="What are we building?"
               required
               disabled={busy}
             />
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <Text tone="muted" size="xs">
-                Uses project setup
-              </Text>
-              <Button type="submit" disabled={busy}>
+            <div className="composer-actions">
+              <Button type="submit" size="sm" disabled={busy}>
                 {busy ? "Starting…" : "Start chat"}
               </Button>
             </div>
           </div>
-          <details className="text-sm text-muted-foreground">
-            <summary>Chat title (optional)</summary>
-            <FieldLabel className="mt-3">
-              Chat title
-              <Input
-                name="title"
-                className="mt-2"
-                maxLength={200}
-                disabled={busy}
-                placeholder="Named from your first message"
-              />
-            </FieldLabel>
-          </details>
         </form>
       )}
       {id !== "" && !isNew && detail === undefined && error === "" && (
