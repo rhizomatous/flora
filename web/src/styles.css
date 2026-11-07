@@ -111,6 +111,17 @@
   border-radius: 0.875rem;
   background: color-mix(in oklch, var(--background), var(--muted) 55%);
 }
+.chat-composer:focus-within {
+  border-color: color-mix(in oklch, var(--foreground) 32%, transparent);
+}
+.composer-message:focus-visible {
+  outline: none;
+}
+@media (forced-colors: active) {
+  .chat-composer:focus-within {
+    border-color: Highlight;
+  }
+}
 .composer-message {
   min-height: 5rem;
   max-height: 20rem;
