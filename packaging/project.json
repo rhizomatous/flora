@@ -1,0 +1,13 @@
+{
+  "name": "packaging",
+  "targets": {
+    "package-check": {
+      "inputs": [
+        "go",
+        "image",
+        "{workspaceRoot}/packaging/**/*"
+      ],
+      "command": "bash scripts/check-package.sh"
+    }
+  }
+}
