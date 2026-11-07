@@ -7,7 +7,6 @@ import {
   FieldLabel,
   FlowerMark,
   Heading,
-  Input,
   Link,
   NativeSelect,
   Text,
@@ -262,7 +261,6 @@ export function Chats({
     const project = text(fields, "project");
     // Forty-five Unicode code points fit within the server's 200-byte title limit.
     const chatTitle =
-      text(fields, "title").trim() ||
       // oxlint-disable-next-line typescript/no-misused-spread -- Bound code points to stay below the UTF-8 byte limit without splitting surrogate pairs.
       [...message.trim().replaceAll(/\s+/gu, " ")].slice(0, 45).join("");
     const input = isNew ? { title: chatTitle, text: message } : { text: message };
@@ -390,21 +388,6 @@ export function Chats({
               disabled={busy}
             />
             <div className="composer-actions">
-              <details className="chat-options">
-                <summary aria-label="Chat options" title="Chat options">
-                  <span aria-hidden="true">⋯</span>
-                </summary>
-                <FieldLabel className="px-2 pb-2">
-                  Chat title
-                  <Input
-                    name="title"
-                    className="mt-2"
-                    maxLength={200}
-                    disabled={busy}
-                    placeholder="Named from your first message"
-                  />
-                </FieldLabel>
-              </details>
               <Button type="submit" size="sm" disabled={busy}>
                 {busy ? "Starting…" : "Start chat"}
               </Button>

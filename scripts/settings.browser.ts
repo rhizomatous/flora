@@ -49,8 +49,6 @@ try {
   await page.getByRole("button", { name: "Enable notification sound", exact: true }).click();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   await page.getByRole("combobox", { name: /^Project/ }).selectOption({ label: "Browser project" });
-  await page.getByLabel("Chat options", { exact: true }).click();
-  await page.getByLabel("Chat title", { exact: true }).fill("Settings sound fixture");
   await page.getByLabel("Message", { exact: true }).fill("Sound enabled");
   await page.getByRole("button", { name: "Start chat", exact: true }).click();
   await page.getByRole("heading", { name: "Flora needs your answer", exact: true }).waitFor();

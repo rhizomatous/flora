@@ -120,27 +120,9 @@
 .composer-actions {
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 1rem;
   margin-top: 0.5rem;
-}
-.chat-options {
-  flex: 1;
-  min-width: 0;
-}
-.chat-options summary {
-  width: fit-content;
-  list-style: none;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  color: var(--muted-foreground);
-}
-.chat-options summary::-webkit-details-marker {
-  display: none;
-}
-.chat-options summary:hover {
-  background: var(--muted);
 }
 .sound-options summary {
   cursor: pointer;
@@ -153,7 +135,6 @@
   margin-bottom: 0.5rem;
 }
 @media (pointer: coarse) {
-  .chat-options summary,
   .sound-options summary,
   .sidebar-footer > a,
   .sidebar-footer > button {
