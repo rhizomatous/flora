@@ -1,7 +1,5 @@
 {
-  "compatibility": [
-    "Omit an undefined Shiki grammarState for exactOptionalPropertyTypes."
-  ],
+  "compatibility": ["Omit an undefined Shiki grammarState for exactOptionalPropertyTypes."],
   "repository": "https://github.com/shadcn-ui/ui",
   "revision": "42f3bb63b46a69e52a24bd005cdc9ec15ba7a7b9",
   "style": "radix-rhea",

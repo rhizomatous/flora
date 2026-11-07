@@ -69,3 +69,5 @@ subprocess.run(["npm", "exec", "oxfmt", "--", "florets/src/ai", "florets/docs/sr
 for local, details in manifest["files"].items():
  details["importedSha256"] = hashlib.sha256((dst / local).read_bytes()).hexdigest()
 (dst / "florets/src/ai/upstream.json").write_text(json.dumps(manifest, indent=2) + "\n")
+
+subprocess.run(["npm", "exec", "oxfmt", "--", "florets/src/ai/upstream.json"], cwd=dst, check=True)
