@@ -5,10 +5,11 @@ import {
   Button,
   FieldLabel,
   FlowerMark,
+  Heading,
   Input,
   Link,
   NativeSelect,
-  PageTitle,
+  Text,
   Textarea,
 } from "@flora/florets";
 
@@ -313,9 +314,15 @@ export function Chats({
   return (
     <section aria-labelledby="chats-heading" className="min-w-0">
       <div className="flex items-center justify-between gap-4">
-        <PageTitle id="chats-heading" ref={heading} tabIndex={-1} className="min-w-0 break-words">
+        <Heading
+          level={1}
+          id="chats-heading"
+          ref={heading}
+          tabIndex={-1}
+          className="min-w-0 break-words"
+        >
           {title()}
-        </PageTitle>
+        </Heading>
         <Link className="shrink-0 text-sm" href={id === "" ? "#chats/new" : "#chats"}>
           {id === "" ? "New chat" : "All chats"}
         </Link>
@@ -327,9 +334,9 @@ export function Chats({
       )}
       {id === "" && list !== undefined && <ChatList list={list} projects={projects ?? []} />}
       {id === "" && list === undefined && error === "" && listError === "" && (
-        <p role="status" className="mt-8">
+        <Text size="md" role="status" className="mt-8">
           Loading…
-        </p>
+        </Text>
       )}
       {isNew && (
         <form
@@ -355,15 +362,11 @@ export function Chats({
               ))}
             </NativeSelect>
           </FieldLabel>
-          {projects === undefined && error === "" && (
-            <p role="status" className="text-sm">
-              Loading projects…
-            </p>
-          )}
+          {projects === undefined && error === "" && <Text role="status">Loading projects…</Text>}
           {projects?.length === 0 && (
-            <p className="text-sm">
+            <Text>
               <Link href="#projects/new">Connect a project</Link> before starting a chat.
-            </p>
+            </Text>
           )}
           <FieldLabel>
             Chat title
@@ -379,19 +382,19 @@ export function Chats({
               aria-describedby="message-limit"
             />
           </FieldLabel>
-          <p id="message-limit" className="text-sm text-muted-foreground">
+          <Text tone="muted" id="message-limit">
             Up to {messageBytes.toLocaleString()} UTF-8 bytes. Checkout and setup run before Flora
             starts work.
-          </p>
+          </Text>
           <Button type="submit" disabled={busy || projects === undefined || projects.length === 0}>
             {busy ? "Starting…" : "Start chat"}
           </Button>
         </form>
       )}
       {id !== "" && !isNew && detail === undefined && error === "" && (
-        <p role="status" className="mt-8">
+        <Text size="md" role="status" className="mt-8">
           Loading…
-        </p>
+        </Text>
       )}
       {detail && (
         <ChatDetail
@@ -411,9 +414,9 @@ export function Chats({
           }}
         >
           {questionError !== "" && (
-            <p className="mt-6 text-sm" role="status">
+            <Text className="mt-6" role="status">
               {questionError}
-            </p>
+            </Text>
           )}
           {questions.map((q) => (
             <QuestionForm
@@ -436,9 +439,9 @@ export function Chats({
 function ChatList({ list, projects }: { list: Chat[]; projects: Project[] }) {
   if (list.length === 0) {
     return (
-      <p className="mt-8 text-sm text-muted-foreground">
+      <Text tone="muted" className="mt-8">
         No chats yet. Start a chat in a connected project.
-      </p>
+      </Text>
     );
   }
   return (
@@ -448,9 +451,9 @@ function ChatList({ list, projects }: { list: Chat[]; projects: Project[] }) {
         return (
           chats.length > 0 && (
             <section key={p.id} aria-labelledby={`project-${p.id}`}>
-              <h2 id={`project-${p.id}`} className="font-semibold">
+              <Heading level={2} id={`project-${p.id}`}>
                 <Link href={`#projects/${p.id}`}>{p.name}</Link>
-              </h2>
+              </Heading>
               <ul className="mt-3 divide-y divide-foreground/20">
                 {chats.map((c) => (
                   <li key={c.ID} className="flex flex-wrap items-start justify-between gap-3 py-4">
@@ -458,12 +461,14 @@ function ChatList({ list, projects }: { list: Chat[]; projects: Project[] }) {
                       <Link href={`#chats/${c.ID}`} className="font-medium break-words">
                         {c.Title}
                       </Link>
-                      <p className="mt-1 text-sm text-muted-foreground">
+                      <Text tone="muted" className="mt-1">
                         {statusName(c.Status)} ·{" "}
                         <time dateTime={c.UpdatedAt}>{new Date(c.UpdatedAt).toLocaleString()}</time>
-                      </p>
+                      </Text>
                     </div>
-                    <span className="max-w-md text-sm text-muted-foreground">{c.StatusReason}</span>
+                    <Text as="span" tone="muted" className="max-w-md">
+                      {c.StatusReason}
+                    </Text>
                   </li>
                 ))}
               </ul>
@@ -532,9 +537,9 @@ function ChatDetail({
         <strong>{statusName(chat.Status)}</strong>
         <span>{chat.StatusReason}</span>
       </div>
-      <p role="status" className="mt-2 text-xs text-muted-foreground">
+      <Text size="xs" tone="muted" role="status" className="mt-2">
         {connection} · {projectName}
-      </p>
+      </Text>
       {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
         <Alert role="note" className="mt-4 rounded-md border border-foreground/20 p-3 text-sm">
           Some live activity could not be captured while Flora was disconnected from OpenCode.
@@ -568,11 +573,11 @@ function ChatDetail({
               </Button>
             )}
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <Text tone="muted" className="mt-2">
             {stopped
               ? "Send a new message to restart this container with its saved workspace and conversation. Interrupted work is not replayed."
               : "Interrupt keeps the container running. Stop frees container capacity. Both preserve saved work and conversation."}
-          </p>
+          </Text>
         </>
       )}
       <ol aria-label="Conversation" className="mt-8 space-y-8">
@@ -593,9 +598,9 @@ function ChatDetail({
             aria-describedby="followup-help"
           />
         </FieldLabel>
-        <p id="followup-help" className="text-sm text-muted-foreground">
+        <Text tone="muted" id="followup-help">
           {followUpHelp()}
-        </p>
+        </Text>
         <Button type="submit" disabled={busy || activeTurn || blocked}>
           {sendLabel()}
         </Button>
@@ -604,13 +609,13 @@ function ChatDetail({
         <summary className="cursor-pointer text-sm font-medium">
           Full activity ({activity.length} saved events)
         </summary>
-        <p className="mt-3 text-sm text-muted-foreground">
+        <Text tone="muted" className="mt-3">
           Setup activity contains bounded previews. After setup finishes,{" "}
           <Link href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>
             download the full redacted setup log
           </Link>
           . Any capture failure is shown in the final setup event.
-        </p>
+        </Text>
         <ol className="mt-4 space-y-3">
           {activity.map((row) => (
             <li key={row.Sequence}>
@@ -653,14 +658,14 @@ function ConversationMessage({ message: m }: { message: Message }) {
   const failure = m.Payload.info?.error ?? null;
   return (
     <li className="min-w-0 rounded-md border border-foreground/20 p-4">
-      <h2 className="text-sm font-semibold">
+      <Heading level={2} className="text-sm leading-5">
         {m.Role === "user" ? "You" : "Flora"}
         {m.Provider !== "" && (
           <span className="ml-2 font-normal break-all text-muted-foreground">
             {m.Provider}/{m.Model}
           </span>
         )}
-      </h2>
+      </Heading>
       <div className="mt-3 space-y-4">
         {parts.length > 0 ? (
           parts.map((p, i) => <MessagePart key={p.id ?? i} part={p} />)

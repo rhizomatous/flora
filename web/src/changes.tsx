@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useState } from "react";
 
-import { Link } from "@flora/florets";
+import { Heading, Link, Text } from "@flora/florets";
 
 import { isExpired, request } from "./request";
 
@@ -86,7 +86,7 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
       aria-label="Changes"
       className="mt-8 min-w-0 rounded-md border border-foreground/20 p-4"
     >
-      <h2 className="font-semibold">Changes</h2>
+      <Heading level={2}>Changes</Heading>
       {pulls.length > 0 && (
         <ul aria-label="Pull requests" className="mt-3 space-y-2 text-sm">
           {pulls.map((p) => (
@@ -100,38 +100,38 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
         </ul>
       )}
       {pulls.length > 0 && review !== undefined && review.pulls.checkedAt !== "" && (
-        <p className="mt-2 text-xs text-muted-foreground">
+        <Text size="xs" tone="muted" className="mt-2">
           PR discovery last attempted{" "}
           <time dateTime={review.pulls.checkedAt}>
             {new Date(review.pulls.checkedAt).toLocaleString()}
           </time>
           .
-        </p>
+        </Text>
       )}
       {review !== undefined && review.pulls.error !== "" && (
-        <p role="status" className="mt-3 text-sm">
+        <Text role="status" className="mt-3">
           {review.pulls.error}
-        </p>
+        </Text>
       )}
       {error !== "" && (
-        <p role="alert" className="mt-3 text-sm">
+        <Text role="alert" className="mt-3">
           {error}
-        </p>
+        </Text>
       )}
       {review !== undefined && review.error !== "" && (
-        <p role="alert" className="mt-3 text-sm">
+        <Text role="alert" className="mt-3">
           {review.error}
-        </p>
+        </Text>
       )}
       {review === undefined && error === "" && (
-        <p role="status" className="mt-3 text-sm">
+        <Text role="status" className="mt-3">
           Loading changes…
-        </p>
+        </Text>
       )}
-      {snapshot === null && <p className="mt-3 text-sm">No successful review saved yet.</p>}
+      {snapshot === null && <Text className="mt-3">No successful review saved yet.</Text>}
       {snapshot && (
         <>
-          <p role="status" className="mt-3 text-xs break-words text-muted-foreground">
+          <Text size="xs" tone="muted" role="status" className="mt-3 break-words">
             {review.stale || error !== ""
               ? "Saved review, possibly out of date"
               : "Latest saved review"}{" "}
@@ -140,7 +140,7 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
               {new Date(snapshot.capturedAt).toLocaleString()}
             </time>
             {snapshot.base !== "" && <> · Base {snapshot.base.slice(0, 12)}</>}
-          </p>
+          </Text>
           {snapshot.bases !== undefined && (
             <ul aria-label="Repository bases" className="mt-2 text-xs text-muted-foreground">
               {Object.entries(snapshot.bases).map(([name, sha]) => (
@@ -151,7 +151,7 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
             </ul>
           )}
           {snapshot.files.length === 0 && (
-            <p className="mt-3 text-sm">No changes from the starting commit.</p>
+            <Text className="mt-3">No changes from the starting commit.</Text>
           )}
           <ul className="mt-4 space-y-3">
             {snapshot.files.map((f, i) => (
@@ -167,14 +167,14 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
                     {contentNote(f)}
                   </summary>
                   {f.truncated && (
-                    <p className="mt-3 text-sm">
+                    <Text className="mt-3">
                       Diff exceeds the configured inline limit ({f.bytes.toLocaleString()} bytes).{" "}
                       <Link
                         href={`/api/chats/${encodeURIComponent(chatID)}/changes/${i}/diff?snapshot=${encodeURIComponent(snapshot.id)}`}
                       >
                         Download full diff
                       </Link>
-                    </p>
+                    </Text>
                   )}
                   {f.diff !== "" && (
                     <pre

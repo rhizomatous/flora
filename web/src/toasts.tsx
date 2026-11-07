@@ -1,4 +1,4 @@
-import { Button, Link } from "@flora/florets";
+import { Button, Link, Text } from "@flora/florets";
 
 import type { Toast } from "./notifications";
 
@@ -21,12 +21,12 @@ export function CompletionToasts({
           key={t.Sequence}
           className="rounded-md border border-foreground/40 bg-background p-4 shadow-lg"
         >
-          <p className="text-sm break-words">
+          <Text className="break-words">
             <Link className="font-medium" href={`#chats/${encodeURIComponent(t.ChatID)}`}>
               {t.title}
             </Link>{" "}
             finished work.
-          </p>
+          </Text>
           <Button
             variant="link"
             size="inline"

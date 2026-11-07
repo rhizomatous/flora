@@ -1,15 +1,16 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 
 import {
-  FieldSet,
   Alert,
   Button,
   ButtonLink,
   FieldLabel,
+  FieldSet,
+  Heading,
   Input,
   Link,
   NativeSelect,
-  PageTitle,
+  Text,
   Textarea,
 } from "@flora/florets";
 
@@ -58,11 +59,11 @@ function RepositoryFields({ repositories }: { repositories: Repository[] }) {
   }
   return (
     <div ref={container} className="space-y-5">
-      <p className="text-sm text-muted-foreground">
+      <Text tone="muted">
         Use owner/repository or an HTTPS GitHub URL. All repositories must be accessible to the
         saved GitHub token. Leave a base branch blank to use its default. Core repositories download
         before setup; extra repositories are fetched on demand.
-      </p>
+      </Text>
       {rows.map(({ repo, key }, index) => (
         <FieldSet
           key={key}
@@ -222,14 +223,15 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
   return (
     <section aria-labelledby="projects-heading">
       <div className="flex items-center justify-between gap-4">
-        <PageTitle
+        <Heading
+          level={1}
           id="projects-heading"
           ref={heading}
           tabIndex={-1}
           className="min-w-0 break-words"
         >
           {title}
-        </PageTitle>
+        </Heading>
         {id === "" ? (
           <ButtonLink href="#projects/new" className="shrink-0">
             Connect project
@@ -283,14 +285,14 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
             ))}
           </ul>
         ) : (
-          <p className="mt-8 text-sm text-muted-foreground">
+          <Text tone="muted" className="mt-8">
             No projects yet. Connect a GitHub repository to get started.
-          </p>
+          </Text>
         ))}
       {!creating && !project && !list && error === "" && (
-        <p role="status" className="mt-8 text-sm text-muted-foreground">
+        <Text tone="muted" role="status" className="mt-8">
           Loading…
-        </p>
+        </Text>
       )}
       {(creating || project) && (
         <form
@@ -301,9 +303,9 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
           }}
         >
           {!creating && (
-            <p className="text-sm text-muted-foreground">
+            <Text tone="muted">
               Changes apply only to new chats. Existing chats keep their original settings.
-            </p>
+            </Text>
           )}
           <FieldSet disabled={busy}>
             <legend className="sr-only">Project settings</legend>
@@ -330,9 +332,9 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
                 aria-describedby="setup-help"
               />
             </FieldLabel>
-            <p id="setup-help" className="text-sm text-muted-foreground">
+            <Text tone="muted" id="setup-help">
               Runs inside the chat container before the agent starts.
-            </p>
+            </Text>
           </FieldSet>
           <Button type="submit" disabled={busy}>
             {submitLabel}

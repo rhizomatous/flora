@@ -12,5 +12,6 @@ export {
   FieldLegend,
 } from "./components/field";
 export { Alert, LoadingStatus } from "./components/feedback";
-export { Page, PageHeader, PageTitle, PageDescription } from "./components/page";
+export { Heading, Text } from "./components/typography";
+export type { HeadingProps, TextProps } from "./components/typography";
 export { FlowerMark, Wordmark } from "./components/brand";

@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react";
 
 import { cn } from "../lib/utils";
+import { Text } from "./typography";
 
 export function Field({ className, ...props }: ComponentProps<"div">) {
   return <div data-slot="field" className={cn("flex flex-col gap-2", className)} {...props} />;
@@ -19,14 +20,8 @@ export function FieldLabel({ className, htmlFor, children, ...props }: Component
   );
 }
 
-export function FieldDescription({ className, ...props }: ComponentProps<"p">) {
-  return (
-    <p
-      data-slot="field-description"
-      className={cn("text-sm leading-6 text-muted-foreground", className)}
-      {...props}
-    />
-  );
+export function FieldDescription(props: ComponentProps<"p">) {
+  return <Text data-slot="field-description" tone="muted" {...props} />;
 }
 
 export function FieldGroup({ className, ...props }: ComponentProps<"div">) {
