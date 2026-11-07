@@ -7,13 +7,13 @@ import { createPhotoFilter, type PhotoFilterSettings } from "./photo-filter";
 const treatments = [
   {
     value: "stipple",
-    label: "Stochastic stippling",
-    description: "Scattered round marks, with density following the light in the photograph.",
+    label: "Soft stippling",
+    description: "Soft scattered marks that retain the photograph’s detail and shading.",
   },
   {
     value: "mezzotint",
-    label: "Mezzotint",
-    description: "Fine, clustered grain that reveals highlights like a textured print.",
+    label: "Tonal grain",
+    description: "Fine tonal grain, preserving colors and smooth highlights.",
   },
   {
     value: "source",
@@ -128,8 +128,9 @@ export function PhotoLab() {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [error, setError] = useState("");
   const [view, setView] = useState<"compare" | PhotoFilterSettings["treatment"]>("compare");
-  const [size, setSize] = useState(2.5);
-  const [exposure, setExposure] = useState(1.2);
+  const [size, setSize] = useState(1.75);
+  const [strength, setStrength] = useState(0.65);
+  const [exposure, setExposure] = useState(1);
   const [intensity, setIntensity] = useState(0.55);
   const [fade, setFade] = useState(0.7);
   useEffect(() => {
@@ -152,6 +153,15 @@ export function PhotoLab() {
     };
   }, [source]);
   const controls = [
+    {
+      id: "strength",
+      label: "Texture strength",
+      value: strength,
+      min: 0,
+      max: 1,
+      step: 0.05,
+      set: setStrength,
+    },
     { id: "size", label: "Texture size", value: size, min: 1, max: 6, step: 0.25, set: setSize },
     {
       id: "exposure",
@@ -217,7 +227,7 @@ export function PhotoLab() {
           ))}
         </div>
       </div>
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
         {controls.map((control) => (
           <Field key={control.id}>
             <FieldLabel htmlFor={control.id}>
@@ -256,7 +266,7 @@ export function PhotoLab() {
               <PhotoPreview
                 key={entry.value}
                 image={image}
-                settings={{ treatment: entry.value, size, exposure, intensity, fade }}
+                settings={{ treatment: entry.value, size, strength, exposure, intensity, fade }}
               />
             ))}
         </div>

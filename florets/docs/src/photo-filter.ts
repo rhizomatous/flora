@@ -1,6 +1,7 @@
 export type PhotoFilterSettings = {
   treatment: "source" | "stipple" | "mezzotint";
   size: number;
+  strength: number;
   exposure: number;
   intensity: number;
   fade: number;
@@ -13,6 +14,7 @@ uniform vec2 resolution;
 uniform vec2 viewport;
 uniform vec2 imageSize;
 uniform float size;
+uniform float strength;
 uniform float exposure;
 uniform float intensity;
 uniform float fade;
@@ -24,12 +26,13 @@ vec3 samplePhoto(vec2 uv) {
   vec2 crop = vec2(min(1., viewAspect / imageAspect), min(1., imageAspect / viewAspect));
   vec3 color = texture2D(photo, (uv - .5) * crop + .5).rgb;
   float gray = dot(color, vec3(.2126, .7152, .0722));
-  return clamp(mix(vec3(gray), color, .5) * exposure, 0., 1.);
+  return clamp(mix(vec3(gray), color, .75) * exposure, 0., 1.);
 }
 void main() {
   vec2 uv = gl_FragCoord.xy / resolution;
   vec2 pixel = uv * viewport;
   vec3 color = samplePhoto(uv);
+  vec3 filtered = color;
   float mark = 1.;
   if (treatment == 1) {
     vec2 cell = floor(pixel / size);
@@ -42,28 +45,23 @@ void main() {
         float distanceToDot = length(pixel - center);
         float aa = viewport.y / resolution.y * .65;
         if (distanceToDot > radius + aa) continue;
-        vec3 sampleColor = samplePhoto(center / viewport);
-        float tone = dot(sampleColor, vec3(.2126, .7152, .0722));
-        float dotMark = (1. - smoothstep(radius - aa, radius + aa, distanceToDot))
-          * step(hash(neighbor + 119.), min(1., tone * 3.));
-        if (dotMark > mark) {
-          mark = dotMark;
-          color = mix(vec3(.55), sampleColor / max(tone, .08) * .55, .5);
-        }
+        float dotMark = 1. - smoothstep(radius - aa, radius + aa, distanceToDot);
+        mark = max(mark, dotMark);
       }
     }
+    // Keep photographic detail between the marks, with less contrast at the tonal extremes.
+    filtered = color + min(color, 1. - color) * (mark - .32) * 1.4;
   } else if (treatment == 2) {
-    vec2 grain = floor(pixel / max(.6, size * .35));
-    float fine = hash(grain);
-    float coarse = hash(floor(grain / 3.) + 41.);
-    float threshold = fine * .8 + coarse * .2;
-    float tone = dot(color, vec3(.2126, .7152, .0722));
-    mark = smoothstep(threshold - .045, threshold + .045, sqrt(tone) * .8);
-    color = mix(vec3(.48), color / max(tone, .08) * .48, .5);
+    vec2 grain = floor(pixel / max(.6, size * .4));
+    float threshold = hash(grain);
+    // Stochastic rounding between nearby tone levels preserves the source's average color.
+    vec3 levels = color * 7.;
+    filtered = (floor(levels) + step(vec3(threshold), fract(levels))) / 7.;
   }
+  color = mix(color, filtered, strength);
   float falloff = mix(1., smoothstep(.02, .85, uv.y), fade);
   vec3 ink = vec3(.043, .050, .046);
-  gl_FragColor = vec4(mix(ink, color, mark * intensity * falloff), 1.);
+  gl_FragColor = vec4(mix(ink, color, intensity * falloff), 1.);
 }
 `;
 
@@ -140,6 +138,7 @@ export function createPhotoFilter(canvas: HTMLCanvasElement, image: HTMLImageEle
       "viewport",
       "imageSize",
       "size",
+      "strength",
       "exposure",
       "intensity",
       "fade",
@@ -160,7 +159,7 @@ export function createPhotoFilter(canvas: HTMLCanvasElement, image: HTMLImageEle
       gl.uniform2f(uniforms.resolution ?? null, w, h);
       gl.uniform2f(uniforms.viewport ?? null, width, height);
       gl.uniform2f(uniforms.imageSize ?? null, image.naturalWidth, image.naturalHeight);
-      for (const name of ["size", "exposure", "intensity", "fade"] as const) {
+      for (const name of ["size", "strength", "exposure", "intensity", "fade"] as const) {
         gl.uniform1f(uniforms[name] ?? null, settings[name]);
       }
       gl.uniform1i(
