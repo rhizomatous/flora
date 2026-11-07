@@ -48,6 +48,7 @@ try {
   await page.getByRole("button", { name: "Enable notification sound", exact: true }).click();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   await page.getByRole("combobox", { name: /^Project/ }).selectOption({ label: "Browser project" });
+  await page.getByText("Chat title (optional)", { exact: true }).click();
   await page.getByLabel("Chat title", { exact: true }).fill("Settings sound fixture");
   await page.getByLabel("Message", { exact: true }).fill("Sound enabled");
   await page.getByRole("button", { name: "Start chat", exact: true }).click();
@@ -73,7 +74,7 @@ try {
   await page.waitForTimeout(1200);
   assert.equal(await page.evaluate(() => window.tones), 1);
   const chatURL = page.url();
-  await page.getByRole("link", { name: "Installation settings", exact: true }).click();
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page
     .getByRole("heading", { name: "Installation settings", exact: true })
     .waitFor()
@@ -118,7 +119,7 @@ try {
   await page.getByText("Saved response 3", { exact: true }).waitFor();
   await page.waitForTimeout(1200);
   assert.equal(await page.evaluate(() => window.tones), 1);
-  await page.getByRole("link", { name: "Installation settings", exact: true }).click();
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.reload();
   await page.getByRole("heading", { name: "Installation settings", exact: true }).waitFor();
   assert.equal(await page.getByLabel("CPUs per chat", { exact: true }).inputValue(), "3");

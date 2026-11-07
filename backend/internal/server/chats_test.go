@@ -382,7 +382,7 @@ func TestChatBrowser(t *testing.T) {
 			chats, err := store.Chats(gapCtx)
 			if err == nil {
 				for _, c := range chats {
-					if c.Title == "Browser persistence" {
+					if c.Title == "First browser prompt 🌸" {
 						_ = store.AppendActivity(gapCtx, c.ID, "browser-capture-gap", "capture.gap", json.RawMessage(`{"reason":"Transient runtime events cannot be recovered."}`))
 						return
 					}

@@ -12,16 +12,15 @@ try {
   await logIn(page);
   await page
     .getByRole("navigation", { name: "Main" })
-    .getByRole("link", { name: "Chats", exact: true })
+    .getByRole("link", { name: "All chats", exact: true })
     .click();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   await page.getByRole("combobox", { name: /^Project/ }).selectOption({ label: "Browser project" });
-  await page.getByLabel("Chat title", { exact: true }).fill("Browser persistence");
   await page.getByLabel("Message", { exact: true }).fill("First browser prompt 🌸");
   await page.getByRole("button", { name: "Start chat", exact: true }).click();
   await page.waitForURL(/#chats\/(?!new)/);
   const chatURL = page.url();
-  await page.getByRole("heading", { name: "Browser persistence", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "First browser prompt 🌸", exact: true }).waitFor();
   // Reload during execution. The browser request ending must not cancel work.
   await page.reload();
   await page.getByRole("heading", { name: "Flora needs your answer", exact: true }).waitFor();
@@ -45,7 +44,7 @@ try {
   await page.getByRole("heading", { name: "Browser project", exact: true }).waitFor();
   await page
     .getByRole("list")
-    .getByRole("link", { name: "Browser persistence", exact: true })
+    .getByRole("link", { name: "First browser prompt 🌸", exact: true })
     .click();
   await page.getByText("Saved response 2", { exact: true }).waitFor();
   // Exercise a genuine EventSource reconnect without replacing app API routes.
@@ -92,6 +91,7 @@ try {
     1,
   );
   await assertFitsPhone(page);
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("link", { name: "All chats", exact: true }).click();
   await page.getByRole("link", { name: "Missing container", exact: true }).click();
   await page.getByRole("button", { name: "Continuation unavailable", exact: true }).waitFor();
@@ -109,6 +109,7 @@ try {
     await page.locator("body").innerText(),
     /Send a new message to restart|Send new input to continue/,
   );
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("button", { name: "Log out", exact: true }).click();
   await page.goto(chatURL);
   await page.getByRole("heading", { name: "Log in", exact: true }).waitFor();
