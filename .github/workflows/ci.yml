@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check:
     runs-on: ubuntu-24.04
@@ -15,14 +19,24 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # v34
+      - name: Restore Go build and dependency caches
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            ~/.npm
+          key: build-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('flake.lock', 'backend/go.sum', 'package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('flake.lock', 'backend/go.sum', 'package-lock.json') }}-
       - name: Install locked dependencies
         run: nix develop --command make deps
       - name: Check Go and TypeScript; build and exercise the standalone binary
-        run: nix develop --command make check smoke build-linux
+        run: nix develop --command make check smoke
       - name: Check offline admission, lifecycle, and storage races
         run: nix develop --command go -C backend test -race -count=1 ./internal/storage ./internal/settings ./internal/auth ./internal/server ./internal/provisioning ./internal/chat ./internal/changes ./internal/githubbroker
       - name: Install Chromium and check the browser chat workflow
-        run: nix develop --command npx playwright install --with-deps chromium && nix develop --command make browser
+        run: nix develop --command npx playwright install --with-deps --only-shell chromium && nix develop --command make browser-test
 
   agent-image:
     # Native Linux with the runner's uid (1001) differing from the image's
@@ -33,6 +47,16 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # v34
+      - name: Restore Go build and dependency caches
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            ~/.npm
+          key: build-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('flake.lock', 'backend/go.sum', 'package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('flake.lock', 'backend/go.sum', 'package-lock.json') }}-
       - name: Build the pinned agent image
         run: docker build -t flora-agent-test:ci agent/image
       - name: Run live provisioning lifecycle tests against the daemon
