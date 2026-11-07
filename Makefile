@@ -1,4 +1,4 @@
-.PHONY: deps web build build-linux check smoke
+.PHONY: deps web build build-linux check smoke browser browser-test styleguide
 
 export GOTOOLCHAIN := local
 
@@ -18,11 +18,21 @@ build-linux: web
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go -C backend build -mod=readonly -trimpath -o ../bin/flora-linux-amd64 ./cmd/flora
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go -C backend build -mod=readonly -trimpath -o ../bin/flora-linux-arm64 ./cmd/flora
 
-check: web
+styleguide:
+	npm run docs:build
+
+check: web styleguide
 	npm run check
 	test -z "$$(gofmt -l backend)"
 	CGO_ENABLED=0 go -C backend vet ./...
 	CGO_ENABLED=0 go -C backend test -mod=readonly ./...
 
 smoke: build
-	node --test scripts/smoke.test.mjs
+	node --test scripts/smoke.test.ts
+
+browser: web
+	$(MAKE) browser-test
+
+# Requires web assets from a completed web build.
+browser-test:
+	FLORA_CHAT_BROWSER_TEST=1 go -C backend test -mod=readonly -count=1 -run 'Test(Chat|Changes|Projects|Settings|Enrollment)Browser' ./internal/server

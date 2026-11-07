@@ -5,23 +5,54 @@
     "web",
     "florets"
   ],
-  "engines": {
-    "node": ">=24 <25",
-    "npm": ">=11 <12"
-  },
+  "type": "module",
   "scripts": {
     "dev": "npm run dev --workspace @flora/web",
     "build": "npm run build --workspace @flora/web",
-    "check": "npm run check --workspaces --if-present"
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "typecheck": "tsc -p web && tsc -p florets && tsc -p scripts",
+    "test": "node --test scripts/request.test.ts scripts/preview.test.ts",
+    "docs:dev": "npm run docs:dev --workspace @flora/florets",
+    "docs:build": "npm run docs:build --workspace @flora/florets",
+    "docs:preview": "npm run docs:preview --workspace @flora/florets",
+    "preview:chat": "npm run dev --workspace @flora/web -- --mode chat-preview",
+    "preview:capture": "node scripts/capture-chat-preview.ts",
+    "ci:affected": "nx affected -t frontend-check,styleguide,go-check,race,smoke,browser,container-check,package-check"
   },
   "devDependencies": {
+    "@opencode-ai/sdk": "1.2.27",
+    "@playwright/test": "1.64.1",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
+    "nx": "24.0.5",
+    "oxfmt": "0.75.0",
+    "oxlint": "1.90.0",
+    "oxlint-tsgolint": "7.0.2005",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.3.5"
+  },
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11 <12"
+  },
+  "nx": {
+    "includedScripts": [],
+    "targets": {
+      "frontend-check": {
+        "inputs": [
+          "frontend",
+          "{workspaceRoot}/florets/docs/**/*"
+        ],
+        "command": "npm run check"
+      }
+    }
   }
 }

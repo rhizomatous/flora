@@ -3,6 +3,10 @@
 /node_modules/
 **/node_modules/
 /bin/
+/dist/
+/scripts/__pycache__/
 /backend/internal/webassets/dist/
 env.test.sh
 flora-data/
+/florets/docs-dist/
+/.nx/

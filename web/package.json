@@ -1,16 +1,30 @@
 {
   "name": "@flora/web",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
-    "check": "tsc --noEmit && node --test ../scripts/request.test.mjs"
+    "build": "vite build"
   },
   "dependencies": {
     "@flora/florets": "0.0.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"
+  },
+  "nx": {
+    "includedScripts": [],
+    "targets": {
+      "build": {
+        "cache": true,
+        "inputs": [
+          "frontend"
+        ],
+        "outputs": [
+          "{workspaceRoot}/backend/internal/webassets/dist"
+        ],
+        "command": "npm run build --workspace @flora/web"
+      }
+    }
   }
 }

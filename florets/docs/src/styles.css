@@ -1,0 +1,11 @@
+@import "@flora/florets/styles.css";
+@source "./";
+
+@layer base {
+  html {
+    scroll-padding-top: 2rem;
+  }
+  ::selection {
+    @apply bg-foreground text-background;
+  }
+}

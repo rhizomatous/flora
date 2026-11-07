@@ -1,0 +1,73 @@
+{
+  "name": "backend",
+  "targets": {
+    "go-check": {
+      "inputs": [
+        "go"
+      ],
+      "dependsOn": [
+        {
+          "projects": [
+            "@flora/web"
+          ],
+          "target": "build"
+        }
+      ],
+      "command": "test -z \"$(gofmt -l backend)\" && CGO_ENABLED=0 go -C backend vet ./... && CGO_ENABLED=0 go -C backend test -mod=readonly ./..."
+    },
+    "race": {
+      "inputs": [
+        "go"
+      ],
+      "dependsOn": [
+        {
+          "projects": [
+            "@flora/web"
+          ],
+          "target": "build"
+        }
+      ],
+      "command": "go -C backend test -race -count=1 ./internal/storage ./internal/settings ./internal/auth ./internal/server ./internal/provisioning ./internal/chat ./internal/changes ./internal/githubbroker"
+    },
+    "binary": {
+      "inputs": [
+        "go",
+        "frontend"
+      ],
+      "dependsOn": [
+        {
+          "projects": [
+            "@flora/web"
+          ],
+          "target": "build"
+        }
+      ],
+      "command": "mkdir -p bin && CGO_ENABLED=0 go -C backend build -mod=readonly -trimpath -o ../bin/flora ./cmd/flora"
+    },
+    "smoke": {
+      "inputs": [
+        "go",
+        "frontend"
+      ],
+      "dependsOn": [
+        "binary"
+      ],
+      "command": "node --test scripts/smoke.test.ts"
+    },
+    "browser": {
+      "inputs": [
+        "go",
+        "frontend"
+      ],
+      "dependsOn": [
+        {
+          "projects": [
+            "@flora/web"
+          ],
+          "target": "build"
+        }
+      ],
+      "command": "npx playwright install --with-deps --only-shell chromium && make browser-test"
+    }
+  }
+}

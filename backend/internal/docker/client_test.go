@@ -91,6 +91,13 @@ func TestContainerCreateShape(t *testing.T) {
 		if privileged, _ := host["Privileged"].(bool); privileged {
 			t.Errorf("privileged mode must be disabled")
 		}
+		if host["NetworkMode"] != strings.Repeat("a", 64) {
+			t.Errorf("network: %v", host["NetworkMode"])
+		}
+		hosts, _ := host["ExtraHosts"].([]any)
+		if len(hosts) != 1 || hosts[0] != "flora-github.internal:172.29.80.1" {
+			t.Errorf("extra hosts: %v", hosts)
+		}
 		ports, _ := host["PortBindings"].(map[string]any)
 		binding, _ := ports["4096/tcp"].([]any)
 		entry, _ := binding[0].(map[string]any)
@@ -101,6 +108,8 @@ func TestContainerCreateShape(t *testing.T) {
 		_, _ = w.Write([]byte(`{"Id":"container123"}`))
 	})
 	spec := ContainerSpec{
+		NetworkID:    strings.Repeat("a", 64),
+		ExtraHosts:   []string{"flora-github.internal:172.29.80.1"},
 		Name:         "flora-chat-abc",
 		Image:        "example/img@sha256:abc",
 		Env:          []string{"OPENCODE_SERVER_PASSWORD=x"},

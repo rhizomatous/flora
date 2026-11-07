@@ -1,0 +1,139 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "eslint",
+    "typescript",
+    "unicorn",
+    "oxc",
+    "import",
+    "react",
+    "jsx-a11y",
+    "promise",
+    "node"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "error",
+    "perf": "error",
+    "style": "error",
+    "restriction": "error"
+  },
+  "options": {
+    "typeAware": true,
+    "denyWarnings": true,
+    "reportUnusedDisableDirectives": "error"
+  },
+  "ignorePatterns": ["backend/", "agent/", "packaging/"],
+  "rules": {
+    "curly": ["error", "multi-line"],
+    "func-style": ["error", "declaration", { "allowArrowFunctions": true }],
+    "one-var": ["error", "never"],
+    "no-void": ["error", { "allowAsStatement": true }],
+    "prefer-destructuring": [
+      "error",
+      {
+        "VariableDeclarator": { "object": true, "array": false },
+        "AssignmentExpression": { "object": false, "array": false }
+      }
+    ],
+    "no-use-before-define": ["error", { "functions": false }],
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
+    "no-implicit-coercion": ["error", { "allow": ["!!"] }],
+    "jsx-a11y/no-noninteractive-tabindex": ["error", { "tags": ["pre"] }],
+    "react/jsx-filename-extension": ["error", { "extensions": ["tsx"], "allow": "as-needed" }],
+    "typescript/consistent-type-definitions": ["error", "type"],
+    "typescript/no-unnecessary-condition": "error",
+    "typescript/prefer-optional-chain": "error",
+    "typescript/promise-function-async": "off",
+
+    "arrow-body-style": "off",
+    "capitalized-comments": "off",
+    "complexity": "off",
+    "id-length": "off",
+    "init-declarations": "off",
+    "max-lines": "off",
+    "max-lines-per-function": "off",
+    "max-statements": "off",
+    "no-continue": "off",
+    "no-magic-numbers": "off",
+    "no-nested-ternary": "off",
+    "no-plusplus": "off",
+    "no-ternary": "off",
+    "no-undefined": "off",
+    "prefer-named-capture-group": "off",
+    "require-unicode-regexp": "off",
+    "sort-imports": "off",
+    "sort-keys": "off",
+    "import/consistent-type-specifier-style": "off",
+    "import/exports-last": "off",
+    "import/extensions": "off",
+    "import/group-exports": "off",
+    "import/no-named-export": "off",
+    "import/no-nodejs-modules": "off",
+    "import/no-relative-parent-imports": "off",
+    "import/prefer-default-export": "off",
+    "import/unambiguous": "off",
+    "jsx-a11y/prefer-tag-over-role": "off",
+    "node/no-process-env": "off",
+    "node/no-top-level-await": "off",
+    "oxc/no-async-await": "off",
+    "oxc/no-map-spread": "off",
+    "oxc/no-optional-chaining": "off",
+    "oxc/no-rest-spread-properties": "off",
+    "promise/avoid-new": "off",
+    "react/jsx-handler-names": "off",
+    "react/jsx-max-depth": "off",
+    "react/jsx-no-literals": "off",
+    "react/jsx-props-no-spreading": "off",
+    "react/no-multi-comp": "off",
+    "react/react-in-jsx-scope": "off",
+    "react/todo": "off",
+    "typescript/consistent-return": "off",
+    "typescript/explicit-function-return-type": "off",
+    "typescript/explicit-member-accessibility": "off",
+    "typescript/explicit-module-boundary-types": "off",
+    "typescript/prefer-readonly-parameter-types": "off",
+    "unicorn/catch-error-name": "off",
+    "unicorn/import-style": "off",
+    "unicorn/no-null": "off",
+    "unicorn/prefer-global-this": "off"
+  },
+  "overrides": [
+    {
+      "files": ["web/src/**", "florets/src/**", "florets/docs/src/**"],
+      "rules": {
+        "import/no-nodejs-modules": "error",
+        "react/forbid-component-props": ["error", { "forbid": ["style"] }]
+      }
+    },
+    {
+      "files": ["*.config.ts"],
+      "rules": { "import/no-default-export": "off" }
+    },
+    {
+      "files": ["web/src/main.tsx"],
+      "rules": { "react/only-export-components": "off" }
+    },
+    {
+      "files": ["scripts/**"],
+      "rules": {
+        "class-methods-use-this": "off",
+        "max-classes-per-file": "off",
+        "no-await-in-loop": "off",
+        "no-bitwise": "off",
+        "no-console": "off",
+        "no-empty-function": "off",
+        "typescript/no-floating-promises": [
+          "error",
+          {
+            "allowForKnownSafeCalls": [
+              { "from": "package", "name": "test", "package": "node:test" }
+            ]
+          }
+        ],
+        "unicorn/prefer-dom-node-text-content": "off"
+      }
+    }
+  ]
+}

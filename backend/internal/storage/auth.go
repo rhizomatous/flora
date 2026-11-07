@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -66,6 +67,21 @@ func (s *Store) Credentials(ctx context.Context) (Credentials, error) {
 
 // SaveCredentials permits key rotation but never changes an installed model.
 func (s *Store) SaveCredentials(ctx context.Context, c Credentials) error {
+	return s.SaveInstallation(ctx, c, nil)
+}
+
+// SaveInstallation commits validated credentials and optional limits together.
+func (s *Store) SaveInstallation(ctx context.Context, c Credentials, p *Preferences) error {
+	if p != nil {
+		if err := p.Validate(); err != nil {
+			return err
+		}
+	}
+	unlock, err := s.LockContainerCapacity(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	return s.write(ctx, func(tx *sql.Tx) error {
 		var provider, model string
 		err := tx.QueryRowContext(ctx, "SELECT provider,model FROM installation_credentials WHERE id=1").Scan(&provider, &model)
@@ -76,6 +92,13 @@ func (s *Store) SaveCredentials(ctx context.Context, c Credentials) error {
 			return ErrConflict
 		}
 		_, err = tx.ExecContext(ctx, `INSERT INTO installation_credentials VALUES(1,?,?,?,?) ON CONFLICT(id) DO UPDATE SET github_token=excluded.github_token,provider_key=excluded.provider_key`, c.Provider, c.Model, c.GitHubToken, c.ProviderKey)
+		if err == nil && p != nil {
+			raw, e := json.Marshal(p)
+			if e != nil {
+				return e
+			}
+			_, err = tx.ExecContext(ctx, `INSERT INTO installation_settings VALUES(1,?) ON CONFLICT(id) DO UPDATE SET settings=excluded.settings`, string(raw))
+		}
 		return err
 	})
 }

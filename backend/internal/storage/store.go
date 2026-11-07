@@ -13,8 +13,10 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	_ "modernc.org/sqlite"
 )
@@ -157,19 +159,21 @@ func found(err error) error {
 }
 
 type Repository struct {
-	Name       string
-	URL        string
-	BaseBranch string
-	Role       string
+	Name       string `json:"name"`
+	URL        string `json:"url"`
+	BaseBranch string `json:"baseBranch"`
+	Role       string `json:"role"`
 }
 type Configuration struct {
-	Repositories []Repository
-	SetupCommand string
+	Repositories []Repository     `json:"repositories"`
+	SetupCommand string           `json:"setupCommand"`
+	Runtime      *RuntimeDefaults `json:"runtime,omitempty"`
 }
 type Project struct {
-	ID, Name      string
-	Configuration Configuration
-	CreatedAt     string
+	ID            string        `json:"id"`
+	Name          string        `json:"name"`
+	Configuration Configuration `json:"configuration"`
+	CreatedAt     string        `json:"createdAt"`
 }
 type Status string
 
@@ -191,7 +195,7 @@ type Chat struct {
 }
 
 func configJSON(c Configuration) ([]byte, error) {
-	if len(c.Repositories) == 0 {
+	if len(c.Repositories) == 0 || c.Runtime != nil {
 		return nil, ErrInvalid
 	}
 	names := map[string]bool{}
@@ -226,6 +230,45 @@ func (s *Store) Project(ctx context.Context, projectID string) (Project, error) 
 	return p, err
 }
 
+func (s *Store) Projects(ctx context.Context) ([]Project, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT id,name,config,created_at FROM projects")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	projects := []Project{}
+	created := map[string]time.Time{}
+	for rows.Next() {
+		var p Project
+		var config string
+		if err := rows.Scan(&p.ID, &p.Name, &config, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(config), &p.Configuration); err != nil {
+			return nil, err
+		}
+		stamp, err := time.Parse(time.RFC3339Nano, p.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("parse project creation time: %w", err)
+		}
+		created[p.ID] = stamp
+		projects = append(projects, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// RFC3339Nano omits trailing fractional zeros, so string order is not time
+	// order. Compare parsed instants to retain nanosecond precision and offsets.
+	sort.Slice(projects, func(i, j int) bool {
+		a, b := created[projects[i].ID], created[projects[j].ID]
+		if a.Equal(b) {
+			return projects[i].ID < projects[j].ID
+		}
+		return a.After(b)
+	})
+	return projects, nil
+}
+
 // UpdateProject only affects snapshots taken by later CreateChat calls.
 func (s *Store) UpdateProject(ctx context.Context, projectID, name string, c Configuration) error {
 	b, err := configJSON(c)
@@ -244,20 +287,68 @@ func (s *Store) UpdateProject(ctx context.Context, projectID, name string, c Con
 }
 
 func (s *Store) CreateChat(ctx context.Context, projectID, title, imageDigest, harnessVersion string) (Chat, error) {
+	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, "", "")
+}
+
+// CreateChatRequest reserves a creation identity with the immutable first input.
+// A retry returns the same chat even if project settings have since changed.
+func (s *Store) CreateChatRequest(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string) (Chat, error) {
+	if requestID == "" || len(requestID) > 200 || strings.TrimSpace(text) == "" || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
+		return Chat{}, ErrInvalid
+	}
+	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, requestID, text)
+}
+
+func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string) (Chat, error) {
 	imageName, digest, pinned := strings.Cut(imageDigest, "@sha256:")
 	if title == "" || imageName == "" || !pinned || !hexHash(digest, 64) || harnessVersion == "" {
 		return Chat{}, ErrInvalid
 	}
 	chatID := id()
 	err := s.write(ctx, func(tx *sql.Tx) error {
+		if requestID != "" {
+			var savedTitle, savedText string
+			err := tx.QueryRowContext(ctx, "SELECT chat_id,title,text FROM chat_requests WHERE project_id=? AND request_id=?", projectID, requestID).Scan(&chatID, &savedTitle, &savedText)
+			if err == nil {
+				if title != savedTitle || text != savedText {
+					return ErrConflict
+				}
+				return nil
+			}
+			if !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+		}
 		var config string
 		if err := tx.QueryRowContext(ctx, "SELECT config FROM projects WHERE id=?", projectID).Scan(&config); err != nil {
 			return found(err)
 		}
-		stamp := now()
-		_, err := tx.ExecContext(ctx, `INSERT INTO chats (id,project_id,title,config,image_digest,harness_version,status,status_reason,created_at,updated_at) VALUES (?,?,?,?,?,?,'stopped','Not started',?,?)`, chatID, projectID, title, config, imageDigest, harnessVersion, stamp, stamp)
+		prefs, err := readPreferences(ctx, tx)
 		if err != nil {
 			return err
+		}
+		if len(text) > prefs.MessageBytes {
+			return ErrInvalid
+		}
+		var snapshot Configuration
+		if err := json.Unmarshal([]byte(config), &snapshot); err != nil {
+			return err
+		}
+		snapshot.Runtime = &prefs.RuntimeDefaults
+		encoded, err := json.Marshal(snapshot)
+		if err != nil {
+			return err
+		}
+		config = string(encoded)
+		stamp := now()
+		_, err = tx.ExecContext(ctx, `INSERT INTO chats (id,project_id,title,config,image_digest,harness_version,status,status_reason,created_at,updated_at) VALUES (?,?,?,?,?,?,'stopped','Not started',?,?)`, chatID, projectID, title, config, imageDigest, harnessVersion, stamp, stamp)
+		if err != nil {
+			return err
+		}
+		if requestID != "" {
+			if _, err := tx.ExecContext(ctx, "INSERT INTO chat_requests VALUES (?,?,?,?,?)", projectID, requestID, chatID, title, text); err != nil {
+				return err
+			}
 		}
 		return addActivity(ctx, tx, chatID, id(), "status", json.RawMessage(`{"status":"stopped","reason":"Not started"}`))
 	})

@@ -1,0 +1,43 @@
+name: Release packaging check
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  NX_DAEMON: 'false'
+  GOTOOLCHAIN: local
+
+jobs:
+  archive:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # v34
+      - name: Restore Go build and dependency caches
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            ~/.npm
+          key: build-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('flake.lock', 'backend/go.sum', 'package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('flake.lock', 'backend/go.sum', 'package-lock.json') }}-
+      - name: Install locked dependencies
+        run: nix develop --command make deps
+      - name: Exercise the native package and deployment
+        run: nix develop --command npx nx run packaging:package-check --output-style=static --args="${{ matrix.arch }}"
