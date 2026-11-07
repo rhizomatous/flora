@@ -16,7 +16,15 @@ try {
     .click();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   await page.getByRole("combobox", { name: /^Project/ }).selectOption({ label: "Browser project" });
-  await page.getByLabel("Message", { exact: true }).fill("First browser prompt 🌸");
+  await assertFitsPhone(page);
+  const message = page.getByLabel("Message", { exact: true });
+  const compactHeight = await message.evaluate((element) => element.getBoundingClientRect().height);
+  await message.fill("A longer task description.\n".repeat(12));
+  assert.ok(
+    (await message.evaluate((element) => element.getBoundingClientRect().height)) > compactHeight,
+  );
+  await message.fill("First browser prompt 🌸");
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole("button", { name: "Start chat", exact: true }).click();
   await page.waitForURL(/#chats\/(?!new)/);
   const chatURL = page.url();
