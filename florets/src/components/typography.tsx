@@ -17,7 +17,10 @@ export type HeadingProps = ComponentProps<"h1"> & { level: keyof typeof headingL
 export function Heading({ level, className, children, ...props }: HeadingProps) {
   const { tag: Tag, className: typography } = headingLevels[level];
   return (
-    <Tag className={cn("font-semibold text-foreground", typography, className)} {...props}>
+    <Tag
+      className={cn("font-semibold text-foreground outline-none", typography, className)}
+      {...props}
+    >
       {children}
     </Tag>
   );
