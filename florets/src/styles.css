@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @source "./";
+@source not "./ai";
+@source not "../docs/src/ai";
 
 /* Semantic tokens follow the shadcn naming convention. */
 :root {

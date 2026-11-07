@@ -232,6 +232,7 @@ export function Guide() {
         </aside>
         <main id="content" tabIndex={-1} className="min-w-0 px-6 py-10 sm:px-10 lg:px-14 lg:py-14">
           <header className="mb-12 border-b border-border pb-10">
+            <Link href="./ai.html">Explore upstream AI Elements</Link>
             <Text size="xs" tone="muted" className="mb-4 font-mono">
               @flora/florets
             </Text>
