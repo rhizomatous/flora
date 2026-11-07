@@ -112,7 +112,7 @@
       "rules": { "import/no-default-export": "off" }
     },
     {
-      "files": ["web/src/main.tsx"],
+      "files": ["web/src/main.tsx", "florets/docs/src/ai/main.tsx"],
       "rules": { "react/only-export-components": "off" }
     },
     {

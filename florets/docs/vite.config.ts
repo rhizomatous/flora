@@ -5,7 +5,11 @@ import { defineConfig } from "vite";
 export default defineConfig({
   base: "./",
   plugins: [react(), tailwindcss()],
-  build: { outDir: "../docs-dist", emptyOutDir: true },
+  build: {
+    rolldownOptions: { input: { guide: "docs/index.html", ai: "docs/ai.html" } },
+    outDir: "../docs-dist",
+    emptyOutDir: true,
+  },
   server: { host: "127.0.0.1", port: 5176 },
   preview: { host: "127.0.0.1", port: 4176 },
 });
