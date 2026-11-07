@@ -34,13 +34,10 @@ export function StippleBackground({
     const canvas = ref.current;
     if (canvas === null) return;
     const context = canvas.getContext("2d");
-    const dots = document.createElement("canvas");
-    const dotContext = dots.getContext("2d");
-    const field = document.createElement("canvas");
-    const fieldContext = field.getContext("2d");
-    if (context === null || dotContext === null || fieldContext === null) return;
-    field.width = 256;
-    field.height = 128;
+    if (context === null) return;
+    const layers = Array.from({ length: 3 }, () => document.createElement("canvas"));
+    let scale = 1;
+    const padding = 36;
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0;
     let visible = false;
@@ -48,88 +45,68 @@ export function StippleBackground({
     let previous = 0;
     let drawn = 0;
 
-    // Only the broad illumination moves. Dot positions, sizes, and edge fading stay fixed.
+    // Move cached sheets of stippling at different rates so the clusters visibly flow.
     function paint() {
-      if (canvas === null || context === null || fieldContext === null) return;
+      if (canvas === null || context === null) return;
       const t = elapsed / 1000;
-      fieldContext.clearRect(0, 0, 256, 128);
-      const pools = [
-        { x: 35 + Math.sin(t / 8) * 32, y: 15 + Math.cos(t / 11) * 18, radius: 82 },
-        { x: 228 + Math.sin(t / 10 + 2) * 30, y: 32 + Math.sin(t / 9) * 24, radius: 91 },
-        { x: 5 + Math.cos(t / 13) * 22, y: 66 + Math.sin(t / 8) * 14, radius: 58 },
-      ];
-      for (const pool of pools) {
-        const light = fieldContext.createRadialGradient(
-          pool.x,
-          pool.y,
-          0,
-          pool.x,
-          pool.y,
-          pool.radius,
-        );
-        light.addColorStop(0, "rgba(255,255,255,1)");
-        light.addColorStop(0.4, "rgba(255,255,255,0.9)");
-        light.addColorStop(0.7, "rgba(255,255,255,0.35)");
-        light.addColorStop(1, "rgba(255,255,255,0)");
-        fieldContext.fillStyle = light;
-        fieldContext.fillRect(0, 0, 256, 128);
-      }
-      // Uneven bands break up the pools into organic patches instead of circular spotlights.
-      fieldContext.globalCompositeOperation = "destination-out";
-      for (let band = 0; band < 3; band++) {
-        const x = 40 + band * 83 + Math.sin(t / 9 + band) * 26;
-        const y = 25 + band * 27 + Math.cos(t / 12 + band) * 20;
-        const shadow = fieldContext.createRadialGradient(x, y, 0, x, y, 42);
-        shadow.addColorStop(0, "rgba(0,0,0,0.8)");
-        shadow.addColorStop(1, "rgba(0,0,0,0)");
-        fieldContext.fillStyle = shadow;
-        fieldContext.fillRect(0, 0, 256, 128);
-      }
-      fieldContext.globalCompositeOperation = "source-over";
       context.globalCompositeOperation = "source-over";
       context.clearRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(dots, 0, 0);
+      for (const [index, layer] of layers.entries()) {
+        const phase = index * 2.1;
+        const dx = Math.sin(t / 5 + phase) * 22;
+        const dy = Math.sin(t / 7 + phase) * 12;
+        context.drawImage(layer, (dx - padding) * scale, (dy - padding) * scale);
+      }
       context.globalCompositeOperation = "source-in";
       context.fillStyle = getComputedStyle(canvas).color;
       context.fillRect(0, 0, canvas.width, canvas.height);
-      context.globalCompositeOperation = "destination-in";
-      context.drawImage(field, 0, 0, canvas.width, canvas.height);
       context.globalCompositeOperation = "source-over";
     }
 
     function resize() {
-      if (canvas === null || dotContext === null) return;
+      if (canvas === null) return;
       const { width, height } = canvas.getBoundingClientRect();
       if (width <= 0 || height <= 0) return;
-      // Bound both backing-store memory and dot count on large or high-DPI screens.
-      const scale = Math.min(
-        window.devicePixelRatio || 1,
-        2,
-        Math.sqrt(2_000_000 / (width * height)),
-      );
+      // Bound backing-store memory and total dot count on large or high-DPI screens.
+      scale = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(2_000_000 / (width * height)));
       canvas.width = Math.max(1, Math.round(width * scale));
       canvas.height = Math.max(1, Math.round(height * scale));
-      dots.width = canvas.width;
-      dots.height = canvas.height;
-      dotContext.setTransform(scale, 0, 0, scale, 0, 0);
       let randomState = Number.isFinite(seed) ? Math.abs(Math.trunc(seed) % 2_147_483_646) + 1 : 1;
       function random() {
         randomState = (randomState * 16_807) % 2_147_483_647;
         return randomState / 2_147_483_647;
       }
       const spacing = Math.max(
-        6 - bounded(density, 0.75) * 3.5,
-        Math.sqrt((width * height) / 65_000),
+        5 - bounded(density, 0.75) * 2.8,
+        Math.sqrt(((width + padding * 2) * (height + padding * 2)) / 65_000),
       );
-      for (let y = 0; y < height; y += spacing) {
-        for (let x = 0; x < width; x += spacing) {
-          const px = x + random() * spacing;
-          const py = y + random() * spacing;
-          const fade = 1 - Math.min(1, Math.max(0, (py / height - 0.25) / 0.65)) ** 1.5;
-          dotContext.fillStyle = `rgba(255,255,255,${fade * (0.5 + random() * 0.5)})`;
-          dotContext.beginPath();
-          dotContext.arc(px, py, 0.4 + random() * 0.4, 0, Math.PI * 2);
-          dotContext.fill();
+      for (const [index, layer] of layers.entries()) {
+        layer.width = Math.ceil((width + padding * 2) * scale);
+        layer.height = Math.ceil((height + padding * 2) * scale);
+        const dots = layer.getContext("2d");
+        if (dots === null) continue;
+        dots.setTransform(scale, 0, 0, scale, padding * scale, padding * scale);
+        for (let y = -padding + index * spacing; y < height + padding; y += spacing * 3) {
+          for (let x = -padding; x < width + padding; x += spacing) {
+            const px = x + random() * spacing;
+            const py = y + random() * spacing * 3;
+            const u = px / width;
+            const v = py / height;
+            // Warped cloud boundaries vary density as well as opacity, leaving a quiet center.
+            const warp = Math.sin(v * 15 + Math.sin(u * 12)) * 0.045;
+            const left = Math.exp(-(((u - 0.09 - warp) / 0.22) ** 2 + ((v - 0.13) / 0.29) ** 2));
+            const right = Math.exp(-(((u - 0.94 - warp) / 0.25) ** 2 + ((v - 0.2) / 0.3) ** 2));
+            const ripples =
+              0.65 +
+              Math.sin(u * 29 + v * 18 + Math.sin(v * 19) * 2) * 0.2 +
+              Math.cos(u * 17 - v * 27) * 0.15;
+            const cloud = Math.min(1, (left + right) * ripples * 1.5);
+            if (random() > cloud) continue;
+            dots.fillStyle = `rgba(255,255,255,${(0.45 + random() * 0.55) * Math.min(1, cloud * 2)})`;
+            dots.beginPath();
+            dots.arc(px, py, 0.5 + random() * 0.5, 0, Math.PI * 2);
+            dots.fill();
+          }
         }
       }
       paint();

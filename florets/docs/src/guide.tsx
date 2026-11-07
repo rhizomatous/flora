@@ -219,7 +219,7 @@ export function Guide() {
             <Section
               id="backgrounds"
               title="Backgrounds"
-              description="Fixed stippling with slowly drifting illumination. The texture fades toward the center and bottom to keep content quiet."
+              description="Soft clusters of stippling drift in overlapping layers. The texture thins toward the center and bottom to keep content quiet."
             >
               <Example
                 title="StippleBackground"

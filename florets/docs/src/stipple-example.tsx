@@ -1,12 +1,30 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { Button, Field, FieldLabel, StippleBackground, Text } from "@flora/florets";
 
+function subscribeToMotionPreference(onChange: () => void) {
+  const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+  preference.addEventListener("change", onChange);
+  return () => {
+    preference.removeEventListener("change", onChange);
+  };
+}
+
 export function StippleExample() {
+  const reducedMotion = useSyncExternalStore(
+    subscribeToMotionPreference,
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    () => false,
+  );
   const [intensity, setIntensity] = useState(0.32);
   const [density, setDensity] = useState(0.75);
   const [motion, setMotion] = useState(true);
   const [seed, setSeed] = useState(1);
+  let motionDescription = "Animation is off.";
+  if (motion) motionDescription = "The dots drift slowly in overlapping layers.";
+  if (reducedMotion) {
+    motionDescription = "Your device has reduced motion enabled, so the texture is still.";
+  }
   return (
     <div className="space-y-6">
       <div className="grid gap-5 sm:grid-cols-2">
@@ -75,10 +93,9 @@ export function StippleExample() {
         </Button>
       </div>
       <Text size="xs" tone="muted">
-        Motion stays still when your device requests reduced motion. Use the guide’s theme switch to
-        compare light and dark.
+        {motionDescription}
       </Text>
-      <div className="relative isolate aspect-[16/10] min-h-64 overflow-hidden rounded-xl border border-border bg-background">
+      <div className="relative isolate aspect-video min-h-64 overflow-hidden rounded-xl border border-border bg-background">
         <StippleBackground intensity={intensity} density={density} motion={motion} seed={seed} />
       </div>
     </div>
