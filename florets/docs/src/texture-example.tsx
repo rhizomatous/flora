@@ -22,7 +22,7 @@ const directions = [
   {
     value: "silk",
     label: "Silk",
-    description: "Luminous folds, fine threads, sage and warm copper.",
+    description: "Luminous folds, fine threads, muted sage.",
   },
   {
     value: "veil",

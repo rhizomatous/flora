@@ -155,7 +155,7 @@ export function TextureBackground({
       )}
       style={{ opacity: bounded(intensity, 1) }}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_25%,#39745b40,transparent_60%),radial-gradient(ellipse_at_90%_75%,#ef9d8326,transparent_50%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_25%,#39745b40,transparent_60%),radial-gradient(ellipse_at_90%_75%,#39745b26,transparent_50%)]" />
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
     </div>
   );

@@ -36,12 +36,10 @@ vec3 silk(vec2 p, float t) {
   float fold = .5 + .5 * sin(field * 24. + q.x * 2. - t * 1.5);
   float sheen = pow(fold, 5.) * ribbon;
   float threads = .5 + .5 * sin(field * 580. + sin(q.x * 24.) * .6);
-  vec3 green = mix(vec3(.25, .49, .36), vec3(-.37, -.23, -.32), light);
-  vec3 peach = mix(vec3(.65, .43, .29), vec3(-.16, -.28, -.38), light);
-  vec3 tint = mix(green, peach, smoothstep(.08, .8, q.x));
+  vec3 tint = mix(vec3(.29, .40, .34), vec3(-.30, -.23, -.27), light);
   vec3 color = tint * (ribbon * .25 + sheen * .8) * (.72 + threads * .28);
   float glint = pow(fold, 18.) * ribbon * (.5 + .5 * sin(q.x * 3. + t));
-  color += mix(vec3(.25, .28, .20), vec3(-.12, -.12, -.1), light) * glint * .3;
+  color += mix(vec3(.23, .27, .25), vec3(-.12, -.1, -.11), light) * glint * .3;
   color += mix(vec3(.045, .08, .055), vec3(-.025, -.012, -.02), light)
     * exp(-length(p - vec2(-.6, .2)) * 2.);
   return color;
@@ -111,13 +109,12 @@ vec3 ribbons(vec2 uv, vec2 p, float t, float light) {
     q = (uv.y - center - bend) / width + 0.5;
   }
   envelope = pow(max(sin(clamp(q, 0.0, 1.0) * pi), 0.0), 0.7);
-  vec3 warm = mix(vec3(0.459, 0.592, 0.494), vec3(0.588, 0.608, 0.494), smoothstep(0.0, 0.6, uv.x));
-  warm = mix(warm, vec3(0.878, 0.706, 0.592), smoothstep(0.6, 1.0, uv.x));
-  warm = mix(warm, vec3(0.50, 0.34, 0.25), light);
+  vec3 moss = mix(vec3(0.459, 0.592, 0.494), vec3(0.58, 0.65, 0.60), smoothstep(0.0, 1.0, uv.x));
+  moss = mix(moss, vec3(0.30, 0.39, 0.34), light);
   strength = mix(0.24, 0.3, smoothstep(0.0, 0.6, uv.x));
   strength = mix(strength, 0.55, smoothstep(0.6, 1.0, uv.x));
   ink = floraRibbonLines(q, width) * envelope * strength;
-  return mix(color, warm, ink * mix(1.0, 0.45, light));
+  return mix(color, moss, ink * mix(1.0, 0.45, light));
 }
 
 void main() {
