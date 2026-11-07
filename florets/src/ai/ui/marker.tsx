@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
-import * as React from "react";
+import type { ComponentProps } from "react";
 
 import { cn } from "../../lib/utils";
 
@@ -23,7 +23,7 @@ function Marker({
   variant = "default",
   asChild = false,
   ...props
-}: React.ComponentProps<"div"> &
+}: ComponentProps<"div"> &
   VariantProps<typeof markerVariants> & {
     asChild?: boolean;
   }) {
@@ -39,7 +39,7 @@ function Marker({
   );
 }
 
-function MarkerIcon({ className, ...props }: React.ComponentProps<"span">) {
+function MarkerIcon({ className, ...props }: ComponentProps<"span">) {
   return (
     <span
       data-slot="marker-icon"
@@ -50,7 +50,7 @@ function MarkerIcon({ className, ...props }: React.ComponentProps<"span">) {
   );
 }
 
-function MarkerContent({ className, ...props }: React.ComponentProps<"span">) {
+function MarkerContent({ className, ...props }: ComponentProps<"span">) {
   return (
     <span
       data-slot="marker-content"
@@ -63,4 +63,5 @@ function MarkerContent({ className, ...props }: React.ComponentProps<"span">) {
   );
 }
 
+// oxlint-disable-next-line react/only-export-components -- The public styling function is part of the upstream component API.
 export { Marker, MarkerIcon, MarkerContent, markerVariants };

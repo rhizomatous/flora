@@ -1,5 +1,4 @@
 "use client";
-
 import { useChat } from "@ai-sdk/react";
 import type { UIDataTypes, UIMessage } from "ai";
 import {
@@ -9,14 +8,17 @@ import {
   GlobeIcon,
   LoaderCircleIcon,
 } from "lucide-react";
-import * as React from "react";
+import { type ReactNode, useState } from "react";
 
-import { Badge } from "../../../../src/ai/ui/badge";
-import { Bubble, BubbleContent } from "../../../../src/ai/ui/bubble";
-import { Button } from "../../../../src/ai/ui/button";
-import { CodeBlock, CodeBlockContent } from "../../../../src/ai/ui/code-block";
-import { Message, MessageContent } from "../../../../src/ai/ui/message";
 import {
+  Badge,
+  Bubble,
+  BubbleContent,
+  Button,
+  CodeBlock,
+  CodeBlockContent,
+  Message,
+  MessageContent,
   Trace,
   TraceCollapsible,
   TraceCollapsibleContent,
@@ -24,7 +26,8 @@ import {
   TraceIcon,
   TraceLine,
   TraceTitle,
-} from "../../../../src/ai/ui/trace";
+} from "@flora/florets/ai";
+
 import { createChat, getMessageText } from "../lib/ai";
 
 type ChatMessage = UIMessage<
@@ -105,7 +108,7 @@ function Step({
   title: string;
   status?: "running" | "error";
   defaultOpen?: boolean;
-  children?: React.ReactNode;
+  children?: ReactNode;
 }) {
   const line = (
     <TraceLine status={status}>
@@ -116,7 +119,8 @@ function Step({
     </TraceLine>
   );
 
-  if (!children) {
+  const hasChildren = Boolean(children);
+  if (!hasChildren) {
     return line;
   }
 
@@ -129,14 +133,12 @@ function Step({
 }
 
 function StepRow({ part, streaming }: { part: StepPart; streaming: boolean }) {
-  const status =
-    part.state === "output-available"
-      ? undefined
-      : part.state === "output-error" || !streaming
-        ? "error"
-        : "running";
-  const verb = (running: string, done: string, failed: string) =>
-    status === "running" ? running : status === "error" ? failed : done;
+  const unfinished = part.state === "output-error" || !streaming ? "error" : "running";
+  const status = part.state === "output-available" ? undefined : unfinished;
+  function verb(running: string, done: string, failed: string) {
+    if (status === "running") return running;
+    return status === "error" ? failed : done;
+  }
   const error = part.state === "output-error" && (
     <CodeBlock size="sm" variant="destructive">
       <CodeBlockContent wrap className="max-h-64">
@@ -151,27 +153,34 @@ function StepRow({ part, streaming }: { part: StepPart; streaming: boolean }) {
         status={status}
         title={`${verb("Searching", "Searched", "Failed to search")} the web for ${part.input?.query}`}
       >
-        {error ||
-          (part.state === "output-available" && (
-            <Trace>
-              {part.output.results.map((result) => (
-                <a key={result.url} href={result.url} target="_blank" rel="noreferrer">
-                  <TraceLine>
-                    <TraceIcon>
-                      <GlobeIcon />
-                    </TraceIcon>
-                    <TraceTitle>
-                      {result.title}
-                      <span className="sr-only"> (opens in a new tab)</span>
-                    </TraceTitle>
-                    <TraceIcon>
-                      <ArrowUpRightIcon />
-                    </TraceIcon>
-                  </TraceLine>
-                </a>
-              ))}
-            </Trace>
-          ))}
+        {part.state === "output-available" ? (
+          <Trace>
+            {part.output.results.map((result) => (
+              <a
+                aria-label={`${result.title} (opens in a new tab)`}
+                key={result.url}
+                href={result.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <TraceLine>
+                  <TraceIcon>
+                    <GlobeIcon />
+                  </TraceIcon>
+                  <TraceTitle>
+                    {result.title}
+                    <span className="sr-only"> (opens in a new tab)</span>
+                  </TraceTitle>
+                  <TraceIcon>
+                    <ArrowUpRightIcon />
+                  </TraceIcon>
+                </TraceLine>
+              </a>
+            ))}
+          </Trace>
+        ) : (
+          error
+        )}
       </Step>
     );
   }
@@ -183,14 +192,15 @@ function StepRow({ part, streaming }: { part: StepPart; streaming: boolean }) {
         defaultOpen
         title={`${verb("Reading", "Read", "Failed to read")} the build log for ${part.input?.deployment}`}
       >
-        {error ||
-          (part.state === "output-available" && (
-            <CodeBlock size="sm">
-              <CodeBlockContent wrap className="max-h-64">
-                {part.output.log}
-              </CodeBlockContent>
-            </CodeBlock>
-          ))}
+        {part.state === "output-available" ? (
+          <CodeBlock size="sm">
+            <CodeBlockContent wrap className="max-h-64">
+              {part.output.log}
+            </CodeBlockContent>
+          </CodeBlock>
+        ) : (
+          error
+        )}
       </Step>
     );
   }
@@ -200,16 +210,17 @@ function StepRow({ part, streaming }: { part: StepPart; streaming: boolean }) {
       status={status}
       title={`${verb("Searching", "Searched", "Failed to search")} the code for ${part.input?.query}`}
     >
-      {error ||
-        (part.state === "output-available" && (
-          <div className="flex flex-wrap gap-1.5">
-            {part.output.files.map((file) => (
-              <Badge key={file} variant="secondary" className="font-mono">
-                {file}
-              </Badge>
-            ))}
-          </div>
-        ))}
+      {part.state === "output-available" ? (
+        <div className="flex flex-wrap gap-1.5">
+          {part.output.files.map((file) => (
+            <Badge key={file} variant="secondary" className="font-mono">
+              {file}
+            </Badge>
+          ))}
+        </div>
+      ) : (
+        error
+      )}
     </Step>
   );
 }
@@ -223,10 +234,11 @@ function ChainOfThought({
   streaming: boolean;
   answering: boolean;
 }) {
-  const [open, setOpen] = React.useState<boolean>();
+  const [open, setOpen] = useState<boolean>();
   const running = streaming && !answering;
   const failed = steps.filter((part) => part.state === "output-error").length;
-  const status = running ? "running" : failed > 0 ? "error" : undefined;
+  const finishedStatus = failed > 0 ? "error" : undefined;
+  const status = running ? "running" : finishedStatus;
 
   return (
     <Trace>
@@ -304,7 +316,7 @@ export function ChainOfThoughtDemo() {
           className="mt-auto self-start"
           onClick={() => {
             setMessages([]);
-            sendMessage(question);
+            void sendMessage(question);
           }}
         >
           Replay

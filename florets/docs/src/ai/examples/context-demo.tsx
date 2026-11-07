@@ -8,7 +8,7 @@ const usage = {
   input: 8420,
   output: 1260,
   reasoning: 980,
-  limit: 128000,
+  limit: 128_000,
 };
 
 const used = usage.input + usage.output + usage.reasoning;

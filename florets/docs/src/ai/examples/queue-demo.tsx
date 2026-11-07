@@ -53,24 +53,21 @@ const TODOS = [
 ];
 
 function todosAt(current: number) {
-  return TODOS.map(
-    (content, index) =>
-      ({
-        content,
-        status: index < current ? "completed" : index === current ? "in_progress" : "pending",
-      }) satisfies Todo,
-  );
+  return TODOS.map((content, index) => {
+    const remaining = index === current ? "in_progress" : "pending";
+    return { content, status: index < current ? "completed" : remaining } satisfies Todo;
+  });
 }
 
 const chat = createChat<ChatMessage>()
   .user("Add dark mode to the settings page.")
   .assistant(({ writer }) => {
-    TODOS.forEach((_, index) => {
+    for (let index = 0; index < TODOS.length; index++) {
       writer
         .tool("writeTodos", { input: { todos: todosAt(index) } })
         .output("Updated the todo list.");
       writer.sleep(1400);
-    });
+    }
     writer
       .tool("writeTodos", { input: { todos: todosAt(TODOS.length) } })
       .output("Updated the todo list.");
@@ -82,16 +79,15 @@ const [question] = chat.get(1);
 const transport = chat.transport({ delayMs: 20 });
 
 function TodoLine({ todo, streaming }: { todo: Todo; streaming: boolean }) {
+  const StatusIcon = {
+    completed: CircleCheckIcon,
+    in_progress: CircleDotIcon,
+    pending: CircleIcon,
+  }[todo.status];
   return (
     <TraceLine status={streaming && todo.status === "in_progress" ? "running" : undefined}>
       <TraceIcon>
-        {todo.status === "completed" ? (
-          <CircleCheckIcon />
-        ) : todo.status === "in_progress" ? (
-          <CircleDotIcon />
-        ) : (
-          <CircleIcon />
-        )}
+        <StatusIcon />
       </TraceIcon>
       <TraceTitle>{todo.content}</TraceTitle>
     </TraceLine>
@@ -169,10 +165,12 @@ export function QueueDemo() {
         }
 
         const streaming = busy && message === messages.at(-1);
-        const todos = message.parts
-          .filter((part) => part.type === "tool-writeTodos")
-          .filter((part) => part.state !== "input-streaming")
-          .at(-1)?.input?.todos;
+        let todos: Todo[] | undefined;
+        for (const part of message.parts) {
+          if (part.type === "tool-writeTodos" && part.state !== "input-streaming") {
+            todos = part.input?.todos;
+          }
+        }
         const text = getMessageText(message);
 
         return (
@@ -191,7 +189,7 @@ export function QueueDemo() {
           className="mt-auto self-start"
           onClick={() => {
             setMessages([]);
-            sendMessage(question);
+            void sendMessage(question);
           }}
         >
           Replay

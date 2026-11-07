@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
-import * as React from "react";
+import { Fragment } from "react";
 
 import { Bubble, BubbleContent } from "../../../../src/ai/ui/bubble";
 import { Button } from "../../../../src/ai/ui/button";
@@ -67,7 +67,7 @@ export function CheckpointDemo() {
         const canRestore = index < messages.length - 1;
 
         return (
-          <React.Fragment key={message.id}>
+          <Fragment key={message.id}>
             {message.role === "user" ? (
               <Message align="end">
                 <MessageContent>
@@ -92,7 +92,9 @@ export function CheckpointDemo() {
                       size="xs"
                       variant="outline"
                       aria-label={`Restore to ${checkpoint.data.label}`}
-                      onClick={() => restore(message.id)}
+                      onClick={() => {
+                        restore(message.id);
+                      }}
                     >
                       Restore
                     </Button>
@@ -100,7 +102,7 @@ export function CheckpointDemo() {
                 </MarkerContent>
               </Marker>
             )}
-          </React.Fragment>
+          </Fragment>
         );
       })}
       {!busy && nextMessage && (
@@ -108,7 +110,9 @@ export function CheckpointDemo() {
           variant="outline"
           size="sm"
           className="mt-auto self-start"
-          onClick={() => sendMessage(nextMessage)}
+          onClick={() => {
+            void sendMessage(nextMessage);
+          }}
         >
           Continue
         </Button>

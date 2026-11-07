@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import { TerminalIcon } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 
 import { Bubble, BubbleContent } from "../../../../src/ai/ui/bubble";
 import { Button } from "../../../../src/ai/ui/button";
@@ -84,7 +84,7 @@ const chat = createChat<ChatMessage>()
       });
 
       // The tool streams its output as a data part with the tool call's id.
-      output.forEach((_, index) => {
+      for (let index = 0; index < output.length; index++) {
         writer
           .data({
             type: "data-terminal",
@@ -92,7 +92,7 @@ const chat = createChat<ChatMessage>()
             data: { output: output.slice(0, index + 1).join("\n") },
           })
           .sleep(200);
-      });
+      }
 
       tool.output({ exitCode: 0 });
     }
@@ -137,15 +137,16 @@ function CommandRow({
   streaming: boolean;
   defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = React.useState(defaultOpen);
+  const [open, setOpen] = useState(defaultOpen);
   const running =
     streaming && (part.state === "input-streaming" || part.state === "input-available");
   const failed = !running && (part.state !== "output-available" || part.output.exitCode !== 0);
+  const finishedStatus = failed ? "error" : undefined;
 
   return (
     <TraceCollapsible open={open ?? (running && output.length > 0)} onOpenChange={setOpen}>
       <TraceCollapsibleTrigger>
-        <TraceLine status={running ? "running" : failed ? "error" : undefined}>
+        <TraceLine status={running ? "running" : finishedStatus}>
           <TraceIcon>
             <TerminalIcon />
           </TraceIcon>
@@ -217,7 +218,7 @@ export function TerminalDemo() {
           className="mt-auto self-start"
           onClick={() => {
             setMessages([]);
-            sendMessage(question);
+            void sendMessage(question);
           }}
         >
           Replay

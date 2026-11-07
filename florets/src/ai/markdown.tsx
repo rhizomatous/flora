@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import type { ComponentProps } from "react";
 import { Streamdown, useIsCodeFenceIncomplete, type ExtraProps } from "streamdown";
 
 import { cn } from "../lib/utils";
@@ -30,6 +30,7 @@ function MarkdownCodeBlock({ code, language }: { code: string; language: string 
       </CodeBlockHeader>
       <CodeBlockContent lineNumbers>
         {lines.map((line, index) => (
+          // oxlint-disable-next-line react/no-array-index-key -- Code lines are identified by position, including duplicate and empty lines.
           <CodeBlockLine key={index}>{line}</CodeBlockLine>
         ))}
       </CodeBlockContent>
@@ -38,11 +39,11 @@ function MarkdownCodeBlock({ code, language }: { code: string; language: string 
 }
 
 function MarkdownCode({
-  node,
+  node: _node,
   className,
   children,
   ...props
-}: React.ComponentProps<"code"> & ExtraProps) {
+}: ComponentProps<"code"> & ExtraProps) {
   // Streamdown marks fenced code with data-block. Inline code stays inline.
   if (!("data-block" in props)) {
     return (
@@ -71,7 +72,7 @@ function Markdown({
   components = DEFAULT_COMPONENTS,
   controls = false,
   ...props
-}: React.ComponentProps<typeof Streamdown>) {
+}: ComponentProps<typeof Streamdown>) {
   return (
     <Streamdown
       data-slot="markdown"

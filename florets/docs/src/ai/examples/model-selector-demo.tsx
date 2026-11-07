@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowUpIcon, ChevronDownIcon, PlusIcon } from "lucide-react";
-import * as React from "react";
+import { type SubmitEvent, Fragment, useRef, useState } from "react";
 
 import {
   DropdownMenu,
@@ -46,15 +46,15 @@ const efforts = [
 ];
 
 export function ModelSelectorDemo() {
-  const [text, setText] = React.useState("");
-  const [model, setModel] = React.useState(models[0].id);
-  const [effort, setEffort] = React.useState(efforts[1].id);
-  const formRef = React.useRef<HTMLFormElement>(null);
+  const [text, setText] = useState("");
+  const [model, setModel] = useState(models[0].id);
+  const [effort, setEffort] = useState(efforts[1].id);
+  const formRef = useRef<HTMLFormElement>(null);
   const currentModel = models.find((item) => item.id === model) ?? models[0];
   const currentEffort = efforts.find((item) => item.id === effort) ?? efforts[1];
   const canSend = text.trim().length > 0;
 
-  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSend) {
       return;
@@ -69,7 +69,9 @@ export function ModelSelectorDemo() {
         <InputGroup>
           <InputGroupTextarea
             value={text}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => {
+              setText(event.target.value);
+            }}
             placeholder="Ask the agent to change your code..."
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
@@ -105,7 +107,7 @@ export function ModelSelectorDemo() {
               <DropdownMenuContent align="start" className="w-48">
                 <DropdownMenuRadioGroup value={model} onValueChange={setModel}>
                   {providers.map((provider, index) => (
-                    <React.Fragment key={provider.name}>
+                    <Fragment key={provider.name}>
                       {index > 0 && <DropdownMenuSeparator />}
                       <DropdownMenuGroup>
                         <DropdownMenuLabel>{provider.name}</DropdownMenuLabel>
@@ -115,7 +117,7 @@ export function ModelSelectorDemo() {
                           </DropdownMenuRadioItem>
                         ))}
                       </DropdownMenuGroup>
-                    </React.Fragment>
+                    </Fragment>
                   ))}
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>

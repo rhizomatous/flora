@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import * as React from "react";
+import { useState } from "react";
 
 import { Bubble, BubbleContent } from "../../../../src/ai/ui/bubble";
 import { Button } from "../../../../src/ai/ui/button";
@@ -42,7 +42,7 @@ function ReasoningRow({
   running: boolean;
   defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = React.useState(defaultOpen);
+  const [open, setOpen] = useState(defaultOpen);
 
   const line = (
     <TraceLine status={running ? "running" : undefined}>
@@ -95,6 +95,7 @@ export function ReasoningDemo() {
                 <Trace>
                   {reasoning.map((part, index) => (
                     <ReasoningRow
+                      // oxlint-disable-next-line react/no-array-index-key -- Streaming text parts have no IDs and retain their position as content is appended.
                       key={index}
                       text={part.text}
                       running={streaming && part.state === "streaming"}
@@ -115,7 +116,7 @@ export function ReasoningDemo() {
           className="mt-auto self-start"
           onClick={() => {
             setMessages([]);
-            sendMessage(question);
+            void sendMessage(question);
           }}
         >
           Replay

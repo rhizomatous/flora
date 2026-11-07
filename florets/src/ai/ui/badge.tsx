@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
-import * as React from "react";
+import type { ComponentProps } from "react";
 
 import { cn } from "../../lib/utils";
 
@@ -29,7 +29,7 @@ function Badge({
   variant = "default",
   asChild = false,
   ...props
-}: React.ComponentProps<"span"> & VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
+}: ComponentProps<"span"> & VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot.Root : "span";
 
   return (
@@ -42,4 +42,5 @@ function Badge({
   );
 }
 
+// oxlint-disable-next-line react/only-export-components -- The public styling function is part of the upstream component API.
 export { Badge, badgeVariants };

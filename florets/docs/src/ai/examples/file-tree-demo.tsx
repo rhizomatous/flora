@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronRightIcon, FileIcon, FolderIcon } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 
 import { Button } from "../../../../src/ai/ui/button";
 import {
@@ -60,7 +60,7 @@ function FileTreeNode({
   onSelect: (path: string) => void;
 }) {
   switch (node.type) {
-    case "folder":
+    case "folder": {
       return (
         <Collapsible defaultOpen className="group/folder">
           <CollapsibleTrigger asChild>
@@ -88,7 +88,8 @@ function FileTreeNode({
           </CollapsibleContent>
         </Collapsible>
       );
-    case "file":
+    }
+    case "file": {
       return (
         <Button
           variant="ghost"
@@ -97,12 +98,15 @@ function FileTreeNode({
             selected === node.path ? "bg-accent text-accent-foreground" : ""
           }`}
           aria-current={selected === node.path ? "true" : undefined}
-          onClick={() => onSelect(node.path)}
+          onClick={() => {
+            onSelect(node.path);
+          }}
         >
           <FileIcon />
           {node.name}
         </Button>
       );
+    }
     default: {
       const unreachable: never = node;
       return unreachable;
@@ -111,7 +115,7 @@ function FileTreeNode({
 }
 
 export function FileTreeDemo() {
-  const [selected, setSelected] = React.useState("components/ui/button.tsx");
+  const [selected, setSelected] = useState("components/ui/button.tsx");
 
   return (
     <div className="flex w-full max-w-xs flex-col py-6 text-sm">

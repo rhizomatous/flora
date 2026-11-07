@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
-import * as React from "react";
+import type { ComponentProps } from "react";
 
 import { cn } from "../../lib/utils";
 
@@ -45,7 +45,7 @@ function Button({
   size = "default",
   asChild = false,
   ...props
-}: React.ComponentProps<"button"> &
+}: ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
   }) {
@@ -62,4 +62,5 @@ function Button({
   );
 }
 
+// oxlint-disable-next-line react/only-export-components -- The public styling function is part of the upstream component API.
 export { Button, buttonVariants };

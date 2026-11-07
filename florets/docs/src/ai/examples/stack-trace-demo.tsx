@@ -71,7 +71,7 @@ const [question] = chat.get(1);
 const transport = chat.transport({ delayMs: 20 });
 
 function parseFrame(line: string) {
-  const match = line.match(/^at (.+) \((.+):(\d+):(\d+)\)$/);
+  const match = /^at (.+) \((.+):(\d+):(\d+)\)$/.exec(line);
 
   return {
     line,
@@ -84,7 +84,7 @@ function parseFrame(line: string) {
 
 function StackTrace({ stack }: { stack: string }) {
   const [error, ...lines] = stack.split("\n").map((line) => line.trim());
-  const frames = lines.map(parseFrame);
+  const frames = lines.map((line) => parseFrame(line));
   const appFrames = frames.filter((frame) => !frame.internal);
   const internalFrames = frames.filter((frame) => frame.internal);
 
@@ -102,7 +102,7 @@ function StackTrace({ stack }: { stack: string }) {
         <p className="font-mono text-xs text-destructive">{error}</p>
         <Trace>
           {appFrames.map((frame) => (
-            <a key={frame.line} href={`#${frame.file}:${frame.lineNumber}`}>
+            <a aria-label={frame.line} key={frame.line} href={`#${frame.file}:${frame.lineNumber}`}>
               <TraceLine>
                 <TraceIcon>
                   <FileCodeIcon />
@@ -227,7 +227,7 @@ export function StackTraceDemo() {
           className="mt-auto self-start"
           onClick={() => {
             setMessages([]);
-            sendMessage(question);
+            void sendMessage(question);
           }}
         >
           Replay

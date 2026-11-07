@@ -41,19 +41,19 @@ const STEPS = [
 function planAt(current: number) {
   return {
     title: "Plan: migrate to Base UI",
-    steps: STEPS.map((title, index) => ({
-      title,
-      status: index < current ? "done" : index === current ? "running" : "pending",
-    })),
+    steps: STEPS.map((title, index) => {
+      const remaining = index === current ? "running" : "pending";
+      return { title, status: index < current ? "done" : remaining };
+    }),
   } satisfies PlanPart["data"];
 }
 
 const chat = createChat<ChatMessage>()
   .user("Migrate the dialog components to Base UI.")
   .assistant(({ writer }) => {
-    STEPS.forEach((_, index) => {
+    for (let index = 0; index < STEPS.length; index++) {
       writer.data({ type: "data-plan", id: "plan", data: planAt(index) }).sleep(1200);
-    });
+    }
     writer.data({ type: "data-plan", id: "plan", data: planAt(STEPS.length) });
     writer.text("Migrated Dialog and AlertDialog. The type checker passes.");
   });
@@ -81,29 +81,20 @@ function PlanRow({ plan, streaming }: { plan: PlanPart["data"]; streaming: boole
       </TraceCollapsibleTrigger>
       <TraceCollapsibleContent>
         <Trace>
-          {plan.steps.map((step) => (
-            <TraceLine
-              key={step.title}
-              status={
-                step.status === "pending"
-                  ? "pending"
-                  : streaming && step.status === "running"
-                    ? "running"
-                    : undefined
-              }
-            >
-              <TraceIcon>
-                {step.status === "done" ? (
-                  <CircleCheckIcon />
-                ) : step.status === "running" ? (
-                  <CircleDotIcon />
-                ) : (
-                  <CircleIcon />
-                )}
-              </TraceIcon>
-              <TraceTitle>{step.title}</TraceTitle>
-            </TraceLine>
-          ))}
+          {plan.steps.map((step) => {
+            const active = streaming && step.status === "running" ? "running" : undefined;
+            const StepIcon = { done: CircleCheckIcon, running: CircleDotIcon, pending: CircleIcon }[
+              step.status
+            ];
+            return (
+              <TraceLine key={step.title} status={step.status === "pending" ? "pending" : active}>
+                <TraceIcon>
+                  <StepIcon />
+                </TraceIcon>
+                <TraceTitle>{step.title}</TraceTitle>
+              </TraceLine>
+            );
+          })}
         </Trace>
       </TraceCollapsibleContent>
     </TraceCollapsible>
@@ -156,7 +147,7 @@ export function PlanDemo() {
           className="mt-auto self-start"
           onClick={() => {
             setMessages([]);
-            sendMessage(question);
+            void sendMessage(question);
           }}
         >
           Replay

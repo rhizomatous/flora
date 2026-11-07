@@ -3,7 +3,6 @@
 import { useChat } from "@ai-sdk/react";
 import type { UIDataTypes, UIMessage } from "ai";
 import { CircleAlertIcon, CircleCheckIcon, LoaderCircleIcon } from "lucide-react";
-import * as React from "react";
 
 import { Bubble, BubbleContent } from "../../../../src/ai/ui/bubble";
 import { Button } from "../../../../src/ai/ui/button";
@@ -80,7 +79,7 @@ function getSubagentMessage(done: number, report?: string): SubagentMessage {
     });
   }
 
-  if (report) {
+  if (report !== undefined && report !== "") {
     parts.push({ type: "text", text: report });
   }
 
@@ -97,9 +96,9 @@ const chat = createChat<ChatMessage>()
         },
       })
       .sleep(600);
-    steps.forEach((_, index) => {
+    for (let index = 0; index < steps.length; index++) {
       subagent.output(getSubagentMessage(index), { preliminary: true }).sleep(1000);
-    });
+    }
     subagent
       .output(
         getSubagentMessage(
@@ -167,27 +166,24 @@ function SubagentRow({
   part: Extract<Part, { type: "tool-researchAgent" }>;
   streaming: boolean;
 }) {
-  const done = part.state === "output-available" && !part.preliminary;
+  const done = part.state === "output-available" && part.preliminary !== true;
   const running = !done && part.state !== "output-error" && streaming;
   const parts = part.state === "output-available" ? part.output.parts : [];
   const report = parts
     .map((agentPart) => (agentPart.type === "text" ? agentPart.text : ""))
     .join("");
 
+  const unfinishedStatus = running ? "running" : "error";
+  const unfinishedTitle = running ? "Running" : "Failed to run";
+  const unfinishedIcon = running ? (
+    <LoaderCircleIcon className="animate-spin" />
+  ) : (
+    <CircleAlertIcon />
+  );
   const line = (
-    <TraceLine status={done ? undefined : running ? "running" : "error"}>
-      <TraceIcon>
-        {done ? (
-          <CircleCheckIcon />
-        ) : running ? (
-          <LoaderCircleIcon className="animate-spin" />
-        ) : (
-          <CircleAlertIcon />
-        )}
-      </TraceIcon>
-      <TraceTitle>
-        {done ? "Ran" : running ? "Running" : "Failed to run"} the research subagent
-      </TraceTitle>
+    <TraceLine status={done ? undefined : unfinishedStatus}>
+      <TraceIcon>{done ? <CircleCheckIcon /> : unfinishedIcon}</TraceIcon>
+      <TraceTitle>{done ? "Ran" : unfinishedTitle} the research subagent</TraceTitle>
     </TraceLine>
   );
 
@@ -260,7 +256,7 @@ export function SubagentDemo() {
           className="mt-auto self-start"
           onClick={() => {
             setMessages([]);
-            sendMessage(question);
+            void sendMessage(question);
           }}
         >
           Replay

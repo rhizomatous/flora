@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowUpIcon, PlusIcon } from "lucide-react";
-import * as React from "react";
+import { type SubmitEvent, useRef, useState } from "react";
 
 import { Bubble, BubbleContent } from "../../../../src/ai/ui/bubble";
 import { Button } from "../../../../src/ai/ui/button";
@@ -38,12 +38,12 @@ const replies: Record<string, string> = {
 };
 
 export function SuggestionDemo() {
-  const [text, setText] = React.useState("");
-  const [turn, setTurn] = React.useState<{
+  const [text, setText] = useState("");
+  const [turn, setTurn] = useState<{
     prompt: string;
     reply: string;
   } | null>(null);
-  const formRef = React.useRef<HTMLFormElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const canSend = text.trim().length > 0;
 
   function send(prompt: string) {
@@ -54,7 +54,7 @@ export function SuggestionDemo() {
     setText("");
   }
 
-  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSend) {
       return;
@@ -89,7 +89,9 @@ export function SuggestionDemo() {
               variant="outline"
               size="sm"
               className="shrink-0"
-              onClick={() => send(suggestion)}
+              onClick={() => {
+                send(suggestion);
+              }}
             >
               {suggestion}
             </Button>
@@ -99,7 +101,9 @@ export function SuggestionDemo() {
           <InputGroup>
             <InputGroupTextarea
               value={text}
-              onChange={(event) => setText(event.target.value)}
+              onChange={(event) => {
+                setText(event.target.value);
+              }}
               placeholder="Ask the agent to change your code..."
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {

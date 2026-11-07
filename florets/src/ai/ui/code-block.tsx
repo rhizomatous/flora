@@ -1,7 +1,7 @@
 "use client";
 import { cva, type VariantProps } from "class-variance-authority";
 import { CheckIcon, CopyIcon } from "lucide-react";
-import * as React from "react";
+import { type ComponentProps, useEffect, useState } from "react";
 
 import { cn } from "../../lib/utils";
 import { Button } from "./button";
@@ -27,8 +27,7 @@ function CodeBlock({
   variant = "default",
   size = "default",
   ...props
-}: React.ComponentProps<"div"> &
-  VariantProps<typeof codeBlockVariants> & { size?: "default" | "sm" }) {
+}: ComponentProps<"div"> & VariantProps<typeof codeBlockVariants> & { size?: "default" | "sm" }) {
   return (
     <div
       data-slot="code-block"
@@ -40,7 +39,7 @@ function CodeBlock({
   );
 }
 
-function CodeBlockHeader({ className, ...props }: React.ComponentProps<"div">) {
+function CodeBlockHeader({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="code-block-header"
@@ -53,7 +52,7 @@ function CodeBlockHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function CodeBlockTitle({ className, ...props }: React.ComponentProps<"div">) {
+function CodeBlockTitle({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="code-block-title"
@@ -66,7 +65,7 @@ function CodeBlockTitle({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function CodeBlockActions({ className, ...props }: React.ComponentProps<"div">) {
+function CodeBlockActions({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="code-block-actions"
@@ -86,17 +85,30 @@ function CodeBlockCopyButton({
   className,
   onClick,
   ...props
-}: React.ComponentProps<typeof Button> & { value: string }) {
-  const [copied, setCopied] = React.useState(false);
+}: ComponentProps<typeof Button> & { value: string }) {
+  const [copied, setCopied] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!copied) {
       return;
     }
 
-    const timeout = setTimeout(() => setCopied(false), 2000);
-    return () => clearTimeout(timeout);
+    const timeout = setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+    return () => {
+      clearTimeout(timeout);
+    };
   }, [copied]);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+    } catch {
+      // Leave the selectable code visible when clipboard access is denied.
+    }
+  }
 
   return (
     <>
@@ -109,10 +121,8 @@ function CodeBlockCopyButton({
         className={cn("hover:bg-foreground/5 dark:hover:bg-foreground/10", className)}
         onClick={(event) => {
           onClick?.(event);
-          navigator.clipboard
-            .writeText(value)
-            .then(() => setCopied(true))
-            .catch(() => {});
+
+          void copy();
         }}
         {...props}
       >
@@ -133,7 +143,7 @@ function CodeBlockContent({
   lineNumbers = false,
   startLine = 1,
   ...props
-}: React.ComponentProps<"pre"> & {
+}: ComponentProps<"pre"> & {
   wrap?: boolean;
   lineNumbers?: boolean;
   startLine?: number;
@@ -160,6 +170,7 @@ function CodeBlockContent({
           ? children
               .replace(/\n$/, "")
               .split("\n")
+              // oxlint-disable-next-line react/no-array-index-key -- Code lines are identified by position, including duplicate and empty lines.
               .map((line, index) => <CodeBlockLine key={index}>{line}</CodeBlockLine>)
           : children}
       </code>
@@ -189,7 +200,7 @@ function CodeBlockLine({
   variant = "default",
   children,
   ...props
-}: React.ComponentProps<"span"> & VariantProps<typeof codeBlockLineVariants>) {
+}: ComponentProps<"span"> & VariantProps<typeof codeBlockLineVariants>) {
   // An empty line holds a newline so copying a selection keeps blank lines.
   const empty =
     children === undefined ||
@@ -211,7 +222,7 @@ function CodeBlockLine({
   );
 }
 
-function CodeBlockFooter({ className, ...props }: React.ComponentProps<"div">) {
+function CodeBlockFooter({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="code-block-footer"

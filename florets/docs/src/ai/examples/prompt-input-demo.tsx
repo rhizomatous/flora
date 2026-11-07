@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowUpIcon, ChevronDownIcon, FileTextIcon, PlusIcon, XIcon } from "lucide-react";
-import * as React from "react";
+import { type ChangeEvent, type SubmitEvent, Fragment, useRef, useState } from "react";
 
 import {
   Attachment,
@@ -59,17 +59,17 @@ const efforts = [
 ];
 
 export function PromptInputDemo() {
-  const [text, setText] = React.useState("");
-  const [files, setFiles] = React.useState<AttachmentFile[]>([]);
-  const [model, setModel] = React.useState(models[0].id);
-  const [effort, setEffort] = React.useState(efforts[1].id);
-  const formRef = React.useRef<HTMLFormElement>(null);
-  const inputRef = React.useRef<HTMLInputElement>(null);
+  const [text, setText] = useState("");
+  const [files, setFiles] = useState<AttachmentFile[]>([]);
+  const [model, setModel] = useState(models[0].id);
+  const [effort, setEffort] = useState(efforts[1].id);
+  const formRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const currentModel = models.find((item) => item.id === model) ?? models[0];
   const currentEffort = efforts.find((item) => item.id === effort) ?? efforts[1];
   const canSend = text.trim().length > 0;
 
-  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSend) {
       return;
@@ -79,7 +79,7 @@ export function PromptInputDemo() {
     setFiles([]);
   }
 
-  function onAttach(event: React.ChangeEvent<HTMLInputElement>) {
+  function onAttach(event: ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files;
     if (!selected) {
       return;
@@ -120,9 +120,9 @@ export function PromptInputDemo() {
                   <AttachmentActions>
                     <AttachmentAction
                       aria-label={`Remove ${file.name}`}
-                      onClick={() =>
-                        setFiles((current) => current.filter((item) => item.id !== file.id))
-                      }
+                      onClick={() => {
+                        setFiles((current) => current.filter((item) => item.id !== file.id));
+                      }}
                     >
                       <XIcon />
                     </AttachmentAction>
@@ -133,7 +133,9 @@ export function PromptInputDemo() {
           )}
           <InputGroupTextarea
             value={text}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => {
+              setText(event.target.value);
+            }}
             placeholder="Ask the agent to change your code..."
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
@@ -168,7 +170,7 @@ export function PromptInputDemo() {
               <DropdownMenuContent align="start" className="w-48">
                 <DropdownMenuRadioGroup value={model} onValueChange={setModel}>
                   {providers.map((provider, index) => (
-                    <React.Fragment key={provider.name}>
+                    <Fragment key={provider.name}>
                       {index > 0 && <DropdownMenuSeparator />}
                       <DropdownMenuGroup>
                         <DropdownMenuLabel>{provider.name}</DropdownMenuLabel>
@@ -178,7 +180,7 @@ export function PromptInputDemo() {
                           </DropdownMenuRadioItem>
                         ))}
                       </DropdownMenuGroup>
-                    </React.Fragment>
+                    </Fragment>
                   ))}
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>

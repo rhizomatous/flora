@@ -63,7 +63,13 @@ function Sources({ sources }: { sources: SourcePart[] }) {
         <TraceCollapsibleContent>
           <Trace>
             {sources.map((source) => (
-              <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
+              <a
+                aria-label={`${source.title ?? new URL(source.url).hostname} (opens in a new tab)`}
+                key={source.url}
+                href={source.url}
+                target="_blank"
+                rel="noreferrer"
+              >
                 <TraceLine>
                   <TraceTitle>
                     {source.title ?? new URL(source.url).hostname}
@@ -125,7 +131,7 @@ export function SourcesDemo() {
           className="mt-auto self-start"
           onClick={() => {
             setMessages([]);
-            sendMessage(question);
+            void sendMessage(question);
           }}
         >
           Replay

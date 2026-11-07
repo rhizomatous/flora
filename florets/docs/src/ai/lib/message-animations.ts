@@ -122,12 +122,14 @@ const ANIMATIONS = [
 type MessageAnimationPreset = (typeof ANIMATIONS)[number];
 type MessageAnimationId = MessageAnimationPreset["id"];
 
-const MESSAGE_ANIMATIONS = ANIMATIONS.reduce(
-  (acc, preset) => {
-    acc[preset.id] = preset;
-    return acc;
-  },
-  {} as Record<MessageAnimationId, MessageAnimationPreset>,
-);
+const MESSAGE_ANIMATIONS = {
+  fade: ANIMATIONS[0],
+  "slide-up": ANIMATIONS[1],
+  "slide-side": ANIMATIONS[2],
+  "scale-fade": ANIMATIONS[6],
+  "blur-fade": ANIMATIONS[5],
+  pop: ANIMATIONS[3],
+  "spring-bounce": ANIMATIONS[4],
+} satisfies Record<MessageAnimationId, MessageAnimationPreset>;
 
 export { MESSAGE_ANIMATIONS, type MessageAnimationId, type MessageAnimationPreset };

@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import { CircleAlertIcon, CircleCheckIcon, LoaderCircleIcon } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 
 import { Bubble, BubbleContent } from "../../../../src/ai/ui/bubble";
 import { Button } from "../../../../src/ai/ui/button";
@@ -66,11 +66,11 @@ function taskAt(task: (typeof TASKS)[number], done: number) {
 const chat = createChat<ChatMessage>()
   .user("Add Open Graph metadata to the home page.")
   .assistant(({ writer }) => {
-    TASKS.forEach((task) => {
+    for (const task of TASKS) {
       for (let done = 0; done <= task.steps.length; done++) {
         writer.data({ type: "data-task", id: task.id, data: taskAt(task, done) }).sleep(900);
       }
-    });
+    }
     writer.text(
       "Added Open Graph defaults to app/layout.tsx and a title, description and image for the home page in app/page.tsx.",
     );
@@ -100,16 +100,13 @@ function StatusIcon({ status }: { status: Status }) {
 }
 
 function TaskRow({ task, streaming }: { task: TaskPart["data"]; streaming: boolean }) {
-  const [open, setOpen] = React.useState<boolean>();
+  const [open, setOpen] = useState<boolean>();
   const steps = task.steps.map((step) => ({
     title: step.title,
     status: getStepStatus(step.status, streaming),
   }));
-  const status = steps.some((step) => step.status === "error")
-    ? "error"
-    : steps.some((step) => step.status === "running")
-      ? "running"
-      : undefined;
+  const active = steps.some((step) => step.status === "running") ? "running" : undefined;
+  const status = steps.some((step) => step.status === "error") ? "error" : active;
 
   return (
     <TraceCollapsible open={open ?? status === "running"} onOpenChange={setOpen}>
@@ -182,7 +179,7 @@ export function TaskDemo() {
           className="mt-auto self-start"
           onClick={() => {
             setMessages([]);
-            sendMessage(question);
+            void sendMessage(question);
           }}
         >
           Replay

@@ -1,5 +1,4 @@
 "use client";
-
 import { useChat } from "@ai-sdk/react";
 import type { UIDataTypes, UIMessage } from "ai";
 import {
@@ -15,43 +14,40 @@ import {
   TerminalIcon,
 } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import * as React from "react";
+import { type SubmitEvent, useRef, useState } from "react";
 
-import { Markdown } from "../../../../src/ai/markdown";
-import { Bubble, BubbleContent } from "../../../../src/ai/ui/bubble";
-import { Button } from "../../../../src/ai/ui/button";
-import { CodeBlock, CodeBlockContent } from "../../../../src/ai/ui/code-block";
 import {
+  Markdown,
+  Bubble,
+  BubbleContent,
+  Button,
+  CodeBlock,
+  CodeBlockContent,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "../../../../src/ai/ui/dropdown-menu";
-import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "../../../../src/ai/ui/empty";
-import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupTextarea,
-} from "../../../../src/ai/ui/input-group";
-import { Message, MessageContent } from "../../../../src/ai/ui/message";
-import {
+  Message,
+  MessageContent,
   MessageScroller,
   MessageScrollerButton,
   MessageScrollerContent,
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
-} from "../../../../src/ai/ui/message-scroller";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../../../src/ai/ui/tooltip";
-import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   Trace,
   TraceCollapsible,
   TraceCollapsibleContent,
@@ -59,7 +55,8 @@ import {
   TraceIcon,
   TraceLine,
   TraceTitle,
-} from "../../../../src/ai/ui/trace";
+} from "@flora/florets/ai";
+
 import { createChat, getMessageText } from "../lib/ai";
 import { MESSAGE_ANIMATIONS } from "../lib/message-animations";
 
@@ -160,15 +157,15 @@ export function ChatDemo() {
     messages: initialMessages,
     transport,
   });
-  const [draft, setDraft] = React.useState<string | null>(null);
-  const formRef = React.useRef<HTMLFormElement>(null);
+  const [draft, setDraft] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const shouldReduceMotion = useReducedMotion();
   const nextMessage = chat.next(messages);
   const busy = status === "submitted" || status === "streaming";
   const text = draft ?? (nextMessage ? getMessageText(nextMessage) : "");
   const canSend = text.trim().length > 0 && !busy;
 
-  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSend) {
       return;
@@ -239,7 +236,7 @@ export function ChatDemo() {
                             messageId={message.id}
                             scrollAnchor
                             variants={MESSAGE_ANIMATIONS["slide-up"].variants}
-                            initial={shouldReduceMotion ? false : "initial"}
+                            initial={shouldReduceMotion === true ? false : "initial"}
                             animate="animate"
                           >
                             <Message align="end">
@@ -266,6 +263,7 @@ export function ChatDemo() {
                               {steps.length > 0 && (
                                 <Trace>
                                   {steps.map((part, index) => (
+                                    // oxlint-disable-next-line react/no-array-index-key -- Streaming text parts have no IDs and retain their position as content is appended.
                                     <StepRow key={index} part={part} streaming={streaming} />
                                   ))}
                                 </Trace>
@@ -287,7 +285,9 @@ export function ChatDemo() {
               <InputGroup>
                 <InputGroupTextarea
                   value={text}
-                  onChange={(event) => setDraft(event.target.value)}
+                  onChange={(event) => {
+                    setDraft(event.target.value);
+                  }}
                   placeholder="Ask the agent..."
                   aria-label="Message"
                   className="min-h-14"
@@ -359,7 +359,7 @@ function StepRow({ part, streaming }: { part: ChatPart; streaming: boolean }) {
 }
 
 function ReasoningRow({ text, running }: { text: string; running: boolean }) {
-  const [open, setOpen] = React.useState<boolean>();
+  const [open, setOpen] = useState<boolean>();
 
   return (
     <TraceCollapsible open={open ?? running} onOpenChange={setOpen}>

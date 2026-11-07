@@ -24,17 +24,7 @@
     "denyWarnings": true,
     "reportUnusedDisableDirectives": "error"
   },
-  "ignorePatterns": [
-    "backend/",
-    "agent/",
-    "packaging/",
-    "florets/src/ai/ui/**",
-    "florets/src/ai/hooks/**",
-    "florets/src/ai/lib/**",
-    "florets/src/ai/markdown.tsx",
-    "florets/docs/src/ai/examples/**",
-    "florets/docs/src/ai/lib/**"
-  ],
+  "ignorePatterns": ["backend/", "agent/", "packaging/"],
   "rules": {
     "curly": ["error", "multi-line"],
     "func-style": ["error", "declaration", { "allowArrowFunctions": true }],

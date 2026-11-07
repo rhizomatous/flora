@@ -1,4 +1,3 @@
-import * as React from "react";
 import { createHighlighterCore, type GrammarState, type HighlighterCore } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 
@@ -31,30 +30,34 @@ const aliases: Record<string, keyof typeof languages> = {
   zsh: "bash",
 };
 
-let highlighter: Promise<HighlighterCore> | undefined;
+let highlighterPromise: Promise<HighlighterCore> | undefined;
 
 function getHighlighter() {
-  highlighter ??= createHighlighterCore({
+  highlighterPromise ??= createHighlighterCore({
     themes: [import("shiki/themes/github-light.mjs"), import("shiki/themes/github-dark.mjs")],
     langs: [],
     engine: createJavaScriptRegexEngine({ forgiving: true }),
   });
 
-  return highlighter;
+  return highlighterPromise;
 }
 
-function getLanguage(language: string) {
+function isLanguage(name: string): name is keyof typeof languages {
+  return Object.hasOwn(languages, name);
+}
+
+function getLanguage(language: string): keyof typeof languages | "ansi" | null {
   const name = language.toLowerCase();
 
   if (name === "ansi") {
     return name;
   }
 
-  if (name in languages) {
-    return name as keyof typeof languages;
+  if (isLanguage(name)) {
+    return name;
   }
 
-  return aliases[name] ?? null;
+  return Object.hasOwn(aliases, name) ? aliases[name] : null;
 }
 
 // Loads a language and returns a highlighter for it, or null for a language
@@ -91,10 +94,10 @@ export async function loadHighlighter(language: string) {
 
       return {
         lines: tokens.map((line) =>
-          line.map((token, index) => (
+          line.map((token) => (
             <span
-              key={index}
-              style={token.htmlStyle as React.CSSProperties}
+              key={token.offset}
+              style={token.htmlStyle}
               className="text-(--shiki-light) dark:text-(--shiki-dark)"
             >
               {token.content}

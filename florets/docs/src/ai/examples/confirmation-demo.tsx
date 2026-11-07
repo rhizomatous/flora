@@ -7,7 +7,7 @@ import {
   type UIMessage,
 } from "ai";
 import { CircleCheckIcon, LoaderCircleIcon, TerminalIcon } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 
 import { Bubble, BubbleContent } from "../../../../src/ai/ui/bubble";
 import { Button } from "../../../../src/ai/ui/button";
@@ -59,7 +59,9 @@ const chat = createChat<ChatMessage>()
   .assistant(({ writer, toolCall }) => {
     writer.sleep(600);
     writer.text(
-      toolCall?.approved ? "Removed the dist folder." : "Okay, I left the dist folder in place.",
+      toolCall?.approved === true
+        ? "Removed the dist folder."
+        : "Okay, I left the dist folder in place.",
     );
   });
 
@@ -95,11 +97,13 @@ export function ConfirmationDemo() {
             <MessageContent className="gap-4">
               {message.parts.map((part, index) => {
                 if (part.type === "text") {
+                  // oxlint-disable-next-line react/no-array-index-key -- Streaming text parts have no IDs and retain their position as content is appended.
                   return <p key={index}>{part.text}</p>;
                 }
 
                 if (part.type === "reasoning") {
                   return (
+                    // oxlint-disable-next-line react/no-array-index-key -- Streaming text parts have no IDs and retain their position as content is appended.
                     <Trace key={index}>
                       <ReasoningRow text={part.text} running={part.state === "streaming"} />
                     </Trace>
@@ -125,23 +129,23 @@ export function ConfirmationDemo() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() =>
-                            addToolApprovalResponse({
+                          onClick={() => {
+                            void addToolApprovalResponse({
                               id: part.approval.id,
                               approved: false,
-                            })
-                          }
+                            });
+                          }}
                         >
                           Deny
                         </Button>
                         <Button
                           size="sm"
-                          onClick={() =>
-                            addToolApprovalResponse({
+                          onClick={() => {
+                            void addToolApprovalResponse({
                               id: part.approval.id,
                               approved: true,
-                            })
-                          }
+                            });
+                          }}
                         >
                           Approve
                         </Button>
@@ -154,6 +158,7 @@ export function ConfirmationDemo() {
                   part.state === "output-denied" ||
                   (part.state === "approval-responded" && !part.approval.approved);
 
+                const commandTitle = part.state === "output-available" ? "Ran" : "Running";
                 return (
                   <Trace key={part.toolCallId}>
                     <TraceLine
@@ -163,8 +168,7 @@ export function ConfirmationDemo() {
                         <TerminalIcon />
                       </TraceIcon>
                       <TraceTitle>
-                        {denied ? "Denied" : part.state === "output-available" ? "Ran" : "Running"}{" "}
-                        {part.input?.command}
+                        {denied ? "Denied" : commandTitle} {part.input?.command}
                       </TraceTitle>
                     </TraceLine>
                   </Trace>
@@ -179,7 +183,13 @@ export function ConfirmationDemo() {
           variant="outline"
           size="sm"
           className="mt-auto self-start"
-          onClick={() => (nextMessage ? sendMessage(nextMessage) : setMessages(initialMessages))}
+          onClick={() => {
+            if (nextMessage) {
+              void sendMessage(nextMessage);
+            } else {
+              setMessages(initialMessages);
+            }
+          }}
         >
           {nextMessage ? "Send message" : "Reset"}
         </Button>
@@ -189,7 +199,7 @@ export function ConfirmationDemo() {
 }
 
 function ReasoningRow({ text, running }: { text: string; running: boolean }) {
-  const [open, setOpen] = React.useState<boolean>();
+  const [open, setOpen] = useState<boolean>();
 
   return (
     <TraceCollapsible open={open ?? running} onOpenChange={setOpen}>
