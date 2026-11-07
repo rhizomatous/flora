@@ -1,19 +1,10 @@
 import { useState } from "react";
 
-import {
-  Button,
-  Field,
-  FieldLabel,
-  Heading,
-  StippleBackground,
-  Text,
-  Textarea,
-  Wordmark,
-} from "@flora/florets";
+import { Button, Field, FieldLabel, StippleBackground, Text } from "@flora/florets";
 
 export function StippleExample() {
-  const [intensity, setIntensity] = useState(0.22);
-  const [density, setDensity] = useState(0.5);
+  const [intensity, setIntensity] = useState(0.32);
+  const [density, setDensity] = useState(0.75);
   const [motion, setMotion] = useState(true);
   const [seed, setSeed] = useState(1);
   return (
@@ -74,8 +65,8 @@ export function StippleExample() {
           variant="ghost"
           size="sm"
           onClick={() => {
-            setIntensity(0.22);
-            setDensity(0.5);
+            setIntensity(0.32);
+            setDensity(0.75);
             setMotion(true);
             setSeed(1);
           }}
@@ -87,26 +78,8 @@ export function StippleExample() {
         Motion stays still when your device requests reduced motion. Use the guide’s theme switch to
         compare light and dark.
       </Text>
-      <div className="relative isolate min-h-[32rem] overflow-hidden rounded-xl border border-border bg-background">
+      <div className="relative isolate aspect-[16/10] min-h-64 overflow-hidden rounded-xl border border-border bg-background">
         <StippleBackground intensity={intensity} density={density} motion={motion} seed={seed} />
-        <div className="relative space-y-20 p-6 sm:p-8">
-          <Wordmark />
-          <div className="mx-auto max-w-lg space-y-6">
-            <Heading level={3} className="text-center text-xl">
-              What would you like to work on?
-            </Heading>
-            <Field>
-              <FieldLabel htmlFor="stipple-task" className="sr-only">
-                Task preview
-              </FieldLabel>
-              <Textarea
-                id="stipple-task"
-                className="min-h-36 bg-background/90"
-                placeholder="Describe a task…"
-              />
-            </Field>
-          </div>
-        </div>
       </div>
     </div>
   );

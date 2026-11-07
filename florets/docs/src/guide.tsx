@@ -225,7 +225,7 @@ export function Guide() {
                 title="StippleBackground"
                 description="Place in a positioned container with content above it. Intensity and density accept 0–1; seed chooses a repeatable pattern. Motion pauses offscreen and in hidden tabs."
                 code={
-                  '<div className="relative isolate overflow-hidden">\n  <StippleBackground intensity={0.22} density={0.5} motion seed={1} />\n  <div className="relative">Your content</div>\n</div>'
+                  '<div className="relative isolate overflow-hidden">\n  <StippleBackground intensity={0.32} density={0.75} motion seed={1} />\n  <div className="relative">Your content</div>\n</div>'
                 }
               >
                 <StippleExample />
