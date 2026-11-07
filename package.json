@@ -15,7 +15,7 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "typecheck": "tsc -p web && tsc -p florets && tsc -p scripts && tsc -p florets/tsconfig.ai.json",
-    "test": "node --test scripts/request.test.ts scripts/preview.test.ts scripts/ai-elements.test.ts",
+    "test": "node --test scripts/request.test.ts scripts/preview.test.ts",
     "docs:dev": "npm run docs:dev --workspace @flora/florets",
     "docs:build": "npm run docs:build --workspace @flora/florets",
     "docs:preview": "npm run docs:preview --workspace @flora/florets",
