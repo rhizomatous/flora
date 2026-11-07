@@ -218,8 +218,6 @@ The guide lives in `florets/docs/` and imports the library directly. It includes
 live examples, usage snippets, and a light/dark theme switch. It needs no backend.
 Use `npm run docs:build` to produce a standalone static site in `florets/docs-dist/`,
 and `npm run docs:preview` to preview that build. `make check` builds the guide too.
-After building, run `npm run docs:test` for its Chromium checks; `make browser`
-also includes them. Install Chromium with `npx playwright install chromium` first.
 
 ## Repository layout
 
