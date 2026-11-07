@@ -84,6 +84,36 @@ metadata without generating model responses, pulling images or writing to GitHub
 Successful metadata validation does not establish inference quota or repository
 write access. Setup and runtime failures remain visible in each chat's saved activity.
 
+### Chat UI preview
+
+Run `npm ci`, then `npm run preview:chat` and open the loopback URL printed by Vite.
+The sidebar includes working, completed, waiting-for-an-answer, recovered-failure,
+and long-response chats. The preview uses the real app components, API requests,
+and EventSource connection. Its toolbar can replay, pause, or resume the working
+chat. Reload restores hidden controls. Playback is shared by tabs on that dev server.
+
+This mode needs no backend, Docker, credentials, or model access. All API routes
+are intercepted locally; mutations return a read-only error and unknown routes
+never reach an installation. Changed-file review data is illustrative. The preview
+plugin and fixtures are not included in production builds.
+
+Message and question fixtures were captured from Flora's pinned OpenCode 1.2.27
+server using a local deterministic Anthropic-compatible provider. OpenCode executes
+the tools and produces the payloads; only the temporary workspace path is replaced
+with `/workspace`. The committed captures are checked against that exact SDK version.
+Flora's saved-message and activity envelopes are constructed separately, since the
+browser does not consume OpenCode's API directly. This is a UI fixture, not a claim
+that the sample prose came from a live model.
+
+To recapture, install OpenCode **1.2.27** separately, then run
+`OPENCODE_BIN=/absolute/path/to/opencode npm run preview:capture` followed by
+`npm run format` and `npm run check`. The capture command rejects other versions,
+uses temporary HOME/XDG directories, disables project config and default plugins,
+and supplies only a local provider with a fake key. It runs a bounded shell check
+and a missing-file read in its temporary workspace. No existing OpenCode sessions
+or credentials are used. Update the image, SDK pin, and captures together when
+changing the runtime version.
+
 ### Enable chat execution
 
 Build the pinned image as described in `agent/README.md`, then supply
