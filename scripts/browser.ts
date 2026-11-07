@@ -39,3 +39,15 @@ export async function assertFitsPhone(page: Page) {
     true,
   );
 }
+
+/** Opens installation actions without toggling an already-open menu closed. */
+export async function openWorkspaceMenu(page: Page) {
+  const trigger = page.getByRole("button", { name: "Workspace menu", exact: true });
+  if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click();
+}
+
+/** Opens settings through the workspace menu. */
+export async function openSettings(page: Page) {
+  await openWorkspaceMenu(page);
+  await page.getByRole("menuitem", { name: "Settings", exact: true }).click();
+}
