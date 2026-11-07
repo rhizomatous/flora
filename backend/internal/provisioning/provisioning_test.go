@@ -2,6 +2,7 @@ package provisioning
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -16,12 +17,133 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
+func TestSetupErrorTailMasksPartialSecretsAfterShrinkageAndTrim(t *testing.T) {
+	secret := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabc"
+	shrinkSecret := "another-credential-" + strings.Repeat("Q", 81)
+	engine := newFakeEngine()
+	manager, store := newTestManager(t, engine, Config{ProviderAPIKey: secret}, nil)
+	chat := newChat(t, store)
+	ctx := context.Background()
+	if err := store.SaveCredentials(ctx, storage.Credentials{Provider: "anthropic", Model: "model", ProviderKey: shrinkSecret, GitHubToken: "github_pat_test_fixture"}); err != nil {
+		t.Fatal(err)
+	}
+	paths, err := store.Paths(ctx, chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(paths.RuntimeState, "setup"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(paths.RuntimeState, "setup", "exit-status"), []byte("1"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	repeats := strings.Repeat(shrinkSecret, 300)
+	padding := strings.Repeat("z", (32<<10)-20-len(repeats)-20)
+	input := strings.Repeat("x", 64<<10) + secret + repeats + padding + secret[:20]
+	if len(input)-(32<<10) != (64<<10)+19 {
+		t.Fatal("fixture does not cut the credential at the raw window boundary")
+	}
+	for _, test := range []struct{ input, want string }{
+		{input, "[redacted]" + strings.Repeat("[redacted]", 300) + padding + "[redacted]"},
+		{strings.Repeat("x", 64<<10) + secret[19:] + strings.Repeat("z", setupTailMax-20), "[redacted]" + strings.Repeat("z", setupTailMax-20)},
+	} {
+		if err := os.WriteFile(filepath.Join(paths.RuntimeState, "setup", "output.log"), []byte(test.input), 0600); err != nil {
+			t.Fatal(err)
+		}
+		var info docker.ContainerInfo
+		info.State.ExitCode = 1
+		var setupErr *SetupError
+		if err := manager.containerExited(ctx, chat.ID, paths, info); !errors.As(err, &setupErr) {
+			t.Fatal("expected setup error")
+		}
+		if setupErr.OutputTail != test.want || len(setupErr.OutputTail) > setupTailMax {
+			t.Fatal("setup error exposed a credential boundary fragment")
+		}
+	}
+}
+
+func TestInstalledProviderEnvironmentAndEndpointRecovery(t *testing.T) {
+	for provider, key := range map[string]string{"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "google": "GOOGLE_GENERATIVE_AI_API_KEY"} {
+		t.Run(provider, func(t *testing.T) {
+			engine := newFakeEngine()
+			manager, store := newTestManager(t, engine, Config{ProviderAPIKey: "old-test-key"}, nil)
+			chat := newChat(t, store)
+			ctx := context.Background()
+			if err := store.SaveCredentials(ctx, storage.Credentials{Provider: provider, Model: "installed-model", ProviderKey: "installed-test-secret", GitHubToken: "github_pat_host-only"}); err != nil {
+				t.Fatal(err)
+			}
+			endpoint, err := manager.Start(ctx, chat.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			info, err := engine.ContainerInspect(ctx, endpoint.ContainerID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if info.EnvValue(key) != "installed-test-secret" {
+				t.Fatal("provider key not installed")
+			}
+			for _, value := range info.Config.Env {
+				if strings.Contains(value, "host-only") || strings.Contains(value, "old-test-key") {
+					t.Fatal("wrong credential entered container")
+				}
+			}
+			var config struct {
+				Model      string   `json:"model"`
+				SmallModel string   `json:"small_model"`
+				Enabled    []string `json:"enabled_providers"`
+			}
+			if json.Unmarshal([]byte(info.EnvValue("OPENCODE_CONFIG_CONTENT")), &config) != nil || config.Model != provider+"/installed-model" || config.SmallModel != config.Model || len(config.Enabled) != 1 || config.Enabled[0] != provider {
+				t.Fatal("installation model config missing")
+			}
+			recovered, err := manager.Endpoint(ctx, chat.ID)
+			if err != nil || recovered != endpoint || len(engine.created) != 1 {
+				t.Fatal("endpoint recovery changed runtime")
+			}
+		})
+	}
+}
+
 const (
 	testDigest  = "flora/agent@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	testImageID = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 )
 
+func TestPausedActivityDoesNotStopContainer(t *testing.T) {
+	engine := newFakeEngine()
+	manager, store := newTestManager(t, engine, Config{ActivityTimeout: time.Hour}, nil)
+	chat := newChat(t, store)
+	ctx := context.Background()
+	endpoint, err := manager.Start(ctx, chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	manager.now = func() time.Time { return now }
+	manager.BeginActivity(endpoint.ContainerID)
+	now = now.Add(30 * time.Minute)
+	manager.EndActivity(endpoint.ContainerID)
+	now = now.Add(3 * time.Hour)
+	stopped, err := manager.SweepActivity(ctx)
+	if err != nil || len(stopped) != 0 || len(engine.stopped) != 0 {
+		t.Fatal("paused user question stopped its container")
+	}
+	manager.BeginActivity(endpoint.ContainerID)
+	now = now.Add(59 * time.Minute)
+	stopped, err = manager.SweepActivity(ctx)
+	if err != nil || len(stopped) != 0 {
+		t.Fatal("resumed clock did not start fresh")
+	}
+	now = now.Add(2 * time.Minute)
+	stopped, err = manager.SweepActivity(ctx)
+	if err != nil || len(stopped) != 1 {
+		t.Fatal("resumed execution never timed out")
+	}
+}
+
 type fakeContainer struct {
+	networkID         string
+	extraHosts        []string
 	id, name, imageID string
 	labels            map[string]string
 	binds             []string
@@ -84,6 +206,7 @@ func (f *fakeEngine) ContainerCreate(_ context.Context, spec docker.ContainerSpe
 	id := fmt.Sprintf("container-%d", f.nextID)
 	f.created = append(f.created, spec)
 	f.containers[id] = &fakeContainer{
+		networkID: spec.NetworkID, extraHosts: spec.ExtraHosts,
 		id: id, name: spec.Name, imageID: f.imageID, labels: spec.Labels,
 		binds: spec.Binds, env: spec.Env, port: "49152",
 	}
@@ -150,6 +273,11 @@ func (f *fakeEngine) ContainerInspect(_ context.Context, idOrName string) (docke
 	info.Config.Env = c.env
 	info.Config.Labels = c.labels
 	info.HostConfig.Binds = c.binds
+	info.HostConfig.NetworkMode = c.networkID
+	info.HostConfig.ExtraHosts = c.extraHosts
+	if c.networkID != "" {
+		info.NetworkSettings.Networks = map[string]string{"flora-test": c.networkID}
+	}
 	if c.port != "" {
 		info.NetworkSettings.Ports = map[string][]docker.PortBinding{"4096/tcp": {{HostIP: "127.0.0.1", HostPort: c.port}}}
 	}
@@ -175,7 +303,68 @@ func (f *fakeEngine) ContainerList(_ context.Context, running bool, labels map[s
 	return list, nil
 }
 
-func newTestManager(t *testing.T, engine *fakeEngine, cfg Config, checkout CheckoutFunc) (*Manager, *storage.Store) {
+type checkoutFunc func(context.Context, storage.Chat, storage.Paths, string) error
+
+func (f checkoutFunc) Checkout(ctx context.Context, chat storage.Chat, paths storage.Paths, id string) error {
+	return f(ctx, chat, paths, id)
+}
+func (f checkoutFunc) Revoke(context.Context, string) error { return nil }
+
+type observedAccess struct {
+	checkoutFunc
+	revoked int
+}
+
+func (a *observedAccess) Revoke(context.Context, string) error { a.revoked++; return nil }
+
+func TestFailedCheckoutStopsBeforeReadinessAndRetries(t *testing.T) {
+	engine := newFakeEngine()
+	m, store := newTestManager(t, engine, Config{}, nil)
+	chat := newChat(t, store)
+	fail := true
+	checks := 0
+	a := &observedAccess{checkoutFunc: func(ctx context.Context, chat storage.Chat, paths storage.Paths, id string) error {
+		info, err := engine.ContainerInspect(ctx, id)
+		if err != nil || !info.State.Running {
+			t.Fatal("checkout must run inside the started container")
+		}
+		if fail {
+			return errors.New("repository checkout failed")
+		}
+		return nil
+	}}
+	m.access = a
+	m.health = func(context.Context, string, string) bool { checks++; return true }
+	if _, err := m.Start(context.Background(), chat.ID); err == nil {
+		t.Fatal("checkout failure allowed startup")
+	}
+	if checks != 0 || a.revoked != 1 {
+		t.Fatal("checkout failure reached readiness or retained credentials")
+	}
+	saved, err := store.Chat(context.Background(), chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := engine.ContainerInspect(context.Background(), saved.ContainerID)
+	if err != nil || info.State.Running {
+		t.Fatal("failed checkout left container running")
+	}
+	fail = false
+	if _, err := m.Start(context.Background(), chat.ID); err != nil {
+		t.Fatal(err)
+	}
+	if len(engine.created) != 1 || checks != 1 {
+		t.Fatal("retry created a new container")
+	}
+	if err := m.Stop(context.Background(), chat.ID); err != nil {
+		t.Fatal(err)
+	}
+	if a.revoked != 2 {
+		t.Fatal("stop did not revoke")
+	}
+}
+
+func newTestManager(t *testing.T, engine *fakeEngine, cfg Config, checkout WorkspaceAccess) (*Manager, *storage.Store) {
 	t.Helper()
 	store, err := storage.Open(context.Background(), filepath.Join(t.TempDir(), "data"))
 	if err != nil {
@@ -187,6 +376,9 @@ func newTestManager(t *testing.T, engine *fakeEngine, cfg Config, checkout Check
 	}
 	if cfg.HarnessVersion == "" {
 		cfg.HarnessVersion = "1.2.27"
+	}
+	if cfg.NetworkID == "" && cfg.BrokerGateway == "" {
+		cfg.NetworkID, cfg.BrokerGateway = strings.Repeat("a", 64), "172.29.80.1"
 	}
 	m, err := New(engine, store, cfg, checkout)
 	if err != nil {
@@ -231,11 +423,12 @@ func TestConfigDefaultsAndValidation(t *testing.T) {
 		"tag with bad image ID":    {ImageRef: "flora/agent:dev", ImageID: "not-a-sha", HarnessVersion: "1.2.27"},
 		"identity mismatch":        {ImageRef: testDigest, ImageDigest: "flora/agent@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", HarnessVersion: "1.2.27"},
 	} {
+		cfg.NetworkID, cfg.BrokerGateway = strings.Repeat("a", 64), "172.29.80.1"
 		if _, err := New(newFakeEngine(), store, cfg, nil); err == nil {
 			t.Errorf("%s: config must be rejected", name)
 		}
 	}
-	m, err := New(newFakeEngine(), store, Config{ImageRef: testDigest, HarnessVersion: "1.2.27"}, nil)
+	m, err := New(newFakeEngine(), store, Config{NetworkID: strings.Repeat("a", 64), BrokerGateway: "172.29.80.1", ImageRef: testDigest, HarnessVersion: "1.2.27"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,11 +451,16 @@ func TestStartCreatesIsolatedContainer(t *testing.T) {
 	engine := newFakeEngine()
 	var checkedOut []storage.Repository
 	var workspace string
-	checkout := func(_ context.Context, dir string, repos []storage.Repository) error {
-		workspace = dir
-		checkedOut = repos
+	checkout := checkoutFunc(func(_ context.Context, chat storage.Chat, paths storage.Paths, id string) error {
+		workspace = paths.Workspace
+		checkedOut = nil
+		for _, r := range chat.Configuration.Repositories {
+			if r.Role == "core" {
+				checkedOut = append(checkedOut, r)
+			}
+		}
 		return nil
-	}
+	})
 	m, store := newTestManager(t, engine, Config{ProviderAPIKey: "test-key"}, checkout)
 	chat := newChat(t, store)
 	endpoint, err := m.Start(context.Background(), chat.ID)
@@ -316,7 +514,7 @@ func TestStartCreatesIsolatedContainer(t *testing.T) {
 			t.Fatalf("env missing %q in %q", want, env)
 		}
 	}
-	// Checkout ran before creation and received only the core repository.
+	// Checkout prepared this container's workspace before runtime readiness.
 	if workspace == "" || len(checkedOut) != 1 || checkedOut[0].Name != "core" {
 		t.Fatalf("checkout: %q %+v", workspace, checkedOut)
 	}
@@ -331,7 +529,7 @@ func TestStartCreatesIsolatedContainer(t *testing.T) {
 	if endpoint.URL != "http://127.0.0.1:49152" || endpoint.Username != "opencode" || endpoint.Password == "" {
 		t.Fatalf("endpoint: %+v", endpoint)
 	}
-	// A second start reuses the container and skips checkout.
+	// A second start reuses the container and idempotently prepares its access.
 	if _, err := m.Start(context.Background(), chat.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -415,6 +613,7 @@ func TestStartAdoptsOwnedOrphan(t *testing.T) {
 		t.Fatal(err)
 	}
 	orphan := docker.ContainerSpec{
+		NetworkID: m.cfg.NetworkID, ExtraHosts: m.brokerHosts(),
 		Name:   containerName(chat.ID),
 		Image:  testDigest,
 		Env:    []string{"OPENCODE_SERVER_PASSWORD=orphan-secret"},
@@ -440,6 +639,37 @@ func TestStartAdoptsOwnedOrphan(t *testing.T) {
 	}
 	if saved.ContainerID != endpoint.ContainerID {
 		t.Fatal("adoption must bind the existing container")
+	}
+}
+
+func TestStopAdoptsAndStopsOwnedOrphan(t *testing.T) {
+	engine := newFakeEngine()
+	m, store := newTestManager(t, engine, Config{}, nil)
+	chat := newChat(t, store)
+	ctx := context.Background()
+	paths, err := store.Paths(ctx, chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := engine.ContainerCreate(ctx, docker.ContainerSpec{
+		NetworkID: m.cfg.NetworkID, ExtraHosts: m.brokerHosts(),
+		Name: containerName(chat.ID), Image: testDigest,
+		Labels: map[string]string{labelManaged: "true", labelChatID: chat.ID},
+		Binds:  []string{paths.Workspace + ":/workspace", paths.RuntimeState + ":/home/flora"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := engine.ContainerStart(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Stop(ctx, chat.ID); err != nil {
+		t.Fatal(err)
+	}
+	saved, _ := store.Chat(ctx, chat.ID)
+	info, err := engine.ContainerInspect(ctx, id)
+	if err != nil || info.State.Running || saved.ContainerID != id || len(engine.created) != 1 {
+		t.Fatal("orphan was left running or replaced")
 	}
 }
 
@@ -474,7 +704,7 @@ func TestStartRejectsForeignNameCollision(t *testing.T) {
 				t.Fatal(err)
 			}
 			mutate(engine, id)
-			if _, err := m.Start(context.Background(), chat.ID); err == nil || !strings.Contains(err.Error(), "refusing to adopt") {
+			if _, err := m.Start(context.Background(), chat.ID); err == nil || !strings.Contains(err.Error(), "refusing access") {
 				t.Fatalf("foreign container must be rejected: %v", err)
 			}
 			if len(engine.created) != 1 {
@@ -822,7 +1052,12 @@ func TestRunActivityEnforcementSweepsOnInterval(t *testing.T) {
 
 func TestEndpointRecovery(t *testing.T) {
 	engine := newFakeEngine()
-	m, store := newTestManager(t, engine, Config{}, nil)
+	preparations := 0
+	access := checkoutFunc(func(context.Context, storage.Chat, storage.Paths, string) error {
+		preparations++
+		return nil
+	})
+	m, store := newTestManager(t, engine, Config{}, access)
 	chat := newChat(t, store)
 	endpoint, err := m.Start(context.Background(), chat.ID)
 	if err != nil {
@@ -834,6 +1069,15 @@ func TestEndpointRecovery(t *testing.T) {
 	}
 	if recovered != endpoint {
 		t.Fatalf("recovery must rebuild the endpoint: %+v vs %+v", recovered, endpoint)
+	}
+	if preparations != 1 {
+		t.Fatal("endpoint lookup prepared access again")
+	}
+	if _, err := m.Start(context.Background(), chat.ID); err != nil {
+		t.Fatal(err)
+	}
+	if preparations != 2 {
+		t.Fatal("explicit start did not prepare access again")
 	}
 	if err := m.Stop(context.Background(), chat.ID); err != nil {
 		t.Fatal(err)

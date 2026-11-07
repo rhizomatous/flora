@@ -111,7 +111,7 @@ func TestDurableRecordsAndImmutableSnapshot(t *testing.T) {
 	s = openTest(t, root)
 	saved, err := s.Chat(ctx, c.ID)
 	must(t, err)
-	if !reflect.DeepEqual(saved.Configuration, p.Configuration) || saved.StartingCommits["flora"] != sha || saved.ImageDigest != image || saved.HarnessVersion != "opencode/1.2.27" || saved.ContainerID != "container-1" || saved.SessionID != "session-1" || saved.Status != Waiting || saved.ActiveMessageID != accepted.Message.ID {
+	if !reflect.DeepEqual(saved.Configuration, c.Configuration) || saved.StartingCommits["flora"] != sha || saved.ImageDigest != image || saved.HarnessVersion != "opencode/1.2.27" || saved.ContainerID != "container-1" || saved.SessionID != "session-1" || saved.Status != Waiting || saved.ActiveMessageID != accepted.Message.ID {
 		t.Fatalf("bad saved snapshot: %+v", saved)
 	}
 	savedProject, err := s.Project(ctx, p.ID)
@@ -150,6 +150,61 @@ func TestDurableRecordsAndImmutableSnapshot(t *testing.T) {
 	_, err = s.db.ExecContext(ctx, "UPDATE chats SET config='{}' WHERE id=?", c.ID)
 	if err == nil {
 		t.Fatal("schema allowed snapshot mutation")
+	}
+}
+
+func TestLegacyProjectConfigurationJSON(t *testing.T) {
+	s := openTest(t, t.TempDir())
+	p, _ := fixture(t, s)
+	legacy := `{"Repositories":[{"Name":"flora","URL":"https://github.com/rhizomatous/flora","BaseBranch":"main","Role":"core"}],"SetupCommand":"make deps"}`
+	_, err := s.db.ExecContext(ctx, "UPDATE projects SET config=? WHERE id=?", legacy, p.ID)
+	must(t, err)
+	projects, err := s.Projects(ctx)
+	must(t, err)
+	if len(projects) != 1 || !reflect.DeepEqual(projects[0].Configuration, p.Configuration) {
+		t.Fatal("legacy configuration changed")
+	}
+	chat, err := s.CreateChat(ctx, p.ID, "Legacy", image, "opencode/1")
+	must(t, err)
+	expected := p.Configuration
+	runtime := DefaultPreferences().RuntimeDefaults
+	expected.Runtime = &runtime
+	if !reflect.DeepEqual(chat.Configuration, expected) {
+		t.Fatal("legacy snapshot changed")
+	}
+}
+
+func TestProjectsOrderedByCreationInstant(t *testing.T) {
+	s := openTest(t, t.TempDir())
+	config, err := configJSON(Configuration{Repositories: []Repository{{Name: "flora", URL: "https://github.com/rhizomatous/flora", BaseBranch: "main", Role: "core"}}})
+	must(t, err)
+	stamps := map[string]string{
+		"whole-second":         "2026-10-27T12:00:00Z",
+		"one-tenth":            "2026-10-27T12:00:00.1Z",
+		"fifteen-hundredths":   "2026-10-27T12:00:00.15Z",
+		"one-nanosecond-later": "2026-10-27T12:00:00.150000001Z",
+		"next-second-a":        "2026-10-27T12:00:01Z",
+		"next-second-b":        "2026-10-27T13:00:01+01:00",
+		"previous-day":         "2026-10-26T23:59:59.999999999Z",
+	}
+	for id, stamp := range stamps {
+		_, err := s.db.ExecContext(ctx, "INSERT INTO projects VALUES (?,?,?,?)", id, id, string(config), stamp)
+		must(t, err)
+	}
+	want := []string{"next-second-a", "next-second-b", "one-nanosecond-later", "fifteen-hundredths", "one-tenth", "whole-second", "previous-day"}
+	for range 3 {
+		projects, err := s.Projects(ctx)
+		must(t, err)
+		var got []string
+		for _, project := range projects {
+			got = append(got, project.ID)
+			if project.CreatedAt != stamps[project.ID] {
+				t.Fatal("listing rewrote a timestamp")
+			}
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("project order = %v, want %v", got, want)
+		}
 	}
 }
 
@@ -371,7 +426,9 @@ func TestMigrationSafety(t *testing.T) {
 	must(t, s.Close())
 	brokenRoot := t.TempDir()
 	broken := openTest(t, brokenRoot)
-	_, err = broken.db.Exec("DROP TABLE browser_sessions; DROP TABLE administrator; DROP TABLE installation_credentials; DROP TRIGGER immutable_chat_config; DROP TABLE starting_commits; DROP TABLE activity; DROP TABLE chats; DROP TABLE messages; DROP TABLE projects; CREATE TABLE chats (conflict TEXT); PRAGMA user_version=0")
+	_, err = broken.db.Exec("DROP TABLE installation_settings")
+	must(t, err)
+	_, err = broken.db.Exec("DROP TABLE chat_requests; DROP TABLE github_capabilities; DROP TABLE browser_sessions; DROP TABLE administrator; DROP TABLE installation_credentials; DROP TRIGGER immutable_chat_config; DROP TABLE starting_commits; DROP TABLE activity; DROP TABLE chats; DROP TABLE messages; DROP TABLE projects; CREATE TABLE chats (conflict TEXT); PRAGMA user_version=0")
 	must(t, err)
 	if err := broken.migrate(ctx); err == nil {
 		t.Fatal("expected migration conflict")

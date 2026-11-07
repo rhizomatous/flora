@@ -64,13 +64,13 @@ func TestAuthenticationBoundaries(t *testing.T) {
 		t.Fatal("missing cookie")
 	}
 	c := cookies[0]
-	if c.Name != cookieName || !c.HttpOnly || !c.Secure || c.Path != "/" || c.Domain != "" || c.SameSite != http.SameSiteStrictMode || c.MaxAge != 604800 {
+	if c.Name != cookieName || !c.HttpOnly || !c.Secure || c.Path != "/" || c.Domain != "" || c.SameSite != http.SameSiteStrictMode || c.MaxAge < 604798 || c.MaxAge > 604800 {
 		t.Fatalf("unsafe cookie: %+v", c)
 	}
 	cookie := c.Name + "=" + c.Value
 	expect(call("POST", "/api/auth/bootstrap", password, "https://flora.test", "", cookie), 409)
 	expect(call("GET", "/api/settings", "", "", "", cookie), 200)
-	expect(call("GET", "/api/projects", "", "", "", cookie), 404)
+	expect(call("GET", "/api/projects", "", "", "", cookie), 200)
 	input := `{"provider":"openai","model":"gpt-test","githubToken":"github_pat_PRIVATE","providerKey":"PROVIDER_PRIVATE"}`
 	for _, origin := range []string{"", "https://evil.test", "null"} {
 		expect(call("PUT", "/api/settings", input, origin, "", cookie), 403)

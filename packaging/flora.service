@@ -1,0 +1,23 @@
+[Unit]
+Description=Flora
+Requires=docker.service
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+UMask=0077
+ExecStart=/opt/flora/flora -public-url https://flora.example.com -data-dir /var/lib/flora
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/flora
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

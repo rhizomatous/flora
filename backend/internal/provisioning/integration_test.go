@@ -87,13 +87,22 @@ func TestProvisioningDocker(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	// The checkout callback stands in for the chat lifecycle's repository
-	// download: it writes real files into the workspace before the first
-	// container start.
-	checkout := func(_ context.Context, workspaceDir string, _ []storage.Repository) error {
-		return os.WriteFile(filepath.Join(workspaceDir, "checked-out.txt"), []byte("checkout\n"), 0644)
+	// Prepare a real workspace before releasing the entrypoint to run setup.
+	checkout := checkoutFunc(func(ctx context.Context, _ storage.Chat, paths storage.Paths, id string) error {
+		file := filepath.Join(paths.Workspace, "checked-out.txt")
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			if err := os.WriteFile(file, []byte("checkout\n"), 0644); err != nil {
+				return err
+			}
+		}
+		_, err := engine.Exec(ctx, id, "0", []string{"sh", "-c", ": > /home/flora/.flora-github.env; touch /var/lib/flora-checkout.ready"}, nil, io.Discard, io.Discard)
+		return err
+	})
+	network, err := engine.NetworkInspect(ctx, "bridge")
+	if err != nil {
+		t.Fatal(err)
 	}
-	cfg := Config{ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", MaxRunning: 2}
+	cfg := Config{NetworkID: network.ID, BrokerGateway: network.Gateways[0], ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", MaxRunning: 2}
 	m, err := New(observedEngine{Engine: engine, t: t}, store, cfg, checkout)
 	if err != nil {
 		t.Fatal(err)
@@ -235,9 +244,11 @@ func TestProvisioningDocker(t *testing.T) {
 			t.Fatal(err)
 		}
 		orphanID, err := engine.ContainerCreate(ctx, docker.ContainerSpec{
+			NetworkID: cfg.NetworkID, ExtraHosts: []string{"flora-github.internal:" + cfg.BrokerGateway},
 			Name:  containerName(chat.ID),
 			Image: image,
 			Env: []string{
+				"FLORA_CHECKOUT_REQUIRED=1",
 				"OPENCODE_SERVER_PASSWORD=orphan-secret",
 				"FLORA_UID=" + strconv.Itoa(os.Getuid()),
 				"FLORA_GID=" + strconv.Itoa(os.Getgid()),
@@ -299,7 +310,7 @@ func TestProvisioningDocker(t *testing.T) {
 	})
 
 	t.Run("setup timeout", func(t *testing.T) {
-		short, err := New(engine, store, Config{ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", SetupTimeout: 3 * time.Second}, nil)
+		short, err := New(engine, store, Config{NetworkID: network.ID, BrokerGateway: network.Gateways[0], ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", SetupTimeout: 3 * time.Second}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -329,7 +340,7 @@ func TestProvisioningDocker(t *testing.T) {
 	})
 
 	t.Run("setup ignoring SIGTERM is killed", func(t *testing.T) {
-		bounded, err := New(engine, store, Config{ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", SetupTimeout: 2 * time.Second, SetupKillGrace: time.Second}, nil)
+		bounded, err := New(engine, store, Config{NetworkID: network.ID, BrokerGateway: network.Gateways[0], ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27", SetupTimeout: 2 * time.Second, SetupKillGrace: time.Second}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

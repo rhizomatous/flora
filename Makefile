@@ -1,4 +1,4 @@
-.PHONY: deps web build build-linux check smoke
+.PHONY: deps web build build-linux check smoke browser
 
 export GOTOOLCHAIN := local
 
@@ -25,4 +25,7 @@ check: web
 	CGO_ENABLED=0 go -C backend test -mod=readonly ./...
 
 smoke: build
-	node --test scripts/smoke.test.mjs
+	node --test scripts/smoke.test.ts
+
+browser: web
+	FLORA_CHAT_BROWSER_TEST=1 go -C backend test -mod=readonly -count=1 -run 'Test(Chat|Changes|Projects|Settings|Enrollment)Browser' ./internal/server

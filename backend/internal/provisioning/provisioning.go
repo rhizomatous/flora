@@ -2,8 +2,7 @@
 // chat: capacity-limited creation, setup verification, private authenticated
 // endpoints, and continuous-activity enforcement. It talks to Docker only
 // through the Engine API and records facts through the storage package. It
-// does not submit runtime work, answer questions, or recover interrupted
-// turns; chat message wiring is a later layer.
+// does not submit runtime work, answer questions, or recover interrupted turns.
 package provisioning
 
 import (
@@ -11,16 +10,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/rhizomatous/flora/backend/internal/agentfiles"
 	"github.com/rhizomatous/flora/backend/internal/docker"
+	"github.com/rhizomatous/flora/backend/internal/redaction"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
@@ -43,6 +44,19 @@ const (
 
 // Config is the narrow installation-level provisioning configuration.
 type Config struct {
+	// NetworkID and BrokerGateway identify the managed bridge and its inspected
+	// private gateway. Both are required for every container operation.
+	NetworkID     string
+	BrokerGateway string
+	// AgentUID/GID optionally pin the container's non-root identity for a root
+	// application process. Only new empty workspace/runtime directories are
+	// chowned; existing data must already have the recorded numeric ownership.
+	AgentUID int
+	AgentGID int
+	// UseSettings reads live capacity/activity limits and new-chat runtime snapshots.
+	// Explicit MaxRunningOverride takes precedence over the saved container cap.
+	UseSettings        bool
+	MaxRunningOverride int
 	// ImageRef is the daemon-side reference used to pull or create containers.
 	// A name@sha256:... reference is pulled when absent. Any other reference
 	// (a local tag or ID) must already exist locally and requires ImageID;
@@ -63,6 +77,8 @@ type Config struct {
 	// tests; model calls then fail inside the container until replaced.
 	ProviderAPIKey string
 
+	// MaxRunning counts idle running containers too. Lowering it leaves existing
+	// containers running and rejects starts until the running count is below it.
 	MaxRunning   int
 	SetupTimeout time.Duration
 	// SetupKillGrace bounds how long setup may ignore the timeout's SIGTERM
@@ -80,6 +96,13 @@ type Config struct {
 }
 
 func (c Config) withDefaults() (Config, error) {
+	if (c.AgentUID != 0 || c.AgentGID != 0) && (c.AgentUID <= 0 || c.AgentGID <= 0) {
+		return c, errors.New("provisioning: explicit agent UID and GID must both be positive")
+	}
+	ip := net.ParseIP(c.BrokerGateway)
+	if !hexHash(c.NetworkID) || ip == nil || ip.To4() == nil || !ip.IsPrivate() {
+		return c, errors.New("provisioning: owned network requires its full network ID and private IPv4 broker gateway")
+	}
 	if c.ImageRef == "" || c.HarnessVersion == "" {
 		return c, errors.New("provisioning: image reference and harness version are required")
 	}
@@ -154,19 +177,26 @@ type Engine interface {
 	ContainerList(ctx context.Context, running bool, labels map[string]string) ([]docker.ContainerSummary, error)
 }
 
-// CheckoutFunc prepares a chat workspace before its first container start,
-// typically by downloading the project's core repositories. Implementations
-// must be idempotent against an existing workspace. A nil callback leaves the
-// workspace empty; core repository download is wired in by the chat lifecycle.
-type CheckoutFunc func(ctx context.Context, workspaceDir string, coreRepos []storage.Repository) error
+// WorkspaceAccess performs container-side checkout and credential delivery.
+// Checkout must release /var/lib/flora-checkout.ready only after saving the
+// starting commit, and preserve existing work when called again for the same
+// container. Revoke rejects future requests, not already accepted work.
+type WorkspaceAccess interface {
+	Checkout(context.Context, storage.Chat, storage.Paths, string) error
+	Revoke(context.Context, string) error
+}
 
 // Endpoint is a chat container's private authenticated runtime address. The
 // password is per-container and is recovered from the container's own
 // configuration, so a Flora restart does not lose access.
 type Endpoint struct {
-	URL         string
-	Username    string
-	Password    string
+	URL      string
+	Username string
+	Password string `json:"-"`
+	// ProviderKey is the key this container actually received. It may differ
+	// from current installation settings after a key replacement. Capture uses
+	// it only for redaction; never include it in browser responses or logs.
+	ProviderKey string `json:"-"`
 	ContainerID string
 }
 
@@ -175,6 +205,11 @@ type Endpoint struct {
 type CapacityError struct {
 	Limit, Running int
 }
+
+// DependencyError contains only a fixed operator action, never a Docker response.
+type DependencyError struct{ Message string }
+
+func (e *DependencyError) Error() string { return e.Message }
 
 func (e *CapacityError) Error() string {
 	return fmt.Sprintf("container capacity full: %d of %d running; stop a chat to free capacity", e.Running, e.Limit)
@@ -190,7 +225,10 @@ type SetupError struct {
 }
 
 func (e *SetupError) Error() string {
-	return fmt.Sprintf("setup failed with exit %d; fix the setup command and start the chat again to retry", e.ExitCode)
+	if e.ExitCode == 124 {
+		return "setup timed out; inspect saved setup output and dependencies, then retry. To change the setup timeout or command, create a new chat"
+	}
+	return fmt.Sprintf("setup failed with exit %d; inspect saved setup output and fix workspace dependencies, then retry. To change the setup command, create a new chat", e.ExitCode)
 }
 
 // StoppedError reports that a container exited before the runtime became
@@ -220,22 +258,21 @@ func (e *RuntimeStartError) Error() string {
 }
 
 type Manager struct {
-	engine   Engine
-	store    *storage.Store
-	cfg      Config
-	checkout CheckoutFunc
-	health   func(ctx context.Context, url, password string) bool
+	engine Engine
+	store  *storage.Store
+	cfg    Config
+	access WorkspaceAccess
+	health func(ctx context.Context, url, password string) bool
 	// ownerOf reports the uid/gid owning a storage path. Tests override it;
 	// production stats the real directory.
 	ownerOf func(path string) (uid, gid int, err error)
 
 	mu          sync.Mutex
-	locks       map[string]*sync.Mutex
 	activeSince map[string]time.Time
 	now         func() time.Time
 }
 
-func New(engine Engine, store *storage.Store, cfg Config, checkout CheckoutFunc) (*Manager, error) {
+func New(engine Engine, store *storage.Store, cfg Config, access WorkspaceAccess) (*Manager, error) {
 	if engine == nil || store == nil {
 		return nil, errors.New("provisioning: engine and store are required")
 	}
@@ -247,18 +284,16 @@ func New(engine Engine, store *storage.Store, cfg Config, checkout CheckoutFunc)
 		engine:      engine,
 		store:       store,
 		cfg:         cfg,
-		checkout:    checkout,
+		access:      access,
 		health:      healthy,
 		ownerOf:     storageOwner,
-		locks:       map[string]*sync.Mutex{},
 		activeSince: map[string]time.Time{},
 		now:         time.Now,
 	}, nil
 }
 
-// storageOwner reports the uid/gid owning a storage directory. The agent user
-// inside the container is mapped to this identity so the backend keeps
-// ownership of its files and the agent can edit them.
+// storageOwner reports the uid/gid owning a storage directory. The container's
+// agent user is mapped to that bind-mount identity so it can edit its own files.
 func storageOwner(path string) (int, int, error) {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -277,32 +312,24 @@ func (m *Manager) Identity() (imageDigest, harnessVersion string) {
 	return m.cfg.ImageDigest, m.cfg.HarnessVersion
 }
 
-// lockChat serializes Start and Stop calls for one chat. Callers re-read the
-// chat's stored binding only after acquiring this lock, so a concurrent or
-// retried Start cannot create a second container for the same chat.
-func (m *Manager) lockChat(chatID string) func() {
-	m.mu.Lock()
-	lock, ok := m.locks[chatID]
-	if !ok {
-		lock = &sync.Mutex{}
-		m.locks[chatID] = lock
-	}
-	m.mu.Unlock()
-	lock.Lock()
-	return lock.Unlock
-}
-
 // Start makes a chat's container running and its runtime endpoint reachable.
-// On the first start it checks out the workspace, creates the container, and
-// binds it. If an earlier attempt created the container but died before
+// On the first start it creates and binds the container, then checks out its
+// workspace before setup can run. If an earlier attempt died before
 // binding it, Start adopts that container after validating it is exactly the
 // one this chat owns; it never creates a second container for one chat. A
 // failed or timed-out setup blocks startup with a SetupError; calling Start
 // again is the explicit retry. Starting beyond the running-container limit
 // fails with a CapacityError. The wait for runtime readiness is bounded by
 // the configured ReadyTimeout.
+//
+// Start also prepares access on an already running container, which may replace
+// its GitHub credential. Callers must quiesce git/gh work before calling Start;
+// use Endpoint to locate a running container without changing its credentials.
 func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
-	unlock := m.lockChat(chatID)
+	unlock, err := m.store.LockContainer(ctx, chatID)
+	if err != nil {
+		return Endpoint{}, err
+	}
 	defer unlock()
 	chat, err := m.store.Chat(ctx, chatID)
 	if err != nil {
@@ -311,6 +338,13 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 	paths, err := m.store.Paths(ctx, chatID)
 	if err != nil {
 		return Endpoint{}, err
+	}
+	if m.cfg.AgentUID != 0 {
+		for _, path := range []string{paths.Workspace, paths.RuntimeState} {
+			if err := prepareAgentDirectory(path, m.cfg.AgentUID, m.cfg.AgentGID); err != nil {
+				return Endpoint{}, err
+			}
+		}
 	}
 	uid, gid, err := m.ownerOf(paths.Workspace)
 	if err != nil {
@@ -334,40 +368,55 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 		info, err := m.engine.ContainerInspect(ctx, containerName(chatID))
 		switch {
 		case err == nil:
-			if err := validateOwned(info, chat, paths, imageID); err != nil {
+			if err := m.validateOwned(info, chat, paths, imageID); err != nil {
 				return Endpoint{}, err
+			}
+			if m.access != nil && info.EnvValue("FLORA_CHECKOUT_REQUIRED") != "1" {
+				return Endpoint{}, errors.New("provisioning: existing container lacks the pre-setup checkout barrier; refusing to adopt it")
 			}
 			if err := m.store.BindRuntime(ctx, chatID, info.ID, ""); err != nil {
 				return Endpoint{}, err
 			}
 			containerID = info.ID
 		case docker.IsNotFound(err):
-			if m.checkout != nil {
-				var core []storage.Repository
-				for _, r := range chat.Configuration.Repositories {
-					if r.Role == "core" {
-						core = append(core, r)
-					}
-				}
-				if err := m.checkout(ctx, paths.Workspace, core); err != nil {
-					return Endpoint{}, fmt.Errorf("checkout: %w", err)
-				}
-			}
 			password, err := docker.NewPassword()
 			if err != nil {
 				return Endpoint{}, err
 			}
 			spec := m.containerSpec(chat, paths, password, uid, gid)
+			credentials, credentialsErr := m.store.Credentials(ctx)
+			if credentialsErr == nil {
+				keyName := map[string]string{"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "google": "GOOGLE_GENERATIVE_AI_API_KEY"}[credentials.Provider]
+				if keyName == "" {
+					return Endpoint{}, errors.New("unsupported installed provider")
+				}
+				// Stored credentials override the optional test key. They enter only
+				// newly created containers; existing running endpoints are unchanged.
+				for i := 0; i < len(spec.Env); i++ {
+					if strings.HasPrefix(spec.Env[i], "ANTHROPIC_API_KEY=") {
+						spec.Env = append(spec.Env[:i], spec.Env[i+1:]...)
+						break
+					}
+				}
+				spec.Env = append(spec.Env, keyName+"="+credentials.ProviderKey)
+				config, _ := json.Marshal(map[string]any{"model": credentials.Provider + "/" + credentials.Model, "small_model": credentials.Provider + "/" + credentials.Model, "enabled_providers": []string{credentials.Provider}})
+				spec.Env = append(spec.Env, "OPENCODE_CONFIG_CONTENT="+string(config))
+			} else if !errors.Is(credentialsErr, storage.ErrNotFound) {
+				return Endpoint{}, credentialsErr
+			}
 			// Hold the lock across the capacity check, creation, and start
 			// so concurrent starts cannot overbook the running-container limit.
 			var id string
-			m.mu.Lock()
+			release, lockErr := m.store.LockContainerCapacity(ctx)
+			if lockErr != nil {
+				return Endpoint{}, lockErr
+			}
 			if err = m.checkCapacity(ctx); err == nil {
 				if id, err = m.engine.ContainerCreate(ctx, spec); err == nil {
 					err = m.engine.ContainerStart(ctx, id)
 				}
 			}
-			m.mu.Unlock()
+			release()
 			if err != nil {
 				return Endpoint{}, err
 			}
@@ -383,15 +432,52 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 	if err != nil {
 		return Endpoint{}, err
 	}
+	if chat.ContainerID != "" {
+		imageID, err := m.resolveImage(ctx)
+		if err != nil {
+			return Endpoint{}, err
+		}
+		if err := m.validateOwned(info, chat, paths, imageID); err != nil {
+			return Endpoint{}, err
+		}
+	}
+	if m.access != nil && info.EnvValue("FLORA_CHECKOUT_REQUIRED") != "1" {
+		return Endpoint{}, errors.New("provisioning: container lacks the pre-setup checkout barrier; refusing to start it")
+	}
 	if !info.State.Running {
-		m.mu.Lock()
+		release, lockErr := m.store.LockContainerCapacity(ctx)
+		if lockErr != nil {
+			return Endpoint{}, lockErr
+		}
 		err = m.checkCapacity(ctx)
 		if err == nil {
 			err = m.engine.ContainerStart(ctx, containerID)
 		}
-		m.mu.Unlock()
+		release()
 		if err != nil {
 			return Endpoint{}, err
+		}
+		// Docker fills endpoint network IDs only when a created container first
+		// starts. Verify resolved membership before delivering broker credentials.
+		info, err = m.engine.ContainerInspect(ctx, containerID)
+		if err != nil {
+			return Endpoint{}, err
+		}
+		imageID, err := m.resolveImage(ctx)
+		if err != nil {
+			return Endpoint{}, err
+		}
+		if err := m.validateOwned(info, chat, paths, imageID); err != nil {
+			return Endpoint{}, err
+		}
+	}
+	if m.access != nil {
+		if err := m.access.Checkout(ctx, chat, paths, containerID); err != nil {
+			cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+			defer cancel()
+			stopErr := m.engine.ContainerStop(cleanup, containerID, stopTimeout)
+			revokeErr := m.access.Revoke(cleanup, chatID)
+			return Endpoint{}, errors.Join(fmt.Errorf("checkout: %w", err), stopErr, revokeErr)
 		}
 	}
 	return m.awaitReady(ctx, chatID, paths, containerID)
@@ -399,19 +485,18 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 
 func containerName(chatID string) string { return "flora-chat-" + chatID }
 
-// validateOwned checks that a container found under the chat's deterministic
-// name is exactly the container this chat would have created: management and
-// chat labels, image content, and mounts must all match. A name collision
-// with anything else is an operator error, never silently adopted or removed.
+// validateOwned checks the container's chat name, ownership labels, image
+// content, and mounts before accessing it. A mismatched container is never
+// silently adopted, used, or stopped.
 func validateOwned(info docker.ContainerInfo, chat storage.Chat, paths storage.Paths, imageID string) error {
 	if info.Name != "/"+containerName(chat.ID) {
 		return fmt.Errorf("provisioning: container name %q does not match chat %s", info.Name, chat.ID)
 	}
 	if info.Config.Labels[labelManaged] != "true" || info.Config.Labels[labelChatID] != chat.ID {
-		return fmt.Errorf("provisioning: container %s lacks this chat's ownership labels; refusing to adopt it", info.Name)
+		return fmt.Errorf("provisioning: container %s lacks this chat's ownership labels; refusing access", info.Name)
 	}
 	if info.Image != imageID {
-		return fmt.Errorf("provisioning: container %s runs image %s, expected %s; refusing to adopt it", info.Name, info.Image, imageID)
+		return fmt.Errorf("provisioning: container %s runs image %s, expected %s; refusing access", info.Name, info.Image, imageID)
 	}
 	want := map[string]bool{
 		paths.Workspace + ":/workspace":     false,
@@ -419,16 +504,71 @@ func validateOwned(info docker.ContainerInfo, chat storage.Chat, paths storage.P
 	}
 	for _, bind := range info.HostConfig.Binds {
 		if _, ok := want[bind]; !ok {
-			return fmt.Errorf("provisioning: container %s has unexpected mount %q; refusing to adopt it", info.Name, bind)
+			return fmt.Errorf("provisioning: container %s has unexpected mount %q; refusing access", info.Name, bind)
 		}
 		want[bind] = true
 	}
 	for bind, seen := range want {
 		if !seen {
-			return fmt.Errorf("provisioning: container %s is missing mount %q; refusing to adopt it", info.Name, bind)
+			return fmt.Errorf("provisioning: container %s is missing mount %q; refusing access", info.Name, bind)
 		}
 	}
 	return nil
+}
+
+// validateOwned also rejects network drift before adopting or operating a chat.
+func (m *Manager) validateOwned(info docker.ContainerInfo, chat storage.Chat, paths storage.Paths, imageID string) error {
+	if m.cfg.AgentUID != 0 && (info.EnvValue("FLORA_UID") != strconv.Itoa(m.cfg.AgentUID) || info.EnvValue("FLORA_GID") != strconv.Itoa(m.cfg.AgentGID)) {
+		return errors.New("provisioning: container numeric agent identity differs from saved deployment")
+	}
+	if err := validateOwned(info, chat, paths, imageID); err != nil {
+		return err
+	}
+	if info.HostConfig.Privileged {
+		return errors.New("provisioning: owned-network container is privileged; refusing access")
+	}
+	for port, bindings := range info.NetworkSettings.Ports {
+		for _, binding := range bindings {
+			if port != "4096/tcp" || binding.HostIP != "127.0.0.1" {
+				return errors.New("provisioning: container runtime port is not loopback-only; refusing access")
+			}
+		}
+	}
+	if info.HostConfig.NetworkMode != m.cfg.NetworkID || len(info.NetworkSettings.Networks) != 1 {
+		return errors.New("provisioning: container network differs from the configured owned bridge; refusing access")
+	}
+	for _, id := range info.NetworkSettings.Networks {
+		// Before first start Docker leaves the endpoint ID empty. The exact
+		// immutable NetworkMode above still selects the bridge for that start.
+		if id == "" && info.State.Status == "created" && !info.State.Running {
+			continue
+		}
+		if id != m.cfg.NetworkID {
+			return errors.New("provisioning: container network identity changed; refusing access")
+		}
+	}
+	if len(info.HostConfig.ExtraHosts) != 1 || info.HostConfig.ExtraHosts[0] != "flora-github.internal:"+m.cfg.BrokerGateway {
+		return errors.New("provisioning: container broker host mapping changed; refusing access")
+	}
+	return nil
+}
+
+func prepareAgentDirectory(path string, uid, gid int) error {
+	actualUID, actualGID, err := storageOwner(path)
+	if err != nil {
+		return err
+	}
+	if actualUID == uid && actualGID == gid {
+		return nil
+	}
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+	if os.Geteuid() != 0 || actualUID != 0 || len(entries) != 0 {
+		return errors.New("provisioning: restore recorded workspace/runtime numeric ownership; existing data will not be recursively changed")
+	}
+	return os.Chown(path, uid, gid)
 }
 
 // resolveImage returns the content ID of the configured image, pulling it
@@ -441,12 +581,12 @@ func (m *Manager) resolveImage(ctx context.Context) (string, error) {
 			return "", fmt.Errorf("provisioning: image %q is not present locally and the reference is not digest-pinned; refusing to pull a mutable tag", m.cfg.ImageRef)
 		}
 		if err := m.engine.ImagePull(ctx, m.cfg.ImageRef); err != nil {
-			return "", fmt.Errorf("pull agent image: %w", err)
+			return "", &DependencyError{"Agent image pull failed. Check registry access, host networking, disk space and the pinned image reference."}
 		}
 		img, err = m.engine.ImageInspect(ctx, m.cfg.ImageRef)
 	}
 	if err != nil {
-		return "", fmt.Errorf("inspect agent image: %w", err)
+		return "", &DependencyError{"Cannot inspect the agent image. Start Docker and check socket permissions and the installed image reference."}
 	}
 	if m.cfg.ImageID != "" && img.ID != m.cfg.ImageID {
 		return "", fmt.Errorf("provisioning: local image %q has ID %s, expected %s; rebuild or repin the image", m.cfg.ImageRef, img.ID, m.cfg.ImageID)
@@ -455,24 +595,44 @@ func (m *Manager) resolveImage(ctx context.Context) (string, error) {
 }
 
 // checkCapacity enforces the running-container limit. Idle running containers
-// count toward the limit. Callers hold m.mu across the check and
+// count toward the limit. Callers hold the storage capacity lock across the check and
 // the subsequent create or start.
 func (m *Manager) checkCapacity(ctx context.Context) error {
+	limit := m.cfg.MaxRunning
+	if m.cfg.UseSettings {
+		p, err := m.store.Preferences(ctx)
+		if err != nil {
+			return err
+		}
+		limit = p.MaxRunning
+		if m.cfg.MaxRunningOverride > 0 {
+			limit = m.cfg.MaxRunningOverride
+		}
+	}
 	running, err := m.engine.ContainerList(ctx, true, map[string]string{labelManaged: "true"})
 	if err != nil {
 		return err
 	}
-	if len(running) >= m.cfg.MaxRunning {
-		return &CapacityError{Limit: m.cfg.MaxRunning, Running: len(running)}
+	if len(running) >= limit {
+		return &CapacityError{Limit: limit, Running: len(running)}
 	}
 	return nil
 }
 
 func (m *Manager) containerSpec(chat storage.Chat, paths storage.Paths, password string, uid, gid int) docker.ContainerSpec {
+	cfg := m.cfg
+	if cfg.UseSettings {
+		r := chat.Configuration.RuntimeDefaults()
+		cfg.NanoCPUs, cfg.MemoryBytes, cfg.PidsLimit = int64(r.CPUs*1e9), r.MemoryBytes, r.PidsLimit
+		cfg.SetupTimeout = time.Duration(r.SetupSeconds) * time.Second
+	}
 	env := []string{
 		"OPENCODE_SERVER_PASSWORD=" + password,
 		"FLORA_UID=" + strconv.Itoa(uid),
 		"FLORA_GID=" + strconv.Itoa(gid),
+	}
+	if m.access != nil {
+		env = append(env, "FLORA_CHECKOUT_REQUIRED=1")
 	}
 	if m.cfg.ProviderAPIKey != "" {
 		env = append(env, "ANTHROPIC_API_KEY="+m.cfg.ProviderAPIKey)
@@ -480,12 +640,14 @@ func (m *Manager) containerSpec(chat storage.Chat, paths storage.Paths, password
 	if chat.Configuration.SetupCommand != "" {
 		env = append(env, "SETUP_COMMAND="+chat.Configuration.SetupCommand)
 	}
-	env = append(env, "SETUP_TIMEOUT_SECONDS="+strconv.Itoa(int(m.cfg.SetupTimeout.Seconds())))
+	env = append(env, "SETUP_TIMEOUT_SECONDS="+strconv.Itoa(int(cfg.SetupTimeout.Seconds())))
 	env = append(env, "SETUP_KILL_GRACE_SECONDS="+strconv.Itoa(int(m.cfg.SetupKillGrace.Seconds())))
 	return docker.ContainerSpec{
-		Name:  containerName(chat.ID),
-		Image: m.cfg.ImageRef,
-		Env:   env,
+		NetworkID:  m.cfg.NetworkID,
+		ExtraHosts: m.brokerHosts(),
+		Name:       containerName(chat.ID),
+		Image:      m.cfg.ImageRef,
+		Env:        env,
 		Labels: map[string]string{
 			labelManaged: "true",
 			labelChatID:  chat.ID,
@@ -498,17 +660,29 @@ func (m *Manager) containerSpec(chat storage.Chat, paths storage.Paths, password
 			paths.RuntimeState + ":/home/flora",
 		},
 		LoopbackPort: runtimePort,
-		NanoCPUs:     m.cfg.NanoCPUs,
-		MemoryBytes:  m.cfg.MemoryBytes,
-		PidsLimit:    m.cfg.PidsLimit,
+		NanoCPUs:     cfg.NanoCPUs,
+		MemoryBytes:  cfg.MemoryBytes,
+		PidsLimit:    cfg.PidsLimit,
 	}
+}
+
+func (m *Manager) brokerHosts() []string {
+	return []string{"flora-github.internal:" + m.cfg.BrokerGateway}
 }
 
 // awaitReady polls until the runtime answers authenticated health checks, the
 // container exits (setup failure or external stop), or the readiness bound
 // expires.
 func (m *Manager) awaitReady(ctx context.Context, chatID string, paths storage.Paths, containerID string) (Endpoint, error) {
-	ctx, cancel := context.WithTimeout(ctx, m.cfg.ReadyTimeout)
+	readyTimeout := m.cfg.ReadyTimeout
+	if m.cfg.UseSettings {
+		c, err := m.store.Chat(ctx, chatID)
+		if err != nil {
+			return Endpoint{}, err
+		}
+		readyTimeout = time.Duration(c.Configuration.RuntimeDefaults().SetupSeconds)*time.Second + time.Minute
+	}
+	ctx, cancel := context.WithTimeout(ctx, readyTimeout)
 	defer cancel()
 	for {
 		info, err := m.engine.ContainerInspect(ctx, containerID)
@@ -522,12 +696,12 @@ func (m *Manager) awaitReady(ctx context.Context, chatID string, paths storage.P
 			password := info.EnvValue("OPENCODE_SERVER_PASSWORD")
 			url := "http://" + addr
 			if m.health(ctx, url, password) {
-				return Endpoint{URL: url, Username: "opencode", Password: password, ContainerID: containerID}, nil
+				return Endpoint{URL: url, Username: "opencode", Password: password, ProviderKey: containerProviderKey(info), ContainerID: containerID}, nil
 			}
 		}
 		select {
 		case <-ctx.Done():
-			return Endpoint{}, fmt.Errorf("runtime did not become ready within %s: %w", m.cfg.ReadyTimeout, ctx.Err())
+			return Endpoint{}, fmt.Errorf("runtime did not become ready within %s: %w", readyTimeout, ctx.Err())
 		case <-time.After(readyPollStep):
 		}
 	}
@@ -540,10 +714,14 @@ func (m *Manager) awaitReady(ctx context.Context, chatID string, paths storage.P
 // a leftover success status from an earlier setup must not turn a later
 // runtime exit into a bogus "setup failed with exit 0".
 func (m *Manager) containerExited(ctx context.Context, chatID string, paths storage.Paths, info docker.ContainerInfo) error {
-	dir := filepath.Join(paths.RuntimeState, "setup")
+	root, rootErr := os.OpenRoot(paths.RuntimeState)
+	if rootErr != nil {
+		return rootErr
+	}
+	defer root.Close()
 	exitCode := info.State.ExitCode
 	setupFailed := false
-	if raw, err := os.ReadFile(filepath.Join(dir, "exit-status")); err == nil {
+	if raw, err := agentfiles.Read(root, "setup/exit-status", 4096); err == nil {
 		if parsed, err := strconv.Atoi(strings.TrimSpace(string(raw))); err == nil && parsed != 0 {
 			exitCode = parsed
 			setupFailed = true
@@ -556,12 +734,10 @@ func (m *Manager) containerExited(ctx context.Context, chatID string, paths stor
 		return &RuntimeStartError{ChatID: chatID, ExitCode: exitCode}
 	}
 	var tail string
-	if raw, err := os.ReadFile(filepath.Join(dir, "output.log")); err == nil {
-		if len(raw) > setupTailMax {
-			raw = raw[len(raw)-setupTailMax:]
-		}
+	if raw, err := agentfiles.Tail(root, "setup/output.log", 32<<10); err == nil {
 		tail = string(raw)
 	}
+	tail = redaction.Tail(tail, setupTailMax, redaction.Values(ctx, m.store, chatID, m.cfg.ProviderAPIKey, containerProviderKey(info))...)
 	payload, _ := json.Marshal(map[string]any{
 		"exit_code":   exitCode,
 		"output_tail": tail,
@@ -572,26 +748,112 @@ func (m *Manager) containerExited(ctx context.Context, chatID string, paths stor
 }
 
 // Stop stops a chat's container while preserving its workspace, runtime
-// state, and recorded identity. Stopping a chat with no container
-// is a no-op. The container is kept for an explicit later start; it is never
+// state, and recorded identity. An unbound container is adopted only after its
+// ownership is validated. The container is kept for an explicit later start; it is never
 // transparently restarted.
 //
 // Stop serializes with Start per chat, so it can wait behind an in-progress
 // Start for up to the readiness bound. A caller that needs a prompt stop
 // while a Start is still waiting for readiness must first cancel that Start's
-// context; user-facing interrupt wiring is a later layer's job.
+// context.
 func (m *Manager) Stop(ctx context.Context, chatID string) error {
-	unlock := m.lockChat(chatID)
+	unlock, err := m.store.LockContainer(ctx, chatID)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	chat, err := m.store.Chat(ctx, chatID)
 	if err != nil {
 		return err
 	}
-	if chat.ContainerID == "" {
+	// Docker confirmed that no container can execute. Revoke the chat's own
+	// capability even when external removal left a saved binding behind.
+	missing := func() error {
+		m.EndActivity(chat.ContainerID)
+		if m.access != nil {
+			return m.access.Revoke(ctx, chatID)
+		}
 		return nil
 	}
-	m.EndActivity(chat.ContainerID)
-	return m.engine.ContainerStop(ctx, chat.ContainerID, stopTimeout)
+	if chat.ContainerID == "" {
+		info, inspectErr := m.engine.ContainerInspect(ctx, containerName(chatID))
+		if docker.IsNotFound(inspectErr) {
+			return missing()
+		}
+		if inspectErr != nil {
+			return inspectErr
+		}
+		paths, err := m.store.Paths(ctx, chatID)
+		if err != nil {
+			return err
+		}
+		imageID, err := m.resolveImage(ctx)
+		if err != nil {
+			return err
+		}
+		if err := m.validateOwned(info, chat, paths, imageID); err != nil {
+			return err
+		}
+		if err := m.store.BindRuntime(ctx, chatID, info.ID, ""); err != nil {
+			return err
+		}
+		chat.ContainerID = info.ID
+	}
+	var revokeErr error
+	paths, err := m.store.Paths(ctx, chatID)
+	if err != nil {
+		return err
+	}
+	info, err := m.engine.ContainerInspect(ctx, chat.ContainerID)
+	if docker.IsNotFound(err) {
+		return missing()
+	}
+	if err != nil {
+		return err
+	}
+	imageID, err := m.resolveImage(ctx)
+	if err != nil {
+		return err
+	}
+	if err := m.validateOwned(info, chat, paths, imageID); err != nil {
+		return err
+	}
+	if m.access != nil {
+		revokeErr = m.access.Revoke(ctx, chatID)
+	}
+	stopErr := m.engine.ContainerStop(ctx, chat.ContainerID, stopTimeout)
+	if stopErr == nil {
+		info, err := m.engine.ContainerInspect(ctx, chat.ContainerID)
+		stopErr = err
+		if err == nil && info.State.Running {
+			stopErr = errors.New("container stop did not confirm a stopped container")
+		}
+	}
+	if stopErr == nil {
+		m.EndActivity(chat.ContainerID)
+	}
+	return errors.Join(revokeErr, stopErr)
+}
+
+// ActivityExpired reports only observed continuous work, never idle time or
+// known question waits. Callers recheck it after serializing chat controls.
+func (m *Manager) ActivityExpired(containerID string) bool {
+	limit, err := m.activityLimit(context.Background())
+	if err != nil {
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	since, ok := m.activeSince[containerID]
+	return ok && m.now().Sub(since) > limit
+}
+
+func (m *Manager) activityLimit(ctx context.Context) (time.Duration, error) {
+	if !m.cfg.UseSettings {
+		return m.cfg.ActivityTimeout, nil
+	}
+	p, err := m.store.Preferences(ctx)
+	return time.Duration(p.ActivitySeconds) * time.Second, err
 }
 
 // Endpoint recovers the private runtime address of a running chat container,
@@ -601,21 +863,67 @@ func (m *Manager) Endpoint(ctx context.Context, chatID string) (Endpoint, error)
 	if err != nil {
 		return Endpoint{}, err
 	}
-	if chat.ContainerID == "" {
-		return Endpoint{}, storage.ErrNotFound
+	lookup := chat.ContainerID
+	if lookup == "" {
+		lookup = containerName(chatID)
 	}
-	info, err := m.engine.ContainerInspect(ctx, chat.ContainerID)
+	info, err := m.engine.ContainerInspect(ctx, lookup)
+	if err != nil {
+		if docker.IsNotFound(err) {
+			return Endpoint{}, &ExecutionEndedError{Reason: "The saved container is missing", Missing: true}
+		}
+		return Endpoint{}, err
+	}
+	paths, err := m.store.Paths(ctx, chatID)
 	if err != nil {
 		return Endpoint{}, err
 	}
+	image, err := m.engine.ImageInspect(ctx, m.cfg.ImageRef)
+	if err != nil {
+		return Endpoint{}, err
+	}
+	if m.cfg.ImageID != "" && image.ID != m.cfg.ImageID {
+		return Endpoint{}, errors.New("configured runtime image identity changed")
+	}
+	if err := m.validateOwned(info, chat, paths, image.ID); err != nil {
+		return Endpoint{}, err
+	}
+	if chat.ContainerID == "" {
+		if err := m.store.BindRuntime(ctx, chatID, info.ID, ""); err != nil {
+			return Endpoint{}, err
+		}
+		chat.ContainerID = info.ID
+	}
 	if !info.State.Running {
-		return Endpoint{}, fmt.Errorf("container for chat is %s, not running", info.State.Status)
+		reason := fmt.Sprintf("The container exited with code %d", info.State.ExitCode)
+		if info.State.OOMKilled {
+			reason = "Docker reports that the container was killed after running out of memory"
+		}
+		return Endpoint{}, &ExecutionEndedError{Reason: reason}
 	}
 	addr := info.LoopbackAddress(runtimePort)
 	if addr == "" {
 		return Endpoint{}, errors.New("container has no loopback runtime endpoint")
 	}
-	return Endpoint{URL: "http://" + addr, Username: "opencode", Password: info.EnvValue("OPENCODE_SERVER_PASSWORD"), ContainerID: chat.ContainerID}, nil
+	return Endpoint{URL: "http://" + addr, Username: "opencode", Password: info.EnvValue("OPENCODE_SERVER_PASSWORD"), ProviderKey: containerProviderKey(info), ContainerID: chat.ContainerID}, nil
+}
+
+// ExecutionEndedError confirms that the saved container cannot still execute.
+// It does not establish whether commands made external changes before exit.
+type ExecutionEndedError struct {
+	Reason  string
+	Missing bool
+}
+
+func (e *ExecutionEndedError) Error() string { return e.Reason }
+
+func containerProviderKey(info docker.ContainerInfo) string {
+	for _, name := range []string{"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"} {
+		if key := info.EnvValue(name); key != "" {
+			return key
+		}
+	}
+	return ""
 }
 
 // BeginActivity marks continuous agent activity on a container. Repeated
@@ -644,20 +952,45 @@ func (m *Manager) EndActivity(containerID string) {
 // SweepActivity stops containers whose continuous activity exceeds the
 // configured limit and returns their IDs.
 func (m *Manager) SweepActivity(ctx context.Context) ([]string, error) {
+	limit, err := m.activityLimit(ctx)
+	if err != nil {
+		return nil, err
+	}
 	m.mu.Lock()
 	var overdue []string
 	for id, since := range m.activeSince {
-		if m.now().Sub(since) > m.cfg.ActivityTimeout {
+		if m.now().Sub(since) > limit {
 			overdue = append(overdue, id)
 		}
 	}
 	m.mu.Unlock()
 	var stopped []string
 	for _, id := range overdue {
+		// A question or resumed active period may have changed this entry since
+		// the first scan. Serialize the stop decision with Begin/EndActivity.
+		m.mu.Lock()
+		since, active := m.activeSince[id]
+		if !active || m.now().Sub(since) <= limit {
+			m.mu.Unlock()
+			continue
+		}
+		if m.access != nil {
+			info, err := m.engine.ContainerInspect(ctx, id)
+			if err != nil {
+				m.mu.Unlock()
+				return stopped, err
+			}
+			if err := m.access.Revoke(ctx, info.Config.Labels[labelChatID]); err != nil {
+				m.mu.Unlock()
+				return stopped, err
+			}
+		}
 		if err := m.engine.ContainerStop(ctx, id, stopTimeout); err != nil {
+			m.mu.Unlock()
 			return stopped, fmt.Errorf("stop over-limit container %s: %w", id, err)
 		}
-		m.EndActivity(id)
+		delete(m.activeSince, id)
+		m.mu.Unlock()
 		stopped = append(stopped, id)
 	}
 	return stopped, nil

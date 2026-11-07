@@ -9,8 +9,8 @@ if [ "$FLORA_UID" = "0" ] || [ "$FLORA_GID" = "0" ]; then
     printf 'Refusing to run: storage owned by root would map the agent to root. Run Flora as a non-root service user.\n' >&2
     exit 1
 fi
-if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-    printf 'ANTHROPIC_API_KEY is not set; model calls will fail until the runtime is replaced with credentials.\n' >&2
+if [ -z "${ANTHROPIC_API_KEY:-}${OPENAI_API_KEY:-}${GOOGLE_GENERATIVE_AI_API_KEY:-}" ]; then
+    printf 'No model-provider key is set; model calls will fail until a new container receives credentials.\n' >&2
 fi
 # Map the agent user onto the storage owner's uid/gid. The bind-mounted
 # workspace and home stay owned by the backend's service account on the host,
@@ -22,6 +22,12 @@ if [ "$(id -u flora)" != "$FLORA_UID" ]; then
 fi
 mkdir -p /workspace /home/flora
 chown "$FLORA_UID:$FLORA_GID" /workspace /home/flora
+# Checkout runs through Docker exec as the storage owner. Setup cannot run
+# until the host has saved the resolved commit and released this container.
+if [ "${FLORA_CHECKOUT_REQUIRED:-}" = "1" ]; then
+    while [ ! -f /var/lib/flora-checkout.ready ]; do sleep 0.1; done
+    . /home/flora/.flora-github.env
+fi
 # The done marker lives on this container's writable layer, never on the
 # persisted home mount: starting the same stopped container skips setup, and a
 # replacement container runs it again. A failed or timed-out setup leaves no

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -10,6 +11,8 @@ import (
 	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/auth"
+	"github.com/rhizomatous/flora/backend/internal/chat"
+	"github.com/rhizomatous/flora/backend/internal/projects"
 	"github.com/rhizomatous/flora/backend/internal/settings"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
@@ -19,6 +22,8 @@ const cookieName = "__Host-flora"
 type api struct {
 	auth          *auth.Service
 	settings      *settings.Service
+	projects      *projects.Service
+	chats         *chat.Service
 	origin        string
 	passwordSlots chan struct{}
 	attemptMu     sync.Mutex
@@ -90,11 +95,15 @@ func (a *api) protect(next http.Handler) http.Handler {
 }
 
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
+	return decodeLimit(w, r, v, 16*1024)
+}
+
+func decodeLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) bool {
 	if strings.Split(r.Header.Get("Content-Type"), ";")[0] != "application/json" {
 		failure(w, 415, "Send application/json.")
 		return false
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	d := json.NewDecoder(r.Body)
 	d.DisallowUnknownFields()
 	if err := d.Decode(v); err != nil {
@@ -109,6 +118,11 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 }
 
 func (a *api) routes(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/settings/diagnostics", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+		jsonResponse(w, 200, a.settings.Diagnose(ctx))
+	})
 	mux.HandleFunc("GET /api/auth/status", func(w http.ResponseWriter, r *http.Request) {
 		_, err := a.auth.Store.AdministratorHash(r.Context())
 		if err != nil && !errors.Is(err, storage.ErrNotFound) {
@@ -120,12 +134,13 @@ func (a *api) routes(mux *http.ServeMux) {
 			failure(w, 500, "Session storage unavailable.")
 			return
 		}
-		jsonResponse(w, 200, map[string]bool{"setupRequired": errors.Is(err, storage.ErrNotFound), "authenticated": valid})
+		jsonResponse(w, 200, map[string]bool{"setupRequired": errors.Is(err, storage.ErrNotFound), "authenticated": valid, "enrollmentRequired": errors.Is(err, storage.ErrNotFound) && a.auth.EnrollmentRequired()})
 	})
 	for _, action := range []string{"bootstrap", "login"} {
 		mux.HandleFunc("POST /api/auth/"+action, func(w http.ResponseWriter, r *http.Request) {
 			var in struct {
-				Password string `json:"password"`
+				Password       string `json:"password"`
+				EnrollmentCode string `json:"enrollmentCode"`
 			}
 			if !decode(w, r, &in) {
 				return
@@ -147,11 +162,13 @@ func (a *api) routes(mux *http.ServeMux) {
 			var expires time.Time
 			var err error
 			if action == "bootstrap" {
-				value, expires, err = a.auth.Bootstrap(r.Context(), in.Password)
+				value, expires, err = a.auth.Bootstrap(r.Context(), in.Password, in.EnrollmentCode)
 			} else {
 				value, expires, err = a.auth.Login(r.Context(), in.Password)
 			}
 			switch {
+			case errors.Is(err, auth.ErrEnrollment):
+				failure(w, 403, auth.ErrEnrollment.Error())
 			case errors.Is(err, storage.ErrConflict):
 				failure(w, 409, "Administrator already exists. Log in instead.")
 			case errors.Is(err, auth.ErrPassword):
@@ -161,7 +178,7 @@ func (a *api) routes(mux *http.ServeMux) {
 			case err != nil:
 				failure(w, 500, "Could not save the session. Check storage permissions and free space.")
 			default:
-				sessionCookie(w, value, expires, int(auth.Lifetime.Seconds()))
+				sessionCookie(w, value, expires, max(1, int(time.Until(expires).Seconds())))
 				jsonResponse(w, 200, map[string]bool{"authenticated": true})
 			}
 		})
