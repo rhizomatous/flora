@@ -175,7 +175,30 @@ change, rebuild the Go binary to update its embedded production assets.
 | `make smoke` | Build and exercise the native binary from outside the source tree |
 | `make build-linux` | Build standalone Linux binaries for amd64 and arm64 |
 
-The same commands run in GitHub Actions on Linux. One-shot commands work too:
+GitHub Actions uses Nx to select tasks from the whole PR diff. Main-branch pushes
+run every check. Florets and web changes run frontend, browser, and binary smoke
+checks without starting container or native packaging jobs. Backend changes run
+Go, browser, container, and packaging checks. Shared configuration and scripts
+trigger all checks. Unknown directories also trigger the full suite. Documentation-only
+changes skip runtime checks, including edits to documents shipped in archives.
+
+Inside the Nix shell after `make deps`, inspect or run tasks with:
+
+```sh
+npm run ci:plan -- --base origin/main
+npx nx affected -t frontend-check,styleguide,go-check,race,smoke --base=origin/main
+npx nx run backend:browser
+npx nx graph
+```
+
+Nx caches web and styleguide builds locally in `.nx/cache`. Tests run fresh when
+selected. Task inputs are declared in `nx.json`, package manifests, and
+`project.json` files. Container and packaging tasks require a disposable native
+Linux runner with Docker; packaging also requires systemd, shellcheck, and sudo.
+The `result` CI job checks that every selected job passed and accepts only
+intentional skips. It can be used as the required branch check.
+
+The Make commands remain available. One-shot commands work too:
 `nix develop --command make check smoke build-linux`. Before newly created Nix
 files are tracked by Git, use `nix develop path:.` so Nix includes them.
 

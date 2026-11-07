@@ -22,5 +22,24 @@
   },
   "peerDependencies": {
     "react": "^19.0.0"
+  },
+  "nx": {
+    "includedScripts": [],
+    "targets": {
+      "styleguide": {
+        "executor": "nx:run-commands",
+        "cache": true,
+        "inputs": [
+          "shared",
+          "{projectRoot}/**/*"
+        ],
+        "options": {
+          "command": "npm run docs:build"
+        },
+        "outputs": [
+          "{workspaceRoot}/florets/docs-dist"
+        ]
+      }
+    }
   }
 }

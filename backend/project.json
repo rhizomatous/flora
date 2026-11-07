@@ -1,0 +1,95 @@
+{
+  "name": "backend",
+  "targets": {
+    "go-check": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "inputs": [
+        "go"
+      ],
+      "options": {
+        "command": "test -z \"$(gofmt -l backend)\" && CGO_ENABLED=0 go -C backend vet ./... && CGO_ENABLED=0 go -C backend test -mod=readonly ./..."
+      },
+      "dependsOn": [
+        {
+          "projects": [
+            "@flora/web"
+          ],
+          "target": "build"
+        }
+      ]
+    },
+    "race": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "inputs": [
+        "go"
+      ],
+      "options": {
+        "command": "go -C backend test -race -count=1 ./internal/storage ./internal/settings ./internal/auth ./internal/server ./internal/provisioning ./internal/chat ./internal/changes ./internal/githubbroker"
+      },
+      "dependsOn": [
+        {
+          "projects": [
+            "@flora/web"
+          ],
+          "target": "build"
+        }
+      ]
+    },
+    "binary": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "inputs": [
+        "go",
+        "frontend"
+      ],
+      "options": {
+        "command": "mkdir -p bin && CGO_ENABLED=0 go -C backend build -mod=readonly -trimpath -o ../bin/flora ./cmd/flora"
+      },
+      "dependsOn": [
+        {
+          "projects": [
+            "@flora/web"
+          ],
+          "target": "build"
+        }
+      ]
+    },
+    "smoke": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "inputs": [
+        "go",
+        "frontend",
+        "{workspaceRoot}/scripts/smoke.test.ts"
+      ],
+      "options": {
+        "command": "node --test scripts/smoke.test.ts"
+      },
+      "dependsOn": [
+        "binary"
+      ]
+    },
+    "browser": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "inputs": [
+        "go",
+        "frontend",
+        "{workspaceRoot}/scripts/**/*.ts"
+      ],
+      "options": {
+        "command": "npx playwright install --with-deps --only-shell chromium && make browser-test"
+      },
+      "dependsOn": [
+        {
+          "projects": [
+            "@flora/web"
+          ],
+          "target": "build"
+        }
+      ]
+    }
+  }
+}

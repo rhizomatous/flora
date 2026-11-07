@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "defaultBase": "main",
+  "neverConnectToCloud": true,
+  "namedInputs": {
+    "shared": [
+      "{workspaceRoot}/*.{json,lock,nix}",
+      "{workspaceRoot}/Makefile",
+      "{workspaceRoot}/.*",
+      "{workspaceRoot}/.github/**/*",
+      "{workspaceRoot}/**/project.json",
+      "{workspaceRoot}/scripts/**/*"
+    ],
+    "frontend": [
+      "shared",
+      "{workspaceRoot}/web/**/*",
+      "{workspaceRoot}/florets/src/**/*",
+      "{workspaceRoot}/florets/package.json",
+      "{workspaceRoot}/florets/tsconfig.json"
+    ],
+    "go": [
+      "shared",
+      "{workspaceRoot}/backend/**/*",
+      "!{workspaceRoot}/backend/internal/webassets/dist/**/*"
+    ],
+    "image": ["shared", "{workspaceRoot}/agent/**/*"],
+    "scripts": ["shared", "{workspaceRoot}/scripts/**/*"]
+  }
+}

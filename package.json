@@ -18,7 +18,9 @@
     "test": "node --test scripts/request.test.ts",
     "docs:dev": "npm run docs:dev --workspace @flora/florets",
     "docs:build": "npm run docs:build --workspace @flora/florets",
-    "docs:preview": "npm run docs:preview --workspace @flora/florets"
+    "docs:preview": "npm run docs:preview --workspace @flora/florets",
+    "ci:affected": "nx affected -t frontend-check,styleguide,go-check,race,smoke,browser,container-check,package-check",
+    "ci:plan": "python3 scripts/ci-plan.py"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
@@ -27,6 +29,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
+    "nx": "24.0.5",
     "oxfmt": "0.75.0",
     "oxlint": "1.90.0",
     "oxlint-tsgolint": "7.0.2005",
@@ -37,5 +40,22 @@
   "engines": {
     "node": ">=24 <25",
     "npm": ">=11 <12"
+  },
+  "nx": {
+    "includedScripts": [],
+    "targets": {
+      "frontend-check": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "inputs": [
+          "frontend",
+          "{workspaceRoot}/florets/docs/**/*",
+          "scripts"
+        ],
+        "options": {
+          "command": "npm run check"
+        }
+      }
+    }
   }
 }

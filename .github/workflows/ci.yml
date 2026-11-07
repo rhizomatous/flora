@@ -12,8 +12,43 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+env:
+  NX_DAEMON: 'false'
+  GOTOOLCHAIN: local
+
 jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      check: ${{ steps.plan.outputs.check }}
+      agent: ${{ steps.plan.outputs.agent }}
+      package: ${{ steps.plan.outputs.package }}
+      check_targets: ${{ steps.plan.outputs.check_targets }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # v34
+      - name: Install task runner
+        run: nix develop --command npm ci
+      - name: Verify task selection
+        run: nix develop --command python3 -m unittest discover -s scripts -p 'ci_*_test.py'
+      - name: Select affected checks
+        id: plan
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            nix develop --command python3 scripts/ci-plan.py --base "$BASE_SHA" --head "$HEAD_SHA" --github-output "$GITHUB_OUTPUT"
+          else
+            nix develop --command python3 scripts/ci-plan.py --all --github-output "$GITHUB_OUTPUT"
+          fi
+
   check:
+    needs: changes
+    if: needs.changes.outputs.check == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -31,17 +66,15 @@ jobs:
             build-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('flake.lock', 'backend/go.sum', 'package-lock.json') }}-
       - name: Install locked dependencies
         run: nix develop --command make deps
-      - name: Check Go and TypeScript; build and exercise the standalone binary
-        run: nix develop --command make check smoke
-      - name: Check offline admission, lifecycle, and storage races
-        run: nix develop --command go -C backend test -race -count=1 ./internal/storage ./internal/settings ./internal/auth ./internal/server ./internal/provisioning ./internal/chat ./internal/changes ./internal/githubbroker
-      - name: Install Chromium and check the browser chat workflow
-        run: nix develop --command npx playwright install --with-deps --only-shell chromium && nix develop --command make browser-test
+      - name: Run selected checks
+        env:
+          CHECK_TARGETS: ${{ needs.changes.outputs.check_targets }}
+        run: nix develop --command npx nx run-many -t "$CHECK_TARGETS" --parallel=1 --output-style=static
 
   agent-image:
-    # Native Linux with the runner's uid (1001) differing from the image's
-    # default agent uid (1000), so the storage-ownership mapping is genuinely
-    # exercised; desktop Docker masks it.
+    needs: changes
+    if: needs.changes.outputs.agent == 'true'
+    # Native Linux exercises ownership mapping with a different host and image uid.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -57,20 +90,30 @@ jobs:
           key: build-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('flake.lock', 'backend/go.sum', 'package-lock.json') }}-${{ github.sha }}
           restore-keys: |
             build-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('flake.lock', 'backend/go.sum', 'package-lock.json') }}-
-      - name: Build the pinned agent image
-        run: docker build -t flora-agent-test:ci agent/image
-      - name: Run live provisioning lifecycle tests against the daemon
-        run: FLORA_PROVISIONING_TEST_IMAGE=flora-agent-test:ci nix develop --command go -C backend test -race -count=1 -v -run '^Test(Provisioning|Settings)Docker$' ./internal/provisioning
-      - name: Check container checkout against the local GitHub fixture
+      - name: Install task runner
+        run: nix develop --command npm ci
+      - name: Run container integration tests
+        run: nix develop --command npx nx run agent:container-check --output-style=static
+
+  packaging:
+    needs: changes
+    if: needs.changes.outputs.package == 'true'
+    uses: ./.github/workflows/release-check.yml
+
+  result:
+    if: always()
+    needs: [changes, check, agent-image, packaging]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require successful selection and all selected checks
         env:
-          FLORA_GITHUB_TEST_IMAGE: flora-agent-test:ci
-          FLORA_MULTI_TEST_IMAGE: flora-agent-test:ci
-          FLORA_BROKER_GH_TOKEN: ""
-        run: nix develop --command go -C backend test -race -count=1 -v -run '^Test(Checkout|MultiRepository)Docker$' ./internal/githubbroker
-      - name: Check persistent turns against pinned OpenCode and a local provider fixture
-        run: FLORA_CHAT_TEST_IMAGE=flora-agent-test:ci FLORA_CHAT_TEST_LSP=1 FLORA_CHAT_PROVIDER_HOST="$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')" nix develop --command go -C backend test -race -count=1 -v -run '^Test(Chat|Recovery|ThreeChats)Docker$' ./internal/chat
-      - name: Check review retention after container stop and removal
-        env:
-          FLORA_CHANGES_DOCKER_TEST: "1"
-          FLORA_CHANGES_TEST_IMAGE: flora-agent-test:ci
-        run: nix develop --command go -C backend test -race -count=1 -v -run '^TestDockerCaptureAndRemoval$' ./internal/changes
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os
+          jobs = json.loads(os.environ['RESULTS'])
+          assert jobs['changes']['result'] == 'success', jobs
+          for job, flag in [('check', 'check'), ('agent-image', 'agent'), ('packaging', 'package')]:
+              selected = jobs['changes']['outputs'][flag] == 'true'
+              assert jobs[job]['result'] == ('success' if selected else 'skipped'), jobs
+          PYTHON

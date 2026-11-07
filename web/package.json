@@ -11,5 +11,23 @@
     "@flora/florets": "0.0.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"
+  },
+  "nx": {
+    "includedScripts": [],
+    "targets": {
+      "build": {
+        "executor": "nx:run-commands",
+        "cache": true,
+        "inputs": [
+          "frontend"
+        ],
+        "options": {
+          "command": "npm run build --workspace @flora/web"
+        },
+        "outputs": [
+          "{workspaceRoot}/backend/internal/webassets/dist"
+        ]
+      }
+    }
   }
 }
