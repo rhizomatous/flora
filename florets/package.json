@@ -7,10 +7,18 @@
     ".": "./src/index.ts",
     "./styles.css": "./src/styles.css"
   },
+  "scripts": {
+    "docs:dev": "vite docs --config docs/vite.config.ts",
+    "docs:build": "vite build docs --config docs/vite.config.ts",
+    "docs:preview": "vite preview docs --config docs/vite.config.ts"
+  },
   "dependencies": {
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "tailwind-merge": "3.7.0"
+  },
+  "devDependencies": {
+    "react-dom": "19.3.1"
   },
   "peerDependencies": {
     "react": "^19.0.0"

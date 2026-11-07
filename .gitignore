@@ -8,3 +8,4 @@
 /backend/internal/webassets/dist/
 env.test.sh
 flora-data/
+/florets/docs-dist/

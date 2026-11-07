@@ -101,7 +101,7 @@
   },
   "overrides": [
     {
-      "files": ["web/src/**", "florets/src/**"],
+      "files": ["web/src/**", "florets/src/**", "florets/docs/src/**"],
       "rules": {
         "import/no-nodejs-modules": "error",
         "react/forbid-component-props": ["error", { "forbid": ["style"] }]
