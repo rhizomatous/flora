@@ -14,7 +14,7 @@ function present<T>(value: T | undefined): T {
 const scenarios: { id: string; title: string; frames: Frame[] }[] = [
   {
     id: "working",
-    title: "Working · replay",
+    title: "Check the project setup",
     frames: present(captured.find((s) => s.name === "completed")).frames,
   },
   ...captured.map((s) => ({
@@ -22,10 +22,10 @@ const scenarios: { id: string; title: string; frames: Frame[] }[] = [
     title:
       (
         {
-          completed: "Completed · review changes",
-          waiting: "Needs an answer",
-          recovery: "Failed tool · recovered",
-          long: "Long response · Markdown and code",
+          completed: "Review the workspace changes",
+          waiting: "Move project settings into the menu",
+          recovery: "Fix the workspace checks",
+          long: "Improve keyboard navigation",
         } as Record<string, string>
       )[s.name] ?? s.name,
     frames: s.frames,
