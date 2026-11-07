@@ -385,7 +385,7 @@ export function Chats({
               id="new-chat-message"
               name="text"
               className="composer-message"
-              placeholder="Describe a task…"
+              placeholder="What are we building?"
               required
               disabled={busy}
             />
