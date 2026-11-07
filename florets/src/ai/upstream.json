@@ -1,4 +1,7 @@
 {
+  "compatibility": [
+    "Omit an undefined Shiki grammarState for exactOptionalPropertyTypes."
+  ],
   "repository": "https://github.com/shadcn-ui/ui",
   "revision": "42f3bb63b46a69e52a24bd005cdc9ec15ba7a7b9",
   "style": "radix-rhea",
@@ -259,7 +262,7 @@
     "florets/src/ai/lib/highlighter.tsx": {
       "source": "registry/bases/radix/lib/highlighter.tsx",
       "sha256": "ab3cfd4e09735bf90735e851dfe5bc4f17151f3f36b9d4d55e9cd809b1aa2b9c",
-      "importedSha256": "a1b86ef7e922451feb07cd81ea845fa377133523efe67098573408a4f42f828a"
+      "importedSha256": "f029b6d7882e911fd5681d0adeaf55566b1b61729876baef81f159616d3bf746"
     },
     "florets/src/ai/tailwind.css": {
       "source": "packages/shadcn/src/tailwind.css",

@@ -48,8 +48,10 @@ while queue:
   return 'from "'+rel+'"'
  text=re.sub(r'from "([^"]+)"',imp,text)
  text=re.sub(r'\bcn-[\w-]+\b',lambda m:styles.get(m[0],m[0]),text)
+ if origin.endswith('/lib/highlighter.tsx'):
+  text=text.replace('grammarState: state,', '...(state === undefined ? {} : { grammarState: state }),')
  p=dst/out;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text)
-manifest={'repository':'https://github.com/shadcn-ui/ui','revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=src).decode().strip(),'style':'radix-rhea','patterns':names,'files':seen}
+manifest={'compatibility': ['Omit an undefined Shiki grammarState for exactOptionalPropertyTypes.'], 'repository':'https://github.com/shadcn-ui/ui','revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=src).decode().strip(),'style':'radix-rhea','patterns':names,'files':seen}
 (dst/'florets/src/ai/upstream.json').write_text(json.dumps(manifest,indent=2)+'\n')
 (dst/'florets/src/ai/LICENSE').write_text((src.parents[1]/'LICENSE.md').read_text())
 uis=sorted(p.stem for p in (dst/'florets/src/ai/ui').glob('*.tsx'))
