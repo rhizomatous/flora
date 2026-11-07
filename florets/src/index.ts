@@ -15,3 +15,5 @@ export { Alert, LoadingStatus } from "./components/feedback";
 export { Heading, Text } from "./components/typography";
 export type { HeadingProps, TextProps } from "./components/typography";
 export { FlowerMark, Wordmark } from "./components/brand";
+export { TextureBackground } from "./components/texture-background";
+export type { TextureBackgroundProps } from "./components/texture-background";

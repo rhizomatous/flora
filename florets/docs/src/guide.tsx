@@ -21,7 +21,10 @@ import {
   Wordmark,
 } from "@flora/florets";
 
+import { TextureExample } from "./texture-example";
+
 const sections = [
+  { id: "backgrounds", label: "Backgrounds" },
   { id: "typography", label: "Typography" },
   { id: "buttons", label: "Buttons & links" },
   { id: "forms", label: "Form controls" },
@@ -213,6 +216,21 @@ export function Guide() {
             </pre>
           </header>
           <div className="space-y-14">
+            <Section
+              id="backgrounds"
+              title="Backgrounds"
+              description="Three moving textures: iridescent silk, smoky light, and engraved ribbons. Compare them here or open a screen-sized preview."
+            >
+              <Example
+                title="TextureBackground"
+                description="Place in a positioned container with content above it. Intensity accepts 0–1; speed accepts 0–2. Seed chooses a repeatable pattern. Motion pauses offscreen and in hidden tabs."
+                code={
+                  '<div className="relative isolate overflow-hidden">\n  <TextureBackground variant="silk" intensity={1} speed={1} motion seed={1} />\n  <div className="relative">Your content</div>\n</div>'
+                }
+              >
+                <TextureExample dark={dark} />
+              </Example>
+            </Section>
             <Section
               id="typography"
               title="Typography"
