@@ -2,16 +2,11 @@
   "name": "agent",
   "targets": {
     "container-check": {
-      "executor": "nx:run-commands",
-      "cache": false,
       "inputs": [
         "go",
-        "image",
-        "{workspaceRoot}/scripts/check-agent.sh"
+        "image"
       ],
-      "options": {
-        "command": "bash scripts/check-agent.sh"
-      }
+      "command": "bash scripts/check-agent.sh"
     }
   }
 }

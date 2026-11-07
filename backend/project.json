@@ -2,14 +2,9 @@
   "name": "backend",
   "targets": {
     "go-check": {
-      "executor": "nx:run-commands",
-      "cache": false,
       "inputs": [
         "go"
       ],
-      "options": {
-        "command": "test -z \"$(gofmt -l backend)\" && CGO_ENABLED=0 go -C backend vet ./... && CGO_ENABLED=0 go -C backend test -mod=readonly ./..."
-      },
       "dependsOn": [
         {
           "projects": [
@@ -17,17 +12,13 @@
           ],
           "target": "build"
         }
-      ]
+      ],
+      "command": "test -z \"$(gofmt -l backend)\" && CGO_ENABLED=0 go -C backend vet ./... && CGO_ENABLED=0 go -C backend test -mod=readonly ./..."
     },
     "race": {
-      "executor": "nx:run-commands",
-      "cache": false,
       "inputs": [
         "go"
       ],
-      "options": {
-        "command": "go -C backend test -race -count=1 ./internal/storage ./internal/settings ./internal/auth ./internal/server ./internal/provisioning ./internal/chat ./internal/changes ./internal/githubbroker"
-      },
       "dependsOn": [
         {
           "projects": [
@@ -35,18 +26,14 @@
           ],
           "target": "build"
         }
-      ]
+      ],
+      "command": "go -C backend test -race -count=1 ./internal/storage ./internal/settings ./internal/auth ./internal/server ./internal/provisioning ./internal/chat ./internal/changes ./internal/githubbroker"
     },
     "binary": {
-      "executor": "nx:run-commands",
-      "cache": false,
       "inputs": [
         "go",
         "frontend"
       ],
-      "options": {
-        "command": "mkdir -p bin && CGO_ENABLED=0 go -C backend build -mod=readonly -trimpath -o ../bin/flora ./cmd/flora"
-      },
       "dependsOn": [
         {
           "projects": [
@@ -54,34 +41,24 @@
           ],
           "target": "build"
         }
-      ]
+      ],
+      "command": "mkdir -p bin && CGO_ENABLED=0 go -C backend build -mod=readonly -trimpath -o ../bin/flora ./cmd/flora"
     },
     "smoke": {
-      "executor": "nx:run-commands",
-      "cache": false,
       "inputs": [
         "go",
-        "frontend",
-        "{workspaceRoot}/scripts/smoke.test.ts"
+        "frontend"
       ],
-      "options": {
-        "command": "node --test scripts/smoke.test.ts"
-      },
       "dependsOn": [
         "binary"
-      ]
+      ],
+      "command": "node --test scripts/smoke.test.ts"
     },
     "browser": {
-      "executor": "nx:run-commands",
-      "cache": false,
       "inputs": [
         "go",
-        "frontend",
-        "{workspaceRoot}/scripts/**/*.ts"
+        "frontend"
       ],
-      "options": {
-        "command": "npx playwright install --with-deps --only-shell chromium && make browser-test"
-      },
       "dependsOn": [
         {
           "projects": [
@@ -89,7 +66,8 @@
           ],
           "target": "build"
         }
-      ]
+      ],
+      "command": "npx playwright install --with-deps --only-shell chromium && make browser-test"
     }
   }
 }

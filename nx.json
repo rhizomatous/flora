@@ -23,7 +23,6 @@
       "{workspaceRoot}/backend/**/*",
       "!{workspaceRoot}/backend/internal/webassets/dist/**/*"
     ],
-    "image": ["shared", "{workspaceRoot}/agent/**/*"],
-    "scripts": ["shared", "{workspaceRoot}/scripts/**/*"]
+    "image": ["shared", "{workspaceRoot}/agent/**/*"]
   }
 }

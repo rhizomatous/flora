@@ -27,18 +27,15 @@
     "includedScripts": [],
     "targets": {
       "styleguide": {
-        "executor": "nx:run-commands",
         "cache": true,
         "inputs": [
           "shared",
           "{projectRoot}/**/*"
         ],
-        "options": {
-          "command": "npm run docs:build"
-        },
         "outputs": [
           "{workspaceRoot}/florets/docs-dist"
-        ]
+        ],
+        "command": "npm run docs:build"
       }
     }
   }

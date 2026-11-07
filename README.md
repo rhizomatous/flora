@@ -179,13 +179,13 @@ GitHub Actions uses Nx to select tasks from the whole PR diff. Main-branch pushe
 run every check. Florets and web changes run frontend, browser, and binary smoke
 checks without starting container or native packaging jobs. Backend changes run
 Go, browser, container, and packaging checks. Shared configuration and scripts
-trigger all checks. Unknown directories also trigger the full suite. Documentation-only
-changes skip runtime checks, including edits to documents shipped in archives.
+trigger all checks. Documentation-only changes skip runtime checks, including
+edits to documents shipped in archives.
 
 Inside the Nix shell after `make deps`, inspect or run tasks with:
 
 ```sh
-npm run ci:plan -- --base origin/main
+npx nx affected -t frontend-check,styleguide,go-check,race,smoke --base=origin/main --graph
 npx nx affected -t frontend-check,styleguide,go-check,race,smoke --base=origin/main
 npx nx run backend:browser
 npx nx graph
@@ -195,8 +195,8 @@ Nx caches web and styleguide builds locally in `.nx/cache`. Tests run fresh when
 selected. Task inputs are declared in `nx.json`, package manifests, and
 `project.json` files. Container and packaging tasks require a disposable native
 Linux runner with Docker; packaging also requires systemd, shellcheck, and sudo.
-The `result` CI job checks that every selected job passed and accepts only
-intentional skips. It can be used as the required branch check.
+The `result` CI job fails if task selection or any check fails or is cancelled.
+It can be used as the required branch check.
 
 The Make commands remain available. One-shot commands work too:
 `nix develop --command make check smoke build-linux`. Before newly created Nix

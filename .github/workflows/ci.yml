@@ -15,6 +15,9 @@ concurrency:
 env:
   NX_DAEMON: 'false'
   GOTOOLCHAIN: local
+  NX_BASE: ${{ github.event.pull_request.base.sha || 'origin/main' }}
+  NX_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  CHECK_TARGETS: frontend-check,styleguide,go-check,race,smoke,browser
 
 jobs:
   changes:
@@ -24,7 +27,6 @@ jobs:
       check: ${{ steps.plan.outputs.check }}
       agent: ${{ steps.plan.outputs.agent }}
       package: ${{ steps.plan.outputs.package }}
-      check_targets: ${{ steps.plan.outputs.check_targets }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -32,19 +34,23 @@ jobs:
       - uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # v34
       - name: Install task runner
         run: nix develop --command npm ci
-      - name: Verify task selection
-        run: nix develop --command python3 -m unittest discover -s scripts -p 'ci_*_test.py'
       - name: Select affected checks
         id: plan
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: nix develop --command bash -euo pipefail {0}
         run: |
+          selection=()
           if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
-            nix develop --command python3 scripts/ci-plan.py --base "$BASE_SHA" --head "$HEAD_SHA" --github-output "$GITHUB_OUTPUT"
-          else
-            nix develop --command python3 scripts/ci-plan.py --all --github-output "$GITHUB_OUTPUT"
+            selection=(--affected)
           fi
+          for group in check agent package; do
+            case "$group" in
+              check) targets=$CHECK_TARGETS ;;
+              agent) targets=container-check ;;
+              package) targets=package-check ;;
+            esac
+            projects=$(npx nx show projects "${selection[@]}" --with-target="$targets" --json)
+            echo "$group=$(jq "length > 0" <<< "$projects")" >> "$GITHUB_OUTPUT"
+          done
 
   check:
     needs: changes
@@ -53,6 +59,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
       - uses: nixbuild/nix-quick-install-action@2c9db80fb984ceb1bcaa77cdda3fdf8cfba92035 # v34
       - name: Restore Go build and dependency caches
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -67,9 +75,12 @@ jobs:
       - name: Install locked dependencies
         run: nix develop --command make deps
       - name: Run selected checks
-        env:
-          CHECK_TARGETS: ${{ needs.changes.outputs.check_targets }}
-        run: nix develop --command npx nx run-many -t "$CHECK_TARGETS" --parallel=1 --output-style=static
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            nix develop --command npx nx affected -t "$CHECK_TARGETS" --parallel=1 --output-style=static
+          else
+            nix develop --command npx nx run-many -t "$CHECK_TARGETS" --parallel=1 --output-style=static
+          fi
 
   agent-image:
     needs: changes
@@ -105,15 +116,7 @@ jobs:
     needs: [changes, check, agent-image, packaging]
     runs-on: ubuntu-24.04
     steps:
-      - name: Require successful selection and all selected checks
+      - name: Require successful checks
         env:
-          RESULTS: ${{ toJSON(needs) }}
-        run: |
-          python3 - <<'PYTHON'
-          import json, os
-          jobs = json.loads(os.environ['RESULTS'])
-          assert jobs['changes']['result'] == 'success', jobs
-          for job, flag in [('check', 'check'), ('agent-image', 'agent'), ('packaging', 'package')]:
-              selected = jobs['changes']['outputs'][flag] == 'true'
-              assert jobs[job]['result'] == ('success' if selected else 'skipped'), jobs
-          PYTHON
+          SUCCESS: ${{ needs.changes.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+        run: test "$SUCCESS" = true
