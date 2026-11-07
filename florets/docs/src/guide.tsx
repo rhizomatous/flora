@@ -21,7 +21,10 @@ import {
   Wordmark,
 } from "@flora/florets";
 
+import { StippleExample } from "./stipple-example";
+
 const sections = [
+  { id: "backgrounds", label: "Backgrounds" },
   { id: "typography", label: "Typography" },
   { id: "buttons", label: "Buttons & links" },
   { id: "forms", label: "Form controls" },
@@ -213,6 +216,21 @@ export function Guide() {
             </pre>
           </header>
           <div className="space-y-14">
+            <Section
+              id="backgrounds"
+              title="Backgrounds"
+              description="Fixed stippling with slowly drifting illumination. The texture fades toward the center and bottom to keep content quiet."
+            >
+              <Example
+                title="StippleBackground"
+                description="Place in a positioned container with content above it. Intensity and density accept 0–1; seed chooses a repeatable pattern. Motion pauses offscreen and in hidden tabs."
+                code={
+                  '<div className="relative isolate overflow-hidden">\n  <StippleBackground intensity={0.22} density={0.5} motion seed={1} />\n  <div className="relative">Your content</div>\n</div>'
+                }
+              >
+                <StippleExample />
+              </Example>
+            </Section>
             <Section
               id="typography"
               title="Typography"
