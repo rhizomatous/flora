@@ -21,7 +21,7 @@ import {
   Wordmark,
 } from "@flora/florets";
 
-import { StippleExample } from "./stipple-example";
+import { TextureExample } from "./texture-example";
 
 const sections = [
   { id: "backgrounds", label: "Backgrounds" },
@@ -219,16 +219,16 @@ export function Guide() {
             <Section
               id="backgrounds"
               title="Backgrounds"
-              description="Soft clusters of stippling drift in overlapping layers. The texture thins toward the center and bottom to keep content quiet."
+              description="Three moving textures: iridescent silk, smoky light, and engraved ribbons. Compare them here or open a screen-sized preview."
             >
               <Example
-                title="StippleBackground"
-                description="Place in a positioned container with content above it. Intensity and density accept 0–1; seed chooses a repeatable pattern. Motion pauses offscreen and in hidden tabs."
+                title="TextureBackground"
+                description="Place in a positioned container with content above it. Intensity accepts 0–1; speed accepts 0–2. Seed chooses a repeatable pattern. Motion pauses offscreen and in hidden tabs."
                 code={
-                  '<div className="relative isolate overflow-hidden">\n  <StippleBackground intensity={0.32} density={0.75} motion seed={1} />\n  <div className="relative">Your content</div>\n</div>'
+                  '<div className="relative isolate overflow-hidden">\n  <TextureBackground variant="silk" intensity={1} speed={1} motion seed={1} />\n  <div className="relative">Your content</div>\n</div>'
                 }
               >
-                <StippleExample />
+                <TextureExample dark={dark} />
               </Example>
             </Section>
             <Section
