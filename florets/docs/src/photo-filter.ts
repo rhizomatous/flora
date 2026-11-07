@@ -1,7 +1,6 @@
 export type PhotoFilterSettings = {
-  treatment: "source" | "stipple" | "mezzotint";
+  treatment: "source" | "halftone" | "engraving";
   size: number;
-  strength: number;
   exposure: number;
   intensity: number;
   fade: number;
@@ -14,12 +13,10 @@ uniform vec2 resolution;
 uniform vec2 viewport;
 uniform vec2 imageSize;
 uniform float size;
-uniform float strength;
 uniform float exposure;
 uniform float intensity;
 uniform float fade;
 uniform int treatment;
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 vec3 samplePhoto(vec2 uv) {
   float imageAspect = imageSize.x / imageSize.y;
   float viewAspect = viewport.x / viewport.y;
@@ -32,35 +29,33 @@ void main() {
   vec2 uv = gl_FragCoord.xy / resolution;
   vec2 pixel = uv * viewport;
   vec3 color = samplePhoto(uv);
-  vec3 filtered = color;
-  float mark = 1.;
-  if (treatment == 1) {
-    vec2 cell = floor(pixel / size);
-    mark = 0.;
-    for (int y = -1; y <= 1; y++) {
-      for (int x = -1; x <= 1; x++) {
-        vec2 neighbor = cell + vec2(float(x), float(y));
-        vec2 center = (neighbor + .05 + .9 * vec2(hash(neighbor), hash(neighbor + 37.))) * size;
-        float radius = size * mix(.28, .35, hash(neighbor + 71.));
-        float distanceToDot = length(pixel - center);
-        float aa = viewport.y / resolution.y * .65;
-        if (distanceToDot > radius + aa) continue;
-        float dotMark = 1. - smoothstep(radius - aa, radius + aa, distanceToDot);
-        mark = max(mark, dotMark);
-      }
-    }
-    // Keep photographic detail between the marks, with less contrast at the tonal extremes.
-    filtered = color + min(color, 1. - color) * (mark - .32) * 1.4;
-  } else if (treatment == 2) {
-    vec2 grain = floor(pixel / max(.6, size * .4));
-    float threshold = hash(grain);
-    // Stochastic rounding between nearby tone levels preserves the source's average color.
-    vec3 levels = color * 7.;
-    filtered = (floor(levels) + step(vec3(threshold), fract(levels))) / 7.;
-  }
-  color = mix(color, filtered, strength);
-  float falloff = mix(1., smoothstep(.02, .85, uv.y), fade);
   vec3 ink = vec3(.043, .050, .046);
+  if (treatment == 1) {
+    // Staggered rows keep visible circular marks without a square checkerboard.
+    float row = floor(pixel.y / size);
+    float offset = mod(row, 2.) * .5;
+    vec2 cell = vec2(floor(pixel.x / size - offset), row);
+    vec2 center = (cell + vec2(.5 + offset, .5)) * size;
+    vec3 sampleColor = samplePhoto(center / viewport);
+    float tone = max(max(sampleColor.r, sampleColor.g), sampleColor.b);
+    float radius = sqrt(tone) * size * .48;
+    float aa = viewport.y / resolution.y * .55;
+    float coverage = 1. - smoothstep(radius - aa, radius + aa, length(pixel - center));
+    coverage *= smoothstep(0., .02, tone);
+    vec3 pigment = sampleColor / max(tone, .001) * .85;
+    color = mix(ink, pigment, coverage);
+  } else if (treatment == 2) {
+    // Brightness sets the width of diagonal strokes; gaps remain bare background.
+    float tone = max(max(color.r, color.g), color.b);
+    float distanceToLine = abs(fract((pixel.y + pixel.x * .6) / size) - .5);
+    float width = pow(tone, .85) * .44;
+    float aa = viewport.y / resolution.y / size * .6;
+    float coverage = (1. - smoothstep(width - aa, width + aa, distanceToLine))
+      * smoothstep(0., .02, tone);
+    vec3 pigment = color / max(tone, .001) * .75;
+    color = mix(ink, pigment, coverage);
+  }
+  float falloff = mix(1., smoothstep(.02, .85, uv.y), fade);
   gl_FragColor = vec4(mix(ink, color, intensity * falloff), 1.);
 }
 `;
@@ -138,7 +133,6 @@ export function createPhotoFilter(canvas: HTMLCanvasElement, image: HTMLImageEle
       "viewport",
       "imageSize",
       "size",
-      "strength",
       "exposure",
       "intensity",
       "fade",
@@ -159,12 +153,12 @@ export function createPhotoFilter(canvas: HTMLCanvasElement, image: HTMLImageEle
       gl.uniform2f(uniforms.resolution ?? null, w, h);
       gl.uniform2f(uniforms.viewport ?? null, width, height);
       gl.uniform2f(uniforms.imageSize ?? null, image.naturalWidth, image.naturalHeight);
-      for (const name of ["size", "strength", "exposure", "intensity", "fade"] as const) {
+      for (const name of ["size", "exposure", "intensity", "fade"] as const) {
         gl.uniform1f(uniforms[name] ?? null, settings[name]);
       }
       gl.uniform1i(
         uniforms.treatment ?? null,
-        { source: 0, stipple: 1, mezzotint: 2 }[settings.treatment],
+        { source: 0, halftone: 1, engraving: 2 }[settings.treatment],
       );
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     },
