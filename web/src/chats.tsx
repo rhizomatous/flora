@@ -5,7 +5,6 @@ import {
   Button,
   ButtonLink,
   FieldLabel,
-  FlowerMark,
   Heading,
   Link,
   NativeSelect,
@@ -13,35 +12,12 @@ import {
   Textarea,
 } from "@flora/florets";
 
-import { Changes } from "./changes";
+import { ChatDetail, type Activity, type Detail } from "./chat-view";
 import type { Chat } from "./notifications";
 import { QuestionForm, type Question } from "./question";
 import { errorMessage, isExpired, request } from "./request";
 import { text } from "./ui";
 
-type Part = {
-  id?: string;
-  type: string;
-  text?: string;
-  tool?: string;
-  state?: { status: string; input?: unknown; output?: string; error?: string; title?: string };
-};
-type Message = {
-  ID: string;
-  Role: string;
-  Text: string;
-  Provider: string;
-  Model: string;
-  Payload: { parts?: Part[]; info?: { error?: unknown } };
-};
-type Activity = {
-  ChatID: string;
-  Sequence: number;
-  Kind: string;
-  CreatedAt: string;
-  Payload: unknown;
-};
-type Detail = { chat: Chat; messages: Message[]; continuationBlockedReason?: string };
 type Project = { id: string; name: string };
 
 const statusName = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -308,6 +284,8 @@ export function Chats({
     setBusy(false);
   }
 
+  const detailClass = id === "" ? "min-w-0" : "chat-detail";
+
   function title() {
     if (isNew) return "New chat";
     if (id === "") return "Chats";
@@ -316,8 +294,12 @@ export function Chats({
   }
 
   return (
-    <section aria-labelledby="chats-heading" className={isNew ? "new-chat" : "min-w-0"}>
-      <div className={isNew ? "sr-only" : "flex items-center justify-between gap-4"}>
+    <section aria-labelledby="chats-heading" className={isNew ? "new-chat" : detailClass}>
+      <div
+        className={
+          isNew || detail !== undefined ? "sr-only" : "flex items-center justify-between gap-4"
+        }
+      >
         <Heading
           level={1}
           id="chats-heading"
@@ -485,253 +467,3 @@ function ChatList({ list, projects }: { list: Chat[]; projects: Project[] }) {
 }
 
 /** Shows one chat. `children` renders between the review of changes and the follow-up form. */
-function ChatDetail({
-  id,
-  detail,
-  activity,
-  connection,
-  projectName,
-  busy,
-  messageBytes,
-  onExpired,
-  onControl,
-  onSend,
-  children,
-}: {
-  id: string;
-  detail: Detail;
-  activity: Activity[];
-  connection: string;
-  projectName: string | undefined;
-  busy: boolean;
-  messageBytes: number;
-  onExpired: () => void;
-  onControl: (action: "interrupt" | "stop") => void;
-  onSend: (event: React.SubmitEvent<HTMLFormElement>) => void;
-  children: React.ReactNode;
-}) {
-  const { chat } = detail;
-  const activeTurn = chat.Status === "working" || chat.Status === "waiting";
-  const stopped = chat.Status === "stopped";
-  const blocked = (detail.continuationBlockedReason ?? "") !== "";
-
-  function followUpHelp() {
-    if (blocked) {
-      return "Continuation is unavailable. Saved conversation and workspace files are retained.";
-    }
-    if (activeTurn) {
-      return "Wait for the current turn to finish or answer Flora’s question. Messages are not queued.";
-    }
-    return `Continue in the same workspace and conversation. Up to ${messageBytes.toLocaleString()} UTF-8 bytes.`;
-  }
-
-  function sendLabel() {
-    if (blocked) return "Continuation unavailable";
-    if (busy) return "Working…";
-    return stopped ? "Resume with new message" : "Send message";
-  }
-
-  return (
-    <>
-      <div
-        role="status"
-        className="mt-6 flex flex-wrap items-center gap-2 rounded-md border border-foreground/20 p-3 text-sm"
-      >
-        {chat.Status === "working" && <FlowerMark />}
-        <strong>{statusName(chat.Status)}</strong>
-        <span>{chat.StatusReason}</span>
-      </div>
-      <Text size="xs" tone="muted" role="status" className="mt-2">
-        {connection} · {projectName}
-      </Text>
-      {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
-        <Alert role="note" className="mt-4 rounded-md border border-foreground/20 p-3 text-sm">
-          Some live activity could not be captured while Flora was disconnected from OpenCode.
-          Recovered message and tool snapshots are shown below. Transient output may be missing.
-          Reconnecting does not replay accepted messages or actions.
-        </Alert>
-      )}
-      {!blocked && (
-        <>
-          <div className="mt-4 flex flex-wrap gap-3" aria-label="Execution controls">
-            {activeTurn && (
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  onControl("interrupt");
-                }}
-              >
-                Interrupt current work
-              </Button>
-            )}
-            {!stopped && (
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  onControl("stop");
-                }}
-              >
-                Stop container
-              </Button>
-            )}
-          </div>
-          <Text tone="muted" className="mt-2">
-            {stopped
-              ? "Send a new message to restart this container with its saved workspace and conversation. Interrupted work is not replayed."
-              : "Interrupt keeps the container running. Stop frees container capacity. Both preserve saved work and conversation."}
-          </Text>
-        </>
-      )}
-      <ol aria-label="Conversation" className="mt-8 space-y-8">
-        {detail.messages.map((m) => (
-          <ConversationMessage key={m.ID} message={m} />
-        ))}
-      </ol>
-      <Changes key={id} chatID={id} onExpired={onExpired} />
-      {children}
-      <form onSubmit={onSend} className="mt-8 space-y-4">
-        <FieldLabel>
-          Follow-up
-          <Textarea
-            className="mt-2 min-h-28"
-            name="text"
-            required
-            disabled={busy || activeTurn || blocked}
-            aria-describedby="followup-help"
-          />
-        </FieldLabel>
-        <Text tone="muted" id="followup-help">
-          {followUpHelp()}
-        </Text>
-        <Button type="submit" disabled={busy || activeTurn || blocked}>
-          {sendLabel()}
-        </Button>
-      </form>
-      <details className="mt-10 rounded-md border border-foreground/20 p-4">
-        <summary className="cursor-pointer text-sm font-medium">
-          Full activity ({activity.length} saved events)
-        </summary>
-        <Text tone="muted" className="mt-3">
-          Setup activity contains bounded previews. After setup finishes,{" "}
-          <Link href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>
-            download the full redacted setup log
-          </Link>
-          . Any capture failure is shown in the final setup event.
-        </Text>
-        <ol className="mt-4 space-y-3">
-          {activity.map((row) => (
-            <li key={row.Sequence}>
-              <details>
-                <summary className="cursor-pointer text-xs break-words">
-                  {row.Kind} ·{" "}
-                  <time dateTime={row.CreatedAt}>
-                    {new Date(row.CreatedAt).toLocaleTimeString()}
-                  </time>{" "}
-                  · #{row.Sequence}
-                </summary>
-                <pre className="mt-2 max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
-                  {JSON.stringify(row.Payload, null, 2)}
-                </pre>
-              </details>
-            </li>
-          ))}
-        </ol>
-      </details>
-      <details className="mt-4 rounded-md border border-foreground/20 p-4">
-        <summary className="cursor-pointer text-sm font-medium">Environment snapshot</summary>
-        <pre className="mt-3 overflow-auto text-xs break-all whitespace-pre-wrap">
-          {JSON.stringify(
-            {
-              image: chat.ImageDigest,
-              OpenCode: chat.HarnessVersion,
-              startingCommits: chat.StartingCommits,
-            },
-            null,
-            2,
-          )}
-        </pre>
-      </details>
-    </>
-  );
-}
-
-function ConversationMessage({ message: m }: { message: Message }) {
-  const parts = m.Payload.parts ?? [];
-  const failure = m.Payload.info?.error ?? null;
-  return (
-    <li className="min-w-0 rounded-md border border-foreground/20 p-4">
-      <Heading level={2} className="text-sm leading-5">
-        {m.Role === "user" ? "You" : "Flora"}
-        {m.Provider !== "" && (
-          <span className="ml-2 font-normal break-all text-muted-foreground">
-            {m.Provider}/{m.Model}
-          </span>
-        )}
-      </Heading>
-      <div className="mt-3 space-y-4">
-        {parts.length > 0 ? (
-          parts.map((p, i) => <MessagePart key={p.id ?? i} part={p} />)
-        ) : (
-          <pre className="font-sans text-sm leading-6 break-words whitespace-pre-wrap">
-            {m.Text}
-          </pre>
-        )}
-      </div>
-      {failure !== null && (
-        <pre role="alert" className="mt-3 text-sm break-words whitespace-pre-wrap">
-          {JSON.stringify(failure, null, 2)}
-        </pre>
-      )}
-    </li>
-  );
-}
-
-function MessagePart({ part: p }: { part: Part }) {
-  if (p.type === "text") {
-    return (
-      <pre className="font-sans text-sm leading-6 break-words whitespace-pre-wrap">{p.text}</pre>
-    );
-  }
-  if (p.type === "reasoning") {
-    return (
-      <details>
-        <summary className="cursor-pointer text-sm">Reasoning</summary>
-        <pre className="mt-2 text-sm break-words whitespace-pre-wrap">{p.text}</pre>
-      </details>
-    );
-  }
-  if (p.type === "tool") {
-    const output = p.state?.output ?? "";
-    const error = p.state?.error ?? "";
-    return (
-      <details open className="rounded-md border border-foreground/20 p-3">
-        <summary className="cursor-pointer text-sm font-medium break-words">
-          {p.tool} · {p.state?.status} {p.state?.title}
-        </summary>
-        <pre className="mt-3 overflow-auto text-xs break-words whitespace-pre-wrap">
-          {JSON.stringify(p.state?.input, null, 2)}
-        </pre>
-        {output !== "" && (
-          <pre className="mt-3 max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
-            {output}
-          </pre>
-        )}
-        {error !== "" && (
-          <pre role="alert" className="mt-3 text-xs break-words whitespace-pre-wrap">
-            {error}
-          </pre>
-        )}
-      </details>
-    );
-  }
-  return (
-    <details>
-      <summary className="cursor-pointer text-sm">{p.type}</summary>
-      <pre className="mt-2 overflow-auto text-xs break-words whitespace-pre-wrap">
-        {JSON.stringify(p, null, 2)}
-      </pre>
-    </details>
-  );
-}

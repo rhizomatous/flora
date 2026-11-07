@@ -14,7 +14,7 @@ export function CompletionToasts({
       aria-label="Completion notifications"
       aria-live="polite"
       aria-relevant="additions"
-      className="fixed right-4 bottom-4 z-10 max-h-[40svh] w-[calc(100%-2rem)] max-w-sm space-y-3 overflow-auto rounded-md"
+      className="fixed top-20 right-4 z-10 max-h-[40svh] w-[calc(100%-2rem)] max-w-sm space-y-3 overflow-auto rounded-md"
     >
       {toasts.map((t) => (
         <div

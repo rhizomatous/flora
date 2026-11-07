@@ -27,7 +27,10 @@ import {
   Wordmark,
 } from "@flora/florets";
 
+import { AIElementsGuide } from "./ai-guide";
+
 const sections = [
+  { id: "ai-elements", label: "AI Elements" },
   { id: "typography", label: "Typography" },
   { id: "buttons", label: "Buttons & links" },
   { id: "menus", label: "Menus" },
@@ -255,6 +258,13 @@ export function Guide() {
             </pre>
           </header>
           <div className="space-y-14">
+            <Section
+              id="ai-elements"
+              title="AI Elements"
+              description="Reusable patterns for agent conversations, activity, and controls."
+            >
+              <AIElementsGuide />
+            </Section>
             <Section
               id="typography"
               title="Typography"

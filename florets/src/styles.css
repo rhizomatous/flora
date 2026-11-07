@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @source "./";
+@source "../../node_modules/streamdown/dist/*.js";
 
 /* Semantic tokens follow the shadcn naming convention. */
 :root {

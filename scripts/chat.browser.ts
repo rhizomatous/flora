@@ -35,7 +35,13 @@ try {
   await page.getByRole("radio", { name: /^Yes/ }).check();
   await page.getByRole("button", { name: "Answer and continue", exact: true }).click();
   await page.getByText("Saved response 1", { exact: true }).waitFor();
-  await page.getByText("anthropic/model", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Chat options", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Activity and environment", exact: true }).click();
+  const diagnostics = page.getByRole("dialog", { name: "Activity and environment", exact: true });
+  await diagnostics.getByText("Saved message metadata", { exact: true }).click();
+  assert.match(await diagnostics.innerText(), /"Provider": "anthropic"/);
+  assert.match(await diagnostics.innerText(), /"Model": "model"/);
+  await page.keyboard.press("Escape");
   assert.equal(
     await page
       .getByLabel("Conversation")
@@ -43,6 +49,7 @@ try {
       .count(),
     1,
   );
+  await page.getByLabel("Conversation").locator("[data-slot=trace-trigger]").first().click();
   assert.match(await page.getByLabel("Conversation").innerText(), /\/workspace/);
   assert.doesNotMatch(await page.locator("body").innerText(), /provider-test-secret/);
   await page.getByLabel("Follow-up", { exact: true }).fill("Continue in this workspace");
@@ -75,6 +82,7 @@ try {
     .waitFor();
   await page.getByRole("button", { name: "Interrupt current work", exact: true }).click();
   await page
+    .locator("#followup-help")
     .getByText("Current work interrupted; send a new message to continue with saved context", {
       exact: true,
     })
@@ -85,7 +93,8 @@ try {
   await page.getByLabel("Follow-up", { exact: true }).fill("stop control work");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await page.getByLabel("Conversation").getByText("stop control work", { exact: true }).waitFor();
-  await page.getByRole("button", { name: "Stop container", exact: true }).click();
+  await page.getByRole("button", { name: "Chat options", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Stop container", exact: true }).click();
   await page.getByRole("button", { name: "Resume with new message", exact: true }).waitFor();
   await page.reload();
   await page.getByLabel("Follow-up", { exact: true }).fill("New explicit work after stop");

@@ -62,7 +62,7 @@ export function QuestionForm({
       onSubmit={(event) => {
         void answer(event);
       }}
-      className="mt-8 space-y-5 rounded-md border p-4"
+      className="question-card"
     >
       <Heading level={2}>Flora needs your answer</Heading>
       {q.questions.map((question, i) => (
@@ -72,7 +72,7 @@ export function QuestionForm({
             {question.header}: {question.question}
           </legend>
           {question.options.map((option) => (
-            <label key={option.label} className="flex gap-3 text-sm">
+            <label key={option.label} className="question-option">
               <input
                 type={question.multiple ? "checkbox" : "radio"}
                 name={`option-${i}`}
