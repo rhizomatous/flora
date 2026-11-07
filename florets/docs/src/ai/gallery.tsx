@@ -45,7 +45,7 @@ const patterns = [
   { id: "terminal", name: "Terminal", Component: TerminalDemo },
   { id: "test-results", name: "Test Results", Component: TestResultsDemo },
   { id: "tool", name: "Tool", Component: ToolDemo },
-];
+] as const;
 export function AIGallery() {
   const [selected, setSelected] = useState(location.hash.slice(1) || "chain-of-thought");
   const [dark, setDark] = useState(true);

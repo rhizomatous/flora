@@ -33,13 +33,13 @@ type AttachmentFile = {
   name: string;
 };
 
+const defaultModel = { id: "gpt-5", name: "GPT-5" };
+const defaultEffort = { id: "medium", name: "Medium" };
+
 const providers = [
   {
     name: "OpenAI",
-    models: [
-      { id: "gpt-5", name: "GPT-5" },
-      { id: "gpt-5-mini", name: "GPT-5 mini" },
-    ],
+    models: [defaultModel, { id: "gpt-5-mini", name: "GPT-5 mini" }],
   },
   {
     name: "Anthropic",
@@ -52,21 +52,17 @@ const providers = [
 
 const models = providers.flatMap((provider) => provider.models);
 
-const efforts = [
-  { id: "low", name: "Low" },
-  { id: "medium", name: "Medium" },
-  { id: "high", name: "High" },
-];
+const efforts = [{ id: "low", name: "Low" }, defaultEffort, { id: "high", name: "High" }];
 
 export function PromptInputDemo() {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<AttachmentFile[]>([]);
-  const [model, setModel] = useState(models[0].id);
-  const [effort, setEffort] = useState(efforts[1].id);
+  const [model, setModel] = useState(defaultModel.id);
+  const [effort, setEffort] = useState(defaultEffort.id);
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const currentModel = models.find((item) => item.id === model) ?? models[0];
-  const currentEffort = efforts.find((item) => item.id === effort) ?? efforts[1];
+  const currentModel = models.find((item) => item.id === model) ?? defaultModel;
+  const currentEffort = efforts.find((item) => item.id === effort) ?? defaultEffort;
   const canSend = text.trim().length > 0;
 
   function onSubmit(event: SubmitEvent<HTMLFormElement>) {

@@ -51,7 +51,7 @@ const TASKS = [
       ["Editing app/page.tsx", "Edited app/page.tsx"],
     ],
   },
-];
+] as const;
 
 function taskAt(task: (typeof TASKS)[number], done: number) {
   return {

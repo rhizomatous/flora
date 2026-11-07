@@ -22,7 +22,8 @@ function TraceLine({
   status,
   ...props
 }: ComponentProps<"span"> & {
-  status?: "running" | "error" | "pending";
+  // Undefined represents a completed step with no active status.
+  status?: "running" | "error" | "pending" | undefined;
 }) {
   return (
     <span

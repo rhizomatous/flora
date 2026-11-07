@@ -91,7 +91,7 @@ const transcript = chat.get();
 const [question] = chat.get(1);
 const transport = chat.transport({ delayMs: 20 });
 
-function StatusIcon({ status }: { status?: "running" | "error" }) {
+function StatusIcon({ status }: { status?: "running" | "error" | undefined }) {
   if (status === "running") {
     return <LoaderCircleIcon className="animate-spin" />;
   }
@@ -106,7 +106,7 @@ function Step({
   children,
 }: {
   title: string;
-  status?: "running" | "error";
+  status?: "running" | "error" | undefined;
   defaultOpen?: boolean;
   children?: ReactNode;
 }) {

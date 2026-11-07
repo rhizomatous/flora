@@ -70,12 +70,13 @@ function getSubagentMessage(done: number, report?: string): SubagentMessage {
     output: { stdout: step.stdout },
   }));
 
-  if (done < steps.length) {
+  const nextStep = steps[done];
+  if (nextStep !== undefined) {
     parts.push({
       type: "tool-runCommand",
       toolCallId: `step-${done}`,
       state: "input-available",
-      input: { command: steps[done].command },
+      input: { command: nextStep.command },
     });
   }
 

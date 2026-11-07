@@ -1,5 +1,4 @@
 {
   "extends": "../tsconfig.base.json",
-  "include": ["src", "docs"],
-  "exclude": ["src/ai", "docs/src/ai"]
+  "include": ["src", "docs"]
 }

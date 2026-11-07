@@ -57,7 +57,7 @@ function getLanguage(language: string): keyof typeof languages | "ansi" | null {
     return name;
   }
 
-  return Object.hasOwn(aliases, name) ? aliases[name] : null;
+  return Object.hasOwn(aliases, name) ? (aliases[name] ?? null) : null;
 }
 
 // Loads a language and returns a highlighter for it, or null for a language

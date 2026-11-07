@@ -99,7 +99,7 @@ export function ReasoningDemo() {
                       key={index}
                       text={part.text}
                       running={streaming && part.state === "streaming"}
-                      defaultOpen={busy ? undefined : true}
+                      {...(busy ? {} : { defaultOpen: true })}
                     />
                   ))}
                 </Trace>

@@ -201,7 +201,7 @@ export function TerminalDemo() {
                       part={part}
                       output={getOutput(message, part.toolCallId)}
                       streaming={streaming}
-                      defaultOpen={busy ? undefined : part === tools.at(-1)}
+                      {...(busy ? {} : { defaultOpen: part === tools.at(-1) })}
                     />
                   ))}
                 </Trace>

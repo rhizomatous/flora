@@ -139,7 +139,7 @@ export function ToolDemo() {
                       key={part.toolCallId}
                       part={part}
                       streaming={streaming}
-                      defaultOpen={busy ? undefined : part.state === "output-error"}
+                      {...(busy ? {} : { defaultOpen: part.state === "output-error" })}
                     />
                   ))}
                 </Trace>
