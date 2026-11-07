@@ -22,7 +22,7 @@ class ReleaseGuardTest(unittest.TestCase):
                 pass
 
         server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
-        thread = threading.Thread(target=server.serve_forever)
+        thread = threading.Thread(target=server.serve_forever, kwargs={'poll_interval': 0.01})
         thread.start()
         try:
             require_unpublished('owner/repo', tag, 'fixture-token',

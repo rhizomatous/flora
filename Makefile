@@ -1,4 +1,4 @@
-.PHONY: deps web build build-linux check smoke browser styleguide
+.PHONY: deps web build build-linux check smoke browser browser-test styleguide
 
 export GOTOOLCHAIN := local
 
@@ -31,4 +31,8 @@ smoke: build
 	node --test scripts/smoke.test.ts
 
 browser: web
+	$(MAKE) browser-test
+
+# Requires web assets from a completed web build.
+browser-test:
 	FLORA_CHAT_BROWSER_TEST=1 go -C backend test -mod=readonly -count=1 -run 'Test(Chat|Changes|Projects|Settings|Enrollment)Browser' ./internal/server
