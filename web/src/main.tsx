@@ -68,7 +68,7 @@ function App() {
       {notice && <p role="status" className="mb-6 rounded-md border p-3 text-sm">{notice}</p>}
       {!status && <p role="status" className="text-muted-foreground">Loading…</p>}
       {status && !status.authenticated && <section aria-labelledby="account-heading">
-        <h1 ref={heading} tabIndex={-1} id="account-heading" className="text-2xl font-semibold tracking-tight">{status.setupRequired ? "Create administrator" : "Log in"}</h1>
+        <h1 ref={heading} tabIndex={-1} id="account-heading" className="text-2xl font-semibold tracking-tight outline-none">{status.setupRequired ? "Create administrator" : "Log in"}</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">{status.setupRequired ? "Create the single administrator account for this installation. Use a unique password of at least 12 characters." : "Enter your administrator password. Your session lasts seven days."}</p>
         <form className="mt-8 space-y-6" onSubmit={e => submit(e, "password")}>
           <label className="block text-sm font-medium">Password
@@ -78,7 +78,7 @@ function App() {
         </form>
       </section>}
       {status?.authenticated && settings && <section aria-labelledby="settings-heading">
-        <h1 ref={heading} tabIndex={-1} id="settings-heading" className="text-2xl font-semibold tracking-tight">Installation settings</h1>
+        <h1 ref={heading} tabIndex={-1} id="settings-heading" className="text-2xl font-semibold tracking-tight outline-none">Installation settings</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">Choose one hosted provider and model for all chats. Once saved, the provider and model cannot be changed.</p>
         <form className="mt-8 space-y-6" onSubmit={e => submit(e, "settings")}>
           <fieldset disabled={busy} className="space-y-6">
