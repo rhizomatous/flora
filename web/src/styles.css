@@ -95,6 +95,8 @@
 }
 .project-picker {
   width: auto;
+  field-sizing: content;
+  padding: 0.125rem 0.375rem;
   max-width: 100%;
   border-color: transparent;
   background: transparent;
@@ -135,6 +137,9 @@
   margin-bottom: 0.5rem;
 }
 @media (pointer: coarse) {
+  .project-picker {
+    min-height: 2.75rem;
+  }
   .sound-options summary,
   .sidebar-footer > a,
   .sidebar-footer > button {

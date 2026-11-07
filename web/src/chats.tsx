@@ -354,7 +354,7 @@ export function Chats({
           onSubmit={(event) => {
             void send(event);
           }}
-          className="space-y-2"
+          className="space-y-1"
         >
           <div className="flex flex-wrap items-center gap-3">
             <FieldLabel className="sr-only" htmlFor="new-chat-project">
