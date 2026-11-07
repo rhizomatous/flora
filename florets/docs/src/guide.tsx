@@ -161,6 +161,9 @@ export function Guide() {
               Flora’s design system
             </Text>
           </div>
+          <Link href="?photo-lab" className="mt-6 block text-sm">
+            Photo texture lab
+          </Link>
           <nav
             aria-label="Components"
             className="mt-6 flex flex-wrap gap-x-5 gap-y-3 lg:mt-10 lg:flex-col lg:gap-1"

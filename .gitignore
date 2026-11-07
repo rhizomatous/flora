@@ -9,3 +9,5 @@
 env.test.sh
 flora-data/
 /florets/docs-dist/
+
+/florets/docs/public/local-reference.avif
