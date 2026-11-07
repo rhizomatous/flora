@@ -79,6 +79,7 @@ try {
   await page.waitForTimeout(1200);
   await page.getByRole("button", { name: "Interrupt current work", exact: true }).click();
   await page
+    .locator("#followup-help")
     .getByText("Current work interrupted; send a new message to continue with saved context", {
       exact: true,
     })

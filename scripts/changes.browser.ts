@@ -11,6 +11,7 @@ try {
   const errors = pageErrors(page);
   await logIn(page);
   await page.goto(`${origin}/#chats/${requiredEnv("FLORA_BROWSER_CHAT")}`);
+  await page.getByRole("button", { name: "Changes", exact: true }).click();
   const review = page.getByRole("region", { name: "Changes", exact: true });
   await review.getByText(/Saved review, possibly out of date/).waitFor();
   const pulls = review.getByRole("list", { name: "Pull requests" });
@@ -68,6 +69,7 @@ try {
   await review.getByText(/picture.png · Binary/).waitFor();
   await review.getByText(/removed.txt/).waitFor();
   await page.reload();
+  await page.getByRole("button", { name: "Changes", exact: true }).click();
   await review.getByText(/Saved review, possibly out of date/).waitFor();
   assert.equal(await pulls.getByRole("listitem").count(), 5);
   await review.getByText(/Saved statuses may be out of date/).waitFor();
