@@ -24,7 +24,17 @@
     "denyWarnings": true,
     "reportUnusedDisableDirectives": "error"
   },
-  "ignorePatterns": ["backend/", "agent/", "packaging/"],
+  "ignorePatterns": [
+    "backend/",
+    "agent/",
+    "packaging/",
+    "florets/src/ai/ui/**",
+    "florets/src/ai/hooks/**",
+    "florets/src/ai/lib/**",
+    "florets/src/ai/markdown.tsx",
+    "florets/docs/src/ai/examples/**",
+    "florets/docs/src/ai/lib/**"
+  ],
   "rules": {
     "curly": ["error", "multi-line"],
     "func-style": ["error", "declaration", { "allowArrowFunctions": true }],
@@ -112,7 +122,7 @@
       "rules": { "import/no-default-export": "off" }
     },
     {
-      "files": ["web/src/main.tsx"],
+      "files": ["web/src/main.tsx", "florets/docs/src/ai/main.tsx"],
       "rules": { "react/only-export-components": "off" }
     },
     {
