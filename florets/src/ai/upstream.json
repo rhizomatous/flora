@@ -154,7 +154,7 @@
     "florets/src/ai/ui/code-block.tsx": {
       "source": "registry/bases/radix/ui/code-block.tsx",
       "sha256": "95d4468cd2da58478f2a28bccc3d42a28db5d82549c7cd83cc9b59d4887680c2",
-      "importedSha256": "389824e9cb8acfbf18b9fcbf70fa8206562a6f6a092635c8196398e6d1f661e0"
+      "importedSha256": "5c3e2da9c087bbf7177bdf2a0240f208cd7e50f5400560d9e7d5efe8f42b2d5e"
     },
     "florets/src/ai/ui/message.tsx": {
       "source": "registry/bases/radix/ui/message.tsx",
@@ -179,7 +179,7 @@
     "florets/src/ai/ui/dropdown-menu.tsx": {
       "source": "registry/bases/radix/ui/dropdown-menu.tsx",
       "sha256": "f29f9046532435ec183482ad990ac282e5ecfc76af80a6352eaa500a5689c447",
-      "importedSha256": "0ffc475dc06a67784f0f360cb11f4d753e84590caaba5fba552f3c76d1aef542"
+      "importedSha256": "709a77081d7567584f0ded3c1300f0c02c9c487075ce262d83931a869322392d"
     },
     "florets/src/ai/ui/empty.tsx": {
       "source": "registry/bases/radix/ui/empty.tsx",
@@ -194,7 +194,7 @@
     "florets/src/ai/ui/message-scroller.tsx": {
       "source": "registry/bases/radix/ui/message-scroller.tsx",
       "sha256": "80328938060d2c7dd782f0a8ffa501b391cb4af77564cd682c574de2e5564ac2",
-      "importedSha256": "2304963bafe5bc24de83e3f750dd3eab0602433b3aefdc7311b429f81ce4d694"
+      "importedSha256": "6d013d87ca6d2a67d10fbd515c420ff1da6e6843a7e6188e938085fbf7f5ab58"
     },
     "florets/src/ai/ui/tooltip.tsx": {
       "source": "registry/bases/radix/ui/tooltip.tsx",

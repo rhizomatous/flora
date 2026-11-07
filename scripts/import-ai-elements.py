@@ -28,7 +28,11 @@ while queue:
   attrs=re.sub(r'\s*(lucide|tabler|hugeicons|phosphor|remixicon)="[^"]*"','',attrs)
   return '<'+name+attrs+' />'
  text=re.sub(r'<IconPlaceholder\s+([\s\S]*?)/>',icon,text)
- if icons:text='import { '+', '.join(sorted(icons))+' } from "lucide-react"\n'+text
+ if icons:
+  declaration='import { '+', '.join(sorted(icons))+' } from "lucide-react"\n'
+  if text.startswith('"use client"'):
+   text=text.replace('"use client"', '"use client"\n'+declaration, 1)
+  else: text=declaration+text
  def imp(m):
   p=m[1]
   if p=='cn':

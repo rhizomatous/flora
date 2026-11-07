@@ -1,6 +1,5 @@
+"use client";
 import { CheckIcon, ChevronRightIcon } from "lucide-react";
-("use client");
-
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import * as React from "react";
 
