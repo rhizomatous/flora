@@ -38,7 +38,9 @@ void main() {
     vec2 center = (cell + vec2(.5 + offset, .5)) * size;
     vec3 sampleColor = samplePhoto(center / viewport);
     float tone = max(max(sampleColor.r, sampleColor.g), sampleColor.b);
-    float radius = sqrt(tone) * size * .48;
+    // Preserve small shadow dots; leave more space around midtones and highlights.
+    float spacing = mix(1., .72, smoothstep(.12, .75, tone));
+    float radius = sqrt(tone) * size * .48 * spacing;
     float aa = viewport.y / resolution.y * .55;
     float coverage = 1. - smoothstep(radius - aa, radius + aa, length(pixel - center));
     coverage *= smoothstep(0., .02, tone);
