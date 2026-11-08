@@ -607,7 +607,7 @@ export function Guide() {
         </Sheet>
         <div className="docs-layout">
           <Sidebar collapsible="none" className="docs-sidebar">
-            <SidebarContent ref={nav}>
+            <SidebarContent ref={nav} className="scroll-fade-y scrollbar-none overflow-x-hidden">
               <nav aria-label="Documentation">{navigation()}</nav>
             </SidebarContent>
           </Sidebar>
