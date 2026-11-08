@@ -6,6 +6,7 @@ import {
   ButtonLink,
   FieldLabel,
   FlowerMark,
+  SidebarTrigger,
   DropdownMenuItem,
   Heading,
   Link,
@@ -362,6 +363,10 @@ export function Chats({
     setBusy(false);
   }
 
+  const existingChat = !isNew && id !== "";
+  const headerLayout = existingChat
+    ? "-mx-4 flex h-14 shrink-0 items-center gap-3 border-b px-4 sm:-mx-8"
+    : "mx-auto flex w-full max-w-[880px] shrink-0 items-center justify-between gap-4 pb-3";
   const chatLayout = id === "" ? "mx-auto max-w-4xl min-w-0" : "flex min-h-0 flex-1 flex-col";
 
   function title() {
@@ -376,19 +381,14 @@ export function Chats({
       aria-labelledby="chats-heading"
       className={isNew ? "mx-auto my-12 max-w-3xl md:mt-[25svh]" : chatLayout}
     >
-      <div
-        className={
-          isNew
-            ? "sr-only"
-            : "mx-auto flex w-full max-w-[880px] shrink-0 items-center justify-between gap-4 pb-3"
-        }
-      >
+      <div className={isNew ? "sr-only" : headerLayout}>
+        {existingChat && <SidebarTrigger aria-label="Menu" />}
         <Heading
           level={1}
           id="chats-heading"
           ref={heading}
           tabIndex={-1}
-          className="min-w-0 text-base break-words"
+          className="min-w-0 truncate text-base"
         >
           {title()}
         </Heading>
@@ -595,6 +595,10 @@ function ChatDetail({
   const activeTurn = chat.Status === "working" || chat.Status === "waiting";
   const stopped = chat.Status === "stopped";
   const blocked = (detail.continuationBlockedReason ?? "") !== "";
+  const turnStart = detail.messages.findLastIndex((message) => message.Role === "user");
+  const visibleActivity = detail.messages
+    .slice(turnStart + 1)
+    .some((message) => (message.Payload.parts ?? []).some((part) => isLivePart(part)));
 
   return (
     <MessageScrollerProvider autoScroll>
@@ -608,16 +612,16 @@ function ChatDetail({
                 shown; transient output may be missing.
               </Alert>
             )}
-            {detail.messages.map((message) => (
+            {detail.messages.map((message, index) => (
               <MessageScrollerItem
                 key={message.ID}
                 messageId={message.ID}
                 scrollAnchor={message.Role === "user"}
               >
-                <ConversationMessage message={message} />
+                <ConversationMessage message={message} active={activeTurn && index > turnStart} />
               </MessageScrollerItem>
             ))}
-            {activeTurn && (
+            {activeTurn && !visibleActivity && (
               <div role="status" aria-label="Working">
                 <FlowerMark className="text-muted-foreground motion-safe:animate-pulse" />
               </div>
@@ -705,11 +709,11 @@ function FollowUpComposer({
       <FieldLabel htmlFor="follow-up-message" className="sr-only">
         Follow-up
       </FieldLabel>
-      <InputGroup>
+      <InputGroup className="rounded-xl">
         <InputGroupTextarea
           id="follow-up-message"
           name="text"
-          className="max-h-[25dvh] min-h-20"
+          className="max-h-[25dvh] min-h-12"
           placeholder="Message…"
           value={draft}
           required
@@ -778,7 +782,7 @@ function FollowUpComposer({
   );
 }
 
-function ConversationMessage({ message: m }: { message: Message }) {
+function ConversationMessage({ message: m, active }: { message: Message; active: boolean }) {
   const parts = (m.Payload.parts ?? []).filter(
     (part) => part.type !== "step-start" && part.type !== "step-finish",
   );
@@ -806,7 +810,7 @@ function ConversationMessage({ message: m }: { message: Message }) {
           <Bubble variant={m.Role === "user" ? "muted" : "ghost"}>
             <BubbleContent className="space-y-4 text-[15px] leading-7">
               {parts.length > 0 ? (
-                <MessageParts parts={parts} user={m.Role === "user"} />
+                <MessageParts parts={parts} user={m.Role === "user"} active={active} />
               ) : (
                 <MessagePart part={{ type: "text", text: m.Text }} user={m.Role === "user"} />
               )}
@@ -839,7 +843,7 @@ function ConversationMessage({ message: m }: { message: Message }) {
   );
 }
 
-function MessageParts({ parts, user }: { parts: Part[]; user: boolean }) {
+function MessageParts({ parts, user, active }: { parts: Part[]; user: boolean; active: boolean }) {
   const groups: Part[][] = [];
   for (const part of parts) {
     const previous = groups.at(-1);
@@ -852,17 +856,36 @@ function MessageParts({ parts, user }: { parts: Part[]; user: boolean }) {
     if (first.type === "text" || user) {
       return group.map((part, i) => <MessagePart key={part.id ?? i} part={part} user={user} />);
     }
-    return <WorkSummary key={first.id ?? index} parts={group} />;
+    return <WorkSummary key={first.id ?? index} parts={group} active={active} />;
   });
 }
 
-function WorkSummary({ parts }: { parts: Part[] }) {
+function isLivePart(part: Part) {
+  return (
+    part.state?.status === "running" ||
+    part.state?.status === "pending" ||
+    (part.type === "reasoning" && part.time?.end === undefined)
+  );
+}
+
+function WorkSummary({ parts, active }: { parts: Part[]; active: boolean }) {
+  const live = active && parts.some((part) => isLivePart(part));
+  if (live) {
+    return (
+      <div aria-label="Current activity" className="space-y-2">
+        {parts.map((part, index) => (
+          <MessagePart key={part.id ?? index} part={part} user={false} live />
+        ))}
+      </div>
+    );
+  }
+  return <CompletedWork parts={parts} />;
+}
+
+function CompletedWork({ parts }: { parts: Part[] }) {
   const failed = parts.filter(
     (part) => part.state?.status === "error" || (part.state?.error ?? "") !== "",
   ).length;
-  const running = parts.find(
-    (part) => part.state?.status === "running" || part.state?.status === "pending",
-  );
   const times = parts.flatMap((part) => {
     const time = part.state?.time ?? part.time;
     return time ? [time] : [];
@@ -872,7 +895,6 @@ function WorkSummary({ parts }: { parts: Part[] }) {
   const ends = times.map((time) => time.end ?? time.start);
   const elapsed = Math.max(...ends) - Math.min(...starts);
   const seconds = finished ? Math.max(0, Math.round(elapsed / 1000)) : 0;
-  const traceStatus = running ? "running" : undefined;
   const finishedLabel = finished
     ? `Worked for ${seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`}`
     : "Work details";
@@ -880,12 +902,8 @@ function WorkSummary({ parts }: { parts: Part[] }) {
     <Trace>
       <TraceCollapsible>
         <TraceCollapsibleTrigger>
-          <TraceLine status={failed > 0 ? "error" : traceStatus}>
-            <TraceTitle>
-              {running
-                ? `Working · ${running.state?.title ?? running.tool ?? "Thinking"}`
-                : finishedLabel}
-            </TraceTitle>
+          <TraceLine status={failed > 0 ? "error" : undefined}>
+            <TraceTitle>{finishedLabel}</TraceTitle>
             <TraceDescription>
               {parts.length} {parts.length === 1 ? "step" : "steps"}
               {failed > 0 && ` · ${failed} failed`}
@@ -902,7 +920,15 @@ function WorkSummary({ parts }: { parts: Part[] }) {
   );
 }
 
-function MessagePart({ part: p, user }: { part: Part; user: boolean }) {
+function MessagePart({
+  part: p,
+  user,
+  live = false,
+}: {
+  part: Part;
+  user: boolean;
+  live?: boolean;
+}) {
   if (p.type === "text") {
     return user ? (
       <div className="whitespace-pre-wrap">{p.text}</div>
@@ -916,7 +942,10 @@ function MessagePart({ part: p, user }: { part: Part; user: boolean }) {
         <TraceCollapsible>
           <TraceCollapsibleTrigger>
             <TraceLine>
-              <TraceTitle>Reasoning</TraceTitle>
+              <TraceTitle>
+                {live && p.time?.end === undefined ? "Thinking" : "Reasoning"}
+              </TraceTitle>
+              {live && p.time?.end === undefined && <ActivityDuration start={p.time?.start} />}
             </TraceLine>
           </TraceCollapsibleTrigger>
           <TraceCollapsibleContent className="whitespace-pre-wrap">
@@ -938,10 +967,17 @@ function MessagePart({ part: p, user }: { part: Part; user: boolean }) {
         <TraceCollapsible>
           <TraceCollapsibleTrigger>
             <TraceLine status={traceStatus}>
-              <TraceTitle>{p.state?.title ?? p.tool}</TraceTitle>
-              <TraceDescription>
-                {p.tool} · {status}
-              </TraceDescription>
+              <TraceTitle>{toolTitle(p)}</TraceTitle>
+              {live ? (
+                <>
+                  {traceStatus === "error" && <TraceDescription>Failed</TraceDescription>}
+                  <ActivityDuration start={p.state?.time?.start} end={p.state?.time?.end} />
+                </>
+              ) : (
+                <TraceDescription>
+                  {p.tool} · {status}
+                </TraceDescription>
+              )}
             </TraceLine>
           </TraceCollapsibleTrigger>
           <TraceCollapsibleContent>
@@ -978,5 +1014,54 @@ function MessagePart({ part: p, user }: { part: Part; user: boolean }) {
         </TraceCollapsibleContent>
       </TraceCollapsible>
     </Trace>
+  );
+}
+
+function toolTitle(part: Part) {
+  if (part.state?.title !== undefined && part.state.title !== "") return part.state.title;
+  const names: Record<string, string> = {
+    bash: "Running command",
+    read: "Reading file",
+    edit: "Editing file",
+    write: "Writing file",
+    grep: "Searching files",
+    glob: "Finding files",
+    question: "Waiting for your answer",
+    webfetch: "Fetching page",
+  };
+  const input = part.state?.input;
+  if (typeof input === "object" && input !== null) {
+    if (
+      "description" in input &&
+      typeof input.description === "string" &&
+      input.description !== ""
+    ) {
+      return input.description;
+    }
+    if ("filePath" in input && typeof input.filePath === "string") {
+      return `${names[part.tool ?? ""] ?? part.tool ?? "File"} ${input.filePath}`;
+    }
+  }
+  return names[part.tool ?? ""] ?? part.tool ?? "Tool";
+}
+
+/** Uses recorded runtime timestamps so reconnecting does not restart the elapsed time. */
+function ActivityDuration({ start, end }: { start: number | undefined; end?: number | undefined }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (start === undefined || end !== undefined) return;
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [start, end]);
+  if (start === undefined) return null;
+  const seconds = Math.max(0, Math.floor(((end ?? now) - start) / 1000));
+  return (
+    <TraceDescription>
+      {seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`}
+    </TraceDescription>
   );
 }

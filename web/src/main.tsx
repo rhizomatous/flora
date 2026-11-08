@@ -201,7 +201,7 @@ function App() {
   const Layout = ready ? SidebarProvider : "div";
   const conversation = ready && path.startsWith("chats/") && !path.startsWith("chats/new");
   const contentLayout = conversation
-    ? "flex min-h-0 flex-1 flex-col px-4 pt-3 pb-2 sm:px-8"
+    ? "flex min-h-0 flex-1 flex-col px-4 pb-2 sm:px-8"
     : "mx-auto w-full max-w-6xl p-4 sm:p-8";
   const frameLayout = conversation
     ? "h-dvh min-h-0 min-w-0 overflow-hidden md:h-[calc(100dvh-1rem)]"
@@ -231,7 +231,7 @@ function App() {
         </header>
       )}
       <Content id="main-content" tabIndex={-1} className={ready ? frameLayout : undefined}>
-        {ready && (
+        {ready && !conversation && (
           <header className="flex h-14 shrink-0 items-center border-b px-4">
             <SidebarTrigger aria-label="Menu" />
           </header>

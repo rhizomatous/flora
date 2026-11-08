@@ -21,6 +21,31 @@ try {
   await expect(draft).toHaveValue("Keep this draft\n");
   await page.reload();
   await expect(draft).toHaveValue("Keep this draft\n");
+  const menu = await page.getByRole("button", { name: "Menu", exact: true }).boundingBox();
+  const heading = await page
+    .getByRole("heading", { name: "Check the project setup", exact: true })
+    .boundingBox();
+  assert.ok(
+    menu && heading && Math.abs(menu.y + menu.height / 2 - heading.y - heading.height / 2) < 2,
+  );
+  const composer = await page.locator("form").filter({ has: draft }).boundingBox();
+  assert.ok(composer && composer.height < 110);
+  await page.request.post(`${base}/__preview/control?action=play`);
+  await expect(
+    page
+      .getByLabel("Current activity")
+      .getByRole("button", { name: /Check workspace|Running command/ }),
+  ).toBeVisible();
+  await page.request.post(`${base}/__preview/control?action=pause`);
+  await page.reload();
+  await expect(page.getByLabel("Current activity")).toBeVisible();
+  await expect(draft).toHaveValue("Keep this draft\n");
+  await page.request.post(`${base}/__preview/control?action=play`);
+  await expect(page.getByLabel("Current activity")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Worked for/ }).first()).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
   await page.goto(`${base}/#chats/completed`);
   await expect(draft).toHaveValue("");
   await page.locator('[data-slot="markdown"]').waitFor();
