@@ -4,10 +4,10 @@ import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import { Fragment } from "react";
 
-import { Bubble, BubbleContent } from "../../../../src/ai/ui/bubble";
-import { Button } from "../../../../src/ai/ui/button";
-import { Marker, MarkerContent } from "../../../../src/ai/ui/marker";
-import { Message, MessageContent } from "../../../../src/ai/ui/message";
+import { Bubble, BubbleContent } from "../../../../src/components/bubble";
+import { Button } from "../../../../src/components/button";
+import { Marker, MarkerContent } from "../../../../src/components/marker";
+import { Message, MessageContent } from "../../../../src/components/message";
 import { createChat, getMessageText } from "../lib/ai";
 
 type ChatMessage = UIMessage<

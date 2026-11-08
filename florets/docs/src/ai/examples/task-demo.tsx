@@ -5,9 +5,9 @@ import type { UIMessage } from "ai";
 import { CircleAlertIcon, CircleCheckIcon, LoaderCircleIcon } from "lucide-react";
 import { useState } from "react";
 
-import { Bubble, BubbleContent } from "../../../../src/ai/ui/bubble";
-import { Button } from "../../../../src/ai/ui/button";
-import { Message, MessageContent } from "../../../../src/ai/ui/message";
+import { Bubble, BubbleContent } from "../../../../src/components/bubble";
+import { Button } from "../../../../src/components/button";
+import { Message, MessageContent } from "../../../../src/components/message";
 import {
   Trace,
   TraceCollapsible,
@@ -16,7 +16,7 @@ import {
   TraceIcon,
   TraceLine,
   TraceTitle,
-} from "../../../../src/ai/ui/trace";
+} from "../../../../src/components/trace";
 import { createChat, getMessageText } from "../lib/ai";
 
 type ChatMessage = UIMessage<

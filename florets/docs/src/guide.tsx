@@ -27,7 +27,74 @@ import {
   Wordmark,
 } from "@flora/florets";
 
+const catalog = [
+  "accordion",
+  "alert",
+  "alert-dialog",
+  "aspect-ratio",
+  "attachment",
+  "avatar",
+  "badge",
+  "breadcrumb",
+  "bubble",
+  "button",
+  "button-group",
+  "calendar",
+  "card",
+  "carousel",
+  "chart",
+  "checkbox",
+  "code-block",
+  "collapsible",
+  "combobox",
+  "command",
+  "context-menu",
+  "dialog",
+  "direction",
+  "drawer",
+  "dropdown-menu",
+  "empty",
+  "field",
+  "hover-card",
+  "input",
+  "input-group",
+  "input-otp",
+  "item",
+  "kbd",
+  "label",
+  "marker",
+  "menubar",
+  "message",
+  "message-scroller",
+  "native-select",
+  "navigation-menu",
+  "pagination",
+  "popover",
+  "progress",
+  "questionnaire",
+  "radio-group",
+  "resizable",
+  "scroll-area",
+  "select",
+  "separator",
+  "sheet",
+  "sidebar",
+  "skeleton",
+  "slider",
+  "sonner",
+  "spinner",
+  "switch",
+  "table",
+  "tabs",
+  "textarea",
+  "toggle",
+  "toggle-group",
+  "tooltip",
+  "trace",
+];
+
 const sections = [
+  { id: "catalog", label: "Component catalog" },
   { id: "typography", label: "Typography" },
   { id: "buttons", label: "Buttons & links" },
   { id: "menus", label: "Menus" },
@@ -257,6 +324,24 @@ export function Guide() {
           </header>
           <div className="space-y-14">
             <Section
+              id="catalog"
+              title="Component catalog"
+              description="The full shadcn Radix/Rhea catalog is available from @flora/florets. Open a component’s upstream documentation for its API and examples."
+            >
+              <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {catalog.map((name) => (
+                  <li key={name}>
+                    <Link
+                      href={`https://ui.shadcn.com/docs/components/radix/${name}`}
+                      className="text-sm"
+                    >
+                      {name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+            <Section
               id="typography"
               title="Typography"
               description="A small type scale, with heading styles tied to semantic level. Layout owns the spacing around text."
@@ -307,13 +392,13 @@ export function Guide() {
             <Section
               id="buttons"
               title="Buttons & links"
-              description="Use buttons for actions and links for navigation. Buttons default to type=button; use type=submit in forms."
+              description="Use buttons for actions and links for navigation. Set type=button for non-submit actions inside forms."
             >
               <Example
                 title="Button"
-                description="Four visual variants, with default, small, and inline sizes. Try a button below."
+                description="Standard shadcn Radix/Rhea buttons, with compact sizes and rounded corners."
                 code={
-                  '<Button onClick={save}>Save changes</Button>\n<Button variant="outline">Cancel</Button>\n<Button variant="ghost" size="sm">More options</Button>\n<Button variant="link" size="inline">Learn more</Button>\n<Button disabled>Unavailable</Button>'
+                  '<Button onClick={save}>Save changes</Button>\n<Button variant="outline">Cancel</Button>\n<Button variant="ghost" size="sm">More options</Button>\n<Button variant="link" size="sm">Learn more</Button>\n<Button disabled>Unavailable</Button>'
                 }
               >
                 <div className="flex flex-wrap items-center gap-3">
@@ -343,7 +428,7 @@ export function Guide() {
                   </Button>
                   <Button
                     variant="link"
-                    size="inline"
+                    size="sm"
                     onClick={() => {
                       setClicked("Link button clicked.");
                     }}

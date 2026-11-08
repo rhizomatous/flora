@@ -1,8 +1,12 @@
 "use client";
 
-import { Button } from "../../../../src/ai/ui/button";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "../../../../src/ai/ui/hover-card";
-import { Progress } from "../../../../src/ai/ui/progress";
+import { Button } from "../../../../src/components/button";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "../../../../src/components/hover-card";
+import { Progress } from "../../../../src/components/progress";
 
 const usage = {
   input: 8420,

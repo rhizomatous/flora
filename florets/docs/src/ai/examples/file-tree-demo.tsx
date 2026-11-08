@@ -3,12 +3,12 @@
 import { ChevronRightIcon, FileIcon, FolderIcon } from "lucide-react";
 import { useState } from "react";
 
-import { Button } from "../../../../src/ai/ui/button";
+import { Button } from "../../../../src/components/button";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "../../../../src/ai/ui/collapsible";
+} from "../../../../src/components/collapsible";
 
 type FileNode =
   | { type: "file"; name: string; path: string }

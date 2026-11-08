@@ -67,6 +67,7 @@
   border-top: 1px solid var(--border);
 }
 .workspace-menu-trigger {
+  height: auto;
   width: 100%;
   justify-content: flex-start;
   padding: 0.5rem;
@@ -82,9 +83,9 @@
   min-width: 0;
   width: 100%;
   padding: 2.5rem;
-  border: 1px solid color-mix(in oklch, var(--foreground) 8%, transparent);
+  border: 1px solid var(--border);
   border-radius: 1rem;
-  background: color-mix(in oklch, var(--background), var(--muted) 25%);
+  background: var(--background);
 }
 .workspace-content > section:not(.new-chat) {
   max-width: 71rem;
@@ -108,12 +109,12 @@
 }
 .chat-composer {
   padding: 0.75rem;
-  border: 1px solid color-mix(in oklch, var(--foreground) 12%, transparent);
+  border: 1px solid var(--input);
   border-radius: 0.875rem;
-  background: color-mix(in oklch, var(--background), var(--muted) 55%);
+  background: var(--background);
 }
 .chat-composer:focus-within {
-  border-color: color-mix(in oklch, var(--foreground) 32%, transparent);
+  border-color: var(--ring);
 }
 .composer-message:focus-visible {
   outline: none;

@@ -71,7 +71,7 @@ function RepositoryFields({ repositories }: { repositories: Repository[] }) {
           className="space-y-4 rounded-md border border-foreground/20 p-4"
         >
           <legend className="px-1 text-sm font-medium">Repository {index + 1}</legend>
-          <FieldLabel>
+          <FieldLabel className="w-full flex-col items-start">
             GitHub repository
             <Input
               name="repository"
@@ -82,7 +82,7 @@ function RepositoryFields({ repositories }: { repositories: Repository[] }) {
               maxLength={300}
             />
           </FieldLabel>
-          <FieldLabel>
+          <FieldLabel className="w-full flex-col items-start">
             Base branch
             <Input
               name="baseBranch"
@@ -92,7 +92,7 @@ function RepositoryFields({ repositories }: { repositories: Repository[] }) {
               placeholder="Repository default branch"
             />
           </FieldLabel>
-          <FieldLabel>
+          <FieldLabel className="w-full flex-col items-start">
             Repository role
             <NativeSelect
               aria-label="Repository role"
@@ -107,7 +107,7 @@ function RepositoryFields({ repositories }: { repositories: Repository[] }) {
           {rows.length > 1 && (
             <Button
               variant="link"
-              size="inline"
+              size="sm"
               type="button"
               className="text-sm text-foreground"
               onClick={() => {
@@ -121,7 +121,7 @@ function RepositoryFields({ repositories }: { repositories: Repository[] }) {
       ))}
       <Button
         variant="link"
-        size="inline"
+        size="sm"
         type="button"
         ref={addButton}
         data-add-repository
@@ -309,7 +309,7 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
           )}
           <FieldSet disabled={busy}>
             <legend className="sr-only">Project settings</legend>
-            <FieldLabel>
+            <FieldLabel className="w-full flex-col items-start">
               Project name
               <Input
                 name="name"
@@ -322,7 +322,7 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
             <RepositoryFields
               repositories={project?.configuration.repositories ?? [blankRepository]}
             />
-            <FieldLabel>
+            <FieldLabel className="w-full flex-col items-start">
               Setup command (optional)
               <Textarea
                 name="setupCommand"

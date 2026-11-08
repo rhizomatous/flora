@@ -76,7 +76,7 @@ function Account({
       </Text>
       <form className="mt-8 space-y-6" onSubmit={submit}>
         {setupRequired && enrollmentRequired === true && (
-          <FieldLabel>
+          <FieldLabel className="w-full flex-col items-start">
             Enrollment code
             <Input
               className="mt-2"
@@ -92,7 +92,7 @@ function Account({
             </span>
           </FieldLabel>
         )}
-        <FieldLabel>
+        <FieldLabel className="w-full flex-col items-start">
           Password
           <Input
             className="mt-2"
