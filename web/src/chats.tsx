@@ -658,7 +658,7 @@ function ChatDetail({
           {followUpHelp()}
         </Text>
       </form>
-      <Collapsible className="mt-10 rounded-2xl border p-4">
+      <Collapsible className="mt-10 rounded-lg border p-4">
         <CollapsibleTrigger asChild>
           <Button variant="ghost" size="sm">
             Full activity ({activity.length} saved events)
@@ -700,7 +700,7 @@ function ChatDetail({
           </ol>
         </CollapsibleContent>
       </Collapsible>
-      <Collapsible className="mt-4 rounded-2xl border p-4">
+      <Collapsible className="mt-4 rounded-lg border p-4">
         <CollapsibleTrigger asChild>
           <Button variant="ghost" size="sm">
             Environment snapshot

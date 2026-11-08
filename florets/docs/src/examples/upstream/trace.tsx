@@ -6,7 +6,7 @@
 // oxlint-disable typescript/strict-boolean-expressions -- The upstream examples use truthiness for optional props and React children.
 // oxlint-disable typescript/switch-exhaustiveness-check -- Unsupported message parts intentionally produce no demo content.
 // oxlint-disable unicorn/no-array-for-each -- The upstream sample iterates its locally constructed data.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/trace-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/trace-example.json
 "use client";
 
 import { useChat } from "@ai-sdk/react";

@@ -9,3 +9,5 @@
     @apply bg-foreground text-background;
   }
 }
+
+@custom-variant style-nova (&);

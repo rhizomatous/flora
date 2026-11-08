@@ -1,4 +1,4 @@
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/message-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/message-example.json
 
 import {
   CopyIcon,

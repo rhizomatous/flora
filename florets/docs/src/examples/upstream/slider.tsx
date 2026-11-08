@@ -1,5 +1,5 @@
 // oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/slider-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/slider-example.json
 "use client";
 
 import * as React from "react";

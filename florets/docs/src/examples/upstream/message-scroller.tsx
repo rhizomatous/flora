@@ -3,7 +3,7 @@
 // oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
 // oxlint-disable react/no-array-index-key -- These fixed demo sequences use positions to distinguish repeated entries.
 // oxlint-disable typescript/no-deprecated -- The upstream example demonstrates the dependency API it was authored against.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/message-scroller-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/message-scroller-example.json
 "use client";
 
 import { useChat } from "@ai-sdk/react";

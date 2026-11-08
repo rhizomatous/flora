@@ -1,6 +1,6 @@
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 // oxlint-disable jsx-a11y/control-has-associated-label -- Nested title and code components provide the visible content.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/item-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/item-example.json
 "use client";
 
 import { FileIcon, FileSearchIcon, InboxIcon } from "lucide-react";

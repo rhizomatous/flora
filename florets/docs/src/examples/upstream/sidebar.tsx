@@ -1,5 +1,5 @@
 // oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/sidebar-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/sidebar-example.json
 "use client";
 
 import { CheckIcon, ChevronsUpDownIcon, SearchIcon } from "lucide-react";

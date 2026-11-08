@@ -13,7 +13,7 @@ import {
   HoverCardTrigger,
 } from "@flora/florets/components/hover-card";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/hover-card-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/hover-card-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {
