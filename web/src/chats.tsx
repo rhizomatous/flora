@@ -16,6 +16,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   ChevronDownIcon,
+  CrossCircledIcon,
   Text,
   InputGroup,
   InputGroupTextarea,
@@ -894,7 +895,15 @@ function WorkSummary({
               <TraceTitle>{title}</TraceTitle>
               <TraceDescription>
                 {steps.length} {steps.length === 1 ? "step" : "steps"}
-                {failures > 0 && ` · ${failures} failed`}
+                {failures > 0 && (
+                  <>
+                    {" · "}
+                    <span className="inline-flex items-center gap-1 text-destructive">
+                      {failures} failed
+                      <CrossCircledIcon aria-hidden="true" className="size-3.5 shrink-0" />
+                    </span>
+                  </>
+                )}
               </TraceDescription>
             </TraceLine>
           </TraceCollapsibleTrigger>

@@ -73,4 +73,5 @@ export {
   ExitIcon,
   ChevronUpIcon,
   ChevronDownIcon,
+  CrossCircledIcon,
 } from "@radix-ui/react-icons";
