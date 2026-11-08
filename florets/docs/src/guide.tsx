@@ -19,7 +19,6 @@ const sections = [
   { id: "links", label: "Links" },
   { id: "feedback", label: "Feedback" },
   { id: "identity", label: "Identity" },
-  { id: "colors", label: "Colors" },
 ];
 
 function Example({
@@ -242,36 +241,6 @@ export function Guide() {
                   </div>
                 </div>
               </Example>
-            </Section>
-            <Section
-              id="colors"
-              title="Colors"
-              description="Semantic Tailwind tokens keep components consistent across light and dark themes. Switch themes to inspect both palettes."
-            >
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {[
-                  { name: "background", color: "bg-background" },
-                  { name: "foreground", color: "bg-foreground" },
-                  { name: "muted", color: "bg-muted" },
-                  { name: "muted-foreground", color: "bg-muted-foreground" },
-                  { name: "primary", color: "bg-primary" },
-                  { name: "border", color: "bg-border" },
-                ].map((token) => (
-                  <div
-                    key={token.name}
-                    className="min-w-0 overflow-hidden rounded-lg border border-border"
-                  >
-                    <div className={`h-20 border-b border-border ${token.color}`} />
-                    <Text size="xs" className="p-3 font-mono break-words">
-                      {token.name}
-                    </Text>
-                  </div>
-                ))}
-              </div>
-              <Text tone="muted">
-                Use <code className="font-mono text-xs">cn</code> to merge conditional Tailwind
-                classes. Components accept native HTML props, refs, and className overrides.
-              </Text>
             </Section>
           </div>
         </main>
