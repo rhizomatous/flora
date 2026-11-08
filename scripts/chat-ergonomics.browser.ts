@@ -53,7 +53,7 @@ try {
   await summary.scrollIntoViewIfNeeded();
   await expect(summary).toHaveAttribute("aria-expanded", "false");
   await summary.click();
-  await page.getByRole("button", { name: /Check workspace.*bash/ }).click();
+  await page.getByRole("button", { name: /Check workspace.*completed/ }).click();
   await expect(page.getByText("Checks passed", { exact: false }).first()).toBeVisible();
   await page.route("**/api/chats/completed/messages", (route) =>
     route.fulfill({ status: 500, json: { error: "Try again" } }),
