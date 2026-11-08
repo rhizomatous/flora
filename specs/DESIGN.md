@@ -31,13 +31,9 @@ The Flora character is used in landing pages as a friendly face for the product.
 
 #### Flower mark
 
-Flora can be represented by a flower mark, U+2747 Black Florette Symbol:
+Use the [Flora SVG mark](../florets/src/assets/flora.svg) for Flora's visual identity. It has five uneven petals, a black contour with extra depth along the lower-right edge, and an even white sticker rim. Keep its black-and-white colors and transparent background on both light and dark surfaces.
 
-```
-✿
-```
-
-This symbol can be used small as a identity mark in UI, animated and small as a busy indicator in chat UI, or statically and large as a logo.
+In UI code, use `FlowerMark` from `@flora/florets`, or `Wordmark` to include the Flora name. Use the same SVG for favicons and standalone artwork instead of a Unicode flower. The mark can appear small in UI, animate as a busy indicator, or scale up as a logo. Give icon-only controls an accessible name; `FlowerMark` itself is decorative.
 
 ## Colors
 

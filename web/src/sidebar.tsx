@@ -4,6 +4,7 @@ import {
   Button,
   Text,
   Wordmark,
+  FlowerMark,
   Sidebar as NavigationSidebar,
   SidebarHeader,
   SidebarContent,
@@ -190,8 +191,8 @@ export function Sidebar({
                           }}
                         >
                           <span className="min-w-0 flex-1 truncate">{chat.Title}</span>
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            {chat.Status === "working" ? "✿ " : ""}
+                          <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                            {chat.Status === "working" && <FlowerMark />}
                             {chat.Status.charAt(0).toUpperCase() + chat.Status.slice(1)}
                           </span>
                         </a>

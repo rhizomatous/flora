@@ -8,6 +8,7 @@ export default defineConfig(async ({ mode, command }) => {
       ? await import("../scripts/preview/server.ts")
       : undefined;
   return {
+    publicDir: "../florets/src/assets",
     plugins: [react(), tailwindcss(), ...(preview ? [preview.chatPreview()] : [])],
     build: {
       outDir: "../backend/internal/webassets/dist",
