@@ -7,7 +7,11 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
     rolldownOptions: {
-      input: { guide: "docs/index.html", ai: "docs/ai.html", example: "docs/example.html" },
+      input: {
+        guide: new URL("index.html", import.meta.url).pathname,
+        ai: new URL("ai.html", import.meta.url).pathname,
+        example: new URL("example.html", import.meta.url).pathname,
+      },
     },
     outDir: "../docs-dist",
     emptyOutDir: true,
