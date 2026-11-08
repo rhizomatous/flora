@@ -8,7 +8,7 @@ import {
 } from "@flora/florets/components/carousel";
 
 // oxlint-disable react/no-array-index-key -- These fixed demo sequences use positions to distinguish repeated entries.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/carousel-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/carousel-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

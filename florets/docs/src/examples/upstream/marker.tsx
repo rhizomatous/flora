@@ -1,6 +1,6 @@
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 // oxlint-disable typescript/strict-void-return -- React ignores return values from these upstream event handlers.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/marker-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/marker-example.json
 "use client";
 
 import {

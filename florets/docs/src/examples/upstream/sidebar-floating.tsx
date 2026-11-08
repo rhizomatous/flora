@@ -1,7 +1,7 @@
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 // oxlint-disable jsx-a11y/control-has-associated-label -- Nested title and code components provide the visible content.
 // oxlint-disable typescript/no-unnecessary-condition -- The upstream examples retain guards for incomplete runtime payloads.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/sidebar-floating-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/sidebar-floating-example.json
 "use client";
 
 import { MoreHorizontalIcon } from "lucide-react";

@@ -1,4 +1,4 @@
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/breadcrumb-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/breadcrumb-example.json
 import { Link } from "@flora/florets";
 import {
   Breadcrumb,

@@ -9,7 +9,7 @@ import {
 import { Kbd, KbdGroup } from "@flora/florets/components/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@flora/florets/components/tooltip";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/kbd-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/kbd-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

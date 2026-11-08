@@ -3,7 +3,7 @@
 // oxlint-disable react/no-array-index-key -- These fixed demo sequences use positions to distinguish repeated entries.
 // oxlint-disable typescript/strict-boolean-expressions -- The upstream examples use truthiness for optional props and React children.
 // oxlint-disable unicorn/no-nested-ternary -- The upstream rendering branches show the same conditional states.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/code-block-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/code-block-example.json
 "use client";
 
 import {

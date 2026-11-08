@@ -13,7 +13,7 @@ import {
 } from "@flora/florets/components/sheet";
 
 // oxlint-disable react/no-array-index-key -- These fixed demo sequences use positions to distinguish repeated entries.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/sheet-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/sheet-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

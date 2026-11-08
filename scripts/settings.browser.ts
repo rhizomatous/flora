@@ -57,7 +57,7 @@ try {
   await expect(workspaceMenu).toBeFocused();
   await openWorkspaceMenu(page);
   await page.getByLabel("Message", { exact: true }).click();
-  assert.equal(await page.getByRole("menu").count(), 0);
+  await expect(page.getByRole("menu")).toHaveCount(0);
   await openWorkspaceMenu(page);
   await page.getByRole("menuitem", { name: "Enable notification sound", exact: true }).click();
   await page.getByRole("link", { name: "New chat", exact: true }).click();

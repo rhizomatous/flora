@@ -28,7 +28,7 @@ import {
   TableRow,
 } from "@flora/florets/components/table";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/table-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/table-example.json
 import { Example, ExampleWrapper } from "../example";
 
 const invoices = [

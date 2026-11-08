@@ -2,7 +2,7 @@ import { ArrowLeftCircleIcon, ArrowRightIcon } from "lucide-react";
 
 import { Button } from "@flora/florets/components/button";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/button-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/button-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

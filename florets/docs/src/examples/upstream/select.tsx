@@ -1,7 +1,7 @@
 // oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
 // oxlint-disable no-shadow -- Example callbacks use the prop names from their underlying primitives.
 // oxlint-disable react/no-array-index-key -- These fixed demo sequences use positions to distinguish repeated entries.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/select-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/select-example.json
 "use client";
 
 import { ChartBarIcon, ChartLineIcon, ChartPieIcon } from "lucide-react";

@@ -118,9 +118,9 @@ export function Catalog({ dark }: { dark: boolean }) {
         key={selected}
         title={`${selected} component examples`}
         src={`./example.html?component=${selected}&theme=${dark ? "dark" : "light"}`}
-        className="h-[75svh] min-h-[32rem] w-full rounded-2xl border bg-background"
+        className="h-[75svh] min-h-[32rem] w-full rounded-lg border bg-background"
       />
-      <details key={`source-${selected}`} className="rounded-2xl border bg-muted/30">
+      <details key={`source-${selected}`} className="rounded-lg border bg-muted/30">
         <summary className="cursor-pointer px-5 py-3 text-sm font-medium">
           View example source
         </summary>

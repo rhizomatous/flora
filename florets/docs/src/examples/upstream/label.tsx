@@ -4,7 +4,7 @@ import { Input } from "@flora/florets/components/input";
 import { Label } from "@flora/florets/components/label";
 import { Textarea } from "@flora/florets/components/textarea";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/label-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/label-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

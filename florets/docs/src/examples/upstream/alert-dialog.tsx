@@ -24,7 +24,7 @@ import {
 } from "@flora/florets/components/dialog";
 
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/alert-dialog-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/alert-dialog-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

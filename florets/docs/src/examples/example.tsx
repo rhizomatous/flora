@@ -22,7 +22,7 @@ export function Example({
     <section
       data-slot="example"
       aria-label={title}
-      className={cn("min-w-0 rounded-2xl border bg-card", containerClassName)}
+      className={cn("min-w-0 rounded-lg border bg-card", containerClassName)}
       {...props}
     >
       {title !== undefined && <h2 className="border-b px-5 py-3 text-sm font-medium">{title}</h2>}
