@@ -592,7 +592,7 @@ function ChatDetail({
       <Changes key={id} chatID={id} onExpired={onExpired} />
       {children}
       <form onSubmit={onSend} className="mt-8 space-y-4">
-        <FieldLabel>
+        <FieldLabel className="w-full flex-col items-start">
           Follow-up
           <Textarea
             className="mt-2 min-h-28"

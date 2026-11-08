@@ -1,0 +1,398 @@
+[
+  {
+    "name": "accordion",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/accordion-example.json",
+    "sha256": "11c475af59ca03ad49fef71b8d93e61e1281f2e4e882a90c722002c184bf0bda",
+    "examples": 5
+  },
+  {
+    "name": "alert",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/alert-example.json",
+    "sha256": "ebaddd61209d0e3519faf1607a6987d26ce3e6bfce16607a2310a23a73138b1c",
+    "examples": 5
+  },
+  {
+    "name": "alert-dialog",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/alert-dialog-example.json",
+    "sha256": "04d0f8d8ce00d89752e00f47cfa8c6a2b7ef66448b91648ab804ed0d783a84ec",
+    "examples": 6
+  },
+  {
+    "name": "aspect-ratio",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/aspect-ratio-example.json",
+    "sha256": "a4958c5764ef80a997cb509deb84c7e42e8c3e260304d5497207b13e47d24d1c",
+    "examples": 4
+  },
+  {
+    "name": "attachment",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/attachment-example.json",
+    "sha256": "f99e8359359eabed61cdd3b3978caf410ac04a3cb7164132301dc2080cbd2eed",
+    "examples": 8
+  },
+  {
+    "name": "avatar",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/avatar-example.json",
+    "sha256": "6089db6377c15aee715f3aab0c6ed9c90ab05318641c17fe0c73fc3fd1738012",
+    "examples": 7
+  },
+  {
+    "name": "badge",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/badge-example.json",
+    "sha256": "869fb3d9d0e535057226370766b40fd7f8aff4a8753550a41d6774a90d9b1b6e",
+    "examples": 7
+  },
+  {
+    "name": "breadcrumb",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/breadcrumb-example.json",
+    "sha256": "0a0935168157a97f10339e1caa189d22e172d68c8dd9b4d9d065af596de07168",
+    "examples": 3
+  },
+  {
+    "name": "bubble",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/bubble-example.json",
+    "sha256": "86f683646e8e72eecfd07eba4071f12dfc8bf9ef00a8955f9e65c12d9828fdae",
+    "examples": 8
+  },
+  {
+    "name": "button",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/button-example.json",
+    "sha256": "19d7b8c0d883dae650a5901caa558a8804b86a241d6b8c3a1ecb42dfbe6ed24b",
+    "examples": 6
+  },
+  {
+    "name": "button-group",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/button-group-example.json",
+    "sha256": "4bff153234d317b6fa518e044c1a7f4530b9ead8ae5fca82bf68dda271856906",
+    "examples": 17
+  },
+  {
+    "name": "calendar",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/calendar-example.json",
+    "sha256": "20a3e1856d3ccdf9a9a4e8372eba949f7d7df2fc7226c8602f52c0ca8ec15ca8",
+    "examples": 14
+  },
+  {
+    "name": "card",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/card-example.json",
+    "sha256": "5750d52150e5b3c0e9a009da132252964907e9ae0e2a7ef7da753d9b8008a6e2",
+    "examples": 12
+  },
+  {
+    "name": "carousel",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/carousel-example.json",
+    "sha256": "0e7a12c431087bbc2f1bd5c28895b411883ccfd4a8ede3930b7d849f8873242f",
+    "examples": 3
+  },
+  {
+    "name": "chart",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/chart-example.json",
+    "sha256": "1cedb26707fd54dfd9d01a38d0e7feadbad3cbaa039df039dbb9afb4625ec36e",
+    "examples": 6
+  },
+  {
+    "name": "checkbox",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/checkbox-example.json",
+    "sha256": "34980eeafe51b58ec1a140593c17cac0e667d6a17eb1c4b440fdb211f029a598",
+    "examples": 7
+  },
+  {
+    "name": "code-block",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/code-block-example.json",
+    "sha256": "c7cb49047812445294057443223cdf6430fc7073ea0aa7191100637917620e2d",
+    "examples": 30
+  },
+  {
+    "name": "collapsible",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/collapsible-example.json",
+    "sha256": "b69399fe00d6b1d4fb54f6a8d5d4dd4fc59277f074ddc6028b54c69467ee5594",
+    "examples": 2
+  },
+  {
+    "name": "combobox",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/combobox-example.json",
+    "sha256": "aff9be5eacda1d953a06a9ea7214bc867d4ddf25da3136c8c21dc61b9a6886e8",
+    "examples": 19
+  },
+  {
+    "name": "command",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/command-example.json",
+    "sha256": "283e128dbfd7d8240a42cf56d3b29beb78d6b91c2b06160048279b01b6e2d170",
+    "examples": 5
+  },
+  {
+    "name": "context-menu",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/context-menu-example.json",
+    "sha256": "ec5990a788f43ed1ec1540cd46d77fe11b61a766d77825700e6a18122ec3481d",
+    "examples": 11
+  },
+  {
+    "name": "dialog",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/dialog-example.json",
+    "sha256": "c03a65085bd40928b3211e7a6b63741e13a9ceec6a914db4dd65b555a7837b95",
+    "examples": 5
+  },
+  {
+    "name": "direction",
+    "url": "https://github.com/shadcn-ui/ui/blob/main/apps/v4/examples/radix/card-rtl.tsx",
+    "sha256": "cf6e3e4f0629f9a20e9f72bd6ed4d53d60b571a8bab7f346ff30eeea3c7924c8",
+    "examples": 1
+  },
+  {
+    "name": "drawer",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/drawer-example.json",
+    "sha256": "d683aefcb064065dbddcc39693e621fe90803f6d6c83fadb70255c4a1bb02e70",
+    "examples": 2
+  },
+  {
+    "name": "dropdown-menu",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/dropdown-menu-example.json",
+    "sha256": "e96f50c880b92f47f4301bea63b4de78a6e0f57d45f2b9081855a0cc83d04385",
+    "examples": 13
+  },
+  {
+    "name": "empty",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/empty-example.json",
+    "sha256": "83c0e62155bd2aee4be28a8b01a5e730f3c7c438fb3a7a873ba4cee90ba019db",
+    "examples": 6
+  },
+  {
+    "name": "field",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/field-example.json",
+    "sha256": "a65dbbd02119e829806e0e740e3c3c99a9a3ba71f5ff5a8c61c53469c792b18a",
+    "examples": 10
+  },
+  {
+    "name": "hover-card",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/hover-card-example.json",
+    "sha256": "588d820c291792688ca91710f3f7cf242254b3c2691336be516808dd1f193e96",
+    "examples": 2
+  },
+  {
+    "name": "input",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/input-example.json",
+    "sha256": "6f53301c6273b8246c43b03266de98218500e160a41a5a63fb6fbabf49060b3c",
+    "examples": 10
+  },
+  {
+    "name": "input-group",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/input-group-example.json",
+    "sha256": "29cd24733ef6cfbf10c91d63e682c971c3f9805bde609945d837e6ceb7f4d383",
+    "examples": 7
+  },
+  {
+    "name": "input-otp",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/input-otp-example.json",
+    "sha256": "cd62cce6ed4c6edddaaa0735d3fc72686fdde8b1b56b5904cef56434db610b34",
+    "examples": 8
+  },
+  {
+    "name": "item",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/item-example.json",
+    "sha256": "73991d79153aaa81c6c7201adb09dc3b99786f9486e64c08ccad8f13078ce5e5",
+    "examples": 25
+  },
+  {
+    "name": "kbd",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/kbd-example.json",
+    "sha256": "14201d4cfeb5e86cadb212f26d20584de7891a815247c9823de917d892c5dcac",
+    "examples": 9
+  },
+  {
+    "name": "label",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/label-example.json",
+    "sha256": "a195db30526af6085a6c354744260ad018e5601e11a0e246740b2b8fad3bb605",
+    "examples": 4
+  },
+  {
+    "name": "marker",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/marker-example.json",
+    "sha256": "531fbf790a1847829174b9e6bd31debb074329995c4742179d5172ab30908b8c",
+    "examples": 5
+  },
+  {
+    "name": "menubar",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/menubar-example.json",
+    "sha256": "945c1d4850083ed860e51412f4e9bc529302ed25025ad993841b48fe38a6c013",
+    "examples": 11
+  },
+  {
+    "name": "message",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/message-example.json",
+    "sha256": "85ced1083d2bb5abce31f1f060da38cb705e6c8239abb4588214dc961fef44d9",
+    "examples": 8
+  },
+  {
+    "name": "message-scroller",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/message-scroller-example.json",
+    "sha256": "6298897b24e7a2fb4c13a93ea751d3072d66ff4bf5d12304cdf72de21f2dc388",
+    "examples": 1
+  },
+  {
+    "name": "native-select",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/native-select-example.json",
+    "sha256": "8e329e0cbb39e09a746f2bcc1b284b7da9c297a3069c4284621d545d797c05be",
+    "examples": 6
+  },
+  {
+    "name": "navigation-menu",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/navigation-menu-example.json",
+    "sha256": "c0105852df5756bb63b44ffa70f9c603448a3b1175d4d99ffc17a6aecb938075",
+    "examples": 2
+  },
+  {
+    "name": "pagination",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/pagination-example.json",
+    "sha256": "34862e7d686f8ea6562ddbf0b8b7e9b9acf667592e2e5302d9582df66821d7b1",
+    "examples": 3
+  },
+  {
+    "name": "popover",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/popover-example.json",
+    "sha256": "26c97a5b74ec10bd0c07dcbd2e5b4cc5bc5c229b5588cc13b1c5722d081c362e",
+    "examples": 4
+  },
+  {
+    "name": "progress",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/progress-example.json",
+    "sha256": "b9c9f08c531366902b1553c55930e66a55a800167a64299808016098e8929276",
+    "examples": 4
+  },
+  {
+    "name": "questionnaire",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/questionnaire-example.json",
+    "sha256": "c1bb2cd8ed83028dc8c54a37375bf79b59e9e96403985aaf6e76edefb776a93a",
+    "examples": 5
+  },
+  {
+    "name": "radio-group",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/radio-group-example.json",
+    "sha256": "8de820c9e60a5b19d5d99a36711da7c51b739f820aff3b775b30a08ab52fe015",
+    "examples": 6
+  },
+  {
+    "name": "resizable",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/resizable-example.json",
+    "sha256": "69addaec2bf0765c5bc643ec350b67e9b8955179c72ca5fde594c4f83c02ae4d",
+    "examples": 5
+  },
+  {
+    "name": "scroll-area",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/scroll-area-example.json",
+    "sha256": "0b673912a05f6546ce4d7f73c857612250053decf8d70607397ad351fb4466c4",
+    "examples": 2
+  },
+  {
+    "name": "select",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/select-example.json",
+    "sha256": "b339b4b05c8f5016f6ee41f1e53314cf1d4e268e6fc8fb4897691638de3391f5",
+    "examples": 13
+  },
+  {
+    "name": "separator",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/separator-example.json",
+    "sha256": "a1c3c6f55e3c3b5426021732b339c67aef9025cdc16340787438569cd2747e48",
+    "examples": 4
+  },
+  {
+    "name": "sheet",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/sheet-example.json",
+    "sha256": "a2b28b6417a239b3ece60a79d615d7b001e44ecb049bb6b362b6e11e6ca8d281",
+    "examples": 3
+  },
+  {
+    "name": "sidebar",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/sidebar-example.json",
+    "sha256": "f367883ca31d1eb260cffb48394ce783e7edf47f3b332ed9064692fe88894c34",
+    "examples": 1
+  },
+  {
+    "name": "sidebar-floating",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/sidebar-floating-example.json",
+    "sha256": "2122b9c12bf77b4cfa766b9ae5b084e53c94655b14bb334dbdbe33453515360a",
+    "examples": 1
+  },
+  {
+    "name": "sidebar-icon",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/sidebar-icon-example.json",
+    "sha256": "1c066e8412d55eef187dddc02e30591f319500f6d1122fdcef56ecea3d4e563f",
+    "examples": 1
+  },
+  {
+    "name": "sidebar-inset",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/sidebar-inset-example.json",
+    "sha256": "4fc43a410b49d7c74a63df83b63512a76f251308de75009155efd632dc271399",
+    "examples": 1
+  },
+  {
+    "name": "skeleton",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/skeleton-example.json",
+    "sha256": "46c56f713650d215b464422888c08aab9b42d8e522691ad2e8a5ec21cdf8a73c",
+    "examples": 5
+  },
+  {
+    "name": "slider",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/slider-example.json",
+    "sha256": "77090c0b1865fb165138c67100d86387e86bcfddedded1191399d90ee5cb70df",
+    "examples": 6
+  },
+  {
+    "name": "sonner",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/sonner-example.json",
+    "sha256": "2194a034e95ad906168da2969ddca38a042f8cbc53704b95d9fd037e79570bd3",
+    "examples": 2
+  },
+  {
+    "name": "spinner",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/spinner-example.json",
+    "sha256": "c076f1640b90952694348fee57be30a856992d3870bb04cf1bb256f9c56436f8",
+    "examples": 5
+  },
+  {
+    "name": "switch",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/switch-example.json",
+    "sha256": "6d220ea1494aea54ca06a2a0b43db9ba261910e9996d34c5c66869da3dd66346",
+    "examples": 5
+  },
+  {
+    "name": "table",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/table-example.json",
+    "sha256": "7d16b57428f40beaf93287dba1a3be45310e97f9da09bd95f7c89ce289fc9f5a",
+    "examples": 7
+  },
+  {
+    "name": "tabs",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/tabs-example.json",
+    "sha256": "07b507b75594b2839d263b14981f16e5dadf6cdcafcbc5b7e8f65ab790ec9c07",
+    "examples": 13
+  },
+  {
+    "name": "textarea",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/textarea-example.json",
+    "sha256": "fc107f8bd584d919f5c5da31fd46e7d8809d3d97154738ee9f84e079e5b94862",
+    "examples": 5
+  },
+  {
+    "name": "toggle",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/toggle-example.json",
+    "sha256": "b1e2cd7270190a933733fa183b44c7cc969d50da1bf74ba877f43ba3391518e7",
+    "examples": 8
+  },
+  {
+    "name": "toggle-group",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/toggle-group-example.json",
+    "sha256": "e1279fc5e2dd0f924ab292558f4b9c07ad463adfe2fa5ba5df0204046d242895",
+    "examples": 15
+  },
+  {
+    "name": "tooltip",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/tooltip-example.json",
+    "sha256": "852d8b42a8e006ba067b587f1f1f86dc3a418ca2a510d13ac22584946ed890cb",
+    "examples": 8
+  },
+  {
+    "name": "trace",
+    "url": "https://ui.shadcn.com/r/styles/radix-rhea/trace-example.json",
+    "sha256": "412326174c233f7b91b9892e7de969fc95219b038ee0427ad624259174000775",
+    "examples": 8
+  }
+]

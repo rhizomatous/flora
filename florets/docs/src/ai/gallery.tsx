@@ -89,7 +89,7 @@ export function AIGallery() {
       </label>
       <p className="my-4 text-sm text-muted-foreground">
         Original shadcn Radix / Rhea examples. Import components from <code>@flora/florets/ai</code>{" "}
-        and styles from <code>@flora/florets/ai/styles.css</code>.
+        and styles from <code>@flora/florets/styles.css</code>.
       </p>
       <a
         className="text-sm underline"

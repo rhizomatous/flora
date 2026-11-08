@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 
 import { cn } from "../lib/utils";
-import { buttonVariants } from "./button-variants";
+import { Button } from "./button";
 
 export function Link({ className, children, ...props }: ComponentProps<"a">) {
   return (
@@ -19,8 +19,8 @@ export function Link({ className, children, ...props }: ComponentProps<"a">) {
 
 export function ButtonLink({ className, children, ...props }: ComponentProps<"a">) {
   return (
-    <a className={cn(buttonVariants(), className)} {...props}>
-      {children}
-    </a>
+    <Button asChild className={className}>
+      <a {...props}>{children}</a>
+    </Button>
   );
 }

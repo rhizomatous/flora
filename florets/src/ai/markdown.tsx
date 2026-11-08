@@ -3,8 +3,6 @@
 import type { ComponentProps } from "react";
 import { Streamdown, useIsCodeFenceIncomplete, type ExtraProps } from "streamdown";
 
-import { cn } from "../lib/utils";
-import { useHighlightedCode } from "./hooks/use-highlighted-code";
 import {
   CodeBlock,
   CodeBlockActions,
@@ -13,7 +11,9 @@ import {
   CodeBlockHeader,
   CodeBlockLine,
   CodeBlockTitle,
-} from "./ui/code-block";
+} from "../components/code-block";
+import { useHighlightedCode } from "../hooks/use-highlighted-code";
+import { cn } from "../lib/utils";
 
 function MarkdownCodeBlock({ code, language }: { code: string; language: string }) {
   // True while the closing fence has not arrived yet.

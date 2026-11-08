@@ -12,13 +12,13 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "../../../../src/ai/ui/dropdown-menu";
+} from "../../../../src/components/dropdown-menu";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupTextarea,
-} from "../../../../src/ai/ui/input-group";
+} from "../../../../src/components/input-group";
 
 const defaultModel = { id: "gpt-5", name: "GPT-5" };
 const defaultEffort = { id: "medium", name: "Medium" };

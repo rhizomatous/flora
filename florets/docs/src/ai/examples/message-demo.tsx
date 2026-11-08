@@ -1,12 +1,17 @@
-import { Avatar, AvatarFallback, AvatarImage } from "../../../../src/ai/ui/avatar";
-import { Bubble, BubbleContent, BubbleGroup, BubbleReactions } from "../../../../src/ai/ui/bubble";
-import { Marker, MarkerContent } from "../../../../src/ai/ui/marker";
+import { Avatar, AvatarFallback, AvatarImage } from "../../../../src/components/avatar";
+import {
+  Bubble,
+  BubbleContent,
+  BubbleGroup,
+  BubbleReactions,
+} from "../../../../src/components/bubble";
+import { Marker, MarkerContent } from "../../../../src/components/marker";
 import {
   Message,
   MessageAvatar,
   MessageContent,
   MessageFooter,
-} from "../../../../src/ai/ui/message";
+} from "../../../../src/components/message";
 
 export function MessageDemo() {
   return (

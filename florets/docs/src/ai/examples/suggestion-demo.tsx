@@ -3,15 +3,15 @@
 import { ArrowUpIcon, PlusIcon } from "lucide-react";
 import { type SubmitEvent, useRef, useState } from "react";
 
-import { Bubble, BubbleContent } from "../../../../src/ai/ui/bubble";
-import { Button } from "../../../../src/ai/ui/button";
+import { Bubble, BubbleContent } from "../../../../src/components/bubble";
+import { Button } from "../../../../src/components/button";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupTextarea,
-} from "../../../../src/ai/ui/input-group";
-import { Message, MessageContent } from "../../../../src/ai/ui/message";
+} from "../../../../src/components/input-group";
+import { Message, MessageContent } from "../../../../src/components/message";
 
 const suggestions = [
   "Add a dark mode toggle",
@@ -82,7 +82,7 @@ export function SuggestionDemo() {
         </div>
       )}
       <div className="flex flex-col gap-2">
-        <div className="scroll-fade-x flex scrollbar-none gap-2 overflow-x-auto overscroll-x-contain">
+        <div className="flex scroll-fade-x scrollbar-none gap-2 overflow-x-auto overscroll-x-contain">
           {suggestions.map((suggestion) => (
             <Button
               key={suggestion}

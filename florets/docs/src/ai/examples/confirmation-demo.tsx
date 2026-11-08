@@ -9,8 +9,8 @@ import {
 import { CircleCheckIcon, LoaderCircleIcon, TerminalIcon } from "lucide-react";
 import { useState } from "react";
 
-import { Bubble, BubbleContent } from "../../../../src/ai/ui/bubble";
-import { Button } from "../../../../src/ai/ui/button";
+import { Bubble, BubbleContent } from "../../../../src/components/bubble";
+import { Button } from "../../../../src/components/button";
 import {
   Item,
   ItemActions,
@@ -18,8 +18,8 @@ import {
   ItemDescription,
   ItemMedia,
   ItemTitle,
-} from "../../../../src/ai/ui/item";
-import { Message, MessageContent } from "../../../../src/ai/ui/message";
+} from "../../../../src/components/item";
+import { Message, MessageContent } from "../../../../src/components/message";
 import {
   Trace,
   TraceCollapsible,
@@ -28,7 +28,7 @@ import {
   TraceIcon,
   TraceLine,
   TraceTitle,
-} from "../../../../src/ai/ui/trace";
+} from "../../../../src/components/trace";
 import { createChat, getMessageText } from "../lib/ai";
 
 type ChatMessage = UIMessage<

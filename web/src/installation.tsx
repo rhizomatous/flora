@@ -82,7 +82,7 @@ export function Installation({
       <form className="mt-8 space-y-6" onSubmit={save}>
         <FieldSet disabled={busy}>
           <FieldLegend>GitHub</FieldLegend>
-          <FieldLabel>
+          <FieldLabel className="w-full flex-col items-start">
             Fine-grained personal access token
             <Input
               className="mt-2"
@@ -103,7 +103,7 @@ export function Installation({
         </FieldSet>
         <FieldSet disabled={busy} className="border-t border-border pt-6">
           <FieldLegend className="mb-0">Model provider</FieldLegend>
-          <FieldLabel>
+          <FieldLabel className="w-full flex-col items-start">
             Hosted provider
             <NativeSelect
               key={settings.provider}
@@ -118,7 +118,7 @@ export function Installation({
               <option value="google">Google</option>
             </NativeSelect>
           </FieldLabel>
-          <FieldLabel>
+          <FieldLabel className="w-full flex-col items-start">
             Model ID
             <Input
               key={settings.model}
@@ -131,7 +131,7 @@ export function Installation({
               placeholder="Exact model ID from your provider"
             />
           </FieldLabel>
-          <FieldLabel>
+          <FieldLabel className="w-full flex-col items-start">
             Provider API key
             <Input
               className="mt-2"

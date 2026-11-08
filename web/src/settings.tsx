@@ -58,7 +58,7 @@ export function PreferenceFields({
           </div>
         ))}
       </div>
-      <FieldLabel>
+      <FieldLabel className="w-full flex-col items-start">
         Git author name
         <Input
           key={value.authorName}
@@ -69,7 +69,7 @@ export function PreferenceFields({
           defaultValue={value.authorName}
         />
       </FieldLabel>
-      <FieldLabel>
+      <FieldLabel className="w-full flex-col items-start">
         Git author email
         <Input
           key={value.authorEmail}

@@ -29,7 +29,7 @@ export function CompletionToasts({
           </Text>
           <Button
             variant="link"
-            size="inline"
+            size="sm"
             type="button"
             className="mt-3 text-sm text-foreground"
             aria-label={`Dismiss completion for ${t.title}`}

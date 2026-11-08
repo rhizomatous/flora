@@ -10,7 +10,7 @@ import {
   AttachmentContent,
   AttachmentMedia,
   AttachmentTitle,
-} from "../../../../src/ai/ui/attachment";
+} from "../../../../src/components/attachment";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,13 +20,13 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "../../../../src/ai/ui/dropdown-menu";
+} from "../../../../src/components/dropdown-menu";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupTextarea,
-} from "../../../../src/ai/ui/input-group";
+} from "../../../../src/components/input-group";
 
 type AttachmentFile = {
   id: string;

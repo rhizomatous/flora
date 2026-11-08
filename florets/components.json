@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "radix-rhea",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@flora/florets/components",
+    "ui": "@flora/florets/components",
+    "utils": "@flora/florets/lib/utils",
+    "lib": "@flora/florets/lib",
+    "hooks": "@flora/florets/hooks"
+  }
+}

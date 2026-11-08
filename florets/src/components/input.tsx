@@ -2,29 +2,18 @@ import type { ComponentProps } from "react";
 
 import { cn } from "../lib/utils";
 
-const control =
-  "w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-60 aria-invalid:border-destructive aria-invalid:outline-destructive";
-
-export function Input({ className, ...props }: ComponentProps<"input">) {
+function Input({ className, type, ...props }: ComponentProps<"input">) {
   return (
     <input
+      type={type}
       data-slot="input"
-      className={cn(control, "placeholder:text-muted-foreground", className)}
+      className={cn(
+        "bg-input/50 border-transparent focus-visible:border-ring focus-visible:ring-ring/30 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 h-8 rounded-2xl border px-2.5 py-1 text-base transition-[color,box-shadow] duration-200 file:h-6 file:text-sm file:font-medium focus-visible:ring-3 aria-invalid:ring-3 md:text-sm w-full min-w-0 outline-none file:inline-flex file:border-0 file:bg-transparent file:text-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+        className,
+      )}
       {...props}
     />
   );
 }
 
-export function NativeSelect({ className, ...props }: ComponentProps<"select">) {
-  return <select data-slot="native-select" className={cn(control, className)} {...props} />;
-}
-
-export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
-  return (
-    <textarea
-      data-slot="textarea"
-      className={cn(control, "min-h-28 placeholder:text-muted-foreground", className)}
-      {...props}
-    />
-  );
-}
+export { Input };
