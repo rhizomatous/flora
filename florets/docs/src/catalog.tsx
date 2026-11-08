@@ -114,18 +114,6 @@ export function Catalog({ dark }: { dark: boolean }) {
           Open full preview
         </a>
       </div>
-      <p className="text-sm text-muted-foreground">
-        {collection !== undefined && collection.url !== "" ? (
-          <>
-            Official shadcn examples rendered with Florets’ Radix/Rhea components.{" "}
-            <a href={collection.url} className="underline underline-offset-4">
-              Upstream source
-            </a>
-          </>
-        ) : (
-          "Source unavailable."
-        )}
-      </p>
       <iframe
         key={selected}
         title={`${selected} component examples`}

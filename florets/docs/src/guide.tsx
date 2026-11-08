@@ -84,7 +84,7 @@ function Section({
 }: {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   children: ReactNode;
 }) {
   return (
@@ -93,9 +93,11 @@ function Section({
         <Heading level={2} id={`${id}-heading`}>
           {title}
         </Heading>
-        <Text tone="muted" className="mt-2 max-w-2xl">
-          {description}
-        </Text>
+        {description !== undefined && (
+          <Text tone="muted" className="mt-2 max-w-2xl">
+            {description}
+          </Text>
+        )}
       </div>
       {children}
     </section>
@@ -259,11 +261,7 @@ export function Guide() {
             </pre>
           </header>
           <div className="space-y-14">
-            <Section
-              id="catalog"
-              title="Component catalog"
-              description="Browse the official shadcn Radix/Rhea example collections, including variants, sizes, states, and compositions. Choose a component to explore its full collection."
-            >
+            <Section id="catalog" title="Component catalog">
               <Catalog dark={dark} />
             </Section>
             <Section
