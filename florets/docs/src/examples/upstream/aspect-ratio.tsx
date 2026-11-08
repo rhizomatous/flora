@@ -1,0 +1,88 @@
+import { AspectRatio } from "@flora/florets/components/aspect-ratio";
+
+import { Example, ExampleWrapper } from "../example";
+// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/aspect-ratio-example.json
+import { PreviewImage as Image } from "../preview-image";
+
+export function Preview() {
+  return (
+    <ExampleWrapper className="max-w-4xl 2xl:max-w-4xl">
+      <AspectRatio16x9 />
+      <AspectRatio21x9 />
+      <AspectRatio1x1 />
+      <AspectRatio9x16 />
+    </ExampleWrapper>
+  );
+}
+
+function AspectRatio16x9() {
+  return (
+    <Example title="16:9" className="items-center justify-center">
+      <AspectRatio
+        ratio={16 / 9}
+        className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none rounded-lg bg-muted"
+      >
+        <Image
+          src="https://avatar.vercel.sh/shadcn1"
+          alt="Photo"
+          fill
+          className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none h-full w-full rounded-lg object-cover grayscale dark:brightness-20"
+        />
+      </AspectRatio>
+    </Example>
+  );
+}
+
+function AspectRatio1x1() {
+  return (
+    <Example title="1:1" className="items-start">
+      <AspectRatio
+        ratio={1 / 1}
+        className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none rounded-lg bg-muted"
+      >
+        <Image
+          src="https://avatar.vercel.sh/shadcn1"
+          alt="Photo"
+          fill
+          className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none h-full w-full rounded-lg object-cover grayscale dark:brightness-20"
+        />
+      </AspectRatio>
+    </Example>
+  );
+}
+
+function AspectRatio9x16() {
+  return (
+    <Example title="9:16" className="items-center justify-center">
+      <AspectRatio
+        ratio={9 / 16}
+        className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none rounded-lg bg-muted"
+      >
+        <Image
+          src="https://avatar.vercel.sh/shadcn1"
+          alt="Photo"
+          fill
+          className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none h-full w-full rounded-lg object-cover grayscale dark:brightness-20"
+        />
+      </AspectRatio>
+    </Example>
+  );
+}
+
+function AspectRatio21x9() {
+  return (
+    <Example title="21:9" className="items-center justify-center">
+      <AspectRatio
+        ratio={21 / 9}
+        className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none rounded-lg bg-muted"
+      >
+        <Image
+          src="https://avatar.vercel.sh/shadcn1"
+          alt="Photo"
+          fill
+          className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none h-full w-full rounded-lg object-cover grayscale dark:brightness-20"
+        />
+      </AspectRatio>
+    </Example>
+  );
+}

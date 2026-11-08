@@ -6,7 +6,9 @@ export default defineConfig({
   base: "./",
   plugins: [react(), tailwindcss()],
   build: {
-    rolldownOptions: { input: { guide: "docs/index.html", ai: "docs/ai.html" } },
+    rolldownOptions: {
+      input: { guide: "docs/index.html", ai: "docs/ai.html", example: "docs/example.html" },
+    },
     outDir: "../docs-dist",
     emptyOutDir: true,
   },

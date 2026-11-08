@@ -262,7 +262,7 @@ export function Guide() {
             <Section
               id="catalog"
               title="Component catalog"
-              description="Live examples of every shadcn Radix/Rhea component in Florets. Try the controls and open View code for the source of each example."
+              description="Browse the official shadcn Radix/Rhea example collections, including variants, sizes, states, and compositions. Choose a component to explore its full collection."
             >
               <Catalog dark={dark} />
             </Section>

@@ -1,43 +1,95 @@
-import { useState, type ComponentType } from "react";
+// oxlint-disable react/iframe-missing-sandbox -- The frame runs trusted local examples with module imports and interactive forms.
+import { useEffect, useState } from "react";
 
-import { Button, Input } from "@flora/florets";
+import { Button, Input, NativeSelect, NativeSelectOption } from "@flora/florets";
 
-const modules = import.meta.glob<{ Example: ComponentType<{ dark: boolean }> }>(
-  "./examples/*.tsx",
-  { eager: true },
-);
-const sources = import.meta.glob<string>("./examples/*.tsx", {
-  eager: true,
+import upstream from "./examples/upstream.json";
+
+const sources = import.meta.glob<string>("./examples/upstream/*.tsx", {
   query: "?raw",
   import: "default",
 });
-const examples = Object.entries(modules)
-  .map(([path, module]) => ({
-    name: path.slice("./examples/".length, -".tsx".length),
-    Component: module.Example,
-    source: sources[path] ?? "",
+const collections = upstream
+  .map(({ name, url }) => ({
+    name,
+    url,
+    source: sources[`./examples/upstream/${name}.tsx`],
   }))
   .toSorted((a, b) => a.name.localeCompare(b.name));
 
+function selectedFromHash() {
+  const name = location.hash.replace(/^#example-/, "");
+  return collections.some((item) => item.name === name) ? name : "button";
+}
+
 export function Catalog({ dark }: { dark: boolean }) {
   const [query, setQuery] = useState("");
-  const visible = examples.filter(({ name }) => name.includes(query.trim().toLowerCase()));
+  const [selected, setSelected] = useState(selectedFromHash);
+  const [source, setSource] = useState({ name: "", text: "" });
+  const collection = collections.find(({ name }) => name === selected);
+  const visible = collections.filter(({ name }) => name.includes(query.trim().toLowerCase()));
+
+  useEffect(() => {
+    function navigate() {
+      if (location.hash.startsWith("#example-")) setSelected(selectedFromHash());
+    }
+    window.addEventListener("hashchange", navigate);
+    return () => {
+      window.removeEventListener("hashchange", navigate);
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    async function readSource() {
+      try {
+        const text = await collection?.source?.();
+        if (active) setSource({ name: selected, text: text ?? "Source unavailable." });
+      } catch {
+        if (active) {
+          setSource({ name: selected, text: "Source could not be loaded. Refresh to try again." });
+        }
+      }
+    }
+    void readSource();
+    return () => {
+      active = false;
+    };
+  }, [collection, selected]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <Input
           type="search"
           aria-label="Find a component"
           placeholder="Find a component…"
-          className="max-w-sm"
+          className="max-w-xs"
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
           }}
         />
+        <NativeSelect
+          aria-label="Component examples"
+          value={visible.some(({ name }) => name === selected) ? selected : ""}
+          onChange={(event) => {
+            const name = event.target.value;
+            setSelected(name);
+            history.replaceState(null, "", `#example-${name}`);
+          }}
+        >
+          <NativeSelectOption value="" disabled>
+            Choose a component
+          </NativeSelectOption>
+          {visible.map(({ name }) => (
+            <NativeSelectOption key={name} value={name}>
+              {name}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
         <span role="status" className="text-sm text-muted-foreground">
-          {visible.length} of {examples.length} components
+          {visible.length} of {collections.length} collections
         </span>
         {query !== "" && (
           <Button
@@ -51,33 +103,47 @@ export function Catalog({ dark }: { dark: boolean }) {
         )}
       </div>
       {visible.length === 0 && <p>No components match your search.</p>}
-      <div className="grid items-start gap-6 xl:grid-cols-2">
-        {visible.map(({ name, Component, source }) => (
-          <article
-            key={name}
-            id={`example-${name}`}
-            aria-labelledby={`example-${name}-title`}
-            className="min-w-0 scroll-mt-8 rounded-2xl border bg-card text-card-foreground"
-          >
-            <h3 id={`example-${name}-title`} className="border-b px-5 py-4 text-sm font-semibold">
-              <a href={`#example-${name}`}>{name}</a>
-            </h3>
-            <div className="flex min-h-40 min-w-0 items-center justify-center p-5">
-              <Component dark={dark} />
-            </div>
-            <details className="rounded-b-2xl border-t bg-muted/30">
-              <summary className="cursor-pointer px-5 py-3 text-xs font-medium">View code</summary>
-              <pre
-                tabIndex={0}
-                aria-label={`${name} example code`}
-                className="max-h-96 overflow-auto px-5 pb-5 text-xs leading-6"
-              >
-                <code>{source}</code>
-              </pre>
-            </details>
-          </article>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="font-semibold">{selected}</h3>
+        <a
+          className="text-sm underline underline-offset-4"
+          href={`./example.html?component=${selected}&theme=${dark ? "dark" : "light"}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open full preview
+        </a>
       </div>
+      <p className="text-sm text-muted-foreground">
+        {collection !== undefined && collection.url !== "" ? (
+          <>
+            Official shadcn examples rendered with Florets’ Radix/Rhea components.{" "}
+            <a href={collection.url} className="underline underline-offset-4">
+              Upstream source
+            </a>
+          </>
+        ) : (
+          "Source unavailable."
+        )}
+      </p>
+      <iframe
+        key={selected}
+        title={`${selected} component examples`}
+        src={`./example.html?component=${selected}&theme=${dark ? "dark" : "light"}`}
+        className="h-[75svh] min-h-[32rem] w-full rounded-2xl border bg-background"
+      />
+      <details key={`source-${selected}`} className="rounded-2xl border bg-muted/30">
+        <summary className="cursor-pointer px-5 py-3 text-sm font-medium">
+          View example source
+        </summary>
+        <pre
+          tabIndex={0}
+          aria-label={`${selected} example source`}
+          className="max-h-[32rem] overflow-auto px-5 pb-5 text-xs leading-6"
+        >
+          <code>{source.name === selected ? source.text : "Loading source…"}</code>
+        </pre>
+      </details>
     </div>
   );
 }

@@ -1,0 +1,81 @@
+// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
+// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/scroll-area-example.json
+import * as React from "react";
+
+import { ScrollArea, ScrollBar } from "@flora/florets/components/scroll-area";
+import { Separator } from "@flora/florets/components/separator";
+
+import { Example, ExampleWrapper } from "../example";
+import { PreviewImage as Image } from "../preview-image";
+
+const tags = Array.from({ length: 50 }).map((_, i, a) => `v1.2.0-beta.${a.length - i}`);
+
+const works = [
+  {
+    artist: "Ornella Binni",
+    art: "https://images.unsplash.com/photo-1465869185982-5a1a7522cbcb?auto=format&fit=crop&w=300&q=80",
+  },
+  {
+    artist: "Tom Byrom",
+    art: "https://images.unsplash.com/photo-1548516173-3cabfa4607e9?auto=format&fit=crop&w=300&q=80",
+  },
+  {
+    artist: "Vladimir Malyav",
+    art: "https://images.unsplash.com/photo-1494337480532-3725c85fd2ab?auto=format&fit=crop&w=300&q=80",
+  },
+] as const;
+
+export function Preview() {
+  return (
+    <ExampleWrapper>
+      <ScrollAreaVertical />
+      <ScrollAreaHorizontal />
+    </ExampleWrapper>
+  );
+}
+
+function ScrollAreaVertical() {
+  return (
+    <Example title="Vertical">
+      <ScrollArea className="style-lyra:rounded-none style-maia:rounded-2xl style-luma:rounded-2xl style-sera:rounded-none style-rhea:rounded-2xl mx-auto h-72 w-48 overflow-hidden rounded-md border">
+        <div className="p-4">
+          <h4 className="mb-4 text-sm leading-none font-medium">Tags</h4>
+          {tags.map((tag) => (
+            <React.Fragment key={tag}>
+              <div className="text-sm">{tag}</div>
+              <Separator className="my-2" />
+            </React.Fragment>
+          ))}
+        </div>
+      </ScrollArea>
+    </Example>
+  );
+}
+
+function ScrollAreaHorizontal() {
+  return (
+    <Example title="Horizontal">
+      <ScrollArea className="style-lyra:rounded-none style-lyra:**:data-[slot=scroll-area-viewport]:rounded-none style-maia:rounded-2xl style-luma:rounded-2xl style-sera:rounded-none style-sera:**:data-[slot=scroll-area-viewport]:rounded-none style-rhea:rounded-2xl mx-auto w-full max-w-96 overflow-hidden rounded-md border p-4 **:data-[slot=scroll-area-viewport]:rounded-md">
+        <div className="flex gap-4">
+          {works.map((artwork) => (
+            <figure key={artwork.artist} className="shrink-0">
+              <div className="style-lyra:rounded-none style-sera:rounded-none overflow-hidden rounded-md">
+                <Image
+                  src={artwork.art}
+                  alt={`Photo by ${artwork.artist}`}
+                  className="aspect-3/4 h-fit w-fit object-cover"
+                  width={300}
+                  height={400}
+                />
+              </div>
+              <figcaption className="pt-2 text-xs text-muted-foreground">
+                Photo by <span className="font-semibold text-foreground">{artwork.artist}</span>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
+    </Example>
+  );
+}

@@ -94,9 +94,10 @@ export async function loadHighlighter(language: string) {
 
       return {
         lines: tokens.map((line) =>
-          line.map((token) => (
+          line.map((token, index) => (
             <span
-              key={token.offset}
+              // oxlint-disable-next-line react/no-array-index-key -- ANSI tokens can share an offset; their positions within a line are unique.
+              key={index}
               style={token.htmlStyle}
               className="text-(--shiki-light) dark:text-(--shiki-dark)"
             >

@@ -268,11 +268,13 @@ to `.envrc`. Manual `nix develop` and CI do not need direnv or any host hook.
 
 Run `npm run docs:dev` to browse the component guide at <http://127.0.0.1:5176>.
 The guide lives in `florets/docs/` and imports the library directly. It includes
-the full shadcn Radix/Rhea component catalog, live examples, usage snippets, and a
-light/dark theme switch. It needs no backend. Import components from `@flora/florets`
+the full shadcn Radix/Rhea component catalog, official example collections, source
+panels, and a light/dark theme switch. Preview frames keep menus and full-page
+sidebar examples inside their own page. It needs no backend. Import components from `@flora/florets`
 and the shared theme from `@flora/florets/styles.css`. The `@flora/florets/ai` entry
 point uses the same components and theme. `florets/components.json` records the
-Radix/Rhea registry configuration.
+Radix/Rhea registry configuration. `florets/docs/src/examples/upstream.json` records
+the source URLs and original source hashes for the imported example collections.
 Use `npm run docs:build` to produce a standalone static site in `florets/docs-dist/`,
 and `npm run docs:preview` to preview that build. `make check` builds the guide too.
 
