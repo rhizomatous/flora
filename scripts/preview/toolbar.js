@@ -2,7 +2,7 @@ const bar = document.createElement("nav");
 bar.setAttribute("aria-label", "Preview controls");
 bar.style.cssText =
   "position:fixed;right:16px;top:8px;z-index:1000;display:flex;align-items:center;gap:8px;background:#222;color:#eee;padding:8px 12px;border:1px solid #555;border-radius:8px;font:12px system-ui;max-width:calc(100vw - 32px);flex-wrap:wrap";
-bar.innerHTML = `<button data-action="restart">Replay working chat</button><button data-action="pause">Pause</button><button data-action="play">Play</button><button data-action="hide">Hide controls</button>`;
+bar.innerHTML = `<button data-action="restart">Replay chat</button><button data-action="pause">Pause</button><button data-action="play">Play</button><button data-action="hide">Hide controls</button>`;
 bar.addEventListener("click", (event) => {
   // oxlint-disable-next-line promise/prefer-await-to-then -- DOM event callbacks cannot return promises.
   void handle().catch(console.error);
@@ -13,13 +13,27 @@ bar.addEventListener("click", (event) => {
       bar.remove();
       return;
     }
-    const response = await fetch(`/__preview/control?action=${action}`, { method: "POST" });
+    const { hash } = window.location;
+    const chat = /^#chats\/([^/?]+)$/.exec(hash)?.[1];
+    if (chat === undefined || chat === "") return;
+    const response = await fetch(
+      `/__preview/control?action=${action}&chat=${encodeURIComponent(chat)}`,
+      { method: "POST" },
+    );
     if (!response.ok) return;
-    if (action === "restart") {
-      window.location.hash = "chats/working";
+    if (action === "restart" && window.location.hash === hash) {
       window.location.reload();
     }
   }
 });
 document.body.append(bar);
 if (!window.location.hash) window.location.hash = "chats/completed";
+
+const updateControls = () => {
+  const chat = /^#chats\/(working|completed|waiting|recovery|long)$/.test(window.location.hash);
+  for (const button of bar.querySelectorAll("button[data-action]:not([data-action=hide])")) {
+    button.disabled = !chat;
+  }
+};
+window.addEventListener("hashchange", updateControls);
+updateControls();
