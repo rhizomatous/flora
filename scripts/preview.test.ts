@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
+import { setTimeout as delay } from "node:timers/promises";
 
 import { createServer } from "vite";
 
@@ -60,6 +61,36 @@ test("preview serves isolated fixtures and replays saved events with resumable I
       assert.doesNotMatch(text, /preview:(completed|waiting|recovery|long)/);
       assert.match(text, /"HarnessVersion":"1.2.27"/);
     }
+    const recovery = captured.find((scenario) => scenario.name === "recovery");
+    assert.ok(recovery);
+    const completedResponse = await fetch(`${base}/api/chats/completed`);
+    const completedBefore = await completedResponse.text();
+    const restartRecovery = await fetch(`${base}/__preview/control?action=restart&chat=recovery`, {
+      method: "POST",
+    });
+    assert.equal(restartRecovery.status, 200);
+    await fetch(`${base}/__preview/control?action=pause&chat=recovery`, { method: "POST" });
+    const pausedResponse = await fetch(`${base}/api/chats/recovery`);
+    const paused = await pausedResponse.text();
+    assert.ok(recovery.frames[0]);
+    const pausedDetail: unknown = JSON.parse(paused);
+    assert.ok(
+      typeof pausedDetail === "object" && pausedDetail !== null && "messages" in pausedDetail,
+    );
+    assert.deepEqual(pausedDetail.messages, messages(recovery.frames[0], "recovery"));
+    await delay(800);
+    const stillPaused = await fetch(`${base}/api/chats/recovery`);
+    assert.equal(await stillPaused.text(), paused);
+    const unchanged = await fetch(`${base}/api/chats/completed`);
+    assert.equal(await unchanged.text(), completedBefore);
+    await fetch(`${base}/__preview/control?action=play&chat=recovery`, { method: "POST" });
+    await delay(800);
+    const resumedRecovery = await fetch(`${base}/api/chats/recovery`);
+    assert.notEqual(await resumedRecovery.text(), paused);
+    const badControl = await fetch(`${base}/__preview/control?action=restart&chat=unknown`, {
+      method: "POST",
+    });
+    assert.equal(badControl.status, 400);
     const mutation = await fetch(`${base}/api/settings`, { method: "PUT", body: "{}" });
     assert.equal(mutation.status, 405);
     const unknown = await fetch(`${base}/api/unknown`);
