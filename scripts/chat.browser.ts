@@ -57,7 +57,7 @@ try {
     .first()
     .click();
   await page
-    .getByRole("button", { name: /.*bash.*completed/ })
+    .getByRole("button", { name: /Running command.*completed/ })
     .first()
     .click();
   assert.match(await page.getByLabel("Conversation").innerText(), /\/workspace/);

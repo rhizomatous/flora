@@ -31,6 +31,35 @@ const scenarios: { id: string; title: string; frames: Frame[] }[] = [
     frames: s.frames,
   })),
 ];
+export const previewFrameMs = 2500;
+
+// Shift only runtime timestamps; file ranges and tool inputs retain their recorded values.
+export function rebaseFrame(frame: Frame, offset: number): Frame {
+  const rebased = structuredClone(frame);
+  for (const { info, parts } of rebased.history) {
+    info.time.created += offset;
+    if (info.role === "assistant" && info.time.completed !== undefined) {
+      info.time.completed += offset;
+    }
+    for (const part of parts) {
+      let time = "time" in part ? part.time : undefined;
+      if (part.type === "tool" && part.state.status !== "pending") time = part.state.time;
+      if (time === undefined) continue;
+      if ("created" in time) time.created += offset;
+      if ("start" in time) time.start += offset;
+      if ("end" in time && typeof time.end === "number") time.end += offset;
+      if ("compacted" in time && typeof time.compacted === "number") time.compacted += offset;
+    }
+  }
+  return rebased;
+}
+
+function replayFrames(frames: Frame[]) {
+  const start = frames[0]?.history[0]?.info.time.created ?? Date.now();
+  const offset = Date.now() - start;
+  return frames.map((frame) => rebaseFrame(frame, offset));
+}
+
 const epoch = "2026-01-01T12:00:00.000Z";
 const project = {
   id: "preview",
@@ -97,23 +126,29 @@ export function chatAt(id: string, frame: Frame, finished: boolean) {
 
 /** The dev server owns only in-memory playback. Every API request is handled here, never proxied to a real installation. */
 export function chatPreview(): Plugin {
-  let frameIndex = 0;
-  let playing = false;
-  let lastTick = Date.now();
-  const streams = new Set<ServerResponse>();
+  const playback = new Map(
+    scenarios.map((scenario) => [
+      scenario.id,
+      {
+        frames: replayFrames(scenario.frames),
+        frameIndex: scenario.id === "working" ? 0 : scenario.frames.length - 1,
+        playing: false,
+        lastTick: Date.now(),
+      },
+    ]),
+  );
+  const streams = new Map<ServerResponse, string>();
   function index(id: string) {
     const scenario = present(scenarios.find((s) => s.id === id));
-    if (id !== "working") return scenario.frames.length - 1;
-    if (playing) {
+    const state = present(playback.get(id));
+    if (state.playing) {
       const now = Date.now();
-      frameIndex = Math.min(
-        frameIndex + Math.floor((now - lastTick) / 700),
-        scenario.frames.length - 1,
-      );
-      if (now - lastTick >= 700) lastTick = now;
-      if (frameIndex === scenario.frames.length - 1) playing = false;
+      const ticks = Math.floor((now - state.lastTick) / previewFrameMs);
+      state.frameIndex = Math.min(state.frameIndex + ticks, scenario.frames.length - 1);
+      state.lastTick += ticks * previewFrameMs;
+      if (state.frameIndex === scenario.frames.length - 1) state.playing = false;
     }
-    return frameIndex;
+    return state.frameIndex;
   }
   // oxlint-disable-next-line unicorn/consistent-function-scoping -- Keep response handling with the preview middleware.
   function json(res: ServerResponse, value: unknown, status = 200) {
@@ -124,12 +159,24 @@ export function chatPreview(): Plugin {
     const url = new URL(req.url ?? "/", "http://localhost");
     if (url.pathname === "/__preview/control" && req.method === "POST") {
       const action = url.searchParams.get("action");
-      if (action === "restart") frameIndex = 0;
-      playing = action === "play" || action === "restart";
-      lastTick = Date.now();
-      // Reconnect from zero after a rewind so the frontend discards the prior timeline on reload.
-      if (action === "restart") for (const stream of streams) stream.end();
-      json(res, { frameIndex, playing });
+      const id = url.searchParams.get("chat") ?? "working";
+      const state = playback.get(id);
+      if (!state || !["restart", "play", "pause"].includes(action ?? "")) {
+        json(res, { error: "Unknown preview chat or action." }, 400);
+        return;
+      }
+      index(id);
+      if (action === "restart") {
+        state.frameIndex = 0;
+        state.frames = replayFrames(present(scenarios.find((s) => s.id === id)).frames);
+      }
+      state.playing = action === "play" || action === "restart";
+      state.lastTick = Date.now();
+      // Only the rewound chat reconnects; other previews keep their position and event cursor.
+      if (action === "restart") {
+        for (const [stream, chatID] of streams) if (chatID === id) stream.end();
+      }
+      json(res, { chat: id, frameIndex: state.frameIndex, playing: state.playing });
       return;
     }
     if (!url.pathname.startsWith("/api/")) {
@@ -179,7 +226,8 @@ export function chatPreview(): Plugin {
       json(res, {
         chats: scenarios.map((s) => {
           const i = index(s.id);
-          return chatAt(s.id, present(s.frames[i]), i === s.frames.length - 1);
+          const state = present(playback.get(s.id));
+          return chatAt(s.id, present(state.frames[i]), i === s.frames.length - 1);
         }),
         completions: [],
         cursor: 0,
@@ -194,7 +242,8 @@ export function chatPreview(): Plugin {
     }
     const { id } = scenario;
     const i = index(id);
-    const frame = present(scenario.frames[i]);
+    const replay = present(playback.get(id));
+    const frame = present(replay.frames[i]);
     const endpoint = match?.[2];
     if (endpoint === undefined) {
       json(res, {
@@ -237,13 +286,13 @@ export function chatPreview(): Plugin {
     }
     if (endpoint === "events") {
       res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-store" });
-      streams.add(res);
+      streams.set(res, id);
       let sequence = Number(req.headers["last-event-id"] ?? url.searchParams.get("after") ?? 0);
       const send = () => {
         let seq = 0;
         const seen = new Map<string, string>();
         const until = index(id);
-        for (const snapshot of scenario.frames.slice(0, until + 1)) {
+        for (const snapshot of replay.frames.slice(0, until + 1)) {
           for (const message of messages(snapshot, id).filter((m) => m.Role === "assistant")) {
             const serialized = JSON.stringify(message.Payload);
             if (seen.get(message.RuntimeMessageID) === serialized) continue;
@@ -280,7 +329,7 @@ export function chatPreview(): Plugin {
     configureServer(server) {
       server.middlewares.use(handler);
       server.httpServer?.on("close", () => {
-        for (const stream of streams) stream.end();
+        for (const stream of streams.keys()) stream.end();
       });
     },
     transformIndexHtml() {

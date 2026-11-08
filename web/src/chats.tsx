@@ -16,6 +16,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   ChevronDownIcon,
+  CrossCircledIcon,
   Text,
   InputGroup,
   InputGroupTextarea,
@@ -47,31 +48,18 @@ import {
 import type { Chat } from "./notifications";
 import { QuestionForm, type Question } from "./question";
 import { errorMessage, isExpired, request } from "./request";
+import {
+  buildTranscript,
+  formatDuration,
+  isFailedPart,
+  isLivePart,
+  workTiming,
+  type Message,
+  type Part,
+  type WorkStep,
+} from "./transcript";
 import { text } from "./ui";
 
-type Part = {
-  id?: string;
-  type: string;
-  text?: string;
-  tool?: string;
-  time?: { start: number; end?: number };
-  state?: {
-    time?: { start: number; end?: number };
-    status: string;
-    input?: unknown;
-    output?: string;
-    error?: string;
-    title?: string;
-  };
-};
-type Message = {
-  ID: string;
-  Role: string;
-  Text: string;
-  Provider: string;
-  Model: string;
-  Payload: { parts?: Part[]; info?: { error?: unknown } };
-};
 type Activity = {
   ChatID: string;
   Sequence: number;
@@ -595,10 +583,8 @@ function ChatDetail({
   const activeTurn = chat.Status === "working" || chat.Status === "waiting";
   const stopped = chat.Status === "stopped";
   const blocked = (detail.continuationBlockedReason ?? "") !== "";
-  const turnStart = detail.messages.findLastIndex((message) => message.Role === "user");
-  const visibleActivity = detail.messages
-    .slice(turnStart + 1)
-    .some((message) => (message.Payload.parts ?? []).some((part) => isLivePart(part)));
+  const rows = buildTranscript(detail.messages, chat.Status);
+  const visibleActivity = rows.some((row) => row.kind === "work" && row.active);
 
   return (
     <MessageScrollerProvider autoScroll>
@@ -612,13 +598,17 @@ function ChatDetail({
                 shown; transient output may be missing.
               </Alert>
             )}
-            {detail.messages.map((message, index) => (
+            {rows.map((row) => (
               <MessageScrollerItem
-                key={message.ID}
-                messageId={message.ID}
-                scrollAnchor={message.Role === "user"}
+                key={row.id}
+                messageId={row.id}
+                scrollAnchor={row.kind === "message" && row.message.Role === "user"}
               >
-                <ConversationMessage message={message} active={activeTurn && index > turnStart} />
+                {row.kind === "work" ? (
+                  <WorkSummary steps={row.steps} active={row.active} failed={row.failed} />
+                ) : (
+                  <ConversationMessage message={row.message} />
+                )}
               </MessageScrollerItem>
             ))}
             {activeTurn && !visibleActivity && (
@@ -782,7 +772,7 @@ function FollowUpComposer({
   );
 }
 
-function ConversationMessage({ message: m, active }: { message: Message; active: boolean }) {
+function ConversationMessage({ message: m }: { message: Message }) {
   const parts = (m.Payload.parts ?? []).filter(
     (part) => part.type !== "step-start" && part.type !== "step-finish",
   );
@@ -810,7 +800,9 @@ function ConversationMessage({ message: m, active }: { message: Message; active:
           <Bubble variant={m.Role === "user" ? "muted" : "ghost"}>
             <BubbleContent className="space-y-4 text-[15px] leading-7">
               {parts.length > 0 ? (
-                <MessageParts parts={parts} user={m.Role === "user"} active={active} />
+                parts.map((part, index) => (
+                  <MessagePart key={part.id ?? index} part={part} user={m.Role === "user"} />
+                ))
               ) : (
                 <MessagePart part={{ type: "text", text: m.Text }} user={m.Role === "user"} />
               )}
@@ -843,92 +835,123 @@ function ConversationMessage({ message: m, active }: { message: Message; active:
   );
 }
 
-function MessageParts({ parts, user, active }: { parts: Part[]; user: boolean; active: boolean }) {
-  const groups: Part[][] = [];
-  for (const part of parts) {
-    const previous = groups.at(-1);
-    if (part.type !== "text" && previous && previous[0]?.type !== "text") previous.push(part);
-    else groups.push([part]);
-  }
-  return groups.map((group, index) => {
-    const first = group[0];
-    if (!first) return null;
-    if (first.type === "text" || user) {
-      return group.map((part, i) => <MessagePart key={part.id ?? i} part={part} user={user} />);
-    }
-    return <WorkSummary key={first.id ?? index} parts={group} active={active} />;
-  });
-}
-
-function isLivePart(part: Part) {
-  return (
-    part.state?.status === "running" ||
-    part.state?.status === "pending" ||
-    (part.type === "reasoning" && part.time?.end === undefined)
-  );
-}
-
-function WorkSummary({ parts, active }: { parts: Part[]; active: boolean }) {
-  const live = active && parts.some((part) => isLivePart(part));
-  if (live) {
+function WorkSummary({
+  steps,
+  active,
+  failed,
+}: {
+  steps: WorkStep[];
+  active: boolean;
+  failed: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(() => new Set());
+  const root = useRef<HTMLDivElement>(null);
+  function stepDetails(step: WorkStep) {
     return (
-      <div aria-label="Current activity" className="space-y-2">
-        {parts.map((part, index) => (
-          <MessagePart key={part.id ?? index} part={part} user={false} live />
-        ))}
+      <div key={step.id} data-step-id={step.id}>
+        <MessagePart
+          part={step.part}
+          user={false}
+          live={active}
+          expanded={expandedSteps.has(step.id)}
+          onExpandedChange={(expanded) => {
+            setExpandedSteps((current) => {
+              const next = new Set(current);
+              if (expanded) next.add(step.id);
+              else next.delete(step.id);
+              return next;
+            });
+            if (expanded && active && !open) {
+              setOpen(true);
+              requestAnimationFrame(() => {
+                root.current
+                  ?.querySelector<HTMLButtonElement>(
+                    `[data-step-id="${CSS.escape(step.id)}"] button`,
+                  )
+                  ?.focus();
+              });
+            }
+          }}
+        />
       </div>
     );
   }
-  return <CompletedWork parts={parts} />;
+  const timing = workTiming(steps, active);
+  const now = useActivityClock(active && timing !== undefined);
+  const failures = steps.filter((step) => isFailedPart(step.part)).length;
+  const running = steps.filter((step) => isLivePart(step.part));
+  const elapsed = timing
+    ? formatDuration(Math.max(0, (timing.end ?? now) - timing.start))
+    : undefined;
+  let title = elapsed === undefined ? "Work details" : `Worked for ${elapsed}`;
+  if (active) title = elapsed === undefined ? "Working" : `Working for ${elapsed}`;
+  return (
+    <div ref={root} data-slot="work-summary" className="space-y-2">
+      <Trace>
+        <TraceCollapsible open={open} onOpenChange={setOpen}>
+          <TraceCollapsibleTrigger>
+            <TraceLine status={failed ? "error" : undefined}>
+              <TraceTitle>{title}</TraceTitle>
+              <TraceDescription>
+                {steps.length} {steps.length === 1 ? "step" : "steps"}
+                {failures > 0 && (
+                  <>
+                    {" · "}
+                    <span className="inline-flex items-center gap-1 text-destructive">
+                      {failures} failed
+                      <CrossCircledIcon aria-hidden="true" className="size-3.5 shrink-0" />
+                    </span>
+                  </>
+                )}
+              </TraceDescription>
+            </TraceLine>
+          </TraceCollapsibleTrigger>
+          <TraceCollapsibleContent className="space-y-3">
+            {steps.map((step) => stepDetails(step))}
+          </TraceCollapsibleContent>
+        </TraceCollapsible>
+      </Trace>
+      {active && !open && (
+        <div aria-label="Current activity" className="space-y-2">
+          {running.map((step) => stepDetails(step))}
+          {running.length === 0 && (
+            <FlowerMark className="text-muted-foreground motion-safe:animate-pulse" />
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
-function CompletedWork({ parts }: { parts: Part[] }) {
-  const failed = parts.filter(
-    (part) => part.state?.status === "error" || (part.state?.error ?? "") !== "",
-  ).length;
-  const times = parts.flatMap((part) => {
-    const time = part.state?.time ?? part.time;
-    return time ? [time] : [];
-  });
-  const finished = times.length > 0 && times.every((time) => time.end !== undefined);
-  const starts = times.map((time) => time.start);
-  const ends = times.map((time) => time.end ?? time.start);
-  const elapsed = Math.max(...ends) - Math.min(...starts);
-  const seconds = finished ? Math.max(0, Math.round(elapsed / 1000)) : 0;
-  const finishedLabel = finished
-    ? `Worked for ${seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`}`
-    : "Work details";
-  return (
-    <Trace>
-      <TraceCollapsible>
-        <TraceCollapsibleTrigger>
-          <TraceLine status={failed > 0 ? "error" : undefined}>
-            <TraceTitle>{finishedLabel}</TraceTitle>
-            <TraceDescription>
-              {parts.length} {parts.length === 1 ? "step" : "steps"}
-              {failed > 0 && ` · ${failed} failed`}
-            </TraceDescription>
-          </TraceLine>
-        </TraceCollapsibleTrigger>
-        <TraceCollapsibleContent className="space-y-3">
-          {parts.map((part, index) => (
-            <MessagePart key={part.id ?? index} part={part} user={false} />
-          ))}
-        </TraceCollapsibleContent>
-      </TraceCollapsible>
-    </Trace>
-  );
+function useActivityClock(ticking: boolean) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (!ticking) return;
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [ticking]);
+  return now;
 }
 
 function MessagePart({
   part: p,
   user,
   live = false,
+  expanded,
+  onExpandedChange,
 }: {
   part: Part;
   user: boolean;
   live?: boolean;
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 }) {
+  const [localOpen, setLocalOpen] = useState(false);
   if (p.type === "text") {
     return user ? (
       <div className="whitespace-pre-wrap">{p.text}</div>
@@ -939,13 +962,18 @@ function MessagePart({
   if (p.type === "reasoning") {
     return (
       <Trace>
-        <TraceCollapsible>
+        <TraceCollapsible
+          open={expanded ?? localOpen}
+          onOpenChange={onExpandedChange ?? setLocalOpen}
+        >
           <TraceCollapsibleTrigger>
             <TraceLine>
               <TraceTitle>
                 {live && p.time?.end === undefined ? "Thinking" : "Reasoning"}
               </TraceTitle>
-              {live && p.time?.end === undefined && <ActivityDuration start={p.time?.start} />}
+              {(live || p.time?.end !== undefined) && (
+                <ActivityDuration start={p.time?.start} end={p.time?.end} />
+              )}
             </TraceLine>
           </TraceCollapsibleTrigger>
           <TraceCollapsibleContent className="whitespace-pre-wrap">
@@ -959,24 +987,24 @@ function MessagePart({
     const output = p.state?.output ?? "";
     const error = p.state?.error ?? "";
     const status = p.state?.status;
+    let description = status;
+    if (!live && isLivePart(p)) description = "Incomplete";
+    if (error !== "" || status === "error") description = "Failed";
     let traceStatus: "error" | "running" | "pending" | undefined;
     if (error !== "" || status === "error") traceStatus = "error";
-    else if (status === "running" || status === "pending") traceStatus = status;
+    else if (live && (status === "running" || status === "pending")) traceStatus = status;
     return (
       <Trace>
-        <TraceCollapsible>
+        <TraceCollapsible
+          open={expanded ?? localOpen}
+          onOpenChange={onExpandedChange ?? setLocalOpen}
+        >
           <TraceCollapsibleTrigger>
             <TraceLine status={traceStatus}>
               <TraceTitle>{toolTitle(p)}</TraceTitle>
-              {live ? (
-                <>
-                  {traceStatus === "error" && <TraceDescription>Failed</TraceDescription>}
-                  <ActivityDuration start={p.state?.time?.start} end={p.state?.time?.end} />
-                </>
-              ) : (
-                <TraceDescription>
-                  {p.tool} · {status}
-                </TraceDescription>
+              <TraceDescription>{description}</TraceDescription>
+              {(live || p.state?.time?.end !== undefined) && (
+                <ActivityDuration start={p.state?.time?.start} end={p.state?.time?.end} />
               )}
             </TraceLine>
           </TraceCollapsibleTrigger>
@@ -1001,7 +1029,10 @@ function MessagePart({
   }
   return (
     <Trace>
-      <TraceCollapsible>
+      <TraceCollapsible
+        open={expanded ?? localOpen}
+        onOpenChange={onExpandedChange ?? setLocalOpen}
+      >
         <TraceCollapsibleTrigger>
           <TraceLine>
             <TraceTitle>{p.type}</TraceTitle>
@@ -1047,21 +1078,7 @@ function toolTitle(part: Part) {
 
 /** Uses recorded runtime timestamps so reconnecting does not restart the elapsed time. */
 function ActivityDuration({ start, end }: { start: number | undefined; end?: number | undefined }) {
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    if (start === undefined || end !== undefined) return;
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-    return () => {
-      clearInterval(timer);
-    };
-  }, [start, end]);
+  const now = useActivityClock(start !== undefined && end === undefined);
   if (start === undefined) return null;
-  const seconds = Math.max(0, Math.floor(((end ?? now) - start) / 1000));
-  return (
-    <TraceDescription>
-      {seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`}
-    </TraceDescription>
-  );
+  return <TraceDescription>{formatDuration(Math.max(0, (end ?? now) - start))}</TraceDescription>;
 }
