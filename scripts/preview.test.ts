@@ -31,7 +31,10 @@ test("captures match the pinned SDK and cover real OpenCode tool and question st
     for (const [i, row] of saved.entries()) {
       assert.equal(row.RuntimeMessageID, frame.history[i]?.info.id);
       assert.deepEqual(row.Payload, row.Role === "user" ? {} : frame.history[i]);
-      if (row.Role === "user") assert.equal(row.Provider, "");
+      if (row.Role === "user") {
+        assert.equal(row.Provider, "");
+        assert.doesNotMatch(row.Text, /preview:(completed|waiting|recovery|long)/);
+      }
     }
   }
 });
@@ -54,6 +57,7 @@ test("preview serves isolated fixtures and replays saved events with resumable I
       assert.equal(response.status, 200);
       const text = await response.text();
       assert.match(text, /"messages":\[/);
+      assert.doesNotMatch(text, /preview:(completed|waiting|recovery|long)/);
       assert.match(text, /"HarnessVersion":"1.2.27"/);
     }
     const mutation = await fetch(`${base}/api/settings`, { method: "PUT", body: "{}" });
