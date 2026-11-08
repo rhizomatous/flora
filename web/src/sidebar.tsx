@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 
 import {
   Button,
@@ -36,7 +36,12 @@ export function Sidebar({
 }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [error, setError] = useState("");
-  const { setOpenMobile } = useSidebar();
+  const { openMobile, setOpenMobile } = useSidebar();
+  const openedPath = useRef<string | undefined>(undefined);
+  const skipToContent = useRef(false);
+  useEffect(() => {
+    if (openMobile && openedPath.current === undefined) openedPath.current = path;
+  }, [openMobile, path]);
   const [retry, setRetry] = useState(0);
   const expire = useEffectEvent(onExpired);
   useEffect(() => {
@@ -66,7 +71,20 @@ export function Sidebar({
   }, [path, retry]);
 
   return (
-    <NavigationSidebar variant="inset">
+    <NavigationSidebar
+      variant="inset"
+      onMobileCloseAutoFocus={(event) => {
+        event.preventDefault();
+        // A destination heading may mount while the sheet still traps focus.
+        const navigated = skipToContent.current || openedPath.current !== path;
+        skipToContent.current = false;
+        openedPath.current = undefined;
+        const target = navigated
+          ? document.querySelector<HTMLElement>('#main-content h1[tabindex="-1"]')
+          : document.querySelector<HTMLElement>('[data-slot="sidebar-trigger"]');
+        (target ?? document.querySelector<HTMLElement>("#main-content"))?.focus();
+      }}
+    >
       <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col">
         <SidebarHeader>
           <a
@@ -74,6 +92,7 @@ export function Sidebar({
             className="sr-only focus:not-sr-only"
             onClick={(event) => {
               event.preventDefault();
+              skipToContent.current = openMobile;
               setOpenMobile(false);
               document.querySelector<HTMLElement>("#main-content")?.focus();
             }}
