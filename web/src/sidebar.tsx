@@ -3,7 +3,6 @@ import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "rea
 import {
   Button,
   Text,
-  Wordmark,
   FlowerMark,
   Sidebar as NavigationSidebar,
   SidebarHeader,
@@ -100,7 +99,7 @@ export function Sidebar({
           >
             Skip to content
           </a>
-          <div className="px-3 py-3">
+          <div className="px-2 py-3">
             <a
               href="#chats/new"
               aria-label="Flora home"
@@ -109,7 +108,7 @@ export function Sidebar({
                 setOpenMobile(false);
               }}
             >
-              <Wordmark />
+              <FlowerMark className="-ml-0.5 text-2xl" />
             </a>
           </div>
           <SidebarMenu>
