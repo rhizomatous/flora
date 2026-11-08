@@ -18,7 +18,15 @@ const root = await mkdtemp(join(tmpdir(), "flora-preview-capture-"));
 const workspace = join(root, "workspace");
 await mkdir(workspace);
 await writeFile(join(workspace, "example.ts"), 'export const greeting = "Hello";\n');
+const scenarioPrompts = {
+  completed: "Check the project setup and summarize what you find.",
+  waiting: "Help me decide where project settings should live.",
+  recovery: "Check the workspace and fix any problems you find.",
+  long: "Review keyboard navigation and explain your findings with examples.",
+};
 const calls = new Map<string, number>();
+// Captures run sequentially and finish all provider requests before switching scenarios.
+let activeScenario: string | undefined;
 const provider = createServer((req, res) => {
   // oxlint-disable-next-line promise/prefer-await-to-then -- The HTTP callback cannot return a promise.
   void respond().catch(() => {
@@ -26,12 +34,9 @@ const provider = createServer((req, res) => {
     res.end();
   });
   async function respond() {
-    const chunks = [];
-    for await (const chunk of req) chunks.push(chunk);
-    const body = Buffer.concat(chunks).toString();
-    const scenario =
-      ["completed", "waiting", "recovery", "long"].find((s) => body.includes(`preview:${s}`)) ??
-      "completed";
+    req.resume();
+    const scenario = activeScenario;
+    assert.ok(scenario !== undefined, "Provider request outside an active capture");
     const n = (calls.get(scenario) ?? 0) + 1;
     calls.set(scenario, n);
     res.writeHead(200, { "Content-Type": "text/event-stream" });
@@ -184,10 +189,10 @@ try {
     return (text ? JSON.parse(text) : null) as T;
   };
   const scenarios = [];
-  for (const name of ["completed", "waiting", "recovery", "long"]) {
+  for (const [name, prompt] of Object.entries(scenarioPrompts)) {
+    activeScenario = name;
     console.log(`Capturing ${name}`);
     const session = await api<Session>("/session", { title: `Preview ${name}` });
-    const prompt = `preview:${name} Please inspect the example project and explain the result.`;
     const pending = api(`/session/${session.id}/message`, {
       model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
       parts: [{ type: "text", text: prompt }],
@@ -238,6 +243,7 @@ try {
       }
     }
     await completion;
+    activeScenario = undefined;
   }
   // Only the isolated temporary workspace path is normalized; message/part payloads come from OpenCode.
   const serialized = JSON.stringify(scenarios, null, 2).replaceAll(workspace, "/workspace");

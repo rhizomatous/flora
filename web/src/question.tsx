@@ -1,9 +1,22 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
-import { Button, FieldLabel, FieldSet, Heading, Input } from "@flora/florets";
+import {
+  Questionnaire,
+  QuestionnaireItem,
+  QuestionnaireTitle,
+  QuestionnaireChoices,
+  QuestionnaireChoice,
+  QuestionnaireChoiceDescription,
+  QuestionnaireInput,
+  QuestionnaireError,
+  QuestionnaireActions,
+  QuestionnairePrevious,
+  QuestionnaireNext,
+  QuestionnaireSubmit,
+  QuestionnaireProgress,
+} from "@flora/florets";
 
 import { request } from "./request";
-import { text, texts } from "./ui";
 
 export type Question = {
   id: string;
@@ -29,72 +42,117 @@ export function QuestionForm({
   onAnswered: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
+  const [answers, setAnswers] = useState<string[][]>(() => q.questions.map(() => []));
+  const [custom, setCustom] = useState<string[]>(() => q.questions.map(() => ""));
+  const items = q.questions.map((question, index) => ({
+    name: `question-${index}`,
+    required: true,
+    choices: question.options.map((option) => ({ value: option.label })),
+  }));
+
+  function choose(index: number, value: string, checked: boolean) {
+    setCustom((rows) => rows.map((text, i) => (i === index ? "" : text)));
+    setAnswers((rows) =>
+      rows.map((values, i) => {
+        if (i !== index) return values;
+        if (!checked) return values.filter((item) => item !== value);
+        return q.questions[index]?.multiple === true
+          ? [...values.filter((item) => item !== value), value]
+          : [value];
+      }),
+    );
+  }
+
+  function write(index: number, value: string) {
+    setCustom((rows) => rows.map((text, i) => (i === index ? value : text)));
+    setAnswers((rows) => rows.map((values, i) => (i === index ? [] : values)));
+  }
 
   async function answer(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy) return;
-    const fields = new FormData(event.currentTarget);
-    const answers = q.questions.map((_, i) => {
-      const custom = text(fields, `custom-${i}`).trim();
-      return custom === "" ? texts(fields, `option-${i}`) : [custom];
+    if (submitting.current) return;
+    const submitted = q.questions.map((_, index) => {
+      const value = custom[index]?.trim() ?? "";
+      return value === "" ? (answers[index] ?? []) : [value];
     });
-    if (answers.some((a) => a.length === 0)) {
-      onError(new Error("Answer each question before continuing."));
-      return;
-    }
+    if (submitted.some((values) => values.length === 0)) return;
+    submitting.current = true;
     setBusy(true);
     try {
       await request(
         `chats/${encodeURIComponent(chatID)}/questions/${encodeURIComponent(q.id)}/reply`,
         "POST",
-        { answers },
+        { answers: submitted },
       );
       onAnswered();
     } catch (error) {
       onError(error);
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
 
   return (
-    <form
+    <Questionnaire
+      items={items}
+      aria-label="Questions"
       onSubmit={(event) => {
         void answer(event);
       }}
-      className="mt-8 space-y-5 rounded-md border p-4"
+      className="rounded-xl border p-4"
     >
-      <Heading level={2}>Flora needs your answer</Heading>
-      {q.questions.map((question, i) => (
-        // oxlint-disable-next-line react/no-array-index-key -- Questions have no id, and the list never changes for one request because the form is keyed by the request id.
-        <FieldSet key={i} disabled={busy} className="space-y-3">
-          <legend className="mb-3 text-sm font-medium">
-            {question.header}: {question.question}
-          </legend>
-          {question.options.map((option) => (
-            <label key={option.label} className="flex gap-3 text-sm">
-              <input
-                type={question.multiple ? "checkbox" : "radio"}
-                name={`option-${i}`}
+      {q.questions.length > 1 && <QuestionnaireProgress />}
+      {q.questions.map((question, index) => (
+        <QuestionnaireItem
+          key={items[index]?.name}
+          name={`question-${index}`}
+          multiple={question.multiple}
+          required
+          disabled={busy}
+        >
+          <QuestionnaireTitle>{question.question}</QuestionnaireTitle>
+          <QuestionnaireChoices>
+            {question.options.map((option) => (
+              <QuestionnaireChoice
+                key={option.label}
                 value={option.label}
+                checked={answers[index]?.includes(option.label) ?? false}
+                onChange={(event) => {
+                  choose(index, option.label, event.target.checked);
+                }}
+              >
+                <span className="font-medium">{option.label}</span>
+                {option.description !== "" && (
+                  <QuestionnaireChoiceDescription>
+                    {option.description}
+                  </QuestionnaireChoiceDescription>
+                )}
+              </QuestionnaireChoice>
+            ))}
+            {question.custom !== false && (
+              <QuestionnaireInput
+                aria-label={question.options.length === 0 ? "Answer" : "Other answer"}
+                placeholder={question.options.length === 0 ? "Answer…" : "Other answer…"}
+                maxLength={8192}
+                value={custom[index] ?? ""}
+                onChange={(event) => {
+                  write(index, event.target.value);
+                }}
               />
-              <span>
-                {option.label}
-                <span className="block text-muted-foreground">{option.description}</span>
-              </span>
-            </label>
-          ))}
-          {question.custom !== false && (
-            <FieldLabel className="font-normal">
-              Other answer (replaces selected options)
-              <Input name={`custom-${i}`} className="mt-2" maxLength={8192} />
-            </FieldLabel>
-          )}
-        </FieldSet>
+            )}
+          </QuestionnaireChoices>
+          <QuestionnaireError />
+        </QuestionnaireItem>
       ))}
-      <Button type="submit" disabled={busy}>
-        {busy ? "Answering…" : "Answer and continue"}
-      </Button>
-    </form>
+      <QuestionnaireActions>
+        <QuestionnairePrevious disabled={busy} />
+        <QuestionnaireNext disabled={busy} />
+        <QuestionnaireSubmit disabled={busy}>
+          {busy ? "Answering…" : "Answer and continue"}
+        </QuestionnaireSubmit>
+      </QuestionnaireActions>
+    </Questionnaire>
   );
 }

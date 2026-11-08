@@ -6,6 +6,8 @@ import {
   ButtonLink,
   FieldLabel,
   FlowerMark,
+  SidebarTrigger,
+  DropdownMenuItem,
   Heading,
   Link,
   DropdownMenu,
@@ -21,7 +23,12 @@ import {
   InputGroupButton,
   Message as ChatMessage,
   MessageContent,
-  MessageHeader,
+  MessageScrollerProvider,
+  MessageScroller,
+  MessageScrollerViewport,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerButton,
   Bubble,
   BubbleContent,
   Trace,
@@ -31,17 +38,12 @@ import {
   TraceCollapsible,
   TraceCollapsibleTrigger,
   TraceCollapsibleContent,
-  Badge,
   Item,
   ItemContent,
   ItemTitle,
   ItemDescription,
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
 } from "@flora/florets";
 
-import { Changes } from "./changes";
 import type { Chat } from "./notifications";
 import { QuestionForm, type Question } from "./question";
 import { errorMessage, isExpired, request } from "./request";
@@ -52,7 +54,15 @@ type Part = {
   type: string;
   text?: string;
   tool?: string;
-  state?: { status: string; input?: unknown; output?: string; error?: string; title?: string };
+  time?: { start: number; end?: number };
+  state?: {
+    time?: { start: number; end?: number };
+    status: string;
+    input?: unknown;
+    output?: string;
+    error?: string;
+    title?: string;
+  };
 };
 type Message = {
   ID: string;
@@ -155,7 +165,7 @@ export function Chats({
   const [questions, setQuestions] = useState<Question[]>([]);
   const [questionError, setQuestionError] = useState("");
   const [error, setError] = useState("");
-  const [connection, setConnection] = useState("Connecting…");
+  const [disconnected, setDisconnected] = useState(false);
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -237,10 +247,10 @@ export function Chats({
     // A burst of activity triggers one detail refresh 100 ms after its first event.
     let debounce: ReturnType<typeof setTimeout> | undefined;
     source.addEventListener("open", () => {
-      setConnection("Live");
+      setDisconnected(false);
     });
     source.addEventListener("error", () => {
-      setConnection("Disconnected. Reconnecting to saved activity…");
+      setDisconnected(true);
       void checkSession();
     });
     source.addEventListener("activity", (event: MessageEvent<string>) => {
@@ -320,6 +330,7 @@ export function Chats({
       } else {
         await request(`${chatPath}/messages`, "POST", { text: message, requestID });
         form.reset();
+        saveDraft(id, "");
         setDetail(await request<Detail>(chatPath));
       }
       forgetIdentity(scope);
@@ -352,6 +363,12 @@ export function Chats({
     setBusy(false);
   }
 
+  const existingChat = !isNew && id !== "";
+  const headerLayout = existingChat
+    ? "-mx-4 flex h-14 shrink-0 items-center gap-3 border-b px-4 sm:-mx-8"
+    : "mx-auto flex w-full max-w-[880px] shrink-0 items-center justify-between gap-4 pb-3";
+  const chatLayout = id === "" ? "mx-auto max-w-4xl min-w-0" : "flex min-h-0 flex-1 flex-col";
+
   function title() {
     if (isNew) return "New chat";
     if (id === "") return "Chats";
@@ -362,15 +379,16 @@ export function Chats({
   return (
     <section
       aria-labelledby="chats-heading"
-      className={isNew ? "mx-auto my-12 max-w-3xl md:mt-[25svh]" : "mx-auto max-w-4xl min-w-0"}
+      className={isNew ? "mx-auto my-12 max-w-3xl md:mt-[25svh]" : chatLayout}
     >
-      <div className={isNew ? "sr-only" : "flex items-center justify-between gap-4"}>
+      <div className={isNew ? "sr-only" : headerLayout}>
+        {existingChat && <SidebarTrigger aria-label="Menu" />}
         <Heading
           level={1}
           id="chats-heading"
           ref={heading}
           tabIndex={-1}
-          className="min-w-0 break-words"
+          className="min-w-0 truncate text-base"
         >
           {title()}
         </Heading>
@@ -440,7 +458,13 @@ export function Chats({
               id="new-chat-message"
               name="text"
               className="max-h-80 min-h-28"
-              placeholder="What are we building?"
+              placeholder="Message…"
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  if (!busy) event.currentTarget.form?.requestSubmit();
+                }
+              }}
               required
               disabled={busy}
             />
@@ -462,11 +486,9 @@ export function Chats({
           id={id}
           detail={detail}
           activity={activity}
-          connection={connection}
-          projectName={projects?.find((p) => p.id === detail.chat.ProjectID)?.name}
+          disconnected={disconnected}
           busy={busy}
           messageBytes={messageBytes}
-          onExpired={onExpired}
           onControl={(action) => {
             void controlWork(action);
           }}
@@ -547,16 +569,14 @@ function ChatList({ list, projects }: { list: Chat[]; projects: Project[] }) {
   );
 }
 
-/** Shows one chat. `children` renders between the review of changes and the follow-up form. */
+/** Keeps pending questions above the composer while the transcript scrolls independently. */
 function ChatDetail({
   id,
   detail,
   activity,
-  connection,
-  projectName,
+  disconnected,
   busy,
   messageBytes,
-  onExpired,
   onControl,
   onSend,
   children,
@@ -564,11 +584,9 @@ function ChatDetail({
   id: string;
   detail: Detail;
   activity: Activity[];
-  connection: string;
-  projectName: string | undefined;
+  disconnected: boolean;
   busy: boolean;
   messageBytes: number;
-  onExpired: () => void;
   onControl: (action: "interrupt" | "stop") => void;
   onSend: (event: React.SubmitEvent<HTMLFormElement>) => void;
   children: React.ReactNode;
@@ -577,193 +595,222 @@ function ChatDetail({
   const activeTurn = chat.Status === "working" || chat.Status === "waiting";
   const stopped = chat.Status === "stopped";
   const blocked = (detail.continuationBlockedReason ?? "") !== "";
-
-  function followUpHelp() {
-    if (blocked) {
-      return "Continuation is unavailable. Saved conversation and workspace files are retained.";
-    }
-    if (activeTurn) {
-      return "Wait for the current turn to finish or answer Flora’s question. Messages are not queued.";
-    }
-    return `Continue in the same workspace and conversation. Up to ${messageBytes.toLocaleString()} UTF-8 bytes.`;
-  }
-
-  function sendLabel() {
-    if (blocked) return "Continuation unavailable";
-    if (busy) return "Working…";
-    return stopped ? "Resume with new message" : "Send message";
-  }
+  const turnStart = detail.messages.findLastIndex((message) => message.Role === "user");
+  const visibleActivity = detail.messages
+    .slice(turnStart + 1)
+    .some((message) => (message.Payload.parts ?? []).some((part) => isLivePart(part)));
 
   return (
-    <>
-      <div role="status" className="mt-6 flex flex-wrap items-center gap-2 text-sm">
-        {chat.Status === "working" && <FlowerMark />}
-        <Badge variant="secondary">{statusName(chat.Status)}</Badge>
-        <span>{chat.StatusReason}</span>
-      </div>
-      <Text size="xs" tone="muted" role="status" className="mt-2">
-        {connection} · {projectName}
-      </Text>
-      {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
-        <Alert role="note" className="mt-4 rounded-md border border-foreground/20 p-3 text-sm">
-          Some live activity could not be captured while Flora was disconnected from OpenCode.
-          Recovered message and tool snapshots are shown below. Transient output may be missing.
-          Reconnecting does not replay accepted messages or actions.
-        </Alert>
-      )}
-      {!blocked && (
-        <>
-          <div className="mt-4 flex flex-wrap gap-3" aria-label="Execution controls">
-            {activeTurn && (
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  onControl("interrupt");
-                }}
-              >
-                Interrupt current work
-              </Button>
+    <MessageScrollerProvider autoScroll>
+      <MessageScroller className="flex-1">
+        <MessageScrollerViewport aria-label="Conversation">
+          <MessageScrollerContent className="mx-auto w-full max-w-[880px] gap-8 px-1 py-6">
+            {disconnected && <Alert role="status">Disconnected. Reconnecting…</Alert>}
+            {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
+              <Alert role="note">
+                Some live activity could not be captured. Recovered messages and tool snapshots are
+                shown; transient output may be missing.
+              </Alert>
             )}
-            {!stopped && (
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  onControl("stop");
-                }}
+            {detail.messages.map((message, index) => (
+              <MessageScrollerItem
+                key={message.ID}
+                messageId={message.ID}
+                scrollAnchor={message.Role === "user"}
               >
-                Stop container
-              </Button>
-            )}
-          </div>
-          <Text tone="muted" className="mt-2">
-            {stopped
-              ? "Send a new message to restart this container with its saved workspace and conversation. Interrupted work is not replayed."
-              : "Interrupt keeps the container running. Stop frees container capacity. Both preserve saved work and conversation."}
-          </Text>
-        </>
-      )}
-      <ol aria-label="Conversation" className="mt-8 space-y-8">
-        {detail.messages.map((m) => (
-          <ConversationMessage key={m.ID} message={m} />
-        ))}
-      </ol>
-      <Changes key={id} chatID={id} onExpired={onExpired} />
-      {children}
-      <form onSubmit={onSend} className="mt-8 space-y-4">
-        <FieldLabel htmlFor="follow-up-message">Follow-up</FieldLabel>
-        <InputGroup>
-          <InputGroupTextarea
-            id="follow-up-message"
-            className="max-h-80 min-h-28"
-            name="text"
-            required
-            disabled={busy || activeTurn || blocked}
-            aria-describedby="followup-help"
-          />
-          <InputGroupAddon align="block-end" className="justify-end">
-            <InputGroupButton
-              type="submit"
-              variant="default"
-              size="sm"
-              disabled={busy || activeTurn || blocked}
-            >
-              {sendLabel()}
-            </InputGroupButton>
-          </InputGroupAddon>
-        </InputGroup>
-        <Text tone="muted" id="followup-help">
-          {followUpHelp()}
-        </Text>
-      </form>
-      <Collapsible className="mt-10 rounded-2xl border p-4">
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm">
-            Full activity ({activity.length} saved events)
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <Text tone="muted" className="mt-3">
-            Setup activity contains bounded previews. After setup finishes,{" "}
-            <Link href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>
-              download the full redacted setup log
-            </Link>
-            . Any capture failure is shown in the final setup event.
-          </Text>
-          <ol className="mt-4 space-y-3">
-            {activity.map((row) => (
-              <li key={row.Sequence}>
-                <Trace>
-                  <TraceCollapsible>
-                    <TraceCollapsibleTrigger>
-                      <TraceLine>
-                        <TraceTitle>{row.Kind}</TraceTitle>
-                        <TraceDescription>
-                          <time dateTime={row.CreatedAt}>
-                            {new Date(row.CreatedAt).toLocaleTimeString()}
-                          </time>{" "}
-                          · #{row.Sequence}
-                        </TraceDescription>
-                      </TraceLine>
-                    </TraceCollapsibleTrigger>
-                    <TraceCollapsibleContent>
-                      <pre className="max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
-                        {JSON.stringify(row.Payload, null, 2)}
-                      </pre>
-                    </TraceCollapsibleContent>
-                  </TraceCollapsible>
-                </Trace>
-              </li>
+                <ConversationMessage message={message} active={activeTurn && index > turnStart} />
+              </MessageScrollerItem>
             ))}
-          </ol>
-        </CollapsibleContent>
-      </Collapsible>
-      <Collapsible className="mt-4 rounded-2xl border p-4">
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm">
-            Environment snapshot
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <pre className="mt-3 overflow-auto text-xs break-all whitespace-pre-wrap">
-            {JSON.stringify(
-              {
-                image: chat.ImageDigest,
-                OpenCode: chat.HarnessVersion,
-                startingCommits: chat.StartingCommits,
-              },
-              null,
-              2,
+            {activeTurn && !visibleActivity && (
+              <div role="status" aria-label="Working">
+                <FlowerMark className="text-muted-foreground motion-safe:animate-pulse" />
+              </div>
             )}
-          </pre>
-        </CollapsibleContent>
-      </Collapsible>
-    </>
+            {(chat.Status === "failed" ||
+              chat.Status === "stopped" ||
+              chat.StatusReason.includes("interrupted")) &&
+              chat.StatusReason !== "" && <Text role="status">{chat.StatusReason}</Text>}
+          </MessageScrollerContent>
+        </MessageScrollerViewport>
+        <MessageScrollerButton aria-label="Jump to latest" />
+      </MessageScroller>
+      <div className="mx-auto max-h-[70dvh] w-full max-w-[880px] shrink-0 overflow-y-auto bg-background pt-3 pb-[env(safe-area-inset-bottom)]">
+        <div className="max-h-[50dvh] overflow-y-auto empty:hidden [&_form]:mt-0 [&_form]:mb-3">
+          {children}
+        </div>
+        <FollowUpComposer
+          key={id}
+          id={id}
+          busy={busy}
+          activeTurn={activeTurn}
+          blocked={blocked}
+          stopped={stopped}
+          messageBytes={messageBytes}
+          onSend={onSend}
+          onControl={onControl}
+        />
+      </div>
+    </MessageScrollerProvider>
   );
 }
 
-function ConversationMessage({ message: m }: { message: Message }) {
-  const parts = m.Payload.parts ?? [];
-  const failure = m.Payload.info?.error ?? null;
+function saveDraft(id: string, value: string) {
+  try {
+    sessionStorage.setItem(`flora-draft:${id}`, value);
+  } catch {
+    /* Drafting still works when browser storage is unavailable. */
+  }
+}
+
+function readDraft(id: string) {
+  try {
+    return sessionStorage.getItem(`flora-draft:${id}`) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function FollowUpComposer({
+  id,
+  busy,
+  activeTurn,
+  blocked,
+  stopped,
+  messageBytes,
+  onSend,
+  onControl,
+}: {
+  id: string;
+  busy: boolean;
+  activeTurn: boolean;
+  blocked: boolean;
+  stopped: boolean;
+  messageBytes: number;
+  onSend: (event: React.SubmitEvent<HTMLFormElement>) => void;
+  onControl: (action: "interrupt" | "stop") => void;
+}) {
+  const [draft, setDraft] = useState(() => readDraft(id));
+  const sendLabel = stopped ? "Resume" : "Send message";
+  const canSend = !busy && !activeTurn && !blocked && draft.trim() !== "";
+
   return (
-    <li className="min-w-0">
+    <form
+      onSubmit={(event) => {
+        if (!canSend) {
+          event.preventDefault();
+          return;
+        }
+        onSend(event);
+      }}
+      onReset={() => {
+        setDraft("");
+      }}
+    >
+      <FieldLabel htmlFor="follow-up-message" className="sr-only">
+        Follow-up
+      </FieldLabel>
+      <InputGroup className="rounded-xl">
+        <InputGroupTextarea
+          id="follow-up-message"
+          name="text"
+          className="max-h-[25dvh] min-h-12"
+          placeholder="Message…"
+          value={draft}
+          required
+          disabled={busy || blocked}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            saveDraft(id, event.target.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              if (canSend) event.currentTarget.form?.requestSubmit();
+            }
+          }}
+        />
+        <InputGroupAddon align="block-end" className="justify-end">
+          {!blocked && !stopped && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <InputGroupButton
+                  type="button"
+                  variant="ghost"
+                  className="mr-auto"
+                  aria-label="Chat actions"
+                >
+                  ⋯
+                </InputGroupButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem
+                  disabled={busy}
+                  onSelect={() => {
+                    onControl("stop");
+                  }}
+                >
+                  Stop container
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {activeTurn && !blocked ? (
+            <InputGroupButton
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                onControl("interrupt");
+              }}
+              title="Interrupt work and keep the container running"
+            >
+              Interrupt
+            </InputGroupButton>
+          ) : (
+            <InputGroupButton
+              type="submit"
+              variant="default"
+              disabled={!canSend}
+              title={`Up to ${messageBytes.toLocaleString()} UTF-8 bytes`}
+            >
+              {blocked ? "Continuation unavailable" : sendLabel}
+            </InputGroupButton>
+          )}
+        </InputGroupAddon>
+      </InputGroup>
+    </form>
+  );
+}
+
+function ConversationMessage({ message: m, active }: { message: Message; active: boolean }) {
+  const parts = (m.Payload.parts ?? []).filter(
+    (part) => part.type !== "step-start" && part.type !== "step-finish",
+  );
+  const failure = m.Payload.info?.error ?? null;
+  const [copyStatus, setCopyStatus] = useState("Copy");
+  const copyText =
+    parts
+      .filter((part) => part.type === "text")
+      .map((part) => part.text ?? "")
+      .join("\n\n") || m.Text;
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(copyText);
+      setCopyStatus("Copied");
+    } catch {
+      setCopyStatus("Could not copy");
+    }
+  }
+
+  return (
+    <div className="group min-w-0">
       <ChatMessage align={m.Role === "user" ? "end" : "start"}>
         <MessageContent>
-          <MessageHeader>
-            <span>{m.Role === "user" ? "You" : "Flora"}</span>
-            {m.Provider !== "" && (
-              <span className="ml-2 break-all">
-                {m.Provider}/{m.Model}
-              </span>
-            )}
-          </MessageHeader>
+          <span className="sr-only">{m.Role === "user" ? "You" : "Flora"}</span>
           <Bubble variant={m.Role === "user" ? "muted" : "ghost"}>
-            <BubbleContent className="space-y-4">
+            <BubbleContent className="space-y-4 text-[15px] leading-7">
               {parts.length > 0 ? (
-                parts.map((p, i) => (
-                  <MessagePart key={p.id ?? i} part={p} user={m.Role === "user"} />
-                ))
+                <MessageParts parts={parts} user={m.Role === "user"} active={active} />
               ) : (
                 <MessagePart part={{ type: "text", text: m.Text }} user={m.Role === "user"} />
               )}
@@ -776,13 +823,112 @@ function ConversationMessage({ message: m }: { message: Message }) {
               </pre>
             </Alert>
           )}
+          {copyText !== "" && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-fit text-xs text-muted-foreground md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
+              onClick={() => {
+                void copy();
+              }}
+              aria-label="Copy message"
+            >
+              <span role="status">{copyStatus}</span>
+            </Button>
+          )}
         </MessageContent>
       </ChatMessage>
-    </li>
+    </div>
   );
 }
 
-function MessagePart({ part: p, user }: { part: Part; user: boolean }) {
+function MessageParts({ parts, user, active }: { parts: Part[]; user: boolean; active: boolean }) {
+  const groups: Part[][] = [];
+  for (const part of parts) {
+    const previous = groups.at(-1);
+    if (part.type !== "text" && previous && previous[0]?.type !== "text") previous.push(part);
+    else groups.push([part]);
+  }
+  return groups.map((group, index) => {
+    const first = group[0];
+    if (!first) return null;
+    if (first.type === "text" || user) {
+      return group.map((part, i) => <MessagePart key={part.id ?? i} part={part} user={user} />);
+    }
+    return <WorkSummary key={first.id ?? index} parts={group} active={active} />;
+  });
+}
+
+function isLivePart(part: Part) {
+  return (
+    part.state?.status === "running" ||
+    part.state?.status === "pending" ||
+    (part.type === "reasoning" && part.time?.end === undefined)
+  );
+}
+
+function WorkSummary({ parts, active }: { parts: Part[]; active: boolean }) {
+  const live = active && parts.some((part) => isLivePart(part));
+  if (live) {
+    return (
+      <div aria-label="Current activity" className="space-y-2">
+        {parts.map((part, index) => (
+          <MessagePart key={part.id ?? index} part={part} user={false} live />
+        ))}
+      </div>
+    );
+  }
+  return <CompletedWork parts={parts} />;
+}
+
+function CompletedWork({ parts }: { parts: Part[] }) {
+  const failed = parts.filter(
+    (part) => part.state?.status === "error" || (part.state?.error ?? "") !== "",
+  ).length;
+  const times = parts.flatMap((part) => {
+    const time = part.state?.time ?? part.time;
+    return time ? [time] : [];
+  });
+  const finished = times.length > 0 && times.every((time) => time.end !== undefined);
+  const starts = times.map((time) => time.start);
+  const ends = times.map((time) => time.end ?? time.start);
+  const elapsed = Math.max(...ends) - Math.min(...starts);
+  const seconds = finished ? Math.max(0, Math.round(elapsed / 1000)) : 0;
+  const finishedLabel = finished
+    ? `Worked for ${seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`}`
+    : "Work details";
+  return (
+    <Trace>
+      <TraceCollapsible>
+        <TraceCollapsibleTrigger>
+          <TraceLine status={failed > 0 ? "error" : undefined}>
+            <TraceTitle>{finishedLabel}</TraceTitle>
+            <TraceDescription>
+              {parts.length} {parts.length === 1 ? "step" : "steps"}
+              {failed > 0 && ` · ${failed} failed`}
+            </TraceDescription>
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent className="space-y-3">
+          {parts.map((part, index) => (
+            <MessagePart key={part.id ?? index} part={part} user={false} />
+          ))}
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
+  );
+}
+
+function MessagePart({
+  part: p,
+  user,
+  live = false,
+}: {
+  part: Part;
+  user: boolean;
+  live?: boolean;
+}) {
   if (p.type === "text") {
     return user ? (
       <div className="whitespace-pre-wrap">{p.text}</div>
@@ -796,7 +942,10 @@ function MessagePart({ part: p, user }: { part: Part; user: boolean }) {
         <TraceCollapsible>
           <TraceCollapsibleTrigger>
             <TraceLine>
-              <TraceTitle>Reasoning</TraceTitle>
+              <TraceTitle>
+                {live && p.time?.end === undefined ? "Thinking" : "Reasoning"}
+              </TraceTitle>
+              {live && p.time?.end === undefined && <ActivityDuration start={p.time?.start} />}
             </TraceLine>
           </TraceCollapsibleTrigger>
           <TraceCollapsibleContent className="whitespace-pre-wrap">
@@ -815,13 +964,20 @@ function MessagePart({ part: p, user }: { part: Part; user: boolean }) {
     else if (status === "running" || status === "pending") traceStatus = status;
     return (
       <Trace>
-        <TraceCollapsible defaultOpen>
+        <TraceCollapsible>
           <TraceCollapsibleTrigger>
             <TraceLine status={traceStatus}>
-              <TraceTitle>{p.state?.title ?? p.tool}</TraceTitle>
-              <TraceDescription>
-                {p.tool} · {status}
-              </TraceDescription>
+              <TraceTitle>{toolTitle(p)}</TraceTitle>
+              {live ? (
+                <>
+                  {traceStatus === "error" && <TraceDescription>Failed</TraceDescription>}
+                  <ActivityDuration start={p.state?.time?.start} end={p.state?.time?.end} />
+                </>
+              ) : (
+                <TraceDescription>
+                  {p.tool} · {status}
+                </TraceDescription>
+              )}
             </TraceLine>
           </TraceCollapsibleTrigger>
           <TraceCollapsibleContent>
@@ -858,5 +1014,54 @@ function MessagePart({ part: p, user }: { part: Part; user: boolean }) {
         </TraceCollapsibleContent>
       </TraceCollapsible>
     </Trace>
+  );
+}
+
+function toolTitle(part: Part) {
+  if (part.state?.title !== undefined && part.state.title !== "") return part.state.title;
+  const names: Record<string, string> = {
+    bash: "Running command",
+    read: "Reading file",
+    edit: "Editing file",
+    write: "Writing file",
+    grep: "Searching files",
+    glob: "Finding files",
+    question: "Waiting for your answer",
+    webfetch: "Fetching page",
+  };
+  const input = part.state?.input;
+  if (typeof input === "object" && input !== null) {
+    if (
+      "description" in input &&
+      typeof input.description === "string" &&
+      input.description !== ""
+    ) {
+      return input.description;
+    }
+    if ("filePath" in input && typeof input.filePath === "string") {
+      return `${names[part.tool ?? ""] ?? part.tool ?? "File"} ${input.filePath}`;
+    }
+  }
+  return names[part.tool ?? ""] ?? part.tool ?? "Tool";
+}
+
+/** Uses recorded runtime timestamps so reconnecting does not restart the elapsed time. */
+function ActivityDuration({ start, end }: { start: number | undefined; end?: number | undefined }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (start === undefined || end !== undefined) return;
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [start, end]);
+  if (start === undefined) return null;
+  const seconds = Math.max(0, Math.floor(((end ?? now) - start) / 1000));
+  return (
+    <TraceDescription>
+      {seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`}
+    </TraceDescription>
   );
 }

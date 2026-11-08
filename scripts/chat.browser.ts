@@ -38,14 +38,13 @@ try {
   await page.getByRole("heading", { name: "First browser prompt 🌸", exact: true }).waitFor();
   // Reload during execution. The browser request ending must not cancel work.
   await page.reload();
-  await page.getByRole("heading", { name: "Flora needs your answer", exact: true }).waitFor();
+  await page.getByRole("form", { name: "Questions", exact: true }).waitFor();
   await page.getByRole("radio", { name: /^Yes/ }).check();
   await page.getByRole("button", { name: "Answer and continue", exact: true }).click();
   await page.getByText("Saved response 1", { exact: true }).waitFor();
   await expect(page.locator('[data-slot="message"]').first()).toBeVisible();
   await expect(page.locator('[data-slot="trace"]').first()).toBeVisible();
   await expect(page.locator('[data-slot="markdown"]').first()).toBeVisible();
-  await page.getByText("anthropic/model", { exact: true }).waitFor();
   assert.equal(
     await page
       .getByLabel("Conversation")
@@ -53,6 +52,14 @@ try {
       .count(),
     1,
   );
+  await page
+    .getByRole("button", { name: /Work details|Worked for/ })
+    .first()
+    .click();
+  await page
+    .getByRole("button", { name: /.*bash.*completed/ })
+    .first()
+    .click();
   assert.match(await page.getByLabel("Conversation").innerText(), /\/workspace/);
   assert.doesNotMatch(await page.locator("body").innerText(), /provider-test-secret/);
   await page.getByLabel("Follow-up", { exact: true }).fill("Continue in this workspace");
@@ -69,24 +76,24 @@ try {
   await context.setOffline(true);
   await page.waitForTimeout(300);
   await context.setOffline(false);
-  await page.getByText(/^Live ·/).waitFor();
+  await expect(page.getByText("Disconnected. Reconnecting…", { exact: true })).toHaveCount(0);
   await page.reload();
   await page.getByText("Saved response 2", { exact: true }).waitFor();
   assert.equal(
     await page.getByLabel("Conversation").getByText("Saved response 2", { exact: true }).count(),
     1,
   );
-  await page.getByRole("note").filter({ hasText: "Transient output may be missing" }).waitFor();
+  await page.getByRole("note").filter({ hasText: "transient output may be missing" }).waitFor();
   await page.getByLabel("Follow-up", { exact: true }).fill("interrupt control work");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await page
     .getByLabel("Conversation")
     .getByText("interrupt control work", { exact: true })
     .waitFor();
-  await page.getByRole("button", { name: "Interrupt current work", exact: true }).click();
+  await page.getByRole("button", { name: "Interrupt", exact: true }).click();
   await page
     .getByText("Current work interrupted; send a new message to continue with saved context", {
-      exact: true,
+      exact: false,
     })
     .waitFor();
   await page.getByLabel("Follow-up", { exact: true }).fill("New explicit work after interruption");
@@ -95,11 +102,12 @@ try {
   await page.getByLabel("Follow-up", { exact: true }).fill("stop control work");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await page.getByLabel("Conversation").getByText("stop control work", { exact: true }).waitFor();
-  await page.getByRole("button", { name: "Stop container", exact: true }).click();
-  await page.getByRole("button", { name: "Resume with new message", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Chat actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Stop container", exact: true }).click();
+  await page.getByRole("button", { name: "Resume", exact: true }).waitFor();
   await page.reload();
   await page.getByLabel("Follow-up", { exact: true }).fill("New explicit work after stop");
-  await page.getByRole("button", { name: "Resume with new message", exact: true }).click();
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
   await page.getByText("Saved response 6", { exact: true }).waitFor();
   assert.equal(
     await page
@@ -136,7 +144,7 @@ try {
   await page.getByRole("heading", { name: "Log in", exact: true }).waitFor();
   assert.deepEqual(errors, []);
   console.log(
-    "Chromium: login, create, reload during work, question/answer, full tool output/model, interrupt, stop, explicit resume, saved context, grouped list, reconnect, mobile width, logout protection passed.",
+    "Chromium: login, create, reload during work, question/answer, full tool output, interrupt, stop, explicit resume, saved context, grouped list, reconnect, mobile width, logout protection passed.",
   );
 } finally {
   await browser.close();

@@ -82,7 +82,7 @@ try {
   await page.waitForURL(/#chats\/(?!new)/);
   const chatURL = page.url();
   const chatID = new URL(chatURL).hash.slice("#chats/".length);
-  await page.getByRole("heading", { name: "Flora needs your answer", exact: true }).waitFor();
+  await page.getByRole("form", { name: "Questions", exact: true }).waitFor();
   await page.goto(`${origin}/#chats/${requiredEnv("FLORA_OTHER_CHAT")}`);
   await page.getByRole("heading", { name: "Other conversation", exact: true }).waitFor();
   const reply = await context.request.post(
@@ -159,10 +159,10 @@ try {
   await toast.getByRole("button").click();
   await page.getByLabel("Follow-up", { exact: true }).fill("interrupt control work");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
-  await page.getByRole("button", { name: "Interrupt current work", exact: true }).click();
+  await page.getByRole("button", { name: "Interrupt", exact: true }).click();
   await page
     .getByText("Current work interrupted; send a new message to continue with saved context", {
-      exact: true,
+      exact: false,
     })
     .waitFor();
   await page.waitForTimeout(1200);
