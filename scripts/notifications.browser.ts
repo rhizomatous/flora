@@ -159,10 +159,10 @@ try {
   await toast.getByRole("button").click();
   await page.getByLabel("Follow-up", { exact: true }).fill("interrupt control work");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
-  await page.getByRole("button", { name: "Interrupt current work", exact: true }).click();
+  await page.getByRole("button", { name: "Interrupt", exact: true }).click();
   await page
     .getByText("Current work interrupted; send a new message to continue with saved context", {
-      exact: true,
+      exact: false,
     })
     .waitFor();
   await page.waitForTimeout(1200);

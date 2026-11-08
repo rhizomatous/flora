@@ -21,7 +21,12 @@ import {
   InputGroupButton,
   Message as ChatMessage,
   MessageContent,
-  MessageHeader,
+  MessageScrollerProvider,
+  MessageScroller,
+  MessageScrollerViewport,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerButton,
   Bubble,
   BubbleContent,
   Trace,
@@ -31,7 +36,6 @@ import {
   TraceCollapsible,
   TraceCollapsibleTrigger,
   TraceCollapsibleContent,
-  Badge,
   Item,
   ItemContent,
   ItemTitle,
@@ -52,7 +56,15 @@ type Part = {
   type: string;
   text?: string;
   tool?: string;
-  state?: { status: string; input?: unknown; output?: string; error?: string; title?: string };
+  time?: { start: number; end?: number };
+  state?: {
+    time?: { start: number; end?: number };
+    status: string;
+    input?: unknown;
+    output?: string;
+    error?: string;
+    title?: string;
+  };
 };
 type Message = {
   ID: string;
@@ -320,6 +332,7 @@ export function Chats({
       } else {
         await request(`${chatPath}/messages`, "POST", { text: message, requestID });
         form.reset();
+        saveDraft(id, "");
         setDetail(await request<Detail>(chatPath));
       }
       forgetIdentity(scope);
@@ -352,6 +365,8 @@ export function Chats({
     setBusy(false);
   }
 
+  const chatLayout = id === "" ? "mx-auto max-w-4xl min-w-0" : "flex min-h-0 flex-1 flex-col";
+
   function title() {
     if (isNew) return "New chat";
     if (id === "") return "Chats";
@@ -362,15 +377,21 @@ export function Chats({
   return (
     <section
       aria-labelledby="chats-heading"
-      className={isNew ? "mx-auto my-12 max-w-3xl md:mt-[25svh]" : "mx-auto max-w-4xl min-w-0"}
+      className={isNew ? "mx-auto my-12 max-w-3xl md:mt-[25svh]" : chatLayout}
     >
-      <div className={isNew ? "sr-only" : "flex items-center justify-between gap-4"}>
+      <div
+        className={
+          isNew
+            ? "sr-only"
+            : "mx-auto flex w-full max-w-[880px] shrink-0 items-center justify-between gap-4 pb-3"
+        }
+      >
         <Heading
           level={1}
           id="chats-heading"
           ref={heading}
           tabIndex={-1}
-          className="min-w-0 break-words"
+          className="min-w-0 text-base break-words"
         >
           {title()}
         </Heading>
@@ -441,6 +462,12 @@ export function Chats({
               name="text"
               className="max-h-80 min-h-28"
               placeholder="What are we building?"
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  if (!busy) event.currentTarget.form?.requestSubmit();
+                }
+              }}
               required
               disabled={busy}
             />
@@ -547,7 +574,7 @@ function ChatList({ list, projects }: { list: Chat[]; projects: Project[] }) {
   );
 }
 
-/** Shows one chat. `children` renders between the review of changes and the follow-up form. */
+/** Keeps pending questions above the composer while the transcript scrolls independently. */
 function ChatDetail({
   id,
   detail,
@@ -578,56 +605,70 @@ function ChatDetail({
   const stopped = chat.Status === "stopped";
   const blocked = (detail.continuationBlockedReason ?? "") !== "";
 
-  function followUpHelp() {
-    if (blocked) {
-      return "Continuation is unavailable. Saved conversation and workspace files are retained.";
-    }
-    if (activeTurn) {
-      return "Wait for the current turn to finish or answer Flora’s question. Messages are not queued.";
-    }
-    return `Continue in the same workspace and conversation. Up to ${messageBytes.toLocaleString()} UTF-8 bytes.`;
-  }
-
-  function sendLabel() {
-    if (blocked) return "Continuation unavailable";
-    if (busy) return "Working…";
-    return stopped ? "Resume with new message" : "Send message";
-  }
+  const model = detail.messages.findLast((message) => message.Model !== "");
 
   return (
-    <>
-      <div role="status" className="mt-6 flex flex-wrap items-center gap-2 text-sm">
-        {chat.Status === "working" && <FlowerMark />}
-        <Badge variant="secondary">{statusName(chat.Status)}</Badge>
-        <span>{chat.StatusReason}</span>
-      </div>
-      <Text size="xs" tone="muted" role="status" className="mt-2">
-        {connection} · {projectName}
-      </Text>
-      {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
-        <Alert role="note" className="mt-4 rounded-md border border-foreground/20 p-3 text-sm">
-          Some live activity could not be captured while Flora was disconnected from OpenCode.
-          Recovered message and tool snapshots are shown below. Transient output may be missing.
-          Reconnecting does not replay accepted messages or actions.
-        </Alert>
-      )}
-      {!blocked && (
-        <>
-          <div className="mt-4 flex flex-wrap gap-3" aria-label="Execution controls">
-            {activeTurn && (
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  onControl("interrupt");
-                }}
-              >
-                Interrupt current work
-              </Button>
+    <MessageScrollerProvider autoScroll>
+      <MessageScroller className="flex-1">
+        <MessageScrollerViewport aria-label="Conversation">
+          <MessageScrollerContent className="mx-auto w-full max-w-[880px] gap-8 px-1 py-6">
+            {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
+              <Alert role="note">
+                Some live activity could not be captured. Recovered messages and tool snapshots are
+                shown; transient output may be missing.
+              </Alert>
             )}
-            {!stopped && (
+            {detail.messages.map((message) => (
+              <MessageScrollerItem
+                key={message.ID}
+                messageId={message.ID}
+                scrollAnchor={message.Role === "user"}
+              >
+                <ConversationMessage message={message} />
+              </MessageScrollerItem>
+            ))}
+            <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+              {activeTurn && <FlowerMark className="motion-safe:animate-pulse" />}
+              <span>
+                {statusName(chat.Status)}
+                {chat.StatusReason !== "" && ` · ${chat.StatusReason}`}
+              </span>
+            </div>
+            <Changes key={id} chatID={id} onExpired={onExpired} />
+          </MessageScrollerContent>
+        </MessageScrollerViewport>
+        <MessageScrollerButton aria-label="Jump to latest" />
+      </MessageScroller>
+      <div className="mx-auto max-h-[70dvh] w-full max-w-[880px] shrink-0 overflow-y-auto bg-background pt-3 pb-[env(safe-area-inset-bottom)]">
+        <div className="max-h-[30dvh] overflow-y-auto empty:hidden [&_form]:mt-0 [&_form]:mb-3">
+          {children}
+        </div>
+        <FollowUpComposer
+          key={id}
+          id={id}
+          busy={busy}
+          activeTurn={activeTurn}
+          blocked={blocked}
+          stopped={stopped}
+          messageBytes={messageBytes}
+          onSend={onSend}
+          onControl={onControl}
+        />
+        <details className="mt-2 text-xs text-muted-foreground">
+          <summary className="cursor-pointer rounded-sm py-2 focus-visible:outline-2 focus-visible:outline-ring">
+            {projectName} · {connection} · Environment & details
+          </summary>
+          <div className="max-h-[30dvh] overflow-y-auto pb-3">
+            {model && (
+              <p className="py-2">
+                {model.Provider}/{model.Model}
+              </p>
+            )}
+            {!blocked && !stopped && (
               <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 disabled={busy}
                 onClick={() => {
                   onControl("stop");
@@ -636,134 +677,221 @@ function ChatDetail({
                 Stop container
               </Button>
             )}
+            <p className="mt-2">
+              {stopped
+                ? "Send a message to restart with the saved workspace and conversation."
+                : "Stopping frees container capacity and preserves your workspace and conversation."}
+            </p>
+            <Collapsible className="mt-3 rounded-md border p-3">
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  Full activity ({activity.length} saved events)
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <Text tone="muted" className="mt-3">
+                  Setup activity contains bounded previews. After setup finishes,{" "}
+                  <Link href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>
+                    download the full redacted setup log
+                  </Link>
+                  . Any capture failure is shown in the final setup event.
+                </Text>
+                <ol className="mt-4 space-y-3">
+                  {activity.map((row) => (
+                    <li key={row.Sequence}>
+                      <Trace>
+                        <TraceCollapsible>
+                          <TraceCollapsibleTrigger>
+                            <TraceLine>
+                              <TraceTitle>{row.Kind}</TraceTitle>
+                              <TraceDescription>
+                                <time dateTime={row.CreatedAt}>
+                                  {new Date(row.CreatedAt).toLocaleTimeString()}
+                                </time>{" "}
+                                · #{row.Sequence}
+                              </TraceDescription>
+                            </TraceLine>
+                          </TraceCollapsibleTrigger>
+                          <TraceCollapsibleContent>
+                            <pre className="max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
+                              {JSON.stringify(row.Payload, null, 2)}
+                            </pre>
+                          </TraceCollapsibleContent>
+                        </TraceCollapsible>
+                      </Trace>
+                    </li>
+                  ))}
+                </ol>
+              </CollapsibleContent>
+            </Collapsible>
+            <Collapsible className="mt-3 rounded-md border p-3">
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  Environment snapshot
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <pre className="mt-3 overflow-auto text-xs break-all whitespace-pre-wrap">
+                  {JSON.stringify(
+                    {
+                      image: chat.ImageDigest,
+                      OpenCode: chat.HarnessVersion,
+                      startingCommits: chat.StartingCommits,
+                    },
+                    null,
+                    2,
+                  )}
+                </pre>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
-          <Text tone="muted" className="mt-2">
-            {stopped
-              ? "Send a new message to restart this container with its saved workspace and conversation. Interrupted work is not replayed."
-              : "Interrupt keeps the container running. Stop frees container capacity. Both preserve saved work and conversation."}
-          </Text>
-        </>
-      )}
-      <ol aria-label="Conversation" className="mt-8 space-y-8">
-        {detail.messages.map((m) => (
-          <ConversationMessage key={m.ID} message={m} />
-        ))}
-      </ol>
-      <Changes key={id} chatID={id} onExpired={onExpired} />
-      {children}
-      <form onSubmit={onSend} className="mt-8 space-y-4">
-        <FieldLabel htmlFor="follow-up-message">Follow-up</FieldLabel>
-        <InputGroup>
-          <InputGroupTextarea
-            id="follow-up-message"
-            className="max-h-80 min-h-28"
-            name="text"
-            required
-            disabled={busy || activeTurn || blocked}
-            aria-describedby="followup-help"
-          />
-          <InputGroupAddon align="block-end" className="justify-end">
+        </details>
+      </div>
+    </MessageScrollerProvider>
+  );
+}
+
+function saveDraft(id: string, value: string) {
+  try {
+    sessionStorage.setItem(`flora-draft:${id}`, value);
+  } catch {
+    /* Drafting still works when browser storage is unavailable. */
+  }
+}
+
+function readDraft(id: string) {
+  try {
+    return sessionStorage.getItem(`flora-draft:${id}`) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function FollowUpComposer({
+  id,
+  busy,
+  activeTurn,
+  blocked,
+  stopped,
+  messageBytes,
+  onSend,
+  onControl,
+}: {
+  id: string;
+  busy: boolean;
+  activeTurn: boolean;
+  blocked: boolean;
+  stopped: boolean;
+  messageBytes: number;
+  onSend: (event: React.SubmitEvent<HTMLFormElement>) => void;
+  onControl: (action: "interrupt" | "stop") => void;
+}) {
+  const [draft, setDraft] = useState(() => readDraft(id));
+  const sendLabel = stopped ? "Resume" : "Send message";
+  const canSend = !busy && !activeTurn && !blocked && draft.trim() !== "";
+  let help = "Enter to send · Shift+Enter for a new line";
+  if (stopped) help = "Your next message resumes this workspace.";
+  if (activeTurn) help = "Draft your next message while Flora works.";
+  if (blocked) help = "Continuation unavailable. Saved work is retained.";
+
+  return (
+    <form
+      onSubmit={(event) => {
+        if (!canSend) {
+          event.preventDefault();
+          return;
+        }
+        onSend(event);
+      }}
+      onReset={() => {
+        setDraft("");
+      }}
+    >
+      <FieldLabel htmlFor="follow-up-message" className="sr-only">
+        Follow-up
+      </FieldLabel>
+      <InputGroup>
+        <InputGroupTextarea
+          id="follow-up-message"
+          name="text"
+          className="max-h-[25dvh] min-h-20"
+          placeholder="Ask Flora…"
+          value={draft}
+          required
+          disabled={busy || blocked}
+          aria-describedby="followup-help"
+          onChange={(event) => {
+            setDraft(event.target.value);
+            saveDraft(id, event.target.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              if (canSend) event.currentTarget.form?.requestSubmit();
+            }
+          }}
+        />
+        <InputGroupAddon align="block-end" className="justify-between gap-2">
+          <span className="text-xs text-muted-foreground" id="followup-help">
+            {help}
+          </span>
+          {activeTurn && !blocked ? (
+            <InputGroupButton
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                onControl("interrupt");
+              }}
+              title="Interrupt work and keep the container running"
+            >
+              Interrupt
+            </InputGroupButton>
+          ) : (
             <InputGroupButton
               type="submit"
               variant="default"
-              size="sm"
-              disabled={busy || activeTurn || blocked}
+              disabled={!canSend}
+              title={`Up to ${messageBytes.toLocaleString()} UTF-8 bytes`}
             >
-              {sendLabel()}
+              {blocked ? "Continuation unavailable" : sendLabel}
             </InputGroupButton>
-          </InputGroupAddon>
-        </InputGroup>
-        <Text tone="muted" id="followup-help">
-          {followUpHelp()}
-        </Text>
-      </form>
-      <Collapsible className="mt-10 rounded-2xl border p-4">
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm">
-            Full activity ({activity.length} saved events)
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <Text tone="muted" className="mt-3">
-            Setup activity contains bounded previews. After setup finishes,{" "}
-            <Link href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>
-              download the full redacted setup log
-            </Link>
-            . Any capture failure is shown in the final setup event.
-          </Text>
-          <ol className="mt-4 space-y-3">
-            {activity.map((row) => (
-              <li key={row.Sequence}>
-                <Trace>
-                  <TraceCollapsible>
-                    <TraceCollapsibleTrigger>
-                      <TraceLine>
-                        <TraceTitle>{row.Kind}</TraceTitle>
-                        <TraceDescription>
-                          <time dateTime={row.CreatedAt}>
-                            {new Date(row.CreatedAt).toLocaleTimeString()}
-                          </time>{" "}
-                          · #{row.Sequence}
-                        </TraceDescription>
-                      </TraceLine>
-                    </TraceCollapsibleTrigger>
-                    <TraceCollapsibleContent>
-                      <pre className="max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
-                        {JSON.stringify(row.Payload, null, 2)}
-                      </pre>
-                    </TraceCollapsibleContent>
-                  </TraceCollapsible>
-                </Trace>
-              </li>
-            ))}
-          </ol>
-        </CollapsibleContent>
-      </Collapsible>
-      <Collapsible className="mt-4 rounded-2xl border p-4">
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm">
-            Environment snapshot
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <pre className="mt-3 overflow-auto text-xs break-all whitespace-pre-wrap">
-            {JSON.stringify(
-              {
-                image: chat.ImageDigest,
-                OpenCode: chat.HarnessVersion,
-                startingCommits: chat.StartingCommits,
-              },
-              null,
-              2,
-            )}
-          </pre>
-        </CollapsibleContent>
-      </Collapsible>
-    </>
+          )}
+        </InputGroupAddon>
+      </InputGroup>
+    </form>
   );
 }
 
 function ConversationMessage({ message: m }: { message: Message }) {
-  const parts = m.Payload.parts ?? [];
+  const parts = (m.Payload.parts ?? []).filter(
+    (part) => part.type !== "step-start" && part.type !== "step-finish",
+  );
   const failure = m.Payload.info?.error ?? null;
+  const [copyStatus, setCopyStatus] = useState("Copy");
+  const copyText =
+    parts
+      .filter((part) => part.type === "text")
+      .map((part) => part.text ?? "")
+      .join("\n\n") || m.Text;
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(copyText);
+      setCopyStatus("Copied");
+    } catch {
+      setCopyStatus("Could not copy");
+    }
+  }
+
   return (
-    <li className="min-w-0">
+    <div className="group min-w-0">
       <ChatMessage align={m.Role === "user" ? "end" : "start"}>
         <MessageContent>
-          <MessageHeader>
-            <span>{m.Role === "user" ? "You" : "Flora"}</span>
-            {m.Provider !== "" && (
-              <span className="ml-2 break-all">
-                {m.Provider}/{m.Model}
-              </span>
-            )}
-          </MessageHeader>
+          <span className="sr-only">{m.Role === "user" ? "You" : "Flora"}</span>
           <Bubble variant={m.Role === "user" ? "muted" : "ghost"}>
-            <BubbleContent className="space-y-4">
+            <BubbleContent className="space-y-4 text-[15px] leading-7">
               {parts.length > 0 ? (
-                parts.map((p, i) => (
-                  <MessagePart key={p.id ?? i} part={p} user={m.Role === "user"} />
-                ))
+                <MessageParts parts={parts} user={m.Role === "user"} />
               ) : (
                 <MessagePart part={{ type: "text", text: m.Text }} user={m.Role === "user"} />
               )}
@@ -776,9 +904,86 @@ function ConversationMessage({ message: m }: { message: Message }) {
               </pre>
             </Alert>
           )}
+          {copyText !== "" && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-fit text-xs text-muted-foreground md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
+              onClick={() => {
+                void copy();
+              }}
+              aria-label="Copy message"
+            >
+              <span role="status">{copyStatus}</span>
+            </Button>
+          )}
         </MessageContent>
       </ChatMessage>
-    </li>
+    </div>
+  );
+}
+
+function MessageParts({ parts, user }: { parts: Part[]; user: boolean }) {
+  const groups: Part[][] = [];
+  for (const part of parts) {
+    const previous = groups.at(-1);
+    if (part.type !== "text" && previous && previous[0]?.type !== "text") previous.push(part);
+    else groups.push([part]);
+  }
+  return groups.map((group, index) => {
+    const first = group[0];
+    if (!first) return null;
+    if (first.type === "text" || user) {
+      return group.map((part, i) => <MessagePart key={part.id ?? i} part={part} user={user} />);
+    }
+    return <WorkSummary key={first.id ?? index} parts={group} />;
+  });
+}
+
+function WorkSummary({ parts }: { parts: Part[] }) {
+  const failed = parts.filter(
+    (part) => part.state?.status === "error" || (part.state?.error ?? "") !== "",
+  ).length;
+  const running = parts.find(
+    (part) => part.state?.status === "running" || part.state?.status === "pending",
+  );
+  const times = parts.flatMap((part) => {
+    const time = part.state?.time ?? part.time;
+    return time ? [time] : [];
+  });
+  const finished = times.length > 0 && times.every((time) => time.end !== undefined);
+  const starts = times.map((time) => time.start);
+  const ends = times.map((time) => time.end ?? time.start);
+  const elapsed = Math.max(...ends) - Math.min(...starts);
+  const seconds = finished ? Math.max(0, Math.round(elapsed / 1000)) : 0;
+  const traceStatus = running ? "running" : undefined;
+  const finishedLabel = finished
+    ? `Worked for ${seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`}`
+    : "Work details";
+  return (
+    <Trace>
+      <TraceCollapsible>
+        <TraceCollapsibleTrigger>
+          <TraceLine status={failed > 0 ? "error" : traceStatus}>
+            <TraceTitle>
+              {running
+                ? `Working · ${running.state?.title ?? running.tool ?? "Thinking"}`
+                : finishedLabel}
+            </TraceTitle>
+            <TraceDescription>
+              {parts.length} {parts.length === 1 ? "step" : "steps"}
+              {failed > 0 && ` · ${failed} failed`}
+            </TraceDescription>
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent className="space-y-3">
+          {parts.map((part, index) => (
+            <MessagePart key={part.id ?? index} part={part} user={false} />
+          ))}
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
   );
 }
 
@@ -815,7 +1020,7 @@ function MessagePart({ part: p, user }: { part: Part; user: boolean }) {
     else if (status === "running" || status === "pending") traceStatus = status;
     return (
       <Trace>
-        <TraceCollapsible defaultOpen>
+        <TraceCollapsible>
           <TraceCollapsibleTrigger>
             <TraceLine status={traceStatus}>
               <TraceTitle>{p.state?.title ?? p.tool}</TraceTitle>
