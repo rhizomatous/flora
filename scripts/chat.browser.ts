@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 
 import { openWorkspaceMenu, assertFitsPhone, logIn, pageErrors } from "./browser.ts";
 
@@ -10,6 +10,12 @@ try {
   const page = await context.newPage();
   const errors = pageErrors(page);
   await logIn(page);
+  const sidebar = page.locator('[data-slot="sidebar"]');
+  await expect(sidebar).toHaveAttribute("data-state", "expanded");
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await expect(sidebar).toHaveAttribute("data-state", "collapsed");
+  await page.keyboard.press("ControlOrMeta+b");
+  await expect(sidebar).toHaveAttribute("data-state", "expanded");
   await page
     .getByRole("navigation", { name: "Main" })
     .getByRole("link", { name: "All chats", exact: true })
@@ -35,6 +41,9 @@ try {
   await page.getByRole("radio", { name: /^Yes/ }).check();
   await page.getByRole("button", { name: "Answer and continue", exact: true }).click();
   await page.getByText("Saved response 1", { exact: true }).waitFor();
+  await expect(page.locator('[data-slot="message"]').first()).toBeVisible();
+  await expect(page.locator('[data-slot="trace"]').first()).toBeVisible();
+  await expect(page.locator('[data-slot="markdown"]').first()).toBeVisible();
   await page.getByText("anthropic/model", { exact: true }).waitFor();
   assert.equal(
     await page
@@ -100,7 +109,9 @@ try {
   );
   await assertFitsPhone(page);
   await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Sidebar", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "All chats", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Sidebar", exact: true })).toHaveCount(0);
   await page.getByRole("link", { name: "Missing container", exact: true }).click();
   await page.getByRole("button", { name: "Continuation unavailable", exact: true }).waitFor();
   assert.equal(await page.getByLabel("Follow-up", { exact: true }).isDisabled(), true);

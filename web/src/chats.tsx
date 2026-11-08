@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import {
   Alert,
@@ -10,7 +10,30 @@ import {
   Link,
   NativeSelect,
   Text,
-  Textarea,
+  InputGroup,
+  InputGroupTextarea,
+  InputGroupAddon,
+  InputGroupButton,
+  Message as ChatMessage,
+  MessageContent,
+  MessageHeader,
+  Bubble,
+  BubbleContent,
+  Trace,
+  TraceLine,
+  TraceTitle,
+  TraceDescription,
+  TraceCollapsible,
+  TraceCollapsibleTrigger,
+  TraceCollapsibleContent,
+  Badge,
+  Item,
+  ItemContent,
+  ItemTitle,
+  ItemDescription,
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
 } from "@flora/florets";
 
 import { Changes } from "./changes";
@@ -43,6 +66,19 @@ type Activity = {
 };
 type Detail = { chat: Chat; messages: Message[]; continuationBlockedReason?: string };
 type Project = { id: string; name: string };
+
+const Markdown = lazy(async () => {
+  const { Markdown: Component } = await import("@flora/florets/ai");
+  return { default: Component };
+});
+
+function ReplyText({ children }: { children: string }) {
+  return (
+    <Suspense fallback={<div className="whitespace-pre-wrap">{children}</div>}>
+      <Markdown>{children}</Markdown>
+    </Suspense>
+  );
+}
 
 const statusName = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -316,7 +352,10 @@ export function Chats({
   }
 
   return (
-    <section aria-labelledby="chats-heading" className={isNew ? "new-chat" : "min-w-0"}>
+    <section
+      aria-labelledby="chats-heading"
+      className={isNew ? "mx-auto my-12 max-w-3xl md:mt-[25svh]" : "mx-auto max-w-4xl min-w-0"}
+    >
       <div className={isNew ? "sr-only" : "flex items-center justify-between gap-4"}>
         <Heading
           level={1}
@@ -354,7 +393,7 @@ export function Chats({
           onSubmit={(event) => {
             void send(event);
           }}
-          className="space-y-1"
+          className="space-y-3"
         >
           <div className="flex flex-wrap items-center gap-3">
             <FieldLabel className="sr-only" htmlFor="new-chat-project">
@@ -363,7 +402,6 @@ export function Chats({
             <NativeSelect
               id="new-chat-project"
               name="project"
-              className="project-picker"
               defaultValue={projectID || projects[0]?.id}
               required
               disabled={busy}
@@ -375,24 +413,24 @@ export function Chats({
               ))}
             </NativeSelect>
           </div>
-          <div className="chat-composer">
+          <InputGroup>
             <FieldLabel className="sr-only" htmlFor="new-chat-message">
               Message
             </FieldLabel>
-            <Textarea
+            <InputGroupTextarea
               id="new-chat-message"
               name="text"
-              className="composer-message"
+              className="max-h-80 min-h-28"
               placeholder="What are we building?"
               required
               disabled={busy}
             />
-            <div className="composer-actions">
-              <Button type="submit" size="sm" disabled={busy}>
+            <InputGroupAddon align="block-end" className="justify-end">
+              <InputGroupButton type="submit" variant="default" size="sm" disabled={busy}>
                 {busy ? "Starting…" : "Start chat"}
-              </Button>
-            </div>
-          </div>
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
         </form>
       )}
       {id !== "" && !isNew && detail === undefined && error === "" && (
@@ -458,21 +496,27 @@ function ChatList({ list, projects }: { list: Chat[]; projects: Project[] }) {
               <Heading level={2} id={`project-${p.id}`}>
                 <Link href={`#projects/${p.id}`}>{p.name}</Link>
               </Heading>
-              <ul className="mt-3 divide-y divide-foreground/20">
+              <ul className="mt-3 space-y-2">
                 {chats.map((c) => (
-                  <li key={c.ID} className="flex flex-wrap items-start justify-between gap-3 py-4">
-                    <div className="min-w-0">
-                      <Link href={`#chats/${c.ID}`} className="font-medium break-words">
-                        {c.Title}
-                      </Link>
-                      <Text tone="muted" className="mt-1">
-                        {statusName(c.Status)} ·{" "}
-                        <time dateTime={c.UpdatedAt}>{new Date(c.UpdatedAt).toLocaleString()}</time>
-                      </Text>
-                    </div>
-                    <Text as="span" tone="muted" className="max-w-md">
-                      {c.StatusReason}
-                    </Text>
+                  <li key={c.ID}>
+                    <Item variant="outline">
+                      <ItemContent>
+                        <ItemTitle>
+                          <Link href={`#chats/${c.ID}`} className="font-medium break-words">
+                            {c.Title}
+                          </Link>
+                        </ItemTitle>
+                        <ItemDescription>
+                          {statusName(c.Status)} ·{" "}
+                          <time dateTime={c.UpdatedAt}>
+                            {new Date(c.UpdatedAt).toLocaleString()}
+                          </time>
+                        </ItemDescription>
+                        {c.StatusReason !== "" && (
+                          <ItemDescription>{c.StatusReason}</ItemDescription>
+                        )}
+                      </ItemContent>
+                    </Item>
                   </li>
                 ))}
               </ul>
@@ -533,12 +577,9 @@ function ChatDetail({
 
   return (
     <>
-      <div
-        role="status"
-        className="mt-6 flex flex-wrap items-center gap-2 rounded-md border border-foreground/20 p-3 text-sm"
-      >
+      <div role="status" className="mt-6 flex flex-wrap items-center gap-2 text-sm">
         {chat.Status === "working" && <FlowerMark />}
-        <strong>{statusName(chat.Status)}</strong>
+        <Badge variant="secondary">{statusName(chat.Status)}</Badge>
         <span>{chat.StatusReason}</span>
       </div>
       <Text size="xs" tone="muted" role="status" className="mt-2">
@@ -592,67 +633,93 @@ function ChatDetail({
       <Changes key={id} chatID={id} onExpired={onExpired} />
       {children}
       <form onSubmit={onSend} className="mt-8 space-y-4">
-        <FieldLabel className="w-full flex-col items-start">
-          Follow-up
-          <Textarea
-            className="mt-2 min-h-28"
+        <FieldLabel htmlFor="follow-up-message">Follow-up</FieldLabel>
+        <InputGroup>
+          <InputGroupTextarea
+            id="follow-up-message"
+            className="max-h-80 min-h-28"
             name="text"
             required
             disabled={busy || activeTurn || blocked}
             aria-describedby="followup-help"
           />
-        </FieldLabel>
+          <InputGroupAddon align="block-end" className="justify-end">
+            <InputGroupButton
+              type="submit"
+              variant="default"
+              size="sm"
+              disabled={busy || activeTurn || blocked}
+            >
+              {sendLabel()}
+            </InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
         <Text tone="muted" id="followup-help">
           {followUpHelp()}
         </Text>
-        <Button type="submit" disabled={busy || activeTurn || blocked}>
-          {sendLabel()}
-        </Button>
       </form>
-      <details className="mt-10 rounded-md border border-foreground/20 p-4">
-        <summary className="cursor-pointer text-sm font-medium">
-          Full activity ({activity.length} saved events)
-        </summary>
-        <Text tone="muted" className="mt-3">
-          Setup activity contains bounded previews. After setup finishes,{" "}
-          <Link href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>
-            download the full redacted setup log
-          </Link>
-          . Any capture failure is shown in the final setup event.
-        </Text>
-        <ol className="mt-4 space-y-3">
-          {activity.map((row) => (
-            <li key={row.Sequence}>
-              <details>
-                <summary className="cursor-pointer text-xs break-words">
-                  {row.Kind} ·{" "}
-                  <time dateTime={row.CreatedAt}>
-                    {new Date(row.CreatedAt).toLocaleTimeString()}
-                  </time>{" "}
-                  · #{row.Sequence}
-                </summary>
-                <pre className="mt-2 max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
-                  {JSON.stringify(row.Payload, null, 2)}
-                </pre>
-              </details>
-            </li>
-          ))}
-        </ol>
-      </details>
-      <details className="mt-4 rounded-md border border-foreground/20 p-4">
-        <summary className="cursor-pointer text-sm font-medium">Environment snapshot</summary>
-        <pre className="mt-3 overflow-auto text-xs break-all whitespace-pre-wrap">
-          {JSON.stringify(
-            {
-              image: chat.ImageDigest,
-              OpenCode: chat.HarnessVersion,
-              startingCommits: chat.StartingCommits,
-            },
-            null,
-            2,
-          )}
-        </pre>
-      </details>
+      <Collapsible className="mt-10 rounded-2xl border p-4">
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm">
+            Full activity ({activity.length} saved events)
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <Text tone="muted" className="mt-3">
+            Setup activity contains bounded previews. After setup finishes,{" "}
+            <Link href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>
+              download the full redacted setup log
+            </Link>
+            . Any capture failure is shown in the final setup event.
+          </Text>
+          <ol className="mt-4 space-y-3">
+            {activity.map((row) => (
+              <li key={row.Sequence}>
+                <Trace>
+                  <TraceCollapsible>
+                    <TraceCollapsibleTrigger>
+                      <TraceLine>
+                        <TraceTitle>{row.Kind}</TraceTitle>
+                        <TraceDescription>
+                          <time dateTime={row.CreatedAt}>
+                            {new Date(row.CreatedAt).toLocaleTimeString()}
+                          </time>{" "}
+                          · #{row.Sequence}
+                        </TraceDescription>
+                      </TraceLine>
+                    </TraceCollapsibleTrigger>
+                    <TraceCollapsibleContent>
+                      <pre className="max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
+                        {JSON.stringify(row.Payload, null, 2)}
+                      </pre>
+                    </TraceCollapsibleContent>
+                  </TraceCollapsible>
+                </Trace>
+              </li>
+            ))}
+          </ol>
+        </CollapsibleContent>
+      </Collapsible>
+      <Collapsible className="mt-4 rounded-2xl border p-4">
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm">
+            Environment snapshot
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <pre className="mt-3 overflow-auto text-xs break-all whitespace-pre-wrap">
+            {JSON.stringify(
+              {
+                image: chat.ImageDigest,
+                OpenCode: chat.HarnessVersion,
+                startingCommits: chat.StartingCommits,
+              },
+              null,
+              2,
+            )}
+          </pre>
+        </CollapsibleContent>
+      </Collapsible>
     </>
   );
 }
@@ -661,77 +728,116 @@ function ConversationMessage({ message: m }: { message: Message }) {
   const parts = m.Payload.parts ?? [];
   const failure = m.Payload.info?.error ?? null;
   return (
-    <li className="min-w-0 rounded-md border border-foreground/20 p-4">
-      <Heading level={2} className="text-sm leading-5">
-        {m.Role === "user" ? "You" : "Flora"}
-        {m.Provider !== "" && (
-          <span className="ml-2 font-normal break-all text-muted-foreground">
-            {m.Provider}/{m.Model}
-          </span>
-        )}
-      </Heading>
-      <div className="mt-3 space-y-4">
-        {parts.length > 0 ? (
-          parts.map((p, i) => <MessagePart key={p.id ?? i} part={p} />)
-        ) : (
-          <pre className="font-sans text-sm leading-6 break-words whitespace-pre-wrap">
-            {m.Text}
-          </pre>
-        )}
-      </div>
-      {failure !== null && (
-        <pre role="alert" className="mt-3 text-sm break-words whitespace-pre-wrap">
-          {JSON.stringify(failure, null, 2)}
-        </pre>
-      )}
+    <li className="min-w-0">
+      <ChatMessage align={m.Role === "user" ? "end" : "start"}>
+        <MessageContent>
+          <MessageHeader>
+            <span>{m.Role === "user" ? "You" : "Flora"}</span>
+            {m.Provider !== "" && (
+              <span className="ml-2 break-all">
+                {m.Provider}/{m.Model}
+              </span>
+            )}
+          </MessageHeader>
+          <Bubble variant={m.Role === "user" ? "muted" : "ghost"}>
+            <BubbleContent className="space-y-4">
+              {parts.length > 0 ? (
+                parts.map((p, i) => (
+                  <MessagePart key={p.id ?? i} part={p} user={m.Role === "user"} />
+                ))
+              ) : (
+                <MessagePart part={{ type: "text", text: m.Text }} user={m.Role === "user"} />
+              )}
+            </BubbleContent>
+          </Bubble>
+          {failure !== null && (
+            <Alert variant="destructive" role="alert">
+              <pre className="text-sm break-words whitespace-pre-wrap">
+                {JSON.stringify(failure, null, 2)}
+              </pre>
+            </Alert>
+          )}
+        </MessageContent>
+      </ChatMessage>
     </li>
   );
 }
 
-function MessagePart({ part: p }: { part: Part }) {
+function MessagePart({ part: p, user }: { part: Part; user: boolean }) {
   if (p.type === "text") {
-    return (
-      <pre className="font-sans text-sm leading-6 break-words whitespace-pre-wrap">{p.text}</pre>
+    return user ? (
+      <div className="whitespace-pre-wrap">{p.text}</div>
+    ) : (
+      <ReplyText>{p.text ?? ""}</ReplyText>
     );
   }
   if (p.type === "reasoning") {
     return (
-      <details>
-        <summary className="cursor-pointer text-sm">Reasoning</summary>
-        <pre className="mt-2 text-sm break-words whitespace-pre-wrap">{p.text}</pre>
-      </details>
+      <Trace>
+        <TraceCollapsible>
+          <TraceCollapsibleTrigger>
+            <TraceLine>
+              <TraceTitle>Reasoning</TraceTitle>
+            </TraceLine>
+          </TraceCollapsibleTrigger>
+          <TraceCollapsibleContent className="whitespace-pre-wrap">
+            {p.text}
+          </TraceCollapsibleContent>
+        </TraceCollapsible>
+      </Trace>
     );
   }
   if (p.type === "tool") {
     const output = p.state?.output ?? "";
     const error = p.state?.error ?? "";
+    const status = p.state?.status;
+    let traceStatus: "error" | "running" | "pending" | undefined;
+    if (error !== "" || status === "error") traceStatus = "error";
+    else if (status === "running" || status === "pending") traceStatus = status;
     return (
-      <details open className="rounded-md border border-foreground/20 p-3">
-        <summary className="cursor-pointer text-sm font-medium break-words">
-          {p.tool} · {p.state?.status} {p.state?.title}
-        </summary>
-        <pre className="mt-3 overflow-auto text-xs break-words whitespace-pre-wrap">
-          {JSON.stringify(p.state?.input, null, 2)}
-        </pre>
-        {output !== "" && (
-          <pre className="mt-3 max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
-            {output}
-          </pre>
-        )}
-        {error !== "" && (
-          <pre role="alert" className="mt-3 text-xs break-words whitespace-pre-wrap">
-            {error}
-          </pre>
-        )}
-      </details>
+      <Trace>
+        <TraceCollapsible defaultOpen>
+          <TraceCollapsibleTrigger>
+            <TraceLine status={traceStatus}>
+              <TraceTitle>{p.state?.title ?? p.tool}</TraceTitle>
+              <TraceDescription>
+                {p.tool} · {status}
+              </TraceDescription>
+            </TraceLine>
+          </TraceCollapsibleTrigger>
+          <TraceCollapsibleContent>
+            <pre className="overflow-auto text-xs break-words whitespace-pre-wrap">
+              {JSON.stringify(p.state?.input, null, 2)}
+            </pre>
+            {output !== "" && (
+              <pre className="mt-3 max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
+                {output}
+              </pre>
+            )}
+            {error !== "" && (
+              <pre role="alert" className="mt-3 text-xs break-words whitespace-pre-wrap">
+                {error}
+              </pre>
+            )}
+          </TraceCollapsibleContent>
+        </TraceCollapsible>
+      </Trace>
     );
   }
   return (
-    <details>
-      <summary className="cursor-pointer text-sm">{p.type}</summary>
-      <pre className="mt-2 overflow-auto text-xs break-words whitespace-pre-wrap">
-        {JSON.stringify(p, null, 2)}
-      </pre>
-    </details>
+    <Trace>
+      <TraceCollapsible>
+        <TraceCollapsibleTrigger>
+          <TraceLine>
+            <TraceTitle>{p.type}</TraceTitle>
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent>
+          <pre className="overflow-auto text-xs break-words whitespace-pre-wrap">
+            {JSON.stringify(p, null, 2)}
+          </pre>
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
   );
 }

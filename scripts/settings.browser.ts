@@ -147,6 +147,18 @@ try {
     false,
   );
   await assertFitsPhone(page);
+  await page.goto(chatURL);
+  await page.getByLabel("Follow-up", { exact: true }).waitFor();
+  const navigation = page.getByRole("button", { name: "Menu", exact: true });
+  await navigation.click();
+  await page.keyboard.press("Escape");
+  await expect(navigation).toBeFocused();
+  await navigation.click();
+  await openSettings(page);
+  await expect(page.getByRole("dialog", { name: "Sidebar", exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Installation settings", exact: true }),
+  ).toBeFocused();
   assert.deepEqual(errors, []);
   console.log(
     "Chromium: real settings API, fixed model, atomic rejected rotation, blank secret preservation, saved limits after reload, effective message bound, safe dependency failures, enabled/disabled completion sound, no sound for interruption, and mobile width passed.",
