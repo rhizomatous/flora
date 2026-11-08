@@ -13,7 +13,6 @@ import {
   Wordmark,
   SidebarProvider,
   SidebarInset,
-  SidebarTrigger,
 } from "@flora/florets";
 
 import { Chats } from "./chats";
@@ -21,7 +20,7 @@ import { Installation, type Settings } from "./installation";
 import { useNotifications } from "./notifications";
 import { Projects } from "./projects";
 import { errorMessage, request } from "./request";
-import { Sidebar } from "./sidebar";
+import { Sidebar, SidebarToggle } from "./sidebar";
 import { CompletionToasts } from "./toasts";
 import { text } from "./ui";
 import { WorkspaceMenu } from "./workspace-menu";
@@ -218,11 +217,7 @@ function App() {
         </header>
       )}
       <Content id="main-content" tabIndex={-1} className={ready ? "min-w-0" : undefined}>
-        {ready && (
-          <header className="flex h-14 shrink-0 items-center border-b px-4">
-            <SidebarTrigger aria-label="Menu" />
-          </header>
-        )}
+        {ready && <SidebarToggle />}
         <div className={ready ? "mx-auto w-full max-w-6xl p-4 sm:p-8" : undefined}>
           {error !== "" && (
             <Alert variant="destructive" role="alert" className="mb-6">

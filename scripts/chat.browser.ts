@@ -12,8 +12,12 @@ try {
   await logIn(page);
   const sidebar = page.locator('[data-slot="sidebar"]');
   await expect(sidebar).toHaveAttribute("data-state", "expanded");
+  await expect(sidebar.getByRole("button", { name: "Menu", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await expect(sidebar).toHaveAttribute("data-state", "collapsed");
+  await expect(
+    page.getByRole("main").getByRole("button", { name: "Menu", exact: true }),
+  ).toBeFocused();
   await page.keyboard.press("ControlOrMeta+b");
   await expect(sidebar).toHaveAttribute("data-state", "expanded");
   await page

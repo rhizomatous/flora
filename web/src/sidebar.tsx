@@ -14,6 +14,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarRail,
+  SidebarTrigger,
   useSidebar,
 } from "@flora/florets";
 
@@ -21,6 +22,31 @@ import type { Chat } from "./notifications";
 import { errorMessage, isExpired, request } from "./request";
 
 type Project = { id: string; name: string };
+
+/** Keeps the collapse control inside navigation and the reopen control in the main panel. */
+export function SidebarToggle({ inSidebar = false }: { inSidebar?: boolean }) {
+  const { open, isMobile } = useSidebar();
+  if (inSidebar ? !open && !isMobile : open && !isMobile) return null;
+
+  const trigger = (
+    <SidebarTrigger
+      aria-label="Menu"
+      onClick={() => {
+        if (!isMobile) {
+          // The desktop control moves to the other panel after toggling.
+          requestAnimationFrame(() => {
+            document.querySelector<HTMLElement>('[data-slot="sidebar-trigger"]')?.focus();
+          });
+        }
+      }}
+    />
+  );
+  return inSidebar ? (
+    trigger
+  ) : (
+    <header className="flex h-14 shrink-0 items-center border-b px-4">{trigger}</header>
+  );
+}
 
 /** Keeps project navigation beside every workspace view, using the shared live chat feed. */
 export function Sidebar({
@@ -99,8 +125,9 @@ export function Sidebar({
           >
             Skip to content
           </a>
-          <div className="px-3 py-3">
+          <div className="flex items-center justify-between gap-2 px-3 py-3">
             <Wordmark />
+            <SidebarToggle inSidebar />
           </div>
           <SidebarMenu>
             <SidebarMenuItem>
