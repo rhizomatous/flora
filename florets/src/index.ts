@@ -67,4 +67,10 @@ export * from "./components/toggle";
 export * from "./components/tooltip";
 export * from "./components/trace";
 export * from "./components/typography";
-export { GearIcon, SpeakerLoudIcon, ExitIcon, ChevronUpIcon } from "@radix-ui/react-icons";
+export {
+  GearIcon,
+  SpeakerLoudIcon,
+  ExitIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+} from "@radix-ui/react-icons";
