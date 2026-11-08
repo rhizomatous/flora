@@ -34,7 +34,7 @@ const scenarios: { id: string; title: string; frames: Frame[] }[] = [
 const epoch = "2026-01-01T12:00:00.000Z";
 const project = {
   id: "preview",
-  name: "Chat previews",
+  name: "Example project",
   configuration: {
     repositories: [
       {

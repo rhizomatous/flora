@@ -100,7 +100,16 @@ export function Sidebar({
             Skip to content
           </a>
           <div className="px-3 py-3">
-            <Wordmark />
+            <a
+              href="#chats/new"
+              aria-label="Flora home"
+              className="inline-flex rounded-md focus-visible:outline-2 focus-visible:outline-ring"
+              onClick={() => {
+                setOpenMobile(false);
+              }}
+            >
+              <Wordmark />
+            </a>
           </div>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -126,19 +135,6 @@ export function Sidebar({
                   }}
                 >
                   All chats
-                </a>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={path.startsWith("projects")}>
-                <a
-                  href="#projects"
-                  aria-current={path.startsWith("projects") ? "page" : undefined}
-                  onClick={() => {
-                    setOpenMobile(false);
-                  }}
-                >
-                  Projects
                 </a>
               </SidebarMenuButton>
             </SidebarMenuItem>

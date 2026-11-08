@@ -8,7 +8,12 @@ import {
   FlowerMark,
   Heading,
   Link,
-  NativeSelect,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  ChevronDownIcon,
   Text,
   InputGroup,
   InputGroupTextarea,
@@ -157,6 +162,9 @@ export function Chats({
   const id = path.startsWith("chats/") ? path.slice(6) : "";
   const isNew = id === "new" || id.startsWith("new?");
   const projectID = new URLSearchParams(path.split("?")[1]).get("project") ?? "";
+  const [selectedProjectID, setSelectedProjectID] = useState(projectID);
+  const selectedProject =
+    projects?.find((project) => project.id === selectedProjectID) ?? projects?.[0];
   const chatPath = `chats/${encodeURIComponent(id)}`;
 
   function report(e: unknown) {
@@ -396,22 +404,33 @@ export function Chats({
           className="space-y-3"
         >
           <div className="flex flex-wrap items-center gap-3">
-            <FieldLabel className="sr-only" htmlFor="new-chat-project">
-              Project
-            </FieldLabel>
-            <NativeSelect
-              id="new-chat-project"
-              name="project"
-              defaultValue={projectID || projects[0]?.id}
-              required
-              disabled={busy}
-            >
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </NativeSelect>
+            <input type="hidden" name="project" value={selectedProject?.id ?? ""} />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  aria-label={`Project: ${selectedProject?.name ?? ""}`}
+                >
+                  {selectedProject?.name}
+                  <ChevronDownIcon aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuRadioGroup
+                  value={selectedProject?.id ?? ""}
+                  onValueChange={setSelectedProjectID}
+                  aria-label="Project"
+                >
+                  {projects.map((project) => (
+                    <DropdownMenuRadioItem key={project.id} value={project.id}>
+                      {project.name}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <InputGroup>
             <FieldLabel className="sr-only" htmlFor="new-chat-message">

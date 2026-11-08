@@ -61,7 +61,8 @@ try {
   await openWorkspaceMenu(page);
   await page.getByRole("menuitem", { name: "Enable notification sound", exact: true }).click();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
-  await page.getByRole("combobox", { name: /^Project/ }).selectOption({ label: "Browser project" });
+  await page.getByRole("button", { name: /^Project:/ }).click();
+  await page.getByRole("menuitemradio", { name: "Browser project", exact: true }).click();
   await page.getByLabel("Message", { exact: true }).fill("Sound enabled");
   await page.getByRole("button", { name: "Start chat", exact: true }).click();
   await page.getByRole("heading", { name: "Flora needs your answer", exact: true }).waitFor();
