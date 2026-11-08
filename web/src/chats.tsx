@@ -656,7 +656,7 @@ function ChatDetail({
         />
         <details className="mt-2 text-xs text-muted-foreground">
           <summary className="cursor-pointer rounded-sm py-2 focus-visible:outline-2 focus-visible:outline-ring">
-            {projectName} · {connection} · Environment & details
+            {projectName} · {connection} · Details
           </summary>
           <div className="max-h-[30dvh] overflow-y-auto pb-3">
             {model && (
@@ -789,10 +789,6 @@ function FollowUpComposer({
   const [draft, setDraft] = useState(() => readDraft(id));
   const sendLabel = stopped ? "Resume" : "Send message";
   const canSend = !busy && !activeTurn && !blocked && draft.trim() !== "";
-  let help = "Enter to send · Shift+Enter for a new line";
-  if (stopped) help = "Your next message resumes this workspace.";
-  if (activeTurn) help = "Draft your next message while Flora works.";
-  if (blocked) help = "Continuation unavailable. Saved work is retained.";
 
   return (
     <form
@@ -819,7 +815,6 @@ function FollowUpComposer({
           value={draft}
           required
           disabled={busy || blocked}
-          aria-describedby="followup-help"
           onChange={(event) => {
             setDraft(event.target.value);
             saveDraft(id, event.target.value);
@@ -831,10 +826,7 @@ function FollowUpComposer({
             }
           }}
         />
-        <InputGroupAddon align="block-end" className="justify-between gap-2">
-          <span className="text-xs text-muted-foreground" id="followup-help">
-            {help}
-          </span>
+        <InputGroupAddon align="block-end" className="justify-end">
           {activeTurn && !blocked ? (
             <InputGroupButton
               type="button"

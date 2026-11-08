@@ -45,9 +45,9 @@ try {
   await expect(page.locator('[data-slot="message"]').first()).toBeVisible();
   await expect(page.locator('[data-slot="trace"]').first()).toBeVisible();
   await expect(page.locator('[data-slot="markdown"]').first()).toBeVisible();
-  await page.getByText("Environment & details", { exact: false }).click();
+  await page.getByText("· Details", { exact: false }).click();
   await page.getByText("anthropic/model", { exact: true }).waitFor();
-  await page.getByText("Environment & details", { exact: false }).click();
+  await page.getByText("· Details", { exact: false }).click();
   assert.equal(
     await page
       .getByLabel("Conversation")
@@ -105,7 +105,7 @@ try {
   await page.getByLabel("Follow-up", { exact: true }).fill("stop control work");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await page.getByLabel("Conversation").getByText("stop control work", { exact: true }).waitFor();
-  await page.getByText("Environment & details", { exact: false }).click();
+  await page.getByText("· Details", { exact: false }).click();
   await page.getByRole("button", { name: "Stop container", exact: true }).click();
   await page.getByRole("button", { name: "Resume", exact: true }).waitFor();
   await page.reload();
