@@ -1,5 +1,5 @@
 // oxlint-disable typescript/strict-void-return -- React ignores return values from these upstream event handlers.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/sonner-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/sonner-example.json
 "use client";
 
 import { toast } from "sonner";

@@ -8,7 +8,7 @@ import {
 import { Label } from "@flora/florets/components/label";
 import { Switch } from "@flora/florets/components/switch";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/switch-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/switch-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

@@ -1,5 +1,5 @@
 // oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/scroll-area-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/scroll-area-example.json
 import * as React from "react";
 
 import { ScrollArea, ScrollBar } from "@flora/florets/components/scroll-area";

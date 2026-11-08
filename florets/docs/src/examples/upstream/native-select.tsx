@@ -5,7 +5,7 @@ import {
   NativeSelectOption,
 } from "@flora/florets/components/native-select";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/native-select-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/native-select-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

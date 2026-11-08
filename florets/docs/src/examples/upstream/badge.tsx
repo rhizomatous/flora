@@ -5,7 +5,7 @@ import { Spinner } from "@flora/florets/components/spinner";
 
 // oxlint-disable jsx-a11y/anchor-ambiguous-text -- The sample link text is preserved from the upstream examples.
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/badge-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/badge-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

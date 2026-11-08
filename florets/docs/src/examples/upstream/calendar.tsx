@@ -4,7 +4,7 @@
 // oxlint-disable react/purity -- The upstream samples use current dates and generated demo values.
 // oxlint-disable typescript/strict-boolean-expressions -- The upstream examples use truthiness for optional props and React children.
 // oxlint-disable unicorn/max-nested-calls -- The sample transport builds scripted conversations with chained calls.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/calendar-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/calendar-example.json
 "use client";
 
 import { addDays, format } from "date-fns";

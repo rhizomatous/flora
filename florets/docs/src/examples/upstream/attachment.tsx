@@ -1,6 +1,6 @@
 // oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/attachment-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/attachment-example.json
 "use client";
 
 import {

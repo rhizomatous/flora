@@ -18,7 +18,7 @@ import {
   PopoverTrigger,
 } from "@flora/florets/components/popover";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/popover-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/popover-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

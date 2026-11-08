@@ -7,7 +7,7 @@
 // oxlint-disable typescript/no-unsafe-member-access -- Recharts exposes formatter payloads through permissive types.
 // oxlint-disable typescript/no-unsafe-type-assertion -- The upstream samples assert types for chart keys and error states.
 // oxlint-disable unicorn/consistent-function-scoping -- The helper remains beside the example that uses it.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/combobox-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/combobox-example.json
 "use client";
 
 import { ChevronDownIcon, GlobeIcon } from "lucide-react";

@@ -1,7 +1,7 @@
 // oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 // oxlint-disable jsx-a11y/img-redundant-alt -- Image descriptions are preserved from the upstream examples.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/card-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/card-example.json
 "use client";
 
 import { CaptionsIcon, PlusIcon } from "lucide-react";

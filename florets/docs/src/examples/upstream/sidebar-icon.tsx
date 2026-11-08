@@ -1,6 +1,6 @@
 // oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
 // oxlint-disable typescript/no-unnecessary-condition -- The upstream examples retain guards for incomplete runtime payloads.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/sidebar-icon-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/sidebar-icon-example.json
 "use client";
 
 import {

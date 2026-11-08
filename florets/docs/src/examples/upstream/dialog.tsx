@@ -3,7 +3,7 @@
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 // oxlint-disable no-shadow -- Example callbacks use the prop names from their underlying primitives.
 // oxlint-disable react/no-array-index-key -- These fixed demo sequences use positions to distinguish repeated entries.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/dialog-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/dialog-example.json
 "use client";
 
 import { InfoIcon } from "lucide-react";

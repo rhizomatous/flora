@@ -1,7 +1,7 @@
 // oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 // oxlint-disable typescript/strict-void-return -- React ignores return values from these upstream event handlers.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/bubble-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/bubble-example.json
 "use client";
 
 import { ChevronDownIcon, ThumbsDownIcon, ThumbsUpIcon } from "lucide-react";

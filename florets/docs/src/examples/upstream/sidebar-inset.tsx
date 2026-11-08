@@ -1,5 +1,5 @@
 // oxlint-disable typescript/strict-boolean-expressions -- The upstream examples use truthiness for optional props and React children.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/sidebar-inset-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/sidebar-inset-example.json
 "use client";
 
 import {
