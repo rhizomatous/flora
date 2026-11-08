@@ -15,7 +15,7 @@ import { CodeExample } from "./code-example";
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
     <section className="space-y-5">
-      <h2 id={id} className="scroll-mt-24 text-xl font-semibold tracking-tight">
+      <h2 id={id} className="text-xl font-semibold tracking-tight">
         {title}
       </h2>
       {children}

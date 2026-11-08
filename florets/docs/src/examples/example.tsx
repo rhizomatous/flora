@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react";
+import { createElement, type ComponentProps } from "react";
 
 import { cn } from "@flora/florets";
 
@@ -51,20 +51,20 @@ export function Example({
       aria-label={title}
       id={documented && title !== undefined ? exampleAnchor(title) : undefined}
       className={cn(
-        documented ? "min-w-0 scroll-mt-24" : "min-w-0 rounded-2xl border bg-card",
+        documented ? "min-w-0" : "min-w-0 rounded-2xl border bg-card",
         containerClassName,
       )}
       {...props}
     >
-      {title !== undefined && (
-        <h2
-          className={
-            documented
+      {title !== undefined &&
+        createElement(
+          documented ? "h3" : "h2",
+          {
+            className: documented
               ? "mb-5 text-xl font-semibold tracking-tight"
-              : "border-b px-5 py-3 text-sm font-medium"
-          }
-        >
-          {documented ? (
+              : "border-b px-5 py-3 text-sm font-medium",
+          },
+          documented ? (
             <a
               className="underline-offset-4 hover:underline"
               href={`${location.hash.startsWith("#example-") ? `#components/${location.hash.slice(9)}` : location.hash.split("/").slice(0, 2).join("/")}/${exampleAnchor(title)}`}
@@ -73,18 +73,17 @@ export function Example({
             </a>
           ) : (
             title
-          )}
-        </h2>
-      )}
+          ),
+        )}
       {documented && title !== undefined && explanations[title] !== undefined && (
         <p className="mb-5 text-sm leading-7 text-muted-foreground">{explanations[title]}</p>
       )}
-      <div className={documented ? "overflow-hidden rounded-xl border" : undefined}>
+      <div className={documented ? "overflow-hidden rounded-2xl border" : undefined}>
         <div
           data-slot="example-content"
           className={cn(
             "flex min-w-0 flex-col items-start gap-6 overflow-x-auto p-5 *:[div:not([class*='w-'])]:w-full",
-            documented && "min-h-64 justify-center px-6 py-12 sm:px-10",
+            documented && "min-h-72 justify-center px-6 py-10 sm:px-10",
             className,
           )}
         >

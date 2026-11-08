@@ -95,6 +95,11 @@
   padding: 0;
   margin-bottom: 24px;
 }
+.docs-menu-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
 .docs-article {
   min-width: 0;
   padding: 48px 0 24px;
@@ -107,8 +112,8 @@
   gap: 20px;
 }
 .docs-page-heading h1 {
-  font-size: 36px;
-  font-weight: 650;
+  font-size: 30px;
+  font-weight: 600;
   letter-spacing: -0.045em;
   line-height: 1.2;
 }
@@ -135,8 +140,8 @@
   margin-bottom: 16px;
 }
 .docs-section > p {
-  color: var(--muted-foreground);
-  font-size: 14px;
+  color: var(--foreground);
+  font-size: 15px;
   line-height: 1.8;
   margin: 12px 0 20px;
 }
@@ -174,17 +179,25 @@
   font-size: 13px;
 }
 .docs-toc > p {
+  color: var(--muted-foreground);
+  font-size: 12px;
   font-weight: 500;
   margin-bottom: 16px;
 }
 .docs-toc > a {
   display: block;
   color: var(--muted-foreground);
-  padding: 6px 0;
+  padding: 4px 0;
 }
 .docs-toc > a:hover,
 .docs-toc > a[aria-current] {
   color: var(--foreground);
+}
+.docs-toc > a[aria-current] {
+  font-weight: 500;
+}
+.docs-toc > a[data-depth="3"] {
+  padding-left: 16px;
 }
 .docs-footer {
   margin-top: 64px;

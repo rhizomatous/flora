@@ -76,11 +76,12 @@ export function CodeExample({
       </CodeBlockHeader>
       <div
         id={id}
-        className={expanded ? "max-h-[36rem] overflow-auto" : "relative h-24 overflow-hidden"}
+        className={expanded ? "max-h-72 overflow-auto" : "relative h-24 overflow-hidden"}
       >
         <CodeBlockContent
           lineNumbers
           aria-label={title}
+          aria-hidden={!expanded}
           tabIndex={expanded ? 0 : -1}
           className="px-5 text-xs leading-7"
         >

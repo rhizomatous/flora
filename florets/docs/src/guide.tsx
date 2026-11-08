@@ -172,7 +172,7 @@ function ComponentPage({ id, ai, dark }: { id: string; ai: boolean; dark: boolea
   if (Preview) {
     if (id.startsWith("sidebar")) {
       previewContent = (
-        <div className="overflow-hidden rounded-xl border">
+        <div className="overflow-hidden rounded-2xl border">
           {/* These trusted local demos need their own viewport for fixed-position sidebars. */}
           {/* oxlint-disable-next-line react/iframe-missing-sandbox */}
           <iframe
@@ -180,16 +180,20 @@ function ComponentPage({ id, ai, dark }: { id: string; ai: boolean; dark: boolea
             src={`./example.html?component=${encodeURIComponent(id)}&theme=${dark ? "dark" : "light"}`}
             className="h-[36rem] w-full border-0"
           />
-          <CodeExample code={source || "// Loading source…"} collapsible />
+          <div className="border-t">
+            <CodeExample code={source || "// Loading source…"} collapsible />
+          </div>
         </div>
       );
     } else if (ai) {
       previewContent = (
-        <div className="overflow-hidden rounded-xl border">
+        <div className="overflow-hidden rounded-2xl border">
           <div className="flex min-h-80 items-center justify-center overflow-x-auto p-6">
             <Preview />
           </div>
-          <CodeExample code={source || "// Loading source…"} collapsible />
+          <div className="border-t">
+            <CodeExample code={source || "// Loading source…"} collapsible />
+          </div>
         </div>
       );
     } else {
@@ -294,7 +298,7 @@ export function Guide() {
       return true;
     }
   });
-  const [toc, setToc] = useState<{ id: string; title: string }[]>([]);
+  const [toc, setToc] = useState<{ id: string; title: string; depth: number }[]>([]);
   const [activeHeading, setActiveHeading] = useState("");
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
@@ -347,19 +351,55 @@ export function Guide() {
   useEffect(() => {
     document.title = `${title} · Florets`;
     window.scrollTo(0, 0);
-    const current = nav.current?.querySelector<HTMLElement>(`[href="#${CSS.escape(route)}"]`);
-    if (current && nav.current) {
+    const container = nav.current;
+    if (!container) return;
+    let restored = false;
+    try {
+      const saved: unknown = JSON.parse(sessionStorage.getItem("florets-docs-scroll") ?? "null");
+      if (
+        saved !== null &&
+        typeof saved === "object" &&
+        "route" in saved &&
+        saved.route === route &&
+        "top" in saved &&
+        typeof saved.top === "number" &&
+        Number.isFinite(saved.top)
+      ) {
+        container.scrollTop = saved.top;
+        restored = true;
+      }
+    } catch {
+      /* Navigation still works when browser storage is unavailable. */
+    }
+    const current = container.querySelector<HTMLElement>(`[href="#${CSS.escape(route)}"]`);
+    if (!restored && current) {
       const bounds = current.getBoundingClientRect();
-      const parent = nav.current.getBoundingClientRect();
+      const parent = container.getBoundingClientRect();
       if (bounds.bottom > parent.bottom || bounds.top < parent.top) {
-        nav.current.scrollTop += bounds.top - parent.top - 100;
+        container.scrollTop += bounds.top - parent.top - (parent.height - bounds.height) / 2;
       }
     }
+    function saveScroll() {
+      if (!container || container.clientHeight === 0) return;
+      try {
+        sessionStorage.setItem(
+          "florets-docs-scroll",
+          JSON.stringify({ route, top: container.scrollTop }),
+        );
+      } catch {
+        /* Keep scrolling when browser storage is unavailable. */
+      }
+    }
+    saveScroll();
+    container.addEventListener("scroll", saveScroll, { passive: true });
+    return () => {
+      container.removeEventListener("scroll", saveScroll);
+    };
   }, [route, title]);
   useEffect(() => {
     const element = article.current;
     if (!element) return;
-    let headings: { element: HTMLElement; id: string; title: string }[] = [];
+    let headings: { element: HTMLElement; id: string; title: string; depth: number }[] = [];
     let pendingAnchor = decodeURIComponent(location.hash.slice(1)).slice(route.length + 1);
     const scroll = () => {
       const current = headings.findLast(
@@ -368,14 +408,21 @@ export function Guide() {
       setActiveHeading(current?.id ?? headings[0]?.id ?? "");
     };
     const update = () => {
-      headings = [...element.querySelectorAll<HTMLElement>("h2[id], h3[id], section[id] > h2")]
+      headings = [
+        ...element.querySelectorAll<HTMLElement>(
+          "h2[id], h3[id], section[id] > h2, section[id] > h3",
+        ),
+      ]
         .map((heading) => ({
           element: heading,
           id: heading.id === "" ? (heading.parentElement?.id ?? "") : heading.id,
           title: heading.textContent,
+          depth: heading.tagName === "H3" ? 3 : 2,
         }))
         .filter((heading) => heading.id);
-      setToc(headings.map(({ id, title: headingTitle }) => ({ id, title: headingTitle })));
+      setToc(
+        headings.map(({ id, title: headingTitle, depth }) => ({ id, title: headingTitle, depth })),
+      );
       if (pendingAnchor) {
         const target = element.querySelector(`#${CSS.escape(pendingAnchor)}`);
         if (target) {
@@ -407,15 +454,21 @@ export function Guide() {
   function navigation() {
     return sections.map((section) => (
       <SidebarGroup key={section.title} className="docs-nav-group">
-        <SidebarGroupLabel className="text-muted-foreground">{section.title}</SidebarGroupLabel>
+        <SidebarGroupLabel className="px-2 text-muted-foreground">
+          {section.title}
+        </SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
             {section.pages.map((item) => (
               <SidebarMenuItem key={item.route}>
                 <SidebarMenuButton
                   asChild
-                  isActive={route === item.route}
-                  className="h-[30px] w-fit rounded-md border border-transparent text-[0.8rem] font-medium data-[active=true]:border-accent data-[active=true]:bg-accent"
+                  isActive={
+                    route === item.route ||
+                    ((item.route === "components" || item.route === "ai") &&
+                      route.startsWith(`${item.route}/`))
+                  }
+                  className="docs-menu-link h-[30px] w-fit overflow-visible rounded-md border border-transparent px-2 text-[0.8rem] font-medium data-[active=true]:border-accent data-[active=true]:bg-accent"
                 >
                   <a
                     href={href(item.route)}
@@ -596,7 +649,11 @@ export function Guide() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="max-h-[60svh] overflow-y-auto">
                     {toc.map((item) => (
-                      <DropdownMenuItem key={item.id} asChild>
+                      <DropdownMenuItem
+                        key={item.id}
+                        asChild
+                        className={item.depth === 3 ? "pl-6" : undefined}
+                      >
                         <a
                           href={`#${route}/${item.id}`}
                           aria-current={activeHeading === item.id ? "location" : undefined}
@@ -618,7 +675,7 @@ export function Guide() {
             <div key={route}>{pageContent}</div>
             <footer className="docs-footer">
               {previous ? (
-                <Button asChild variant="outline" size="sm">
+                <Button asChild variant="secondary" size="sm">
                   <a href={href(previous.route)}>
                     <ArrowLeft className="size-4" />
                     {previous.title}
@@ -628,7 +685,7 @@ export function Guide() {
                 <span />
               )}
               {next && (
-                <Button asChild variant="outline" size="sm">
+                <Button asChild variant="secondary" size="sm">
                   <a href={href(next.route)}>
                     {next.title}
                     <ArrowRight className="size-4" />
@@ -642,6 +699,7 @@ export function Guide() {
             {toc.map((item) => (
               <a
                 key={item.id}
+                data-depth={item.depth}
                 href={`#${route}/${item.id}`}
                 aria-current={activeHeading === item.id ? "location" : undefined}
                 onClick={(event) => {
