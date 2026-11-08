@@ -101,7 +101,7 @@ export function QuestionForm({
       onSubmit={(event) => {
         void answer(event);
       }}
-      className="gap-3 rounded-xl border p-4"
+      className="rounded-xl border p-4"
     >
       {q.questions.length > 1 && <QuestionnaireProgress />}
       {q.questions.map((question, index) => (
@@ -111,10 +111,9 @@ export function QuestionForm({
           multiple={question.multiple}
           required
           disabled={busy}
-          className="gap-3"
         >
-          <QuestionnaireTitle className="mb-0!">{question.question}</QuestionnaireTitle>
-          <QuestionnaireChoices className="gap-2">
+          <QuestionnaireTitle>{question.question}</QuestionnaireTitle>
+          <QuestionnaireChoices>
             {question.options.map((option) => (
               <QuestionnaireChoice
                 key={option.label}
@@ -123,9 +122,8 @@ export function QuestionForm({
                 onChange={(event) => {
                   choose(index, option.label, event.target.checked);
                 }}
-                className="rounded-xl py-2"
               >
-                {option.label}
+                <span className="font-medium">{option.label}</span>
                 {option.description !== "" && (
                   <QuestionnaireChoiceDescription>
                     {option.description}
@@ -148,7 +146,7 @@ export function QuestionForm({
           <QuestionnaireError />
         </QuestionnaireItem>
       ))}
-      <QuestionnaireActions className="sticky bottom-0 bg-background pt-2">
+      <QuestionnaireActions>
         <QuestionnairePrevious disabled={busy} />
         <QuestionnaireNext disabled={busy} />
         <QuestionnaireSubmit disabled={busy}>
