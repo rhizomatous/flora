@@ -67,6 +67,17 @@ export function WorkspaceMenu({
             Settings
           </a>
         </DropdownMenuItem>
+        <DropdownMenuItem
+          asChild
+          onSelect={() => {
+            navigated.current = window.location.hash !== "#projects";
+          }}
+        >
+          <a href="#projects">
+            <GearIcon aria-hidden="true" />
+            Project settings
+          </a>
+        </DropdownMenuItem>
         {sound && (
           <DropdownMenuItem
             disabled={audio.ready}

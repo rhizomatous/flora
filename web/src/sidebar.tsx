@@ -138,19 +138,6 @@ export function Sidebar({
                 </a>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={path.startsWith("projects")}>
-                <a
-                  href="#projects"
-                  aria-current={path.startsWith("projects") ? "page" : undefined}
-                  onClick={() => {
-                    setOpenMobile(false);
-                  }}
-                >
-                  Project settings
-                </a>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
