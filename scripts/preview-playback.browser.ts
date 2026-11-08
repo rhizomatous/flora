@@ -6,6 +6,32 @@ const browser = await chromium.launch();
 try {
   const page = await browser.newPage();
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5202";
+  for (const [id, name] of [
+    ["preview", "Flora"],
+    ["garden", "Garden storefront"],
+    ["fieldnotes", "Fieldnotes API"],
+  ] as const) {
+    await page.goto(`${base}/#projects`);
+    await page.locator("#main-content").getByRole("link", { name, exact: true }).click();
+    await expect(page).toHaveURL(`${base}/#projects/${id}`);
+    await expect(page.getByRole("textbox", { name: "Project name", exact: true })).toHaveValue(
+      name,
+    );
+    await expect(
+      page.getByRole("textbox", { name: "Setup command (optional)", exact: true }),
+    ).not.toBeEmpty();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+  }
+  for (const [id, title, pull] of [
+    ["checkout", "Keep the cart after signing in", "draft PR #42"],
+    ["pagination", "Fix duplicate notes between pages", "PR #18"],
+    ["focus", "Restore focus after removing a repository", "PR #73"],
+  ] as const) {
+    await page.goto(`${base}/#chats/${id}`);
+    await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: pull, exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Replay chat", exact: true })).toBeEnabled();
+  }
   await page.goto(`${base}/#chats/recovery`);
   await Promise.all([
     page.waitForEvent("load"),

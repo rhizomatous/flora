@@ -5,20 +5,24 @@ import type { Message, Part, QuestionRequest } from "@opencode-ai/sdk/v2";
 import type { Plugin } from "vite";
 
 import { captured } from "./captured.ts";
+import { projects, stories } from "./scenarios.ts";
 
 export type Frame = { history: { info: Message; parts: Part[] }[]; questions: QuestionRequest[] };
 function present<T>(value: T | undefined): T {
   assert.ok(value !== undefined);
   return value;
 }
-const scenarios: { id: string; title: string; frames: Frame[] }[] = [
+const scenarios: { id: string; projectID: string; title: string; frames: Frame[] }[] = [
   {
     id: "working",
+    projectID: "preview",
     title: "Check the project setup",
     frames: present(captured.find((s) => s.name === "completed")).frames,
   },
   ...captured.map((s) => ({
     id: s.name,
+    projectID:
+      ({ recovery: "fieldnotes", long: "garden" } as Record<string, string>)[s.name] ?? "preview",
     title:
       (
         {
@@ -30,6 +34,7 @@ const scenarios: { id: string; title: string; frames: Frame[] }[] = [
       )[s.name] ?? s.name,
     frames: s.frames,
   })),
+  ...stories,
 ];
 export const previewFrameMs = 2500;
 
@@ -61,22 +66,6 @@ function replayFrames(frames: Frame[]) {
 }
 
 const epoch = "2026-01-01T12:00:00.000Z";
-const project = {
-  id: "preview",
-  name: "Example project",
-  configuration: {
-    repositories: [
-      {
-        name: "example",
-        url: "https://github.com/example/example",
-        baseBranch: "main",
-        role: "core",
-      },
-    ],
-    setupCommand: "",
-  },
-};
-
 /** Projects captured OpenCode history into the same saved-message fields as captureHistory and AcceptMessage. */
 export function messages(frame: Frame, chatID: string) {
   return frame.history.map(({ info, parts }) => {
@@ -93,13 +82,15 @@ export function messages(frame: Frame, chatID: string) {
         .join(""),
       Provider: user ? "" : info.providerID,
       Model: user ? "" : info.modelID,
-      CreatedAt: epoch,
+      CreatedAt: new Date(info.time.created).toISOString(),
       Payload: user ? {} : { info, parts },
     };
   });
 }
 
 export function chatAt(id: string, frame: Frame, finished: boolean) {
+  const scenario = present(scenarios.find((s) => s.id === id));
+  const project = present(projects.find((p) => p.id === scenario.projectID));
   let status = finished ? "idle" : "working";
   let reason = finished ? "Turn completed; ready for a follow-up" : "Running";
   if (frame.questions.length > 0) {
@@ -109,7 +100,7 @@ export function chatAt(id: string, frame: Frame, finished: boolean) {
   return {
     ID: id,
     ProjectID: project.id,
-    Title: present(scenarios.find((s) => s.id === id)).title,
+    Title: scenario.title,
     Configuration: project.configuration,
     ImageDigest: `flora-preview@sha256:${"0".repeat(64)}`,
     HarnessVersion: "1.2.27",
@@ -120,7 +111,9 @@ export function chatAt(id: string, frame: Frame, finished: boolean) {
     ActiveMessageID: status === "idle" ? "" : `saved-${frame.history[0]?.info.id}`,
     CreatedAt: epoch,
     UpdatedAt: epoch,
-    StartingCommits: { example: "a".repeat(40) },
+    StartingCommits: Object.fromEntries(
+      project.configuration.repositories.map((repo) => [repo.name, "a".repeat(40)]),
+    ),
   };
 }
 
@@ -219,7 +212,13 @@ export function chatPreview(): Plugin {
       return;
     }
     if (url.pathname === "/api/projects") {
-      json(res, [project]);
+      json(res, projects);
+      return;
+    }
+    const projectMatch = /^\/api\/projects\/([^/]+)$/.exec(url.pathname);
+    if (projectMatch) {
+      const project = projects.find((p) => p.id === projectMatch[1]);
+      json(res, project ?? { error: "Unknown preview project." }, project ? 200 : 404);
       return;
     }
     if (url.pathname === "/api/notifications") {
@@ -258,6 +257,23 @@ export function chatPreview(): Plugin {
       return;
     }
     if (endpoint === "changes") {
+      const story = stories.find((s) => s.id === id);
+      const finished = i === scenario.frames.length - 1;
+      const project = present(projects.find((p) => p.id === scenario.projectID));
+      const repository = present(project.configuration.repositories[0]);
+      const files = story?.files.map((file) => {
+        const diff = `@@ -1,${file.before.split("\n").length} +1,${file.after.split("\n").length} @@\n-${file.before}\n+${file.after.split("\n").join("\n+")}\n`;
+        return {
+          repository: repository.name,
+          path: file.path,
+          status: "M",
+          binary: false,
+          undisplayable: false,
+          diff,
+          bytes: Buffer.byteLength(diff),
+          truncated: false,
+        };
+      });
       json(res, {
         snapshot:
           i === scenario.frames.length - 1 && id !== "waiting"
@@ -265,7 +281,7 @@ export function chatPreview(): Plugin {
                 id: "preview-review",
                 capturedAt: epoch,
                 base: "a".repeat(40),
-                files: [
+                files: files ?? [
                   {
                     path: "example.ts",
                     status: "M",
@@ -280,7 +296,20 @@ export function chatPreview(): Plugin {
             : null,
         stale: false,
         error: "",
-        pulls: { items: [], error: "", checkedAt: epoch },
+        pulls: {
+          items:
+            story && finished
+              ? [
+                  {
+                    ...story.pull,
+                    repository: repository.name,
+                    url: `${repository.url}/pull/${story.pull.number}`,
+                  },
+                ]
+              : [],
+          error: "",
+          checkedAt: epoch,
+        },
       });
       return;
     }

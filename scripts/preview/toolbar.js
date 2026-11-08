@@ -30,7 +30,9 @@ document.body.append(bar);
 if (!window.location.hash) window.location.hash = "chats/completed";
 
 const updateControls = () => {
-  const chat = /^#chats\/(working|completed|waiting|recovery|long)$/.test(window.location.hash);
+  const chat = /^#chats\/(working|completed|waiting|recovery|long|checkout|pagination|focus)$/.test(
+    window.location.hash,
+  );
   for (const button of bar.querySelectorAll("button[data-action]:not([data-action=hide])")) {
     button.disabled = !chat;
   }

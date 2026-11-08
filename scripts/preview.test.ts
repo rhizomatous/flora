@@ -6,6 +6,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { createServer } from "vite";
 
 import { captured } from "./preview/captured.ts";
+import { projects as fixtureProjects, stories } from "./preview/scenarios.ts";
 import {
   chatPreview,
   messages,
@@ -59,13 +60,53 @@ test("preview serves isolated fixtures and replays saved events with resumable I
   const base = `http://127.0.0.1:${address.port}`;
   const controller = new AbortController();
   try {
-    for (const id of ["working", "completed", "waiting", "recovery", "long"]) {
+    for (const id of [
+      "working",
+      "completed",
+      "waiting",
+      "recovery",
+      "long",
+      "checkout",
+      "pagination",
+      "focus",
+    ]) {
       const response = await fetch(`${base}/api/chats/${id}`);
       assert.equal(response.status, 200);
       const text = await response.text();
       assert.match(text, /"messages":\[/);
       assert.doesNotMatch(text, /preview:(completed|waiting|recovery|long)/);
       assert.match(text, /"HarnessVersion":"1.2.27"/);
+    }
+    const projectResponse = await fetch(`${base}/api/projects`);
+    assert.deepEqual(await projectResponse.json(), fixtureProjects);
+    for (const project of fixtureProjects) {
+      const detail = await fetch(`${base}/api/projects/${project.id}`);
+      assert.equal(detail.status, 200);
+      assert.deepEqual(await detail.json(), project);
+    }
+    const missingProject = await fetch(`${base}/api/projects/missing`);
+    assert.equal(missingProject.status, 404);
+    const notificationResponse = await fetch(`${base}/api/notifications`);
+    const notificationText = await notificationResponse.text();
+    for (const project of fixtureProjects) {
+      assert.ok(notificationText.includes(`"ProjectID":"${project.id}"`));
+    }
+    for (const story of stories) {
+      const detailResponse = await fetch(`${base}/api/chats/${story.id}`);
+      const detailText = await detailResponse.text();
+      assert.ok(detailText.includes(`"ProjectID":"${story.projectID}"`));
+      assert.ok((detailText.match(/"Role":"user"/g) ?? []).length >= 3);
+      const reviewResponse = await fetch(`${base}/api/chats/${story.id}/changes`);
+      const reviewText = await reviewResponse.text();
+      assert.ok(reviewText.includes(`"number":${story.pull.number}`));
+      assert.ok(reviewText.includes(`"state":"${story.pull.state}"`));
+      for (const file of story.files) assert.ok(reviewText.includes(file.path));
+      await fetch(`${base}/__preview/control?action=restart&chat=${story.id}`, { method: "POST" });
+      await fetch(`${base}/__preview/control?action=pause&chat=${story.id}`, { method: "POST" });
+      const initialResponse = await fetch(`${base}/api/chats/${story.id}/changes`);
+      const initialText = await initialResponse.text();
+      assert.match(initialText, /"snapshot":null/);
+      assert.match(initialText, /"items":\[\]/);
     }
     const recovery = captured.find((scenario) => scenario.name === "recovery");
     assert.ok(recovery);
