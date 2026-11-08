@@ -725,18 +725,20 @@ function FollowUpComposer({
             }
           }}
         />
-        <InputGroupAddon align="block-end" className="justify-between">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <InputGroupButton type="button" variant="ghost" aria-label="Chat actions">
-                ⋯
-              </InputGroupButton>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem asChild>
-                <a href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>Download setup log</a>
-              </DropdownMenuItem>
-              {!blocked && !stopped && (
+        <InputGroupAddon align="block-end" className="justify-end">
+          {!blocked && !stopped && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <InputGroupButton
+                  type="button"
+                  variant="ghost"
+                  className="mr-auto"
+                  aria-label="Chat actions"
+                >
+                  ⋯
+                </InputGroupButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
                 <DropdownMenuItem
                   disabled={busy}
                   onSelect={() => {
@@ -745,9 +747,9 @@ function FollowUpComposer({
                 >
                   Stop container
                 </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           {activeTurn && !blocked ? (
             <InputGroupButton
               type="button"
