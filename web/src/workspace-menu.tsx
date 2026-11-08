@@ -38,7 +38,7 @@ export function WorkspaceMenu({
       <DropdownMenuTrigger asChild>
         <SidebarMenuButton size="lg" aria-label="Workspace menu">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-            <FlowerMark />
+            <FlowerMark className="text-2xl" />
           </span>
           <span className="min-w-0 flex-1 text-left">
             <span className="block">Flora</span>

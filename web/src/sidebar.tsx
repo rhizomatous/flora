@@ -3,7 +3,7 @@ import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "rea
 import {
   Button,
   Text,
-  Wordmark,
+  FlowerMark,
   Sidebar as NavigationSidebar,
   SidebarHeader,
   SidebarContent,
@@ -99,7 +99,7 @@ export function Sidebar({
           >
             Skip to content
           </a>
-          <div className="px-3 py-3">
+          <div className="px-2 py-3">
             <a
               href="#chats/new"
               aria-label="Flora home"
@@ -108,7 +108,7 @@ export function Sidebar({
                 setOpenMobile(false);
               }}
             >
-              <Wordmark />
+              <FlowerMark className="-ml-0.5 text-2xl" />
             </a>
           </div>
           <SidebarMenu>
@@ -190,8 +190,8 @@ export function Sidebar({
                           }}
                         >
                           <span className="min-w-0 flex-1 truncate">{chat.Title}</span>
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            {chat.Status === "working" ? "✿ " : ""}
+                          <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                            {chat.Status === "working" && <FlowerMark />}
                             {chat.Status.charAt(0).toUpperCase() + chat.Status.slice(1)}
                           </span>
                         </a>

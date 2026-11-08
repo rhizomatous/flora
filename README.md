@@ -1,4 +1,4 @@
-# Flora ✿
+# Flora <img src="florets/src/assets/flora.svg" width="32" height="32" alt="" />
 
 A self-hosted autonomous coding agent. Describe a task, let the agent work, then
 return to review its changes and open a draft pull request.

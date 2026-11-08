@@ -262,8 +262,10 @@ export function FoundationPage({ id }: { id: string }) {
       {id === "identity" && (
         <Section id="marks" title="Flower mark and wordmark">
           <p>
-            FlowerMark is a decorative flower symbol, hidden from assistive technology. Wordmark
-            combines it with the Flora name. Give any icon-only control its own accessible name.
+            Use FlowerMark for Flora’s five-petal sticker SVG instead of a Unicode flower. Keep its
+            black-and-white colors and white rim on both light and dark backgrounds. It is
+            decorative and hidden from assistive technology. Wordmark combines it with the Flora
+            name. Give any icon-only control its own accessible name.
           </p>
           <Demo>
             <FlowerMark className="text-4xl" />

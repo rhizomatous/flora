@@ -233,5 +233,5 @@ export const foundationDocs = [
     title: "Feedback",
     description: "Announce loading progress with a readable status message.",
   },
-  { id: "identity", title: "Identity", description: "Use Flora's flower mark and wordmark." },
+  { id: "identity", title: "Identity", description: "Use Flora's SVG sticker mark and wordmark." },
 ];
