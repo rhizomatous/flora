@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@flora/florets/components/select";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/input-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/input-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

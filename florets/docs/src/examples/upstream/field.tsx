@@ -1,5 +1,5 @@
 // oxlint-disable import/max-dependencies -- The upstream collection demonstrates compositions across several components.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/field-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/field-example.json
 "use client";
 
 import { REGEXP_ONLY_DIGITS } from "input-otp";

@@ -8,7 +8,7 @@ import {
 } from "@flora/florets/components/field";
 import { RadioGroup, RadioGroupItem } from "@flora/florets/components/radio-group";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/radio-group-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/radio-group-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

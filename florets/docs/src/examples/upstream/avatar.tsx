@@ -18,7 +18,7 @@ import {
   EmptyTitle,
 } from "@flora/florets/components/empty";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/avatar-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/avatar-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

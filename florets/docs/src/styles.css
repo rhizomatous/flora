@@ -292,3 +292,5 @@
     font-size: 16px;
   }
 }
+
+@custom-variant style-nova (&);

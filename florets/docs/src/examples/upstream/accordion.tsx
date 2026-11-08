@@ -16,7 +16,7 @@ import {
 } from "@flora/florets/components/card";
 
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/accordion-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/accordion-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

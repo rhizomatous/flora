@@ -1,7 +1,7 @@
 import { AspectRatio } from "@flora/florets/components/aspect-ratio";
 
 import { Example, ExampleWrapper } from "../example";
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/aspect-ratio-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/aspect-ratio-example.json
 import { PreviewImage as Image } from "../preview-image";
 
 export function Preview() {

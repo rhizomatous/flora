@@ -51,7 +51,7 @@ export function Example({
       aria-label={title}
       id={documented && title !== undefined ? exampleAnchor(title) : undefined}
       className={cn(
-        documented ? "min-w-0" : "min-w-0 rounded-2xl border bg-card",
+        documented ? "min-w-0" : "min-w-0 rounded-lg border bg-card",
         containerClassName,
       )}
       {...props}

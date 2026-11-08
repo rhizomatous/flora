@@ -18,7 +18,7 @@ import {
 import { Input } from "@flora/florets/components/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@flora/florets/components/tabs";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/tabs-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/tabs-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

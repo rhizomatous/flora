@@ -1,6 +1,6 @@
 // oxlint-disable jsx-a11y/anchor-ambiguous-text -- The sample link text is preserved from the upstream examples.
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/tooltip-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/tooltip-example.json
 "use client";
 
 import { InfoIcon, SaveIcon } from "lucide-react";

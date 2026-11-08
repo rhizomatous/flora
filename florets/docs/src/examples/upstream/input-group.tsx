@@ -1,6 +1,6 @@
 // oxlint-disable import/max-dependencies -- The upstream collection demonstrates compositions across several components.
 // oxlint-disable typescript/strict-void-return -- React ignores return values from these upstream event handlers.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/input-group-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/input-group-example.json
 "use client";
 
 import {

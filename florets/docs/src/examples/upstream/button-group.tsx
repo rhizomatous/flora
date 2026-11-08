@@ -1,5 +1,5 @@
 // oxlint-disable import/max-dependencies -- The upstream collection demonstrates compositions across several components.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/button-group-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/button-group-example.json
 "use client";
 
 import {

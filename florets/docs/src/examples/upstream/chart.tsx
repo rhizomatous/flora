@@ -4,7 +4,7 @@
 // oxlint-disable typescript/no-unsafe-call -- Recharts exposes formatter values through permissive types.
 // oxlint-disable typescript/no-unsafe-member-access -- Recharts exposes formatter payloads through permissive types.
 // oxlint-disable typescript/no-unsafe-return -- Recharts formatters return the supplied demo payload values.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/chart-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/chart-example.json
 "use client";
 
 import { TrendingUpIcon } from "lucide-react";

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 /** Reads an environment variable that the Go browser test sets before launching the script. */
 export function requiredEnv(name: string) {
@@ -43,7 +43,13 @@ export async function assertFitsPhone(page: Page) {
 /** Opens installation actions without toggling an already-open menu closed. */
 export async function openWorkspaceMenu(page: Page) {
   const trigger = page.getByRole("button", { name: "Workspace menu", exact: true });
-  if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click();
+  const menu = page.getByRole("menu", { name: "Workspace menu", exact: true });
+  if ((await trigger.getAttribute("aria-expanded")) !== "true") {
+    // Wait for the exiting menu to release focus before opening it again.
+    await expect(menu).toHaveCount(0);
+    await trigger.click();
+  }
+  await expect(menu).toHaveAttribute("data-state", "open");
 }
 
 /** Opens settings through the workspace menu. */

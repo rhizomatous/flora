@@ -2,7 +2,7 @@
 // oxlint-disable typescript/no-base-to-string -- The sample displays the upstream value as text.
 // oxlint-disable typescript/no-deprecated -- The upstream example demonstrates the dependency API it was authored against.
 // oxlint-disable typescript/restrict-template-expressions -- Demo values are converted to strings for display.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/questionnaire-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/questionnaire-example.json
 "use client";
 
 import * as React from "react";

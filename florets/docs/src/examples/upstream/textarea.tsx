@@ -1,7 +1,7 @@
 import { Field, FieldDescription, FieldLabel } from "@flora/florets/components/field";
 import { Textarea } from "@flora/florets/components/textarea";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/textarea-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/textarea-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

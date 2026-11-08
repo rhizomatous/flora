@@ -1,5 +1,5 @@
 // oxlint-disable react/no-array-index-key -- These fixed demo sequences use positions to distinguish repeated entries.
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/drawer-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/drawer-example.json
 "use client";
 
 import { Button } from "@flora/florets/components/button";

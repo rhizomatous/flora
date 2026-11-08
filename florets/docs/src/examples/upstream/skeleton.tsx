@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader } from "@flora/florets/components/card";
 import { Skeleton } from "@flora/florets/components/skeleton";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/skeleton-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/skeleton-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

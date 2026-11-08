@@ -1,6 +1,6 @@
 import { Separator } from "@flora/florets/components/separator";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/separator-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/separator-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

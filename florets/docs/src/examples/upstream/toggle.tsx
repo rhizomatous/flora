@@ -3,7 +3,7 @@ import { BoldIcon, BookmarkIcon, ItalicIcon, UnderlineIcon } from "lucide-react"
 import { Button } from "@flora/florets/components/button";
 import { Toggle } from "@flora/florets/components/toggle";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-rhea/toggle-example.json
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/toggle-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {
