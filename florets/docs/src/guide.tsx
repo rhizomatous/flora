@@ -415,7 +415,7 @@ export function Guide() {
                 <SidebarMenuButton
                   asChild
                   isActive={route === item.route}
-                  className="h-[30px] w-fit rounded-md text-[0.8rem] font-medium"
+                  className="h-[30px] w-fit rounded-md border border-transparent text-[0.8rem] font-medium data-[active=true]:border-accent data-[active=true]:bg-accent"
                 >
                   <a
                     href={href(item.route)}
