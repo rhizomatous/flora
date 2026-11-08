@@ -1,6 +1,21 @@
 import { useEffect, useEffectEvent, useState, type ReactNode } from "react";
 
-import { Button, Link, Text, Wordmark } from "@flora/florets";
+import {
+  Button,
+  Text,
+  Wordmark,
+  Sidebar as NavigationSidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarRail,
+  useSidebar,
+} from "@flora/florets";
 
 import type { Chat } from "./notifications";
 import { errorMessage, isExpired, request } from "./request";
@@ -21,14 +36,13 @@ export function Sidebar({
 }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [error, setError] = useState("");
-  const [open, setOpen] = useState(false);
+  const { setOpenMobile } = useSidebar();
   const [retry, setRetry] = useState(0);
   const expire = useEffectEvent(onExpired);
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- Route changes close the mobile navigation, including footer links.
-    setOpen(false);
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Navigation changes dismiss the mobile menu.
-  }, [path]);
+    setOpenMobile(false);
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Route changes also dismiss navigation opened from the footer.
+  }, [path, setOpenMobile]);
   useEffect(() => {
     let active = true;
     async function load() {
@@ -52,63 +66,72 @@ export function Sidebar({
   }, [path, retry]);
 
   return (
-    <aside className="workspace-sidebar">
-      <a
-        href="#main-content"
-        onClick={(event) => {
-          event.preventDefault();
-          document.querySelector<HTMLElement>("#main-content")?.focus();
-        }}
-        className="sr-only focus:not-sr-only"
-      >
-        Skip to content
-      </a>
-      <div className="flex items-center justify-between gap-4">
-        <Wordmark />
-        <Button
-          type="button"
-          variant="outline"
-          className="sidebar-toggle"
-          aria-expanded={open}
-          aria-controls="workspace-navigation"
-          onClick={() => {
-            setOpen(!open);
-          }}
-        >
-          Menu
-        </Button>
-      </div>
-      <nav
-        id="workspace-navigation"
-        aria-label="Main"
-        className={open ? "sidebar-navigation is-open" : "sidebar-navigation"}
-      >
-        <Link
-          onClick={() => {
-            setOpen(false);
-          }}
-          href="#chats/new"
-          className="sidebar-new"
-          aria-current={path.startsWith("chats/new") ? "page" : undefined}
-        >
-          <span aria-hidden="true">＋ </span>New chat
-        </Link>
-        <Link
-          onClick={() => {
-            setOpen(false);
-          }}
-          href="#chats"
-          className="sidebar-link"
-          aria-current={path === "chats" ? "page" : undefined}
-        >
-          All chats
-        </Link>
-        <div className="sidebar-chats">
+    <NavigationSidebar variant="inset">
+      <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col">
+        <SidebarHeader>
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only"
+            onClick={(event) => {
+              event.preventDefault();
+              setOpenMobile(false);
+              document.querySelector<HTMLElement>("#main-content")?.focus();
+            }}
+          >
+            Skip to content
+          </a>
+          <div className="px-3 py-3">
+            <Wordmark />
+          </div>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={path.startsWith("chats/new")}>
+                <a
+                  href="#chats/new"
+                  aria-current={path.startsWith("chats/new") ? "page" : undefined}
+                  onClick={() => {
+                    setOpenMobile(false);
+                  }}
+                >
+                  New chat
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={path === "chats"}>
+                <a
+                  href="#chats"
+                  aria-current={path === "chats" ? "page" : undefined}
+                  onClick={() => {
+                    setOpenMobile(false);
+                  }}
+                >
+                  All chats
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={path.startsWith("projects")}>
+                <a
+                  href="#projects"
+                  aria-current={path.startsWith("projects") ? "page" : undefined}
+                  onClick={() => {
+                    setOpenMobile(false);
+                  }}
+                >
+                  Projects
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+        <SidebarContent>
           {error !== "" && (
-            <div role="status">
-              <Text size="xs">{error}</Text>
+            <SidebarGroup>
+              <Text size="xs" role="status">
+                {error}
+              </Text>
               <Button
-                type="button"
                 variant="link"
                 onClick={() => {
                   setRetry(retry + 1);
@@ -116,72 +139,71 @@ export function Sidebar({
               >
                 Retry projects
               </Button>
-            </div>
+            </SidebarGroup>
           )}
           {chats === undefined && (
-            <Text tone="muted" role="status">
-              Loading chats…
-            </Text>
+            <SidebarGroup>
+              <Text tone="muted" role="status">
+                Loading chats…
+              </Text>
+            </SidebarGroup>
           )}
           {projects.map((project) => (
-            <section key={project.id} className="mt-3" aria-label={project.name}>
-              <Link
-                onClick={() => {
-                  setOpen(false);
-                }}
-                href={`#projects/${project.id}`}
-                className="sidebar-project"
-              >
-                {project.name}
-              </Link>
-              <ul className="mt-1">
+            <SidebarGroup key={project.id} aria-label={project.name}>
+              <SidebarGroupLabel asChild>
+                <a
+                  href={`#projects/${project.id}`}
+                  onClick={() => {
+                    setOpenMobile(false);
+                  }}
+                >
+                  {project.name}
+                </a>
+              </SidebarGroupLabel>
+              <SidebarMenu>
                 {chats
                   ?.filter((chat) => chat.ProjectID === project.id)
                   .map((chat) => (
-                    <li key={chat.ID}>
-                      <Link
-                        onClick={() => {
-                          setOpen(false);
-                        }}
-                        href={`#chats/${chat.ID}`}
-                        className="sidebar-chat"
-                        title={chat.Title}
-                        aria-current={path === `chats/${chat.ID}` ? "page" : undefined}
-                      >
-                        <span className="min-w-0 flex-1 truncate">{chat.Title}</span>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {chat.Status === "working" ? "✿ " : ""}
-                          {chat.Status.charAt(0).toUpperCase() + chat.Status.slice(1)}
-                        </span>
-                      </Link>
-                    </li>
+                    <SidebarMenuItem key={chat.ID}>
+                      <SidebarMenuButton asChild isActive={path === `chats/${chat.ID}`}>
+                        <a
+                          href={`#chats/${chat.ID}`}
+                          title={chat.Title}
+                          aria-current={path === `chats/${chat.ID}` ? "page" : undefined}
+                          onClick={() => {
+                            setOpenMobile(false);
+                          }}
+                        >
+                          <span className="min-w-0 flex-1 truncate">{chat.Title}</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            {chat.Status === "working" ? "✿ " : ""}
+                            {chat.Status.charAt(0).toUpperCase() + chat.Status.slice(1)}
+                          </span>
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
                   ))}
                 {chats !== undefined && !chats.some((chat) => chat.ProjectID === project.id) && (
-                  <li>
-                    <Link
-                      onClick={() => {
-                        setOpen(false);
-                      }}
-                      href={`#chats/new?project=${encodeURIComponent(project.id)}`}
-                      className="sidebar-link text-muted-foreground"
-                    >
-                      Start a chat
-                    </Link>
-                  </li>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <a
+                        href={`#chats/new?project=${encodeURIComponent(project.id)}`}
+                        onClick={() => {
+                          setOpenMobile(false);
+                        }}
+                      >
+                        Start a chat
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 )}
-              </ul>
-            </section>
+              </SidebarMenu>
+            </SidebarGroup>
           ))}
-        </div>
-        <Link
-          href="#projects"
-          className="sidebar-link"
-          aria-current={path.startsWith("projects") ? "page" : undefined}
-        >
-          Projects
-        </Link>
+        </SidebarContent>
       </nav>
-      <div className="sidebar-footer">{children}</div>
-    </aside>
+      <SidebarFooter>{children}</SidebarFooter>
+      <SidebarRail />
+    </NavigationSidebar>
   );
 }

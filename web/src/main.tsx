@@ -11,6 +11,9 @@ import {
   LoadingStatus,
   Text,
   Wordmark,
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
 } from "@flora/florets";
 
 import { Chats } from "./chats";
@@ -195,8 +198,11 @@ function App() {
     setNotice("Settings saved. Credentials are not shown.");
   }
 
+  const Layout = ready ? SidebarProvider : "div";
+  const Content = ready ? SidebarInset : "main";
+
   return (
-    <div className={ready ? "workspace" : "mx-auto min-h-svh max-w-4xl px-6 py-10 sm:px-10"}>
+    <Layout className={ready ? "min-h-svh" : "mx-auto min-h-svh max-w-4xl px-6 py-10 sm:px-10"}>
       {ready ? (
         <Sidebar path={path} chats={notifications.chats} onExpired={onExpired}>
           <WorkspaceMenu
@@ -211,70 +217,77 @@ function App() {
           <Wordmark />
         </header>
       )}
-      <main id="main-content" tabIndex={-1} className={ready ? "workspace-content" : undefined}>
-        {error !== "" && (
-          <Alert variant="destructive" role="alert" className="mb-6">
-            {error}
-          </Alert>
-        )}
-        {notice !== "" && (
-          <Alert role="status" className="mb-6">
-            {notice}
-          </Alert>
-        )}
+      <Content id="main-content" tabIndex={-1} className={ready ? "min-w-0" : undefined}>
         {ready && (
-          <>
-            {notifications.error !== "" && (
-              <Alert role="status" className="mb-6">
-                {notifications.error}
-              </Alert>
-            )}
-            <CompletionToasts toasts={notifications.toasts} dismiss={notifications.dismiss} />
-          </>
+          <header className="flex h-14 shrink-0 items-center border-b px-4">
+            <SidebarTrigger aria-label="Menu" />
+          </header>
         )}
-        {(status === undefined || (status.authenticated && settings === undefined)) &&
-          (error === "" ? (
-            <LoadingStatus />
-          ) : (
-            <Button
-              type="button"
-              onClick={() => {
-                setError("");
-                void load();
-              }}
-            >
-              Retry loading Flora
-            </Button>
-          ))}
-        {status?.authenticated === false && (
-          <Account
-            key={String(status.setupRequired)}
-            setupRequired={status.setupRequired}
-            enrollmentRequired={status.enrollmentRequired === true}
-            busy={busy}
-            run={run}
-            onLogin={refresh}
-          />
-        )}
-        {ready && path === "settings" && (
-          <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
-        )}
-        {ready &&
-          path !== "settings" &&
-          (path.startsWith("chats") ? (
-            <Chats
-              key={path}
-              path={path}
-              list={notifications.chats}
-              listError={notifications.error}
-              messageBytes={settings.preferences.messageBytes}
-              onExpired={onExpired}
+        <div className={ready ? "mx-auto w-full max-w-6xl p-4 sm:p-8" : undefined}>
+          {error !== "" && (
+            <Alert variant="destructive" role="alert" className="mb-6">
+              {error}
+            </Alert>
+          )}
+          {notice !== "" && (
+            <Alert role="status" className="mb-6">
+              {notice}
+            </Alert>
+          )}
+          {ready && (
+            <>
+              {notifications.error !== "" && (
+                <Alert role="status" className="mb-6">
+                  {notifications.error}
+                </Alert>
+              )}
+              <CompletionToasts toasts={notifications.toasts} dismiss={notifications.dismiss} />
+            </>
+          )}
+          {(status === undefined || (status.authenticated && settings === undefined)) &&
+            (error === "" ? (
+              <LoadingStatus />
+            ) : (
+              <Button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  void load();
+                }}
+              >
+                Retry loading Flora
+              </Button>
+            ))}
+          {status?.authenticated === false && (
+            <Account
+              key={String(status.setupRequired)}
+              setupRequired={status.setupRequired}
+              enrollmentRequired={status.enrollmentRequired === true}
+              busy={busy}
+              run={run}
+              onLogin={refresh}
             />
-          ) : (
-            <Projects key={path} path={path} onExpired={onExpired} />
-          ))}
-      </main>
-    </div>
+          )}
+          {ready && path === "settings" && (
+            <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
+          )}
+          {ready &&
+            path !== "settings" &&
+            (path.startsWith("chats") ? (
+              <Chats
+                key={path}
+                path={path}
+                list={notifications.chats}
+                listError={notifications.error}
+                messageBytes={settings.preferences.messageBytes}
+                onExpired={onExpired}
+              />
+            ) : (
+              <Projects key={path} path={path} onExpired={onExpired} />
+            ))}
+        </div>
+      </Content>
+    </Layout>
   );
 }
 

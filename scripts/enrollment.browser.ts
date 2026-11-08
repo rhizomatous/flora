@@ -38,6 +38,9 @@ try {
       menuBounds.x + menuBounds.width <= 375 &&
       menuBounds.y + menuBounds.height <= 812,
   );
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Sidebar", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Workspace menu", exact: true })).toBeFocused();
   await expect(code).toHaveCount(0);
   await openWorkspaceMenu(page);
   await page.getByRole("menuitem", { name: "Log out", exact: true }).click();

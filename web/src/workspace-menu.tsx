@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 
 import {
-  Button,
+  SidebarMenuButton,
   FlowerMark,
   DropdownMenu,
   DropdownMenuTrigger,
@@ -36,7 +36,7 @@ export function WorkspaceMenu({
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="workspace-menu-trigger" aria-label="Workspace menu">
+        <SidebarMenuButton size="lg" aria-label="Workspace menu">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
             <FlowerMark />
           </span>
@@ -45,7 +45,7 @@ export function WorkspaceMenu({
             <span className="block text-xs font-normal text-muted-foreground">Your workspace</span>
           </span>
           <ChevronUpIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-        </Button>
+        </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         side="top"
