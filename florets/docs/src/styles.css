@@ -282,9 +282,6 @@
   .docs-page-heading h1 {
     font-size: 30px;
   }
-  .docs-page-heading > button span {
-    display: none;
-  }
   .docs-index {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

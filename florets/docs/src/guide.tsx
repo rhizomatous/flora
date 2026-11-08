@@ -310,7 +310,7 @@ export function Guide() {
     (isIndex ? "" : "This documentation page doesn’t exist. Choose a page from the navigation.");
   const pageIndex = pages.findIndex((item) => item.route === route);
   const previous = pages[pageIndex - 1];
-  const next = pages[pageIndex + 1];
+  const next = pageIndex === -1 ? undefined : pages[pageIndex + 1];
 
   useEffect(() => {
     function navigate() {
@@ -617,17 +617,44 @@ export function Guide() {
                 <p className="docs-eyebrow">{category}</p>
                 <h1>{title}</h1>
               </div>
-              <Button
-                variant="secondary"
-                aria-label={copied ? "Page copied" : "Copy page"}
-                size="sm"
-                onClick={() => {
-                  void copyPage();
-                }}
-              >
-                {copied ? <Check /> : <Copy />}
-                <span>{copied ? "Copied" : "Copy page"}</span>
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  className="hidden sm:inline-flex"
+                  variant="secondary"
+                  aria-label={copied ? "Page copied" : "Copy page"}
+                  size="sm"
+                  onClick={() => {
+                    void copyPage();
+                  }}
+                >
+                  {copied ? <Check /> : <Copy />}
+                  <span>{copied ? "Copied" : "Copy page"}</span>
+                </Button>
+                <nav aria-label="Adjacent pages" className="flex gap-2">
+                  {previous && (
+                    <Button asChild variant="secondary" size="icon-sm" className="size-8 md:size-7">
+                      <a
+                        href={href(previous.route)}
+                        aria-label={`Previous: ${previous.title}`}
+                        title={previous.title}
+                      >
+                        <ArrowLeft />
+                      </a>
+                    </Button>
+                  )}
+                  {next && (
+                    <Button asChild variant="secondary" size="icon-sm" className="size-8 md:size-7">
+                      <a
+                        href={href(next.route)}
+                        aria-label={`Next: ${next.title}`}
+                        title={next.title}
+                      >
+                        <ArrowRight />
+                      </a>
+                    </Button>
+                  )}
+                </nav>
+              </div>
             </div>
             {description && <p className="docs-description">{description}</p>}
             {toc.length > 0 && (
