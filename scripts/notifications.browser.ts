@@ -82,7 +82,7 @@ try {
   await page.waitForURL(/#chats\/(?!new)/);
   const chatURL = page.url();
   const chatID = new URL(chatURL).hash.slice("#chats/".length);
-  await page.getByRole("heading", { name: "Flora needs your answer", exact: true }).waitFor();
+  await page.getByRole("form", { name: "Questions", exact: true }).waitFor();
   await page.goto(`${origin}/#chats/${requiredEnv("FLORA_OTHER_CHAT")}`);
   await page.getByRole("heading", { name: "Other conversation", exact: true }).waitFor();
   const reply = await context.request.post(

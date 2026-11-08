@@ -635,7 +635,7 @@ function ChatDetail({
         <MessageScrollerButton aria-label="Jump to latest" />
       </MessageScroller>
       <div className="mx-auto max-h-[70dvh] w-full max-w-[880px] shrink-0 overflow-y-auto bg-background pt-3 pb-[env(safe-area-inset-bottom)]">
-        <div className="max-h-[30dvh] overflow-y-auto empty:hidden [&_form]:mt-0 [&_form]:mb-3">
+        <div className="max-h-[50dvh] overflow-y-auto empty:hidden [&_form]:mt-0 [&_form]:mb-3">
           {children}
         </div>
         <FollowUpComposer

@@ -38,7 +38,7 @@ try {
   await page.getByRole("heading", { name: "First browser prompt 🌸", exact: true }).waitFor();
   // Reload during execution. The browser request ending must not cancel work.
   await page.reload();
-  await page.getByRole("heading", { name: "Flora needs your answer", exact: true }).waitFor();
+  await page.getByRole("form", { name: "Questions", exact: true }).waitFor();
   await page.getByRole("radio", { name: /^Yes/ }).check();
   await page.getByRole("button", { name: "Answer and continue", exact: true }).click();
   await page.getByText("Saved response 1", { exact: true }).waitFor();

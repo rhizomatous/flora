@@ -90,7 +90,7 @@ try {
   assert.deepEqual(await draft.boundingBox(), before);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${base}/#chats/waiting`);
-  await expect(page.getByRole("heading", { name: "Flora needs your answer" })).toBeVisible();
+  await expect(page.getByRole("form", { name: "Questions", exact: true })).toBeVisible();
   await expect(draft).toBeEnabled();
   const bounds = await draft.boundingBox();
   assert.ok(bounds && bounds.y >= 0 && bounds.y + bounds.height <= 844);

@@ -65,7 +65,7 @@ try {
   await page.getByRole("menuitemradio", { name: "Browser project", exact: true }).click();
   await page.getByLabel("Message", { exact: true }).fill("Sound enabled");
   await page.getByRole("button", { name: "Start chat", exact: true }).click();
-  await page.getByRole("heading", { name: "Flora needs your answer", exact: true }).waitFor();
+  await page.getByRole("form", { name: "Questions", exact: true }).waitFor();
   await page.waitForTimeout(1200);
   assert.equal(await page.evaluate(() => window.tones), 0);
   await page.getByRole("radio", { name: /^Yes/ }).check();
