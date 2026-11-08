@@ -29,9 +29,23 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
   FlowerMark,
   Input,
   Kbd,
+  Sidebar,
+  SidebarProvider,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  Separator,
   Sheet,
   SheetContent,
   SheetHeader,
@@ -74,12 +88,18 @@ const aiPreviews = Object.fromEntries(
 );
 const sections = [
   {
-    title: "Getting started",
-    pages: foundationDocs.slice(0, 3).map((doc) => ({ ...doc, route: doc.id })),
-  },
-  {
-    title: "Foundations",
-    pages: foundationDocs.slice(3).map((doc) => ({ ...doc, route: doc.id })),
+    title: "Sections",
+    pages: [
+      ...foundationDocs.slice(0, 1).map((doc) => ({ ...doc, route: doc.id })),
+      {
+        id: "components",
+        title: "Components",
+        description: "Browse all interface components.",
+        route: "components",
+      },
+      { id: "ai", title: "AI Elements", description: "Browse conversation patterns.", route: "ai" },
+      ...foundationDocs.slice(1).map((doc) => ({ ...doc, route: doc.id })),
+    ],
   },
   {
     title: "Components",
@@ -279,7 +299,7 @@ export function Guide() {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const article = useRef<HTMLElement>(null);
-  const nav = useRef<HTMLElement>(null);
+  const nav = useRef<HTMLDivElement>(null);
   const page = pages.find((item) => item.route === route);
   const isIndex = route === "components" || route === "ai";
   const indexTitle = route === "components" ? "Components" : "AI Elements";
@@ -385,36 +405,34 @@ export function Guide() {
   }, [route]);
 
   function navigation() {
-    return (
-      <>
-        <div className="docs-nav-group">
-          <span>Overview</span>
-          <a href="#components" aria-current={route === "components" ? "page" : undefined}>
-            Components
-          </a>
-          <a href="#ai" aria-current={route === "ai" ? "page" : undefined}>
-            AI Elements
-          </a>
-        </div>
-        {sections.map((section) => (
-          <div key={section.title} className="docs-nav-group">
-            <span>{section.title}</span>
+    return sections.map((section) => (
+      <SidebarGroup key={section.title} className="docs-nav-group">
+        <SidebarGroupLabel className="text-muted-foreground">{section.title}</SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu>
             {section.pages.map((item) => (
-              <a
-                key={item.route}
-                href={href(item.route)}
-                onClick={() => {
-                  setMenuOpen(false);
-                }}
-                aria-current={route === item.route ? "page" : undefined}
-              >
-                {item.title}
-              </a>
+              <SidebarMenuItem key={item.route}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={route === item.route}
+                  className="h-[30px] w-fit rounded-md text-[0.8rem] font-medium"
+                >
+                  <a
+                    href={href(item.route)}
+                    onClick={() => {
+                      setMenuOpen(false);
+                    }}
+                    aria-current={route === item.route ? "page" : undefined}
+                  >
+                    {item.title}
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             ))}
-          </div>
-        ))}
-      </>
-    );
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    ));
   }
   async function copyPage() {
     try {
@@ -445,202 +463,246 @@ export function Guide() {
   }
   return (
     <TooltipProvider>
-      <Toaster theme={dark ? "dark" : "light"} />
-      <a
-        className="docs-skip"
-        href="#content"
-        onClick={(event) => {
-          event.preventDefault();
-          article.current?.focus();
-        }}
-      >
-        Skip to content
-      </a>
-      <header className="docs-header">
-        <div className="docs-header-inner">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden"
-            aria-label="Open navigation"
-            onClick={() => {
-              setMenuOpen(true);
-            }}
-          >
-            <Menu />
-          </Button>
-          <a className="docs-brand" href="#introduction">
-            <FlowerMark /> <span>Florets</span>
-          </a>
-          <nav aria-label="Main navigation" className="docs-top-nav">
-            <a
-              href="#introduction"
-              aria-current={!route.includes("/") && !isIndex ? "page" : undefined}
-            >
-              Docs
-            </a>
-            <a
-              href="#components"
-              aria-current={route.startsWith("components") ? "page" : undefined}
-            >
-              Components
-            </a>
-            <a href="#ai" aria-current={route.startsWith("ai") ? "page" : undefined}>
-              AI Elements
-            </a>
-          </nav>
-          <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="secondary"
-              className="docs-search"
-              onClick={() => {
-                setSearchOpen(true);
-              }}
-              aria-label="Search documentation"
-            >
-              <Search className="size-4" />
-              <span>Search documentation…</span>
-              <Kbd>⌘ K</Kbd>
-            </Button>
-            <a
-              className="docs-github"
-              href="https://github.com/rhizomatous/flora/tree/main/florets"
-              aria-label="Florets on GitHub"
-            >
-              <GitBranch className="size-4" />
-            </a>
+      <SidebarProvider className="block">
+        <Toaster theme={dark ? "dark" : "light"} />
+        <a
+          className="docs-skip"
+          href="#content"
+          onClick={(event) => {
+            event.preventDefault();
+            article.current?.focus();
+          }}
+        >
+          Skip to content
+        </a>
+        <header className="docs-header">
+          <div className="docs-header-inner">
             <Button
               variant="ghost"
               size="icon"
-              aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+              className="lg:hidden"
+              aria-label="Open navigation"
               onClick={() => {
-                setDark(!dark);
+                setMenuOpen(true);
               }}
             >
-              {dark ? <Sun /> : <Moon />}
+              <Menu />
             </Button>
-          </div>
-        </div>
-      </header>
-      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-        <SheetContent side="left" className="w-80">
-          <SheetHeader>
-            <SheetTitle>Florets documentation</SheetTitle>
-          </SheetHeader>
-          <nav aria-label="Mobile documentation" className="docs-mobile-nav">
-            {navigation()}
-          </nav>
-        </SheetContent>
-      </Sheet>
-      <div className="docs-layout">
-        <nav ref={nav} className="docs-sidebar" aria-label="Documentation">
-          {navigation()}
-        </nav>
-        <main ref={article} id="content" tabIndex={-1} className="docs-article">
-          <div className="docs-page-heading">
-            <div>
-              <p className="docs-eyebrow">{category}</p>
-              <h1>{title}</h1>
-            </div>
-            <Button
-              variant="secondary"
-              aria-label={copied ? "Page copied" : "Copy page"}
-              size="sm"
-              onClick={() => {
-                void copyPage();
-              }}
-            >
-              {copied ? <Check /> : <Copy />}
-              <span>{copied ? "Copied" : "Copy page"}</span>
-            </Button>
-          </div>
-          <p className="docs-description">{description}</p>
-          {copyError && (
-            <p role="alert" className="text-sm text-destructive">
-              Couldn’t copy. Select the page text to copy it manually.
-            </p>
-          )}
-          <div key={route}>{pageContent}</div>
-          <footer className="docs-footer">
-            {previous ? (
-              <a href={href(previous.route)}>
-                <ArrowLeft className="size-4" />
-                {previous.title}
-              </a>
-            ) : (
-              <span />
-            )}
-            {next && (
-              <a href={href(next.route)}>
-                {next.title}
-                <ArrowRight className="size-4" />
-              </a>
-            )}
-          </footer>
-        </main>
-        <aside className="docs-toc" aria-label="On this page">
-          <p>On this page</p>
-          {toc.map((item) => (
-            <a
-              key={item.id}
-              href={`#${route}/${item.id}`}
-              aria-current={activeHeading === item.id ? "location" : undefined}
-              onClick={(event) => {
-                event.preventDefault();
-                history.replaceState(null, "", `#${route}/${item.id}`);
-                document
-                  .querySelector(`#${CSS.escape(item.id)}`)
-                  ?.scrollIntoView({ behavior: "smooth" });
-                setActiveHeading(item.id);
-              }}
-            >
-              {item.title}
+            <a className="docs-brand" href="#introduction">
+              <FlowerMark /> <span>Florets</span>
             </a>
-          ))}
-          <div className="docs-toc-note">
-            <FlowerMark />
-            <p>Built with Florets.</p>
-            <span>
-              The navigation, controls, and examples use the same components documented here.
-            </span>
-            <a href="#installation">
-              Start building <ArrowRight className="size-3" />
-            </a>
-          </div>
-        </aside>
-      </div>
-      <CommandDialog
-        open={searchOpen}
-        onOpenChange={setSearchOpen}
-        title="Search documentation"
-        description="Find components, AI Elements, and guides."
-      >
-        <Command>
-          <CommandInput placeholder="Search documentation…" />
-          <CommandList>
-            <CommandEmpty>No results found. Try another component or topic.</CommandEmpty>
-            {sections.map((group) => (
-              <CommandGroup key={group.title} heading={group.title}>
-                {group.pages.map((item) => (
-                  <CommandItem
-                    key={item.route}
-                    value={`${item.route} ${item.title} ${item.description}`}
-                    onSelect={() => {
-                      location.hash = item.route;
-                      setSearchOpen(false);
-                    }}
+            <nav aria-label="Main navigation" className="docs-top-nav">
+              {[
+                { route: "introduction", title: "Docs" },
+                { route: "components", title: "Components" },
+                { route: "ai", title: "AI Elements" },
+              ].map((item) => (
+                <Button key={item.route} asChild variant="ghost" size="sm" className="px-2.5">
+                  <a
+                    href={href(item.route)}
+                    aria-current={
+                      (
+                        item.route === "introduction"
+                          ? !route.includes("/") && !isIndex
+                          : route.startsWith(item.route)
+                      )
+                        ? "page"
+                        : undefined
+                    }
                   >
-                    <span>{item.title}</span>
-                    <span className="ml-auto truncate text-xs text-muted-foreground">
-                      {group.title}
-                    </span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+                    {item.title}
+                  </a>
+                </Button>
+              ))}
+            </nav>
+            <div className="ml-auto flex items-center gap-2">
+              <Button
+                variant="secondary"
+                className="docs-search"
+                onClick={() => {
+                  setSearchOpen(true);
+                }}
+                aria-label="Search documentation"
+              >
+                <Search className="size-4" />
+                <span>Search documentation…</span>
+                <Kbd>⌘ K</Kbd>
+              </Button>
+              <Separator orientation="vertical" className="hidden h-4! lg:block" />
+              <Button asChild variant="ghost" size="icon" className="docs-github">
+                <a
+                  href="https://github.com/rhizomatous/flora/tree/main/florets"
+                  aria-label="Florets on GitHub"
+                >
+                  <GitBranch className="size-4" />
+                </a>
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+                onClick={() => {
+                  setDark(!dark);
+                }}
+              >
+                {dark ? <Sun /> : <Moon />}
+              </Button>
+            </div>
+          </div>
+        </header>
+        <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+          <SheetContent side="left" className="w-80">
+            <SheetHeader>
+              <SheetTitle>Florets documentation</SheetTitle>
+            </SheetHeader>
+            <nav aria-label="Mobile documentation" className="docs-mobile-nav">
+              {navigation()}
+            </nav>
+          </SheetContent>
+        </Sheet>
+        <div className="docs-layout">
+          <Sidebar collapsible="none" className="docs-sidebar">
+            <SidebarContent ref={nav}>
+              <nav aria-label="Documentation">{navigation()}</nav>
+            </SidebarContent>
+          </Sidebar>
+          <main ref={article} id="content" tabIndex={-1} className="docs-article">
+            <div className="docs-page-heading">
+              <div>
+                <p className="docs-eyebrow">{category}</p>
+                <h1>{title}</h1>
+              </div>
+              <Button
+                variant="secondary"
+                aria-label={copied ? "Page copied" : "Copy page"}
+                size="sm"
+                onClick={() => {
+                  void copyPage();
+                }}
+              >
+                {copied ? <Check /> : <Copy />}
+                <span>{copied ? "Copied" : "Copy page"}</span>
+              </Button>
+            </div>
+            <p className="docs-description">{description}</p>
+            {toc.length > 0 && (
+              <div className="mb-6 xl:hidden">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Menu />
+                      On this page
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="max-h-[60svh] overflow-y-auto">
+                    {toc.map((item) => (
+                      <DropdownMenuItem key={item.id} asChild>
+                        <a
+                          href={`#${route}/${item.id}`}
+                          aria-current={activeHeading === item.id ? "location" : undefined}
+                        >
+                          {item.title}
+                        </a>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
+
+            {copyError && (
+              <p role="alert" className="text-sm text-destructive">
+                Couldn’t copy. Select the page text to copy it manually.
+              </p>
+            )}
+            <div key={route}>{pageContent}</div>
+            <footer className="docs-footer">
+              {previous ? (
+                <Button asChild variant="outline" size="sm">
+                  <a href={href(previous.route)}>
+                    <ArrowLeft className="size-4" />
+                    {previous.title}
+                  </a>
+                </Button>
+              ) : (
+                <span />
+              )}
+              {next && (
+                <Button asChild variant="outline" size="sm">
+                  <a href={href(next.route)}>
+                    {next.title}
+                    <ArrowRight className="size-4" />
+                  </a>
+                </Button>
+              )}
+            </footer>
+          </main>
+          <aside className="docs-toc" aria-label="On this page">
+            <p>On this page</p>
+            {toc.map((item) => (
+              <a
+                key={item.id}
+                href={`#${route}/${item.id}`}
+                aria-current={activeHeading === item.id ? "location" : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  history.replaceState(null, "", `#${route}/${item.id}`);
+                  document
+                    .querySelector(`#${CSS.escape(item.id)}`)
+                    ?.scrollIntoView({ behavior: "smooth" });
+                  setActiveHeading(item.id);
+                }}
+              >
+                {item.title}
+              </a>
             ))}
-          </CommandList>
-        </Command>
-      </CommandDialog>
+            <div className="docs-toc-note">
+              <FlowerMark />
+              <p>Built with Florets.</p>
+              <span>
+                The navigation, controls, and examples use the same components documented here.
+              </span>
+              <Button asChild variant="outline" size="sm" className="mt-4">
+                <a href="#installation">
+                  Start building <ArrowRight className="size-3" />
+                </a>
+              </Button>
+            </div>
+          </aside>
+        </div>
+        <CommandDialog
+          open={searchOpen}
+          onOpenChange={setSearchOpen}
+          title="Search documentation"
+          description="Find components, AI Elements, and guides."
+        >
+          <Command>
+            <CommandInput placeholder="Search documentation…" />
+            <CommandList>
+              <CommandEmpty>No results found. Try another component or topic.</CommandEmpty>
+              {sections.map((group) => (
+                <CommandGroup key={group.title} heading={group.title}>
+                  {group.pages.map((item) => (
+                    <CommandItem
+                      key={item.route}
+                      value={`${item.route} ${item.title} ${item.description}`}
+                      onSelect={() => {
+                        location.hash = item.route;
+                        setSearchOpen(false);
+                      }}
+                    >
+                      <span>{item.title}</span>
+                      <span className="ml-auto truncate text-xs text-muted-foreground">
+                        {group.title}
+                      </span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ))}
+            </CommandList>
+          </Command>
+        </CommandDialog>
+      </SidebarProvider>
     </TooltipProvider>
   );
 }
