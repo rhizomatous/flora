@@ -214,7 +214,13 @@ function App() {
         </Sidebar>
       ) : (
         <header className="mb-14">
-          <Wordmark />
+          <a
+            href="#chats/new"
+            aria-label="Flora home"
+            className="inline-flex rounded-md focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            <Wordmark />
+          </a>
         </header>
       )}
       <Content id="main-content" tabIndex={-1} className={ready ? "min-w-0" : undefined}>

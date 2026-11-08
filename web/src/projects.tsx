@@ -214,7 +214,7 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
     }
   }
 
-  let title = "Projects";
+  let title = "Project settings";
   if (creating) title = "Connect project";
   else if (id !== "") title = project?.name ?? "Project";
   let submitLabel = creating ? "Validate and connect" : "Validate and save";
@@ -242,6 +242,11 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
           </Link>
         )}
       </div>
+      {id === "" && (
+        <Text tone="muted" className="mt-3">
+          Manage the GitHub repositories and setup command used by new chats in each project.
+        </Text>
+      )}
       {project && (
         <Link
           className="mt-5 inline-block text-sm"
@@ -271,16 +276,15 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
                 <ul className="mt-2 text-sm break-words text-muted-foreground">
                   {p.configuration.repositories.map((repo) => (
                     <li key={repo.name}>
-                      {repo.name} · {repo.baseBranch} · {repo.role}
+                      {repo.url.replace("https://github.com/", "")} · Branch: {repo.baseBranch} ·{" "}
+                      {repo.role === "core" ? "Available at startup" : "Fetched on demand"}
                     </li>
                   ))}
                 </ul>
-                <Link
-                  className="mt-3 inline-block text-sm"
-                  href={`#chats/new?project=${encodeURIComponent(p.id)}`}
-                >
-                  Start chat
-                </Link>
+                <div className="mt-3 flex gap-4 text-sm">
+                  <Link href={`#chats/new?project=${encodeURIComponent(p.id)}`}>Start chat</Link>
+                  <Link href={`#projects/${p.id}`}>Edit settings</Link>
+                </div>
               </li>
             ))}
           </ul>

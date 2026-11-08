@@ -100,7 +100,16 @@ export function Sidebar({
             Skip to content
           </a>
           <div className="px-3 py-3">
-            <Wordmark />
+            <a
+              href="#chats/new"
+              aria-label="Flora home"
+              className="inline-flex rounded-md focus-visible:outline-2 focus-visible:outline-ring"
+              onClick={() => {
+                setOpenMobile(false);
+              }}
+            >
+              <Wordmark />
+            </a>
           </div>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -138,7 +147,7 @@ export function Sidebar({
                     setOpenMobile(false);
                   }}
                 >
-                  Projects
+                  Project settings
                 </a>
               </SidebarMenuButton>
             </SidebarMenuItem>
