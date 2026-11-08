@@ -9,6 +9,8 @@ import { promisify } from "node:util";
 
 import type { Config, Session, Message, Part, QuestionRequest } from "@opencode-ai/sdk/v2";
 
+import { keyboardReview, keyboardWalkthrough } from "./preview/keyboard-review.ts";
+
 const binary = process.env.OPENCODE_BIN ?? "opencode";
 // oxlint-disable-next-line typescript/strict-void-return -- Node promisify accepts the callback-based execFile overload.
 const { stdout: versionOutput } = await promisify(execFile)(binary, ["--version"]);
@@ -96,9 +98,10 @@ const provider = createServer((req, res) => {
     } else {
       const paragraph =
         'The workspace checks passed.\n\n## What changed\n\n- Kept project navigation compact.\n- Preserved keyboard focus and readable labels.\n\n```ts\nexport const greeting = "Hello";\n```\n\nSee [the example](https://example.com) for context.\n\n';
+      const reviewText = n === 2 ? keyboardReview : keyboardWalkthrough;
       const text =
         scenario === "long"
-          ? Array.from({ length: 8 }, (_, i) => `### Review ${i + 1}\n\n${paragraph}`).join("")
+          ? reviewText
           : (scenario === "recovery"
               ? "The first file path was missing. I recovered and completed the workspace check.\n\n"
               : "") + paragraph;
