@@ -45,9 +45,6 @@ try {
   await expect(page.locator('[data-slot="message"]').first()).toBeVisible();
   await expect(page.locator('[data-slot="trace"]').first()).toBeVisible();
   await expect(page.locator('[data-slot="markdown"]').first()).toBeVisible();
-  await page.getByText("· Details", { exact: false }).click();
-  await page.getByText("anthropic/model", { exact: true }).waitFor();
-  await page.getByText("· Details", { exact: false }).click();
   assert.equal(
     await page
       .getByLabel("Conversation")
@@ -79,7 +76,7 @@ try {
   await context.setOffline(true);
   await page.waitForTimeout(300);
   await context.setOffline(false);
-  await page.getByText(/· Live ·/).waitFor();
+  await expect(page.getByText("Disconnected. Reconnecting…", { exact: true })).toHaveCount(0);
   await page.reload();
   await page.getByText("Saved response 2", { exact: true }).waitFor();
   assert.equal(
@@ -105,8 +102,8 @@ try {
   await page.getByLabel("Follow-up", { exact: true }).fill("stop control work");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await page.getByLabel("Conversation").getByText("stop control work", { exact: true }).waitFor();
-  await page.getByText("· Details", { exact: false }).click();
-  await page.getByRole("button", { name: "Stop container", exact: true }).click();
+  await page.getByRole("button", { name: "Chat actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Stop container", exact: true }).click();
   await page.getByRole("button", { name: "Resume", exact: true }).waitFor();
   await page.reload();
   await page.getByLabel("Follow-up", { exact: true }).fill("New explicit work after stop");
@@ -147,7 +144,7 @@ try {
   await page.getByRole("heading", { name: "Log in", exact: true }).waitFor();
   assert.deepEqual(errors, []);
   console.log(
-    "Chromium: login, create, reload during work, question/answer, full tool output/model, interrupt, stop, explicit resume, saved context, grouped list, reconnect, mobile width, logout protection passed.",
+    "Chromium: login, create, reload during work, question/answer, full tool output, interrupt, stop, explicit resume, saved context, grouped list, reconnect, mobile width, logout protection passed.",
   );
 } finally {
   await browser.close();

@@ -6,6 +6,7 @@ import {
   ButtonLink,
   FieldLabel,
   FlowerMark,
+  DropdownMenuItem,
   Heading,
   Link,
   DropdownMenu,
@@ -40,12 +41,8 @@ import {
   ItemContent,
   ItemTitle,
   ItemDescription,
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
 } from "@flora/florets";
 
-import { Changes } from "./changes";
 import type { Chat } from "./notifications";
 import { QuestionForm, type Question } from "./question";
 import { errorMessage, isExpired, request } from "./request";
@@ -167,7 +164,7 @@ export function Chats({
   const [questions, setQuestions] = useState<Question[]>([]);
   const [questionError, setQuestionError] = useState("");
   const [error, setError] = useState("");
-  const [connection, setConnection] = useState("Connecting…");
+  const [disconnected, setDisconnected] = useState(false);
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -249,10 +246,10 @@ export function Chats({
     // A burst of activity triggers one detail refresh 100 ms after its first event.
     let debounce: ReturnType<typeof setTimeout> | undefined;
     source.addEventListener("open", () => {
-      setConnection("Live");
+      setDisconnected(false);
     });
     source.addEventListener("error", () => {
-      setConnection("Disconnected. Reconnecting to saved activity…");
+      setDisconnected(true);
       void checkSession();
     });
     source.addEventListener("activity", (event: MessageEvent<string>) => {
@@ -461,7 +458,7 @@ export function Chats({
               id="new-chat-message"
               name="text"
               className="max-h-80 min-h-28"
-              placeholder="What are we building?"
+              placeholder="Message…"
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                   event.preventDefault();
@@ -489,11 +486,9 @@ export function Chats({
           id={id}
           detail={detail}
           activity={activity}
-          connection={connection}
-          projectName={projects?.find((p) => p.id === detail.chat.ProjectID)?.name}
+          disconnected={disconnected}
           busy={busy}
           messageBytes={messageBytes}
-          onExpired={onExpired}
           onControl={(action) => {
             void controlWork(action);
           }}
@@ -579,11 +574,9 @@ function ChatDetail({
   id,
   detail,
   activity,
-  connection,
-  projectName,
+  disconnected,
   busy,
   messageBytes,
-  onExpired,
   onControl,
   onSend,
   children,
@@ -591,11 +584,9 @@ function ChatDetail({
   id: string;
   detail: Detail;
   activity: Activity[];
-  connection: string;
-  projectName: string | undefined;
+  disconnected: boolean;
   busy: boolean;
   messageBytes: number;
-  onExpired: () => void;
   onControl: (action: "interrupt" | "stop") => void;
   onSend: (event: React.SubmitEvent<HTMLFormElement>) => void;
   children: React.ReactNode;
@@ -605,13 +596,12 @@ function ChatDetail({
   const stopped = chat.Status === "stopped";
   const blocked = (detail.continuationBlockedReason ?? "") !== "";
 
-  const model = detail.messages.findLast((message) => message.Model !== "");
-
   return (
     <MessageScrollerProvider autoScroll>
       <MessageScroller className="flex-1">
         <MessageScrollerViewport aria-label="Conversation">
           <MessageScrollerContent className="mx-auto w-full max-w-[880px] gap-8 px-1 py-6">
+            {disconnected && <Alert role="status">Disconnected. Reconnecting…</Alert>}
             {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
               <Alert role="note">
                 Some live activity could not be captured. Recovered messages and tool snapshots are
@@ -627,14 +617,15 @@ function ChatDetail({
                 <ConversationMessage message={message} />
               </MessageScrollerItem>
             ))}
-            <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
-              {activeTurn && <FlowerMark className="motion-safe:animate-pulse" />}
-              <span>
-                {statusName(chat.Status)}
-                {chat.StatusReason !== "" && ` · ${chat.StatusReason}`}
-              </span>
-            </div>
-            <Changes key={id} chatID={id} onExpired={onExpired} />
+            {activeTurn && (
+              <div role="status" aria-label="Working">
+                <FlowerMark className="text-muted-foreground motion-safe:animate-pulse" />
+              </div>
+            )}
+            {(chat.Status === "failed" ||
+              chat.Status === "stopped" ||
+              chat.StatusReason.includes("interrupted")) &&
+              chat.StatusReason !== "" && <Text role="status">{chat.StatusReason}</Text>}
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <MessageScrollerButton aria-label="Jump to latest" />
@@ -654,98 +645,6 @@ function ChatDetail({
           onSend={onSend}
           onControl={onControl}
         />
-        <details className="mt-2 text-xs text-muted-foreground">
-          <summary className="cursor-pointer rounded-sm py-2 focus-visible:outline-2 focus-visible:outline-ring">
-            {projectName} · {connection} · Details
-          </summary>
-          <div className="max-h-[30dvh] overflow-y-auto pb-3">
-            {model && (
-              <p className="py-2">
-                {model.Provider}/{model.Model}
-              </p>
-            )}
-            {!blocked && !stopped && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() => {
-                  onControl("stop");
-                }}
-              >
-                Stop container
-              </Button>
-            )}
-            <p className="mt-2">
-              {stopped
-                ? "Send a message to restart with the saved workspace and conversation."
-                : "Stopping frees container capacity and preserves your workspace and conversation."}
-            </p>
-            <Collapsible className="mt-3 rounded-md border p-3">
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  Full activity ({activity.length} saved events)
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <Text tone="muted" className="mt-3">
-                  Setup activity contains bounded previews. After setup finishes,{" "}
-                  <Link href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>
-                    download the full redacted setup log
-                  </Link>
-                  . Any capture failure is shown in the final setup event.
-                </Text>
-                <ol className="mt-4 space-y-3">
-                  {activity.map((row) => (
-                    <li key={row.Sequence}>
-                      <Trace>
-                        <TraceCollapsible>
-                          <TraceCollapsibleTrigger>
-                            <TraceLine>
-                              <TraceTitle>{row.Kind}</TraceTitle>
-                              <TraceDescription>
-                                <time dateTime={row.CreatedAt}>
-                                  {new Date(row.CreatedAt).toLocaleTimeString()}
-                                </time>{" "}
-                                · #{row.Sequence}
-                              </TraceDescription>
-                            </TraceLine>
-                          </TraceCollapsibleTrigger>
-                          <TraceCollapsibleContent>
-                            <pre className="max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
-                              {JSON.stringify(row.Payload, null, 2)}
-                            </pre>
-                          </TraceCollapsibleContent>
-                        </TraceCollapsible>
-                      </Trace>
-                    </li>
-                  ))}
-                </ol>
-              </CollapsibleContent>
-            </Collapsible>
-            <Collapsible className="mt-3 rounded-md border p-3">
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  Environment snapshot
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <pre className="mt-3 overflow-auto text-xs break-all whitespace-pre-wrap">
-                  {JSON.stringify(
-                    {
-                      image: chat.ImageDigest,
-                      OpenCode: chat.HarnessVersion,
-                      startingCommits: chat.StartingCommits,
-                    },
-                    null,
-                    2,
-                  )}
-                </pre>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
-        </details>
       </div>
     </MessageScrollerProvider>
   );
@@ -811,7 +710,7 @@ function FollowUpComposer({
           id="follow-up-message"
           name="text"
           className="max-h-[25dvh] min-h-20"
-          placeholder="Ask Flora…"
+          placeholder="Message…"
           value={draft}
           required
           disabled={busy || blocked}
@@ -826,7 +725,29 @@ function FollowUpComposer({
             }
           }}
         />
-        <InputGroupAddon align="block-end" className="justify-end">
+        <InputGroupAddon align="block-end" className="justify-between">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <InputGroupButton type="button" variant="ghost" aria-label="Chat actions">
+                ⋯
+              </InputGroupButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem asChild>
+                <a href={`/api/chats/${encodeURIComponent(id)}/setup-log`}>Download setup log</a>
+              </DropdownMenuItem>
+              {!blocked && !stopped && (
+                <DropdownMenuItem
+                  disabled={busy}
+                  onSelect={() => {
+                    onControl("stop");
+                  }}
+                >
+                  Stop container
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {activeTurn && !blocked ? (
             <InputGroupButton
               type="button"

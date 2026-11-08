@@ -9,6 +9,8 @@ try {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  await page.request.post(`${base}/__preview/control?action=restart`);
+  await page.request.post(`${base}/__preview/control?action=pause`);
   await page.goto(`${base}/#chats/working`);
   const draft = page.getByLabel("Follow-up", { exact: true });
   await expect(draft).toBeEnabled();
