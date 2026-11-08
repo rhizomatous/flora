@@ -21,7 +21,8 @@ try {
     .getByRole("link", { name: "All chats", exact: true })
     .click();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
-  await page.getByRole("combobox", { name: /^Project/ }).selectOption({ label: "Browser project" });
+  await page.getByRole("button", { name: /^Project:/ }).click();
+  await page.getByRole("menuitemradio", { name: "Browser project", exact: true }).click();
   await assertFitsPhone(page);
   const message = page.getByLabel("Message", { exact: true });
   const compactHeight = await message.evaluate((element) => element.getBoundingClientRect().height);

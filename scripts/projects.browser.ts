@@ -109,8 +109,12 @@ try {
   );
   await assertFitsPhone(page);
   await page.getByRole("link", { name: "All projects", exact: true }).click();
-  await page.getByText("first/app · main · core", { exact: true }).waitFor();
-  await page.getByText("third/extra · next · extra", { exact: true }).waitFor();
+  await page
+    .getByText("first/app.git · Branch: main · Available at startup", { exact: true })
+    .waitFor();
+  await page
+    .getByText("third/extra.git · Branch: next · Fetched on demand", { exact: true })
+    .waitFor();
   assert.deepEqual(errors, []);
   console.log(
     "Chromium: multi-repository create/edit, extra branch validation, add/remove field preservation, persisted roles/branches, project list, and mobile width passed.",
