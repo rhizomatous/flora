@@ -6,7 +6,13 @@ import { setTimeout as delay } from "node:timers/promises";
 import { createServer } from "vite";
 
 import { captured } from "./preview/captured.ts";
-import { chatPreview, messages, type Frame } from "./preview/server.ts";
+import {
+  chatPreview,
+  messages,
+  previewFrameMs,
+  rebaseFrame,
+  type Frame,
+} from "./preview/server.ts";
 
 test("captures match the pinned SDK and cover real OpenCode tool and question states", async () => {
   const image = await readFile(new URL("../agent/image/Dockerfile", import.meta.url), "utf8");
@@ -77,14 +83,15 @@ test("preview serves isolated fixtures and replays saved events with resumable I
     assert.ok(
       typeof pausedDetail === "object" && pausedDetail !== null && "messages" in pausedDetail,
     );
-    assert.deepEqual(pausedDetail.messages, messages(recovery.frames[0], "recovery"));
-    await delay(800);
+    assert.ok(Array.isArray(pausedDetail.messages));
+    assert.equal(pausedDetail.messages.length, recovery.frames[0].history.length);
+    await delay(previewFrameMs + 100);
     const stillPaused = await fetch(`${base}/api/chats/recovery`);
     assert.equal(await stillPaused.text(), paused);
     const unchanged = await fetch(`${base}/api/chats/completed`);
     assert.equal(await unchanged.text(), completedBefore);
     await fetch(`${base}/__preview/control?action=play&chat=recovery`, { method: "POST" });
-    await delay(800);
+    await delay(previewFrameMs + 100);
     const resumedRecovery = await fetch(`${base}/api/chats/recovery`);
     assert.notEqual(await resumedRecovery.text(), paused);
     const badControl = await fetch(`${base}/__preview/control?action=restart&chat=unknown`, {
@@ -111,5 +118,25 @@ test("preview serves isolated fixtures and replays saved events with resumable I
   } finally {
     controller.abort();
     await server.close();
+  }
+});
+
+test("replay timestamps are fresh without changing recorded durations or inputs", () => {
+  const original = captured.find((s) => s.name === "recovery")?.frames.at(-1);
+  assert.ok(original);
+  const start = original.history[0]?.info.time.created;
+  assert.ok(start !== undefined);
+  const now = Date.now();
+  const offset = now - start;
+  const rebased = rebaseFrame(original, offset);
+  assert.equal(rebased.history[0]?.info.time.created, now);
+  assert.deepEqual(rebaseFrame(rebased, -offset), original);
+  for (const [i, message] of original.history.entries()) {
+    for (const [j, part] of message.parts.entries()) {
+      const shifted = rebased.history[i]?.parts[j];
+      if (part.type === "tool" && shifted?.type === "tool") {
+        assert.deepEqual(shifted.state.input, part.state.input);
+      }
+    }
   }
 });

@@ -7,24 +7,37 @@ try {
   const page = await browser.newPage();
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5202";
   await page.goto(`${base}/#chats/recovery`);
-  await page.getByRole("button", { name: "Replay chat", exact: true }).click();
+  await Promise.all([
+    page.waitForEvent("load"),
+    page.getByRole("button", { name: "Replay chat", exact: true }).click(),
+  ]);
   await expect(page).toHaveURL(`${base}/#chats/recovery`);
   await expect(
     page.getByRole("heading", { name: "Fix the workspace checks", exact: true }),
   ).toBeVisible();
   await expect(page.getByLabel("Current activity")).toBeVisible();
+  await expect(page.getByLabel("Current activity")).toContainText("pending");
+  await expect(page.locator('[data-slot="work-summary"]')).not.toContainText("1 failed");
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   await page.waitForTimeout(900);
   await expect(page.getByLabel("Current activity")).toBeVisible();
   await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.getByLabel("Current activity")).toContainText("Check workspace", {
+    timeout: 10_000,
+  });
+  await expect(page.getByLabel("Current activity")).toContainText("running");
+  await expect(page.getByLabel("Current activity")).not.toContainText(/\d+m/);
   await expect(
     page
       .locator('[data-slot="work-summary"]')
       .getByRole("button", { name: /Worked for.*2 steps.*1 failed/ }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
   assert.equal(new URL(page.url()).hash, "#chats/recovery");
   await page.goto(`${base}/#chats/waiting`);
-  await page.getByRole("button", { name: "Replay chat", exact: true }).click();
+  await Promise.all([
+    page.waitForEvent("load"),
+    page.getByRole("button", { name: "Replay chat", exact: true }).click(),
+  ]);
   await expect(page.getByRole("form", { name: "Questions", exact: true })).toBeVisible();
   assert.equal(new URL(page.url()).hash, "#chats/waiting");
   await page.goto(`${base}/#chats/new`);

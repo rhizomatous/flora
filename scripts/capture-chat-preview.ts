@@ -88,6 +88,7 @@ const provider = createServer((req, res) => {
         index: 0,
         content_block: { type: "tool_use", id: `toolu_${scenario}_${n}`, name: tool, input: {} },
       });
+      if (scenario === "recovery" && n === 1) await delay(2000);
       send("content_block_delta", {
         index: 0,
         delta: { type: "input_json_delta", partial_json: JSON.stringify(input) },
