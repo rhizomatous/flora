@@ -264,13 +264,14 @@ your environment when you leave; nix-direnv caches it for faster re-entry.
 Local `.direnv/` state is ignored. Re-run `direnv allow` after approving changes
 to `.envrc`. Manual `nix develop` and CI do not need direnv or any host hook.
 
-### Florets component guide
+### Florets documentation
 
-Run `npm run docs:dev` to browse the component guide at <http://127.0.0.1:5176>.
-The guide lives in `florets/docs/` and imports the library directly. It includes
-the full shadcn Radix/Rhea component catalog, official example collections, source
-panels, and a light/dark theme switch. Preview frames keep menus and full-page
-sidebar examples inside their own page. It needs no backend. Import components from `@flora/florets`
+Run `npm run docs:dev` to browse the documentation at <http://127.0.0.1:5176>.
+The site lives in `florets/docs/` and uses the library directly. Searchable component
+and AI pattern pages include live examples, copyable source, and on-page navigation.
+Foundation pages cover setup, themes, typography, and identity. Full-page sidebar
+examples run in isolated preview frames. The site supports light and dark themes
+and mobile navigation, and needs no backend. Import components from `@flora/florets`
 and the shared theme from `@flora/florets/styles.css`. The `@flora/florets/ai` entry
 point uses the same components and theme. `florets/components.json` records the
 Radix/Rhea registry configuration. `florets/docs/src/examples/upstream.json` records

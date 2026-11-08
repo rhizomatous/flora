@@ -1,250 +1,646 @@
-import { useState, type ReactNode } from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Copy,
+  GitBranch,
+  Menu,
+  Moon,
+  Search,
+  Sun,
+} from "lucide-react";
+import {
+  Component,
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 
 import {
   Button,
-  ButtonLink,
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
   FlowerMark,
-  Heading,
-  Link,
-  LoadingStatus,
-  Text,
-  Wordmark,
+  Input,
+  Kbd,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  Toaster,
+  TooltipProvider,
 } from "@flora/florets";
 
-import { Catalog } from "./catalog";
+import { CodeExample } from "./code-example";
+import { aiDocs, componentDocs, foundationDocs } from "./docs-data";
+import { ExampleSourceProvider } from "./example-source";
+import { standaloneSource } from "./example-source-utils";
+import { FoundationPage } from "./foundations";
 
+const loaders = import.meta.glob<{ Preview: ComponentType }>("./examples/upstream/*.tsx");
+const aiLoaders = import.meta.glob<Record<string, ComponentType>>("./ai/examples/*-demo.tsx");
+const sources = import.meta.glob<string>(
+  ["./examples/upstream/*.tsx", "./ai/examples/*-demo.tsx", "./ai/lib/message-animations.ts"],
+  { query: "?raw", import: "default" },
+);
+const previews = Object.fromEntries(
+  Object.entries(loaders).map(([path, load]) => [
+    path,
+    lazy(async () => {
+      const module = await load();
+      return { default: module.Preview };
+    }),
+  ]),
+);
+const aiPreviews = Object.fromEntries(
+  Object.entries(aiLoaders).map(([path, load]) => [
+    path,
+    lazy(async () => {
+      const module = await load();
+      const entry = Object.entries(module).find(([key]) => key.endsWith("Demo"));
+      if (!entry) throw new Error(`No demo exported by ${path}`);
+      return { default: entry[1] };
+    }),
+  ]),
+);
 const sections = [
-  { id: "catalog", label: "Component catalog" },
-  { id: "typography", label: "Typography" },
-  { id: "links", label: "Links" },
-  { id: "feedback", label: "Feedback" },
-  { id: "identity", label: "Identity" },
+  {
+    title: "Getting started",
+    pages: foundationDocs.slice(0, 3).map((doc) => ({ ...doc, route: doc.id })),
+  },
+  {
+    title: "Foundations",
+    pages: foundationDocs.slice(3).map((doc) => ({ ...doc, route: doc.id })),
+  },
+  {
+    title: "Components",
+    pages: componentDocs.map((doc) => ({ ...doc, route: `components/${doc.id}` })),
+  },
+  { title: "AI Elements", pages: aiDocs.map((doc) => ({ ...doc, route: `ai/${doc.id}` })) },
 ];
-
-function Example({
-  title,
-  description,
-  code,
-  children,
-}: {
-  title: string;
-  description: string;
-  code: string;
-  children: ReactNode;
-}) {
+const pages = sections.flatMap((group) => group.pages);
+function routeFromLocation() {
+  const hash = decodeURIComponent(location.hash.slice(1));
+  if (hash.startsWith("example-")) return `components/${hash.slice(8)}`;
+  if (hash === "catalog") return "components";
+  const segments = hash.split("/");
+  if ((segments[0] === "components" || segments[0] === "ai") && segments[1] === "all-components") {
+    return segments[0];
+  }
   return (
-    <article className="min-w-0 overflow-hidden rounded-xl border border-border">
-      <div className="border-b border-border px-5 py-4">
-        <Heading level={3}>{title}</Heading>
-        <Text tone="muted" className="mt-1">
-          {description}
-        </Text>
-      </div>
-      <div className="p-5 sm:p-7">{children}</div>
-      <details className="border-t border-border bg-muted/30">
-        <summary className="cursor-pointer px-5 py-3 text-xs font-medium text-muted-foreground">
-          View code
-        </summary>
-        <pre
-          tabIndex={0}
-          aria-label={`${title} example code`}
-          className="overflow-auto px-5 pb-5 text-xs leading-6"
-        >
-          <code>{code}</code>
-        </pre>
-      </details>
-    </article>
+    segments.slice(0, segments[0] === "components" || segments[0] === "ai" ? 2 : 1).join("/") ||
+    "introduction"
+  );
+}
+function href(route: string) {
+  return `#${route}`;
+}
+
+class PreviewBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { failed: false };
+  }
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  override render() {
+    return this.state.failed ? (
+      <p role="alert" className="rounded-xl border p-6">
+        This example could not load. Refresh the page to try again.
+      </p>
+    ) : (
+      this.props.children
+    );
+  }
+}
+
+function ComponentPage({ id, ai, dark }: { id: string; ai: boolean; dark: boolean }) {
+  const path = ai ? `./ai/examples/${id}-demo.tsx` : `./examples/upstream/${id}.tsx`;
+  const Preview = (ai ? aiPreviews : previews)[path];
+  const [source, setSource] = useState("");
+  useEffect(() => {
+    let active = true;
+    async function loadSource() {
+      try {
+        let text = await sources[path]?.();
+        if (text !== undefined && (ai || id.startsWith("sidebar"))) {
+          const animationSource = await sources["./ai/lib/message-animations.ts"]?.();
+          text = standaloneSource(text, animationSource);
+        }
+        if (active) setSource(text ?? "// Source unavailable.");
+      } catch {
+        if (active) setSource("// Source could not load. Refresh to try again.");
+      }
+    }
+    void loadSource();
+    return () => {
+      active = false;
+    };
+  }, [path, ai, id]);
+  const doc = componentDocs.find((item) => item.id === id);
+  let previewContent: ReactNode = null;
+  if (Preview) {
+    if (id.startsWith("sidebar")) {
+      previewContent = (
+        <div className="overflow-hidden rounded-xl border">
+          {/* These trusted local demos need their own viewport for fixed-position sidebars. */}
+          {/* oxlint-disable-next-line react/iframe-missing-sandbox */}
+          <iframe
+            title={`${doc?.title ?? id} example`}
+            src={`./example.html?component=${encodeURIComponent(id)}&theme=${dark ? "dark" : "light"}`}
+            className="h-[36rem] w-full border-0"
+          />
+          <CodeExample code={source || "// Loading source…"} collapsible />
+        </div>
+      );
+    } else if (ai) {
+      previewContent = (
+        <div className="overflow-hidden rounded-xl border">
+          <div className="flex min-h-80 items-center justify-center overflow-x-auto p-6">
+            <Preview />
+          </div>
+          <CodeExample code={source || "// Loading source…"} collapsible />
+        </div>
+      );
+    } else {
+      previewContent = (
+        <ExampleSourceProvider source={source}>
+          <Preview />
+        </ExampleSourceProvider>
+      );
+    }
+  }
+
+  return (
+    <>
+      <section className="docs-section" id="usage">
+        <h2>Usage</h2>
+        <p>Import {ai ? "AI components" : doc?.title} and the shared styles in your application.</p>
+        <CodeExample
+          code={
+            ai
+              ? 'import { Markdown, Button } from "@flora/florets/ai";\nimport "@flora/florets/styles.css";\nimport "@flora/florets/ai/styles.css";'
+              : `import { ${doc?.importName ?? "Button"} } from "@flora/florets";\nimport "@flora/florets/styles.css";`
+          }
+        />
+      </section>
+      {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Delegates native link activation, including keyboard activation, from example children. */}
+      <section
+        className="docs-section"
+        id="examples"
+        onClick={(event) => {
+          // Placeholder links demonstrate styling without leaving the documentation.
+          if (event.target instanceof Element && event.target.closest('a[href="#"]')) {
+            event.preventDefault();
+          }
+        }}
+      >
+        <h2>Examples</h2>
+        <p>
+          {ai
+            ? "Try this interactive pattern, then open the code to see how its parts fit together."
+            : "Explore the variations below. Each example uses the same Florets components available to your application."}
+        </p>
+        <PreviewBoundary key={path}>
+          <Suspense
+            fallback={
+              <p role="status" className="py-20 text-center text-muted-foreground">
+                Loading examples…
+              </p>
+            }
+          >
+            {previewContent}
+          </Suspense>
+        </PreviewBoundary>
+      </section>
+    </>
   );
 }
 
-function Section({
-  id,
-  title,
-  description,
-  children,
-}: {
-  id: string;
-  title: string;
-  description?: string;
-  children: ReactNode;
-}) {
+function IndexPage({ ai }: { ai: boolean }) {
+  const [query, setQuery] = useState("");
+  const docs = ai ? aiDocs : componentDocs;
+  const filtered = docs.filter((doc) =>
+    `${doc.title} ${doc.description}`.toLowerCase().includes(query.trim().toLowerCase()),
+  );
   return (
-    <section id={id} aria-labelledby={`${id}-heading`} className="space-y-6">
-      <div>
-        <Heading level={2} id={`${id}-heading`}>
-          {title}
-        </Heading>
-        {description !== undefined && (
-          <Text tone="muted" className="mt-2 max-w-2xl">
-            {description}
-          </Text>
-        )}
+    <section className="docs-section">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+        <h2 id="all-components" className="mb-0!">
+          {ai ? "All AI Elements" : "All components"}
+        </h2>
+        <Input
+          type="search"
+          aria-label="Filter components"
+          placeholder="Filter components…"
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+          }}
+          className="w-full sm:w-56"
+        />
       </div>
-      {children}
+      <div className="docs-index">
+        {filtered.map((doc) => (
+          <a key={doc.id} href={href(`${ai ? "ai" : "components"}/${doc.id}`)}>
+            <span>{doc.title}</span>
+            <ArrowRight className="size-4" />
+          </a>
+        ))}
+      </div>
+      {filtered.length === 0 && <p role="status">No components found. Try a different search.</p>}
     </section>
   );
 }
 
 export function Guide() {
-  const [dark, setDark] = useState(true);
-  return (
-    <div className="min-h-svh">
-      <a
-        href="#content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-20 focus:rounded-md focus:bg-primary focus:p-3 focus:text-primary-foreground"
-      >
-        Skip to components
-      </a>
-      <div className="mx-auto grid max-w-7xl lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <aside className="border-b border-border p-6 lg:sticky lg:top-0 lg:h-svh lg:border-r lg:border-b-0 lg:p-8">
-          <div className="flex items-center justify-between gap-4 lg:block">
-            <a href="#content" className="flex items-center gap-2 text-lg font-semibold">
-              <FlowerMark /> Florets
-            </a>
-            <Text size="xs" tone="muted" className="lg:mt-2">
-              Flora’s design system
-            </Text>
-          </div>
-          <nav
-            aria-label="Components"
-            className="mt-6 flex flex-wrap gap-x-5 gap-y-3 lg:mt-10 lg:flex-col lg:gap-1"
-          >
-            {sections.map((section) => (
+  const [route, setRoute] = useState(routeFromLocation);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [dark, setDark] = useState(() => {
+    try {
+      return localStorage.getItem("florets-theme") !== "light";
+    } catch {
+      return true;
+    }
+  });
+  const [toc, setToc] = useState<{ id: string; title: string }[]>([]);
+  const [activeHeading, setActiveHeading] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
+  const article = useRef<HTMLElement>(null);
+  const nav = useRef<HTMLElement>(null);
+  const page = pages.find((item) => item.route === route);
+  const isIndex = route === "components" || route === "ai";
+  const indexTitle = route === "components" ? "Components" : "AI Elements";
+  const title = page?.title ?? (isIndex ? indexTitle : "Page not found");
+  let category = "Documentation";
+  if (route.startsWith("components/")) category = "Components";
+  if (route.startsWith("ai/")) category = "AI Elements";
+  const description =
+    page?.description ??
+    (isIndex
+      ? "Browse the collection. Find a component, try the examples, and bring it into your application."
+      : "This documentation page doesn’t exist. Choose a page from the navigation.");
+  const pageIndex = pages.findIndex((item) => item.route === route);
+  const previous = pages[pageIndex - 1];
+  const next = pages[pageIndex + 1];
+
+  useEffect(() => {
+    function navigate() {
+      setRoute(routeFromLocation());
+      setMenuOpen(false);
+      setCopied(false);
+      setCopyError(false);
+    }
+    function keyboard(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen((open) => !open);
+      }
+    }
+    window.addEventListener("hashchange", navigate);
+    window.addEventListener("keydown", keyboard);
+    return () => {
+      window.removeEventListener("hashchange", navigate);
+      window.removeEventListener("keydown", keyboard);
+    };
+  }, []);
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    try {
+      localStorage.setItem("florets-theme", dark ? "dark" : "light");
+    } catch {
+      /* Theme remains available when storage is disabled. */
+    }
+  }, [dark]);
+  useEffect(() => {
+    document.title = `${title} · Florets`;
+    window.scrollTo(0, 0);
+    const current = nav.current?.querySelector<HTMLElement>(`[href="#${CSS.escape(route)}"]`);
+    if (current && nav.current) {
+      const bounds = current.getBoundingClientRect();
+      const parent = nav.current.getBoundingClientRect();
+      if (bounds.bottom > parent.bottom || bounds.top < parent.top) {
+        nav.current.scrollTop += bounds.top - parent.top - 100;
+      }
+    }
+  }, [route, title]);
+  useEffect(() => {
+    const element = article.current;
+    if (!element) return;
+    let headings: { element: HTMLElement; id: string; title: string }[] = [];
+    let pendingAnchor = decodeURIComponent(location.hash.slice(1)).slice(route.length + 1);
+    const scroll = () => {
+      const current = headings.findLast(
+        (heading) => heading.element.getBoundingClientRect().top < 150,
+      );
+      setActiveHeading(current?.id ?? headings[0]?.id ?? "");
+    };
+    const update = () => {
+      headings = [...element.querySelectorAll<HTMLElement>("h2[id], h3[id], section[id] > h2")]
+        .map((heading) => ({
+          element: heading,
+          id: heading.id === "" ? (heading.parentElement?.id ?? "") : heading.id,
+          title: heading.textContent,
+        }))
+        .filter((heading) => heading.id);
+      setToc(headings.map(({ id, title: headingTitle }) => ({ id, title: headingTitle })));
+      if (pendingAnchor) {
+        const target = element.querySelector(`#${CSS.escape(pendingAnchor)}`);
+        if (target) {
+          pendingAnchor = "";
+          target.scrollIntoView();
+        }
+      }
+      scroll();
+    };
+    const navigateAnchor = () => {
+      if (routeFromLocation() === route) {
+        pendingAnchor = decodeURIComponent(location.hash.slice(1)).slice(route.length + 1);
+        update();
+      }
+    };
+    const frame = requestAnimationFrame(update);
+    const observer = new MutationObserver(update);
+    observer.observe(element, { childList: true, subtree: true });
+    window.addEventListener("scroll", scroll, { passive: true });
+    window.addEventListener("hashchange", navigateAnchor);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("scroll", scroll);
+      window.removeEventListener("hashchange", navigateAnchor);
+    };
+  }, [route]);
+
+  function navigation() {
+    return (
+      <>
+        <div className="docs-nav-group">
+          <span>Overview</span>
+          <a href="#components" aria-current={route === "components" ? "page" : undefined}>
+            Components
+          </a>
+          <a href="#ai" aria-current={route === "ai" ? "page" : undefined}>
+            AI Elements
+          </a>
+        </div>
+        {sections.map((section) => (
+          <div key={section.title} className="docs-nav-group">
+            <span>{section.title}</span>
+            {section.pages.map((item) => (
               <a
-                key={section.id}
-                href={`#${section.id}`}
-                className="rounded-md py-2 text-sm text-muted-foreground hover:text-foreground lg:px-3 lg:hover:bg-muted"
+                key={item.route}
+                href={href(item.route)}
+                onClick={() => {
+                  setMenuOpen(false);
+                }}
+                aria-current={route === item.route ? "page" : undefined}
               >
-                {section.label}
+                {item.title}
               </a>
             ))}
-          </nav>
+          </div>
+        ))}
+      </>
+    );
+  }
+  async function copyPage() {
+    try {
+      await navigator.clipboard.writeText(
+        `# ${title}\n\n${description}\n\n${article.current?.textContent ?? ""}`,
+      );
+      setCopied(true);
+      setCopyError(false);
+    } catch {
+      setCopyError(true);
+    }
+  }
+  let pageContent: ReactNode;
+  if (isIndex) {
+    pageContent = <IndexPage ai={route === "ai"} />;
+  } else if (route.startsWith("components/") || route.startsWith("ai/")) {
+    pageContent = page ? (
+      <ComponentPage id={page.id} ai={route.startsWith("ai/")} dark={dark} />
+    ) : (
+      <a href="#components">Browse components</a>
+    );
+  } else {
+    pageContent = page ? (
+      <FoundationPage id={route} />
+    ) : (
+      <a href="#introduction">Go to introduction</a>
+    );
+  }
+  return (
+    <TooltipProvider>
+      <Toaster theme={dark ? "dark" : "light"} />
+      <a
+        className="docs-skip"
+        href="#content"
+        onClick={(event) => {
+          event.preventDefault();
+          article.current?.focus();
+        }}
+      >
+        Skip to content
+      </a>
+      <header className="docs-header">
+        <div className="docs-header-inner">
           <Button
-            variant="outline"
-            size="sm"
-            className="mt-6 lg:mt-10"
-            aria-pressed={!dark}
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            aria-label="Open navigation"
             onClick={() => {
-              document.documentElement.classList.toggle("dark", !dark);
-              setDark(!dark);
+              setMenuOpen(true);
             }}
           >
-            Light theme
+            <Menu />
           </Button>
-        </aside>
-        <main id="content" tabIndex={-1} className="min-w-0 px-6 py-10 sm:px-10 lg:px-14 lg:py-14">
-          <header className="mb-12 border-b border-border pb-10">
-            <Link href="./ai.html">Explore upstream AI Elements</Link>
-            <Text size="xs" tone="muted" className="mb-4 font-mono">
-              @flora/florets
-            </Text>
-            <Heading level={1} className="text-3xl leading-10">
-              Component guide
-            </Heading>
-            <pre
-              tabIndex={0}
-              aria-label="Import Florets"
-              className="mt-6 overflow-auto rounded-lg border border-border bg-muted/30 p-4 text-xs leading-6"
+          <a className="docs-brand" href="#introduction">
+            <FlowerMark /> <span>Florets</span>
+          </a>
+          <nav aria-label="Main navigation" className="docs-top-nav">
+            <a
+              href="#introduction"
+              aria-current={!route.includes("/") && !isIndex ? "page" : undefined}
             >
-              <code>
-                {
-                  'import { Button, Heading, Text } from "@flora/florets";\nimport "@flora/florets/styles.css";'
-                }
-              </code>
-            </pre>
-          </header>
-          <div className="space-y-14">
-            <Section id="catalog" title="Component catalog">
-              <Catalog dark={dark} />
-            </Section>
-            <Section
-              id="typography"
-              title="Typography"
-              description="A small type scale, with heading styles tied to semantic level. Layout owns the spacing around text."
+              Docs
+            </a>
+            <a
+              href="#components"
+              aria-current={route.startsWith("components") ? "page" : undefined}
             >
-              <Example
-                title="Heading"
-                description="Choose the level for the document structure. Each level has a default size, weight, and line height."
-                code={
-                  "<Heading level={1}>Installation settings</Heading>\n<Heading level={2}>Model provider</Heading>\n<Heading level={3}>Credentials</Heading>"
-                }
-              >
-                <div className="space-y-4">
-                  {([1, 2, 3, 4, 5, 6] as const).map((level) => (
-                    <div key={level} className="flex items-baseline gap-6">
-                      <Text as="span" size="xs" tone="muted" className="w-6 shrink-0 font-mono">
-                        h{level}
-                      </Text>
-                      <Heading level={level}>Build something useful</Heading>
-                    </div>
-                  ))}
-                </div>
-              </Example>
-              <Example
-                title="Text"
-                description="Use paragraphs or inline spans, with three sizes and default, muted, or inherited color."
-                code={
-                  '<Text size="md">Body text</Text>\n<Text tone="muted">Supporting information</Text>\n<Text as="span" size="xs">Last updated today</Text>'
-                }
-              >
-                <div className="space-y-4">
-                  <Text size="md">Describe a task. Come back to review the work.</Text>
-                  <Text>Describe a task. Come back to review the work.</Text>
-                  <Text size="xs">Describe a task. Come back to review the work.</Text>
-                  <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-border pt-4">
-                    <Text as="span">Default</Text>
-                    <Text as="span" tone="muted">
-                      Muted
-                    </Text>
-                    <div className="text-muted-foreground">
-                      <Text as="span" tone="inherit">
-                        Inherited
-                      </Text>
-                    </div>
-                  </div>
-                </div>
-              </Example>
-            </Section>
-            <Section id="links" title="Links">
-              <Example
-                title="Link & ButtonLink"
-                description="Both render anchors. ButtonLink uses the primary button styling."
-                code={
-                  '<Link href="#catalog">Component catalog</Link>\n<ButtonLink href="#catalog">Browse components</ButtonLink>'
-                }
-              >
-                <div className="flex flex-wrap items-center gap-6">
-                  <Link href="#catalog">Component catalog</Link>
-                  <ButtonLink href="#catalog">Browse components</ButtonLink>
-                </div>
-              </Example>
-            </Section>
-            <Section id="feedback" title="Feedback">
-              <Example
-                title="LoadingStatus"
-                description="Uses role=status to announce loading progress."
-                code="<LoadingStatus>Loading projects…</LoadingStatus>"
-              >
-                <LoadingStatus>Loading projects…</LoadingStatus>
-              </Example>
-            </Section>
-            <Section id="identity" title="Identity">
-              <Example
-                title="FlowerMark & Wordmark"
-                description="The flower is decorative and hidden from assistive technology. Give icon-only controls their own accessible name."
-                code={"<FlowerMark />\n<Wordmark />"}
-              >
-                <div className="flex flex-wrap items-center gap-10">
-                  <FlowerMark className="text-4xl" />
-                  <div className="border-l border-border pl-10">
-                    <Wordmark />
-                  </div>
-                </div>
-              </Example>
-            </Section>
+              Components
+            </a>
+            <a href="#ai" aria-current={route.startsWith("ai") ? "page" : undefined}>
+              AI Elements
+            </a>
+          </nav>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="secondary"
+              className="docs-search"
+              onClick={() => {
+                setSearchOpen(true);
+              }}
+              aria-label="Search documentation"
+            >
+              <Search className="size-4" />
+              <span>Search documentation…</span>
+              <Kbd>⌘ K</Kbd>
+            </Button>
+            <a
+              className="docs-github"
+              href="https://github.com/rhizomatous/flora/tree/main/florets"
+              aria-label="Florets on GitHub"
+            >
+              <GitBranch className="size-4" />
+            </a>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+              onClick={() => {
+                setDark(!dark);
+              }}
+            >
+              {dark ? <Sun /> : <Moon />}
+            </Button>
           </div>
+        </div>
+      </header>
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+        <SheetContent side="left" className="w-80">
+          <SheetHeader>
+            <SheetTitle>Florets documentation</SheetTitle>
+          </SheetHeader>
+          <nav aria-label="Mobile documentation" className="docs-mobile-nav">
+            {navigation()}
+          </nav>
+        </SheetContent>
+      </Sheet>
+      <div className="docs-layout">
+        <nav ref={nav} className="docs-sidebar" aria-label="Documentation">
+          {navigation()}
+        </nav>
+        <main ref={article} id="content" tabIndex={-1} className="docs-article">
+          <div className="docs-page-heading">
+            <div>
+              <p className="docs-eyebrow">{category}</p>
+              <h1>{title}</h1>
+            </div>
+            <Button
+              variant="secondary"
+              aria-label={copied ? "Page copied" : "Copy page"}
+              size="sm"
+              onClick={() => {
+                void copyPage();
+              }}
+            >
+              {copied ? <Check /> : <Copy />}
+              <span>{copied ? "Copied" : "Copy page"}</span>
+            </Button>
+          </div>
+          <p className="docs-description">{description}</p>
+          {copyError && (
+            <p role="alert" className="text-sm text-destructive">
+              Couldn’t copy. Select the page text to copy it manually.
+            </p>
+          )}
+          <div key={route}>{pageContent}</div>
+          <footer className="docs-footer">
+            {previous ? (
+              <a href={href(previous.route)}>
+                <ArrowLeft className="size-4" />
+                {previous.title}
+              </a>
+            ) : (
+              <span />
+            )}
+            {next && (
+              <a href={href(next.route)}>
+                {next.title}
+                <ArrowRight className="size-4" />
+              </a>
+            )}
+          </footer>
         </main>
+        <aside className="docs-toc" aria-label="On this page">
+          <p>On this page</p>
+          {toc.map((item) => (
+            <a
+              key={item.id}
+              href={`#${route}/${item.id}`}
+              aria-current={activeHeading === item.id ? "location" : undefined}
+              onClick={(event) => {
+                event.preventDefault();
+                history.replaceState(null, "", `#${route}/${item.id}`);
+                document
+                  .querySelector(`#${CSS.escape(item.id)}`)
+                  ?.scrollIntoView({ behavior: "smooth" });
+                setActiveHeading(item.id);
+              }}
+            >
+              {item.title}
+            </a>
+          ))}
+          <div className="docs-toc-note">
+            <FlowerMark />
+            <p>Built with Florets.</p>
+            <span>
+              The navigation, controls, and examples use the same components documented here.
+            </span>
+            <a href="#installation">
+              Start building <ArrowRight className="size-3" />
+            </a>
+          </div>
+        </aside>
       </div>
-    </div>
+      <CommandDialog
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        title="Search documentation"
+        description="Find components, AI Elements, and guides."
+      >
+        <Command>
+          <CommandInput placeholder="Search documentation…" />
+          <CommandList>
+            <CommandEmpty>No results found. Try another component or topic.</CommandEmpty>
+            {sections.map((group) => (
+              <CommandGroup key={group.title} heading={group.title}>
+                {group.pages.map((item) => (
+                  <CommandItem
+                    key={item.route}
+                    value={`${item.route} ${item.title} ${item.description}`}
+                    onSelect={() => {
+                      location.hash = item.route;
+                      setSearchOpen(false);
+                    }}
+                  >
+                    <span>{item.title}</span>
+                    <span className="ml-auto truncate text-xs text-muted-foreground">
+                      {group.title}
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
+          </CommandList>
+        </Command>
+      </CommandDialog>
+    </TooltipProvider>
   );
 }
