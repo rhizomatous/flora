@@ -209,7 +209,6 @@ function ComponentPage({ id, ai, dark }: { id: string; ai: boolean; dark: boolea
     <>
       <section className="docs-section" id="usage">
         <h2>Usage</h2>
-        <p>Import {ai ? "AI components" : doc?.title} and the shared styles in your application.</p>
         <CodeExample
           code={
             ai
@@ -230,11 +229,6 @@ function ComponentPage({ id, ai, dark }: { id: string; ai: boolean; dark: boolea
         }}
       >
         <h2>Examples</h2>
-        <p>
-          {ai
-            ? "Try this interactive pattern, then open the code to see how its parts fit together."
-            : "Explore the variations below. Each example uses the same Florets components available to your application."}
-        </p>
         <PreviewBoundary key={path}>
           <Suspense
             fallback={
@@ -313,12 +307,10 @@ export function Guide() {
   if (route.startsWith("ai/")) category = "AI Elements";
   const description =
     page?.description ??
-    (isIndex
-      ? "Browse the collection. Find a component, try the examples, and bring it into your application."
-      : "This documentation page doesn’t exist. Choose a page from the navigation.");
+    (isIndex ? "" : "This documentation page doesn’t exist. Choose a page from the navigation.");
   const pageIndex = pages.findIndex((item) => item.route === route);
   const previous = pages[pageIndex - 1];
-  const next = pages[pageIndex + 1];
+  const next = pageIndex === -1 ? undefined : pages[pageIndex + 1];
 
   useEffect(() => {
     function navigate() {
@@ -615,7 +607,7 @@ export function Guide() {
         </Sheet>
         <div className="docs-layout">
           <Sidebar collapsible="none" className="docs-sidebar">
-            <SidebarContent ref={nav}>
+            <SidebarContent ref={nav} className="scroll-fade-y scrollbar-none overflow-x-hidden">
               <nav aria-label="Documentation">{navigation()}</nav>
             </SidebarContent>
           </Sidebar>
@@ -625,19 +617,46 @@ export function Guide() {
                 <p className="docs-eyebrow">{category}</p>
                 <h1>{title}</h1>
               </div>
-              <Button
-                variant="secondary"
-                aria-label={copied ? "Page copied" : "Copy page"}
-                size="sm"
-                onClick={() => {
-                  void copyPage();
-                }}
-              >
-                {copied ? <Check /> : <Copy />}
-                <span>{copied ? "Copied" : "Copy page"}</span>
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  className="hidden sm:inline-flex"
+                  variant="secondary"
+                  aria-label={copied ? "Page copied" : "Copy page"}
+                  size="sm"
+                  onClick={() => {
+                    void copyPage();
+                  }}
+                >
+                  {copied ? <Check /> : <Copy />}
+                  <span>{copied ? "Copied" : "Copy page"}</span>
+                </Button>
+                <nav aria-label="Adjacent pages" className="flex gap-2">
+                  {previous && (
+                    <Button asChild variant="secondary" size="icon-sm" className="size-8 md:size-7">
+                      <a
+                        href={href(previous.route)}
+                        aria-label={`Previous: ${previous.title}`}
+                        title={previous.title}
+                      >
+                        <ArrowLeft />
+                      </a>
+                    </Button>
+                  )}
+                  {next && (
+                    <Button asChild variant="secondary" size="icon-sm" className="size-8 md:size-7">
+                      <a
+                        href={href(next.route)}
+                        aria-label={`Next: ${next.title}`}
+                        title={next.title}
+                      >
+                        <ArrowRight />
+                      </a>
+                    </Button>
+                  )}
+                </nav>
+              </div>
             </div>
-            <p className="docs-description">{description}</p>
+            {description && <p className="docs-description">{description}</p>}
             {toc.length > 0 && (
               <div className="mb-6 xl:hidden">
                 <DropdownMenu>

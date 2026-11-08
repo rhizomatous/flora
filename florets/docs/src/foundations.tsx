@@ -47,10 +47,6 @@ export function FoundationPage({ id }: { id: string }) {
               Florets is the shared design system used by Flora. It brings together general-purpose
               interface components, conversation patterns, and Flora’s typography and identity.
             </p>
-            <p>
-              These docs use Florets too. The live examples run the same components that
-              applications import from the workspace package.
-            </p>
           </Section>
           <Section id="getting-started" title="Getting started">
             <p>
