@@ -656,18 +656,6 @@ export function Guide() {
                 {item.title}
               </a>
             ))}
-            <div className="docs-toc-note">
-              <FlowerMark />
-              <p>Built with Florets.</p>
-              <span>
-                The navigation, controls, and examples use the same components documented here.
-              </span>
-              <Button asChild variant="outline" size="sm" className="mt-4">
-                <a href="#installation">
-                  Start building <ArrowRight className="size-3" />
-                </a>
-              </Button>
-            </div>
           </aside>
         </div>
         <CommandDialog

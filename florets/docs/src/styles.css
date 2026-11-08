@@ -186,23 +186,6 @@
 .docs-toc > a[aria-current] {
   color: var(--foreground);
 }
-.docs-toc-note {
-  border-radius: 12px;
-  background: var(--muted);
-  padding: 20px;
-  margin: 32px 0;
-}
-.docs-toc-note > span:first-child {
-  font-size: 26px;
-}
-.docs-toc-note p {
-  font-weight: 500;
-  margin: 12px 0 8px;
-}
-.docs-toc-note > span {
-  color: var(--muted-foreground);
-  line-height: 1.7;
-}
 .docs-footer {
   margin-top: 64px;
   padding: 24px 0;
