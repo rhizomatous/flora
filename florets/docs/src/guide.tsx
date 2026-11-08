@@ -27,71 +27,7 @@ import {
   Wordmark,
 } from "@flora/florets";
 
-const catalog = [
-  "accordion",
-  "alert",
-  "alert-dialog",
-  "aspect-ratio",
-  "attachment",
-  "avatar",
-  "badge",
-  "breadcrumb",
-  "bubble",
-  "button",
-  "button-group",
-  "calendar",
-  "card",
-  "carousel",
-  "chart",
-  "checkbox",
-  "code-block",
-  "collapsible",
-  "combobox",
-  "command",
-  "context-menu",
-  "dialog",
-  "direction",
-  "drawer",
-  "dropdown-menu",
-  "empty",
-  "field",
-  "hover-card",
-  "input",
-  "input-group",
-  "input-otp",
-  "item",
-  "kbd",
-  "label",
-  "marker",
-  "menubar",
-  "message",
-  "message-scroller",
-  "native-select",
-  "navigation-menu",
-  "pagination",
-  "popover",
-  "progress",
-  "questionnaire",
-  "radio-group",
-  "resizable",
-  "scroll-area",
-  "select",
-  "separator",
-  "sheet",
-  "sidebar",
-  "skeleton",
-  "slider",
-  "sonner",
-  "spinner",
-  "switch",
-  "table",
-  "tabs",
-  "textarea",
-  "toggle",
-  "toggle-group",
-  "tooltip",
-  "trace",
-];
+import { Catalog } from "./catalog";
 
 const sections = [
   { id: "catalog", label: "Component catalog" },
@@ -326,20 +262,9 @@ export function Guide() {
             <Section
               id="catalog"
               title="Component catalog"
-              description="The full shadcn Radix/Rhea catalog is available from @flora/florets. Open a component’s upstream documentation for its API and examples."
+              description="Live examples of every shadcn Radix/Rhea component in Florets. Try the controls and open View code for the source of each example."
             >
-              <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                {catalog.map((name) => (
-                  <li key={name}>
-                    <Link
-                      href={`https://ui.shadcn.com/docs/components/radix/${name}`}
-                      className="text-sm"
-                    >
-                      {name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              <Catalog dark={dark} />
             </Section>
             <Section
               id="typography"
