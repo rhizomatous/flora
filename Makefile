@@ -30,10 +30,7 @@ check: web styleguide
 smoke: build
 	node --test scripts/smoke.test.ts
 
-browser: web
-	$(MAKE) browser-test
+browser: browser-test
 
-# Requires web assets from a completed web build.
 browser-test:
 	npm run test:browser
-	FLORA_CHAT_BROWSER_TEST=1 go -C backend test -mod=readonly -count=1 -run 'Test(Chat|Changes|Projects|Settings|Enrollment)Browser' ./internal/server

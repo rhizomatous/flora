@@ -23,7 +23,7 @@
     "preview:capture": "node scripts/capture-chat-preview.ts",
     "ci:affected": "nx affected -t frontend-check,styleguide,go-check,race,smoke,browser,container-check,package-check",
     "test:watch": "vitest",
-    "test:browser": "playwright test --config web/playwright.config.ts --project preview"
+    "test:browser": "playwright test --config web/playwright.config.ts"
   },
   "devDependencies": {
     "@opencode-ai/sdk": "1.2.27",

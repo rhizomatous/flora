@@ -1,15 +1,17 @@
 import assert from "node:assert/strict";
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures.ts";
 
-import { openWorkspaceMenu, assertFitsPhone, origin, pageErrors } from "../helpers.ts";
+import { openWorkspaceMenu, assertFitsPhone, pageErrors } from "../helpers.ts";
 
-test("administrator enrollment and logout", async ({ page }) => {
+test.use({ scenario: "enrollment" });
+
+test("administrator enrollment and logout", async ({ page, backend }) => {
   const errors = pageErrors(page);
   page.on("request", (request) => {
     assert.equal(request.url().includes("fixture-installer-enrollment-code"), false);
   });
-  await page.goto(origin);
+  await page.goto(backend.url);
   await expect(page.getByRole("heading", { name: "Create administrator" })).toBeVisible();
   await assertFitsPhone(page);
   await page.getByLabel("Password", { exact: true }).fill("browser test password");

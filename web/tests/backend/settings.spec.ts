@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 
-import { test, expect } from "@playwright/test";
+import { test, expect, savedSettingsURL } from "../fixtures.ts";
 
 import { openWorkspaceMenu, openSettings, assertFitsPhone, logIn, pageErrors } from "../helpers.ts";
 
-test("settings persistence, credential rotation, and completion sounds", async ({ page }) => {
+test.use({ scenario: "settings" });
+
+test("settings persistence, credential rotation, and completion sounds", async ({ page, backend, request }) => {
   const errors = pageErrors(page);
   await page.addInitScript(() => {
     window.tones = 0;
@@ -159,4 +161,13 @@ test("settings persistence, credential rotation, and completion sounds", async (
     page.getByRole("heading", { name: "Installation settings", exact: true }),
   ).toBeFocused();
   assert.deepEqual(errors, []);
+  const saved = await request.get(savedSettingsURL(backend));
+  await expect(saved).toBeOK();
+  expect(await saved.json()).toEqual({
+    cpus: 3,
+    messageBytes: 1024,
+    sound: false,
+    providerKey: "rotated-fixture-key",
+    githubToken: "github_pat_test-secret",
+  });
 });

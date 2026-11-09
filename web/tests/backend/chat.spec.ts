@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures.ts";
 
 import { openWorkspaceMenu, assertFitsPhone, logIn, pageErrors } from "../helpers.ts";
+
+test.use({ scenario: "chat" });
 
 test("chat creation, recovery, controls, and logout", async ({ page, context }) => {
   const errors = pageErrors(page);

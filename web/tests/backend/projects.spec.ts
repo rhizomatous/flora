@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 
-import { test } from "@playwright/test";
+import { test } from "../fixtures.ts";
 
-import { assertFitsPhone, logIn, origin, pageErrors } from "../helpers.ts";
+import { assertFitsPhone, logIn, pageErrors } from "../helpers.ts";
 
-test("project repositories, validation, and keyboard focus", async ({ page }) => {
+test.use({ scenario: "projects" });
+
+test("project repositories, validation, and keyboard focus", async ({ page, backend }) => {
   const errors = pageErrors(page);
   await logIn(page);
-  await page.goto(`${origin}/#projects/new`);
+  await page.goto(`${backend.url}/#projects/new`);
   await page.getByLabel("Project name", { exact: true }).fill("Collection");
   await page.getByLabel("GitHub repository", { exact: true }).fill("first/app");
   await page.getByRole("button", { name: "Add repository", exact: true }).focus();
