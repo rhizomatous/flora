@@ -39,10 +39,7 @@
   line-height: 16px;
   box-shadow: none;
 }
-/* Align the visible letters with the icons, allowing for the font's descender space. */
 .composer-label {
-  position: relative;
-  top: -0.5px;
   line-height: 16px;
 }
 .composer-control:hover,
@@ -236,9 +233,6 @@
   .composer-branch {
     margin-left: 0;
     justify-self: end;
-  }
-  .composer-control {
-    height: 32px;
   }
   .composer-project {
     min-width: 0;
