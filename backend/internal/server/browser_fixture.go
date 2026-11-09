@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/auth"
@@ -23,85 +22,21 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/webassets"
 )
 
-type browserInstance struct {
+// BrowserInstance owns one isolated app server and its temporary data.
+type BrowserInstance struct {
 	URL         string `json:"url"`
-	ID          string `json:"id"`
 	ChatID      string `json:"chatID"`
 	OtherChatID string `json:"otherChatID"`
-	store       *storage.Store
-	close       func()
-}
-
-// BrowserFixtures allocates isolated backends for Playwright. It is compiled only
-// into the loopback fixture executable, never into the shipped application.
-func BrowserFixtures() (http.Handler, func()) {
-	var mu sync.Mutex
-	instances := map[string]*browserInstance{}
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
-	mux.HandleFunc("POST /fixtures/{scenario}", func(w http.ResponseWriter, r *http.Request) {
-		instance, err := newBrowserInstance(r.PathValue("scenario"))
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		mu.Lock()
-		instances[instance.ID] = instance
-		mu.Unlock()
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(instance)
-	})
-	mux.HandleFunc("DELETE /fixtures/{id}", func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		instance := instances[r.PathValue("id")]
-		delete(instances, r.PathValue("id"))
-		mu.Unlock()
-		if instance != nil {
-			instance.close()
-		}
-		w.WriteHeader(http.StatusNoContent)
-	})
-	// Read saved values independently of the browser UI, including credentials that
-	// the application deliberately never returns through its public settings API.
-	mux.HandleFunc("GET /fixtures/{id}/settings", func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		defer mu.Unlock()
-		instance := instances[r.PathValue("id")]
-		if instance == nil {
-			http.NotFound(w, r)
-			return
-		}
-		preferences, err := instance.store.Preferences(r.Context())
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		credentials, err := instance.store.Credentials(r.Context())
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
-			"cpus": preferences.CPUs, "messageBytes": preferences.MessageBytes, "sound": preferences.Sound,
-			"providerKey": credentials.ProviderKey, "githubToken": credentials.GitHubToken,
-		})
-	})
-	return mux, func() {
-		mu.Lock()
-		defer mu.Unlock()
-		for id, instance := range instances {
-			instance.close()
-			delete(instances, id)
-		}
-	}
+	Close       func() `json:"-"`
 }
 
 type browserTransport func(*http.Request) (*http.Response, error)
 
 func (f browserTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
-func newBrowserInstance(scenario string) (_ *browserInstance, err error) {
+// NewBrowserInstance starts one scenario. The caller must close it after the test.
+// This code is compiled only into the fixture executable.
+func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	switch scenario {
 	case "chat", "changes", "enrollment", "notifications", "projects", "settings":
 	default:
@@ -113,30 +48,31 @@ func newBrowserInstance(scenario string) (_ *browserInstance, err error) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cleanup := []func(){func() { os.RemoveAll(directory) }, cancel}
-	instance := &browserInstance{ID: filepath.Base(directory)}
-	instance.close = func() {
+	instance := &BrowserInstance{}
+	var store *storage.Store
+	instance.Close = func() {
 		for i := len(cleanup) - 1; i >= 0; i-- {
 			cleanup[i]()
 		}
 	}
 	defer func() {
 		if err != nil {
-			instance.close()
+			instance.Close()
 		}
 	}()
 	var authentication *auth.Service
 	var fixture *testfixture.Fixture
 	if scenario == "enrollment" {
-		instance.store, err = storage.Open(ctx, filepath.Join(directory, "data"))
+		store, err = storage.Open(ctx, filepath.Join(directory, "data"))
 		if err != nil {
 			return nil, err
 		}
-		cleanup = append(cleanup, func() { instance.store.Close() })
+		cleanup = append(cleanup, func() { store.Close() })
 		file := filepath.Join(directory, "enrollment.sha256")
 		if err = os.WriteFile(file, []byte(auth.TokenHash("fixture-installer-enrollment-code")), 0600); err != nil {
 			return nil, err
 		}
-		authentication = auth.New(instance.store)
+		authentication = auth.New(store)
 		if err = authentication.RequireEnrollment(file); err != nil {
 			return nil, err
 		}
@@ -146,9 +82,8 @@ func newBrowserInstance(scenario string) (_ *browserInstance, err error) {
 			return nil, err
 		}
 		cleanup = append(cleanup, fixture.Close)
-		instance.store, authentication = fixture.Store, fixture.Auth
+		store, authentication = fixture.Store, fixture.Auth
 	}
-	store := instance.store
 	configuration := settings.New(store)
 	if scenario == "settings" {
 		configuration.MaxRunningOverride = 4
@@ -248,7 +183,28 @@ func newBrowserInstance(scenario string) (_ *browserInstance, err error) {
 			original.ServeHTTP(w, r)
 		})
 	}
-	srv.Config.Handler = app
+	// Expose saved values only in this fixture executable so tests can verify
+	// credentials that the public settings API deliberately does not return.
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /__fixture/settings", func(w http.ResponseWriter, r *http.Request) {
+		preferences, err := store.Preferences(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		credentials, err := store.Credentials(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"cpus": preferences.CPUs, "messageBytes": preferences.MessageBytes, "sound": preferences.Sound,
+			"providerKey": credentials.ProviderKey, "githubToken": credentials.GitHubToken,
+		})
+	})
+	mux.Handle("/", app)
+	srv.Config.Handler = mux
 	srv.StartTLS()
 	cleanup = append(cleanup, func() { srv.CloseClientConnections(); srv.Close() })
 	instance.URL = srv.URL

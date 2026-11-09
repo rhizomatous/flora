@@ -242,10 +242,12 @@ preview tooling in `scripts/preview/`.
 Browser tests use Playwright Test and live in `web/tests/`. Install Chromium with
 `npx playwright install --with-deps --only-shell chromium`, then run
 `npm run test:browser` (or `make browser`) for the full browser suite. Playwright
-starts the preview server and builds and starts a dedicated Go fixture server.
-Each backend test gets its own temporary database, fake runtime, and HTTPS app
-server through a Playwright fixture, which cleans up after the test. The fixture
-server is excluded from normal builds by the `browserfixture` build tag.
+starts the preview server and builds the app and fixture executable once.
+A Playwright fixture starts a fresh Go process for each backend test, with its
+own temporary database, fake runtime, and HTTPS app server. It stops the process
+after the test. The process also cleans up when its parent closes stdin.
+The fixture executable is excluded from normal builds by the `browserfixture`
+build tag. Backend logs are saved with the test's output.
 
 Use `npm run test:browser -- --project=backend` to run backend scenarios, or
 `npm run test:browser -- --project=backend changes.spec.ts` to run one file.

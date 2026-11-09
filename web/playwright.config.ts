@@ -3,6 +3,7 @@ import { defineConfig } from "@playwright/test";
 const previewURL = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
 
 export default defineConfig({
+  globalSetup: "./tests/global-setup.ts",
   testDir: "./tests",
   outputDir: "../test-results",
   forbidOnly: Boolean(process.env.CI),
@@ -29,14 +30,6 @@ export default defineConfig({
       cwd: "..",
       url: previewURL,
       reuseExistingServer: Boolean(process.env.FLORA_PREVIEW_URL),
-    },
-    {
-      command:
-        "npm run build && go -C backend build -tags browserfixture -o ../bin/browser-fixture ./cmd/browser-fixture && exec ./bin/browser-fixture",
-      cwd: "..",
-      url: "http://127.0.0.1:5198/health",
-      timeout: 120_000,
-      gracefulShutdown: { signal: "SIGTERM", timeout: 10_000 },
     },
   ],
 });
