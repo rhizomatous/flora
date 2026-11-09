@@ -207,7 +207,7 @@ export function ChatComposerFooter({
         <PopoverTrigger
           render={
             <Button
-              variant="tertiary"
+              variant="ghost"
               size="icon-sm"
               className="composer-context"
               aria-label="Context usage"
