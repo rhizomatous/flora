@@ -22,16 +22,16 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 0 12px 8px;
+  padding: 0 8px 6px;
 }
 .composer-control {
-  height: 36px;
-  padding: 0 10px;
-  gap: 7px;
+  height: 28px;
+  padding: 0 8px;
+  gap: 6px;
   border: 0;
   border-radius: 8px;
   color: var(--composer-muted);
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 450;
   box-shadow: none;
 }
@@ -41,25 +41,25 @@
   color: var(--foreground);
 }
 .composer-control svg {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   stroke-width: 1.8;
 }
 .composer-control .composer-chevron {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   margin-left: 4px;
   opacity: 0.6;
 }
 .composer-project {
-  max-width: 240px;
+  max-width: 180px;
 }
 .composer-branch {
   margin-left: auto;
 }
 .composer-box {
   border: 1px solid var(--composer-border);
-  border-radius: 12px;
+  border-radius: 9px;
   background: var(--composer-surface);
   box-shadow: 0 12px 24px #00000012;
 }
@@ -71,10 +71,10 @@
   --tw-ring-shadow: 0 0 #0000;
 }
 .composer-textarea {
-  min-height: 106px;
+  min-height: 80px;
   max-height: 320px;
-  padding: 20px 20px 12px;
-  font-size: 18px;
+  padding: 15px 15px 9px;
+  font-size: 14px;
   line-height: 1.5;
 }
 .composer-textarea::placeholder {
@@ -85,18 +85,18 @@
 }
 .composer-bottom-bar {
   gap: 4px;
-  padding: 0 10px 10px;
+  padding: 0 8px 6px;
   flex-wrap: wrap;
 }
 .composer-icon {
-  width: 36px;
+  width: 28px;
   padding: 0;
 }
 .composer-model-mark {
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   border-radius: 7px;
   background: #4866ff;
   color: #101735;
@@ -107,8 +107,8 @@
 }
 .composer-send {
   margin-left: auto;
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border-radius: 8px;
   background: #4565f6;
@@ -122,23 +122,23 @@
   background: #5674ff;
 }
 .composer-send svg {
-  width: 19px;
-  height: 19px;
+  width: 15px;
+  height: 15px;
 }
 .composer-menu {
-  width: 300px;
+  width: 260px;
   max-width: calc(100vw - 24px);
   padding: 6px;
   border: 1px solid var(--composer-border, #dedede);
-  border-radius: 12px;
+  border-radius: 9px;
   background: var(--composer-menu, #fff);
   box-shadow: 0 12px 28px #0003;
 }
 .composer-menu [role="menuitem"] {
-  min-height: 36px;
+  min-height: 28px;
   padding: 6px 10px;
   gap: 12px;
-  font-size: 16px;
+  font-size: 13px;
 }
 .composer-menu [role="menuitem"][data-disabled] {
   opacity: 0.65;
@@ -160,10 +160,10 @@
 }
 .composer-search {
   width: 100%;
-  padding: 14px 16px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--composer-border, #dedede);
   outline-offset: -3px;
-  font-size: 16px;
+  font-size: 13px;
 }
 .composer-project-list {
   max-height: 240px;
@@ -177,7 +177,7 @@
   gap: 12px;
   width: 100%;
   padding: 8px 10px;
-  font-size: 16px;
+  font-size: 13px;
   border-radius: 6px;
   text-align: left;
 }
@@ -186,8 +186,8 @@
   background: var(--composer-hover, #ededed);
 }
 .composer-project-menu svg {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
   color: var(--muted-foreground);
 }
@@ -206,8 +206,13 @@
     gap: 0;
   }
   .composer-control {
+    height: 36px;
     font-size: 14px;
     padding-inline: 7px;
+  }
+  .composer-send {
+    width: 36px;
+    height: 36px;
   }
   .composer-project {
     max-width: 180px;
