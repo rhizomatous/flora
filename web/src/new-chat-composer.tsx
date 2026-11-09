@@ -268,7 +268,7 @@ export function NewChatComposer({
             <span className="composer-model-mark">
               <TerminalIcon />
             </span>
-            Default model
+            <span>Default model</span>
           </PlaceholderMenu>
           <PlaceholderMenu label="Reasoning effort" items={[{ label: "Default reasoning effort" }]}>
             Default

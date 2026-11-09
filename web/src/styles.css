@@ -28,12 +28,13 @@
 .composer-control {
   height: 28px;
   padding: 0 8px;
-  gap: 6px;
+  gap: 4px;
   border: 0;
   border-radius: 8px;
   color: var(--composer-muted);
   font-size: 13px;
   font-weight: 450;
+  line-height: 16px;
   box-shadow: none;
 }
 .composer-control:hover,
@@ -49,7 +50,7 @@
 .composer-control .composer-chevron {
   width: 10px;
   height: 10px;
-  margin-left: 4px;
+  margin-left: 0;
   opacity: 0.6;
 }
 .composer-project {
@@ -99,6 +100,7 @@
   padding: 0;
 }
 .composer-model-mark {
+  flex-shrink: 0;
   display: grid;
   place-items: center;
   width: 16px;
