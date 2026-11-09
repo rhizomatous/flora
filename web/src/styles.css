@@ -47,6 +47,11 @@
   background: var(--composer-hover);
   color: var(--foreground);
 }
+.composer-topbar .composer-control,
+.composer-topbar .composer-control:hover,
+.composer-topbar .composer-control[data-state="open"] {
+  background: transparent;
+}
 .composer-control svg {
   width: 14px;
   height: 14px;
