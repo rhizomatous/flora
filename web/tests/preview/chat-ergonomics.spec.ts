@@ -116,7 +116,7 @@ test("shared composer stays compact and exposes honest placeholders", async ({ p
     const send = await page
       .getByRole("button", { name: "Send message", exact: true })
       .boundingBox();
-    for (const name of ["Model", "Reasoning effort", "Chat actions", "Chat branch"]) {
+    for (const name of ["Model", "Reasoning effort", "Chat actions"]) {
       const offsets = await page.getByRole("button", { name, exact: true }).evaluate((button) => {
         const label = button.querySelector(".composer-label")?.getBoundingClientRect();
         if (!label) throw new Error("Missing composer label");

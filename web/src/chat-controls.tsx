@@ -194,15 +194,6 @@ export function ChatComposerFooter({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      <PlaceholderMenu
-        label="Chat branch"
-        variant="tertiary"
-        side="top"
-        items={[{ label: "Branch details unavailable", icon: <GitBranchIcon /> }]}
-      >
-        <GitBranchIcon />
-        <span className="composer-label">Branch</span>
-      </PlaceholderMenu>
       <Popover>
         <PopoverTrigger
           render={

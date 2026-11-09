@@ -43,7 +43,6 @@ The menus open, but their unfinished actions are disabled. Default model, reason
 - [ ] PR summary: fetch associated PRs, titles, status, additions/deletions, checks, and review/open actions. The strip shows “PRs”, not a fabricated count.
 - [ ] Terminals: list active shells, open a terminal, and reflect their count in the summary strip.
 - [ ] Runtime: report actual machine size, CPU, memory, disk, awake/asleep state, and wake controls. The neutral dot does not report machine health.
-- [ ] Chat branch: fetch the current working branch and provide branch actions.
 - [ ] Context: report usage, limits, system prompt, native tools, rules, codemode catalog, environment, and conversation breakdown; implement compaction thresholds. Unknown values are shown as dashes.
 - [ ] Cost: report actual spend instead of the unavailable dash.
 - [ ] View menu: search views; add diffs, machine files, setup, browser, side threads, new shell, desktop, and keep-awake controls. Overview is the current chat view.
