@@ -232,6 +232,33 @@ The Make commands remain available. One-shot commands work too:
 `nix develop --command make check smoke build-linux`. Before newly created Nix
 files are tracked by Git, use `nix develop path:.` so Nix includes them.
 
+### Tests
+
+Run `npm test` for Vitest tests, or `npm run test:watch` while editing. Frontend
+unit tests live beside their source in `web/src/`; documentation utility tests
+live in `florets/docs/src/`. Preview server integration tests live beside the
+preview tooling in `scripts/preview/`.
+
+Browser tests use Playwright Test and live in `web/tests/`. Install Chromium with
+`npx playwright install --with-deps --only-shell chromium`, then run
+`npm run test:browser` (or `make browser`) for the full browser suite. Playwright
+starts the preview server and builds the app and fixture executable once.
+A Playwright fixture starts a fresh Go process for each backend test, with its
+own temporary database, fake runtime, and HTTPS app server. It stops the process
+after the test. The process also cleans up when its parent closes stdin.
+The fixture executable is excluded from normal builds by the `browserfixture`
+build tag. Backend logs are saved with the test's output.
+
+Use `npm run test:browser -- --project=backend` to run backend scenarios, or
+`npm run test:browser -- --project=backend changes.spec.ts` to run one file.
+Playwright's `--ui`, `--debug`, and `--grep` options work with the same command.
+Failed browser tests save traces and screenshots in `test-results/`.
+Use `npx playwright show-trace <trace.zip>` to inspect a saved trace.
+
+Go tests stay beside their source. The standalone CLI smoke tests use Node's
+test runner (`make smoke`), and release and installer tests stay with their
+Python and shell tooling in `scripts/`.
+
 ### Automatic shell activation with direnv (optional)
 
 Install [direnv](https://direnv.net/) and
@@ -286,7 +313,7 @@ and `npm run docs:preview` to preview that build. `make check` builds the guide 
 - `florets/`: shared shadcn Radix/Nova components, AI elements, and theme.
 - `agent/`: pinned agent image and container integration checks.
 - `specs/`: authoritative product requirements and visual direction.
-- `scripts/`: standalone-binary smoke test.
+- `scripts/`: release, installer, preview, and standalone-binary tooling and their tests.
 
 Npm workspaces and Make provide the small amount of build coordination needed.
 Generated assets, dependencies, and binaries are ignored. `make web` must precede

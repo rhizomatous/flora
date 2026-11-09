@@ -2,17 +2,7 @@ import assert from "node:assert/strict";
 
 import { expect, type Page } from "@playwright/test";
 
-/** Reads an environment variable that the Go browser test sets before launching the script. */
-export function requiredEnv(name: string) {
-  const value = process.env[name];
-  if (value === undefined || value === "") throw new Error(`${name} must be set`);
-  return value;
-}
-
-/** HTTPS origin of the Go test server. */
-export const origin = requiredEnv("FLORA_BROWSER_URL");
-
-/** Collects uncaught page errors so a script can assert that none occurred. */
+/** Collects uncaught page errors so a test can assert that none occurred. */
 export function pageErrors(page: Page) {
   const errors: string[] = [];
   page.on("pageerror", (error) => {
@@ -23,7 +13,7 @@ export function pageErrors(page: Page) {
 
 /** Opens Flora and logs in with the fixture password, submitting with the button or Enter. */
 export async function logIn(page: Page, submit: "button" | "enter" = "button") {
-  await page.goto(origin);
+  await page.goto("/");
   const password = page.getByLabel("Password", { exact: true });
   await password.fill("browser test password");
   await (submit === "enter"

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,7 +13,6 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/auth"
 	"github.com/rhizomatous/flora/backend/internal/settings"
 	"github.com/rhizomatous/flora/backend/internal/storage"
-	"github.com/rhizomatous/flora/backend/internal/webassets"
 )
 
 func enrollmentService(t *testing.T) (*storage.Store, *auth.Service) {
@@ -59,27 +57,5 @@ func TestInstallerEnrollmentHTTP(t *testing.T) {
 		if strings.Contains(w.Body.String(), "fixture-installer-enrollment-code") {
 			t.Fatal("response leaked enrollment code")
 		}
-	}
-}
-
-func TestEnrollmentBrowser(t *testing.T) {
-	if os.Getenv("FLORA_CHAT_BROWSER_TEST") != "1" {
-		t.Skip("set FLORA_CHAT_BROWSER_TEST=1 to run Chromium")
-	}
-	store, authentication := enrollmentService(t)
-	srv := httptest.NewUnstartedServer(nil)
-	origin := "https://" + srv.Listener.Addr().String()
-	srv.Config.Handler = New(webassets.FS(), authentication, settings.New(store), origin)
-	srv.StartTLS()
-	defer srv.Close()
-	script, err := filepath.Abs("../../../scripts/enrollment.browser.ts")
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.Command("node", script)
-	cmd.Env = append(os.Environ(), "FLORA_BROWSER_URL="+srv.URL)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("browser: %v\n%s", err, out)
 	}
 }

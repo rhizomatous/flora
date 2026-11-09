@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
 
-import { request, RequestError } from "../web/src/request.ts";
+import { test, vi } from "vitest";
 
-test("API requests preserve method, credentials, and JSON body", async (t) => {
-  t.mock.method(globalThis, "fetch", (url: RequestInfo | URL, init?: RequestInit) => {
+import { request, RequestError } from "./request.ts";
+
+test("API requests preserve method, credentials, and JSON body", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation((url: RequestInfo | URL, init?: RequestInit) => {
     assert.equal(url, "/api/auth/login");
     assert.equal(init?.method, "POST");
     assert.equal(init.credentials, "same-origin");
@@ -18,8 +19,8 @@ test("API requests preserve method, credentials, and JSON body", async (t) => {
   });
 });
 
-test("API failures keep safe JSON diagnostics", async (t) => {
-  t.mock.method(globalThis, "fetch", () =>
+test("API failures keep safe JSON diagnostics", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(() =>
     Promise.resolve(Response.json({ error: "Password is incorrect." }, { status: 401 })),
   );
   await assert.rejects(request("auth/login"), {
@@ -29,8 +30,8 @@ test("API failures keep safe JSON diagnostics", async (t) => {
   });
 });
 
-test("validation failures expose their HTTP status as an Error", async (t) => {
-  t.mock.method(globalThis, "fetch", () =>
+test("validation failures expose their HTTP status as an Error", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(() =>
     Promise.resolve(Response.json({ error: "Base branch was not found." }, { status: 400 })),
   );
   await assert.rejects(request("projects", "POST", {}), (error) => {
@@ -57,8 +58,8 @@ const unsafeResponses = [
 ] as const;
 
 for (const [name, body, contentType, status] of unsafeResponses) {
-  test(`${name} returns a useful status error without the response body`, async (t) => {
-    t.mock.method(globalThis, "fetch", () =>
+  test(`${name} returns a useful status error without the response body`, async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(() =>
       Promise.resolve(new Response(body, { status, headers: { "Content-Type": contentType } })),
     );
     await assert.rejects(request("settings"), {
