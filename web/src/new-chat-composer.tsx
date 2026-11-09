@@ -34,6 +34,7 @@ import {
   SlidersHorizontalIcon,
   SparklesIcon,
   TagIcon,
+  FlowerIcon,
   TerminalIcon,
   UsersIcon,
   FilesIcon,
@@ -260,10 +261,10 @@ export function NewChatComposer({
           </PlaceholderMenu>
           <PlaceholderMenu
             label="Model"
-            items={[{ label: "Server default model", icon: <TerminalIcon /> }]}
+            items={[{ label: "Server default model", icon: <FlowerIcon /> }]}
           >
             <span className="composer-model-mark">
-              <TerminalIcon />
+              <FlowerIcon />
             </span>
             <span className="composer-label">Default model</span>
           </PlaceholderMenu>
