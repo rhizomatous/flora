@@ -2,6 +2,8 @@
 @source "./";
 
 .new-chat-composer {
+  --composer-blue: #5b7cff;
+  --composer-blue-hover: #4565f6;
   --composer-surface: #fafafa;
   --composer-menu: #fff;
   --composer-border: #dedede;
@@ -106,7 +108,7 @@
   width: 16px;
   height: 16px;
   border-radius: 7px;
-  background: #4866ff;
+  background: var(--composer-blue);
   color: #101735;
 }
 .composer-model-mark svg {
@@ -119,15 +121,15 @@
   height: 28px;
   padding: 0;
   border-radius: 8px;
-  background: #4565f6;
+  background: var(--composer-blue);
   color: white;
-  border: 1px solid #6681ff;
+  border: 1px solid #819aff;
   box-shadow:
     0 1px 3px #0005,
     inset 0 1px 1px #ffffff25;
 }
 .composer-send:hover {
-  background: #5674ff;
+  background: var(--composer-blue-hover);
 }
 .composer-send svg {
   width: 15px;
@@ -254,15 +256,11 @@
     width: 28px;
     padding: 0;
   }
-  .composer-send {
-    width: 32px;
-    height: 32px;
-  }
 }
 @container (max-width: 360px) {
   .composer-bottom-bar {
     display: grid;
-    grid-template-columns: 28px 28px minmax(0, 1fr) 32px;
+    grid-template-columns: 28px 28px minmax(0, 1fr) 28px;
     gap: 4px 2px;
   }
   .composer-bottom-bar > .composer-control:nth-child(3) {
