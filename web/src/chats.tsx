@@ -13,9 +13,6 @@ import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  ChevronDownIcon,
   CrossCircledIcon,
   Text,
   InputGroup,
@@ -45,6 +42,7 @@ import {
   ItemDescription,
 } from "@flora/florets";
 
+import { NewChatComposer } from "./new-chat-composer";
 import type { Chat } from "./notifications";
 import { QuestionForm, type Question } from "./question";
 import { errorMessage, isExpired, request } from "./request";
@@ -367,7 +365,7 @@ export function Chats({
   return (
     <section
       aria-labelledby="chats-heading"
-      className={isNew ? "mx-auto my-12 max-w-3xl md:mt-[25svh]" : chatLayout}
+      className={isNew ? "mx-auto my-12 w-full max-w-[720px] md:mt-[25svh]" : chatLayout}
     >
       <div className={isNew ? "sr-only" : headerLayout}>
         {existingChat && <SidebarTrigger aria-label="Menu" />}
@@ -403,66 +401,15 @@ export function Chats({
         </div>
       )}
       {isNew && projects !== undefined && projects.length > 0 && (
-        <form
-          onSubmit={(event) => {
+        <NewChatComposer
+          projects={projects}
+          selectedProject={selectedProject}
+          onProjectChange={setSelectedProjectID}
+          busy={busy}
+          onSend={(event) => {
             void send(event);
           }}
-          className="space-y-3"
-        >
-          <div className="flex flex-wrap items-center gap-3">
-            <input type="hidden" name="project" value={selectedProject?.id ?? ""} />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={busy}
-                  aria-label={`Project: ${selectedProject?.name ?? ""}`}
-                >
-                  {selectedProject?.name}
-                  <ChevronDownIcon aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuRadioGroup
-                  value={selectedProject?.id ?? ""}
-                  onValueChange={setSelectedProjectID}
-                  aria-label="Project"
-                >
-                  {projects.map((project) => (
-                    <DropdownMenuRadioItem key={project.id} value={project.id}>
-                      {project.name}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          <InputGroup>
-            <FieldLabel className="sr-only" htmlFor="new-chat-message">
-              Message
-            </FieldLabel>
-            <InputGroupTextarea
-              id="new-chat-message"
-              name="text"
-              className="max-h-80 min-h-28"
-              placeholder="Message…"
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                  event.preventDefault();
-                  if (!busy) event.currentTarget.form?.requestSubmit();
-                }
-              }}
-              required
-              disabled={busy}
-            />
-            <InputGroupAddon align="block-end" className="justify-end">
-              <InputGroupButton type="submit" variant="default" size="sm" disabled={busy}>
-                {busy ? "Starting…" : "Start chat"}
-              </InputGroupButton>
-            </InputGroupAddon>
-          </InputGroup>
-        </form>
+        />
       )}
       {id !== "" && !isNew && detail === undefined && error === "" && (
         <Text size="md" role="status" className="mt-8">

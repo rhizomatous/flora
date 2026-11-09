@@ -1,2 +1,283 @@
 @import "@flora/florets/styles.css";
 @source "./";
+
+.new-chat-composer {
+  --composer-blue: #5b7cff;
+  --composer-blue-hover: #4565f6;
+  --composer-surface: #fafafa;
+  --composer-menu: #fff;
+  --composer-border: #dedede;
+  --composer-muted: #737373;
+  --composer-hover: #ededed;
+  width: 100%;
+  container-type: inline-size;
+}
+.dark .new-chat-composer,
+.dark .composer-menu {
+  --composer-surface: #161616;
+  --composer-menu: #202020;
+  --composer-border: #333;
+  --composer-muted: #999;
+  --composer-hover: #292929;
+}
+.composer-topbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding: 0 8px 2px 12px;
+}
+.composer-control {
+  height: 28px;
+  padding: 0 8px;
+  gap: 4px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--composer-muted);
+  font-size: 13px;
+  font-weight: 450;
+  line-height: 16px;
+  box-shadow: none;
+}
+.composer-label {
+  line-height: 16px;
+}
+.composer-control:hover,
+.composer-control[data-state="open"] {
+  background: var(--composer-hover);
+  color: var(--foreground);
+}
+.composer-topbar .composer-control {
+  padding-inline: 4px;
+}
+.composer-topbar .composer-control,
+.composer-topbar .composer-control:hover,
+.composer-topbar .composer-control[data-state="open"] {
+  background: transparent;
+}
+.composer-control svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.8;
+}
+/* Geist's visible capitals sit above the line-box center. Move the artwork, not the text. */
+.composer-control > svg,
+.composer-control > .composer-model-mark,
+.composer-menu [role="menuitem"] > svg,
+.composer-project-option > svg,
+.composer-project-links a > svg {
+  transform: translateY(-1px);
+}
+.composer-control .composer-chevron {
+  width: 10px;
+  height: 10px;
+  margin-left: 0;
+  opacity: 0.6;
+}
+.composer-project {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 180px;
+  justify-content: flex-start;
+}
+.composer-branch {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.composer-box {
+  border: 1px solid var(--composer-border);
+  border-radius: 9px;
+  background: var(--composer-surface);
+  box-shadow: 0 12px 24px #00000012;
+}
+.dark .composer-box {
+  background: var(--composer-surface);
+}
+.composer-box:has(textarea:focus-visible) {
+  border-color: var(--composer-border);
+  box-shadow: 0 12px 24px #00000012;
+}
+.composer-textarea {
+  min-height: 80px;
+  max-height: 320px;
+  padding: 15px 15px 9px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.composer-textarea:focus-visible,
+.composer-search:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.composer-textarea::placeholder {
+  color: #777;
+}
+.dark .composer-textarea::placeholder {
+  color: #646464;
+}
+.composer-bottom-bar {
+  gap: 4px;
+  padding: 0 8px 6px;
+  flex-wrap: wrap;
+}
+.composer-icon {
+  width: 28px;
+  padding: 0;
+}
+.composer-model-mark {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 7px;
+  background: var(--composer-blue);
+  color: white;
+}
+.composer-model-mark svg {
+  width: 14px;
+  height: 14px;
+}
+.composer-send {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  background: var(--composer-blue);
+  color: white;
+  border: 1px solid #819aff;
+  box-shadow:
+    0 1px 3px #0005,
+    inset 0 1px 1px #ffffff25;
+}
+.composer-send:hover {
+  background: var(--composer-blue-hover);
+}
+.composer-send svg {
+  width: 15px;
+  height: 15px;
+}
+.composer-menu {
+  width: 260px;
+  max-width: calc(100vw - 24px);
+  padding: 6px;
+  border: 1px solid var(--composer-border, #dedede);
+  border-radius: 9px;
+  background: var(--composer-menu, #fff);
+  box-shadow: 0 12px 28px #0003;
+}
+.composer-menu [role="menuitem"] {
+  min-height: 28px;
+  padding: 6px 10px;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 16px;
+}
+.composer-menu [role="menuitem"] > svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  stroke-width: 1.8;
+}
+.composer-menu [role="menuitem"][data-disabled] {
+  opacity: 0.65;
+}
+.composer-menu [data-slot="dropdown-menu-separator"] {
+  margin: 6px -6px;
+  background: var(--composer-border, #dedede);
+}
+.composer-menu-note {
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+.composer-project-menu {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.composer-search {
+  width: 100%;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--composer-border, #dedede);
+  outline: none;
+  font-size: 13px;
+}
+.composer-project-list {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 6px;
+}
+.composer-project-option,
+.composer-project-links a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  text-align: left;
+}
+.composer-project-option:hover,
+.composer-project-links a:hover {
+  background: var(--composer-hover, #ededed);
+}
+.composer-project-menu svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+.composer-project-links {
+  padding: 6px;
+  border-top: 1px solid var(--composer-border, #dedede);
+}
+/* Adapt to the space beside the sidebar as well as narrow browser windows. */
+@container (max-width: 560px) {
+  .composer-topbar {
+    padding-left: 10px;
+  }
+  .composer-control > svg,
+  .composer-control > .composer-model-mark {
+    transform: none;
+  }
+  .composer-textarea {
+    padding: 14px;
+    font-size: 16px;
+    min-height: 106px;
+  }
+  .composer-bottom-bar {
+    flex-wrap: nowrap;
+    gap: 2px;
+    padding: 0 6px 6px;
+  }
+  .composer-bottom-bar .composer-control {
+    padding-inline: 5px;
+    gap: 4px;
+  }
+  .composer-bottom-bar .composer-chevron {
+    margin-left: 0;
+  }
+  .composer-bottom-bar .composer-icon {
+    width: 28px;
+    padding: 0;
+  }
+}
+@container (max-width: 360px) {
+  .composer-bottom-bar .composer-control {
+    padding-inline: 3px;
+    gap: 3px;
+  }
+  .composer-bottom-bar > .composer-control:nth-child(3) {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+  .composer-bottom-bar > .composer-control:nth-child(3) .composer-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
