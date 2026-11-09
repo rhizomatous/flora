@@ -10,17 +10,17 @@
 
 ## Disconnected placeholders
 
-The menus open, but their unfinished actions are disabled and marked as coming soon. Default model, reasoning, and branch labels do not claim a particular backend configuration.
+The menus open, but their unfinished actions are disabled. Default model, reasoning, and branch labels do not claim a particular backend configuration.
 
 - [ ] Cloud: show actual runtime status and machine details; implement machine selection and wake controls.
-- [ ] Setup: implement setup assistance and snapshots. The plain button currently displays a coming-soon message.
+- [ ] Setup: implement setup assistance and snapshots. The plain button is currently disabled.
 - [ ] Branch: load the project's actual branches and allow a per-chat base branch override. Currently the server uses the saved project configuration.
 - [ ] Attachments: upload, store, preview, remove, and send attachments with messages.
 - [ ] Context: add environment variables, people, threads, pull requests, skills, and files to a message.
 - [ ] Chat settings: implement access, machine size, setup/snapshots, environment variables, MCP servers, pinning, folders, and tags.
 - [ ] Model: load supported models and pass the selected model to the backend. Currently uses the server default.
 - [ ] Reasoning effort: load supported options and pass the selection to the backend. Currently uses the server default.
-- [ ] Voice input: record and transcribe audio. The microphone currently explains that voice input is coming soon.
+- [ ] Voice input: record and transcribe audio. The microphone button is currently disabled.
 - [ ] Slash commands and @ context: implement suggestions, keyboard selection, and structured message payloads. The reference placeholder is present, but text is sent literally.
 
 ## Other reference views

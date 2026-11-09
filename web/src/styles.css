@@ -218,11 +218,6 @@
   padding: 6px;
   border-top: 1px solid var(--composer-border, #dedede);
 }
-.composer-notice {
-  margin-top: 10px;
-  color: var(--muted-foreground);
-  font-size: 13px;
-}
 /* Adapt to the space beside the sidebar as well as narrow browser windows. */
 @container (max-width: 560px) {
   .composer-topbar {
