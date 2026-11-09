@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 
-import { chromium, expect } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
-import { openWorkspaceMenu, openSettings, assertFitsPhone, logIn, pageErrors } from "./browser.ts";
+import { openWorkspaceMenu, openSettings, assertFitsPhone, logIn, pageErrors } from "../helpers.ts";
 
-const browser = await chromium.launch();
-try {
-  const page = await browser.newPage({ ignoreHTTPSErrors: true });
+test("settings persistence, credential rotation, and completion sounds", async ({ page }) => {
   const errors = pageErrors(page);
   await page.addInitScript(() => {
     window.tones = 0;
@@ -161,9 +159,4 @@ try {
     page.getByRole("heading", { name: "Installation settings", exact: true }),
   ).toBeFocused();
   assert.deepEqual(errors, []);
-  console.log(
-    "Chromium: real settings API, fixed model, atomic rejected rotation, blank secret preservation, saved limits after reload, effective message bound, safe dependency failures, enabled/disabled completion sound, no sound for interruption, and mobile width passed.",
-  );
-} finally {
-  await browser.close();
-}
+});

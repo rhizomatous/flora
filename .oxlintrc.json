@@ -116,8 +116,9 @@
       "rules": { "react/only-export-components": "off" }
     },
     {
-      "files": ["scripts/**"],
+      "files": ["scripts/**", "**/*.test.{ts,tsx}", "web/tests/**"],
       "rules": {
+        "import/no-nodejs-modules": "off",
         "class-methods-use-this": "off",
         "max-classes-per-file": "off",
         "no-await-in-loop": "off",

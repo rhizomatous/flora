@@ -1,15 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
-import { test } from "node:test";
 
 import { createVirtualFileSystem } from "typescript/unstable/fs";
 import { API } from "typescript/unstable/sync";
+import { test } from "vitest";
 
-import {
-  exampleAnchor,
-  sourceForExample,
-  standaloneSource,
-} from "../florets/docs/src/example-source-utils.ts";
+import { exampleAnchor, sourceForExample, standaloneSource } from "./example-source-utils.ts";
 
 test("focused snippets keep transitive helpers and module-level data", () => {
   const source = `import { Button } from "@flora/florets";
@@ -33,7 +29,7 @@ function Selected() {
 });
 
 test("all example variants produce source without documentation-only imports", async () => {
-  const directory = new URL("../florets/docs/src/examples/upstream/", import.meta.url);
+  const directory = new URL("examples/upstream/", import.meta.url);
   let checked = 0;
   const snippets: Record<string, string> = {};
   for (const file of await readdir(directory)) {
@@ -48,9 +44,9 @@ test("all example variants produce source without documentation-only imports", a
     }
   }
   assert.ok(checked > 400);
-  const aiDirectory = new URL("../florets/docs/src/ai/examples/", import.meta.url);
+  const aiDirectory = new URL("ai/examples/", import.meta.url);
   const animations = await readFile(
-    new URL("../florets/docs/src/ai/lib/message-animations.ts", import.meta.url),
+    new URL("ai/lib/message-animations.ts", import.meta.url),
     "utf8",
   );
   for (const file of await readdir(aiDirectory)) {

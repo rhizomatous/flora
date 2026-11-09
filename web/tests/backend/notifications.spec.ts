@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { chromium } from "@playwright/test";
+import { test } from "@playwright/test";
 
 import {
   openWorkspaceMenu,
@@ -10,11 +10,9 @@ import {
   origin,
   pageErrors,
   requiredEnv,
-} from "./browser.ts";
+} from "../helpers.ts";
 
-const browser = await chromium.launch();
-try {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true });
+test("completion notifications, reconnects, and sound preferences", async ({ page, context, browser }) => {
   // Control only the browser audio boundary. All chat, event, notification and
   // settings requests use the TLS Go server and its saved runtime fixture.
   await context.addInitScript(() => {
@@ -60,7 +58,6 @@ try {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Intentional partial fake of a DOM class.
     window.AudioContext = FakeAudioContext as unknown as typeof AudioContext;
   });
-  const page = await context.newPage();
   const errors = pageErrors(page);
   const requests: string[] = [];
   page.on("request", (r) => {
@@ -183,9 +180,4 @@ try {
     .getByRole("menuitem", { name: "Sound enabled for this page", exact: true })
     .waitFor();
   await realAudio.close();
-  console.log(
-    "Chromium: background completion, correct chat keyboard navigation/focus, denied audio guidance, gesture retry, missed completion on reconnect, no replay on reconnect/reload, muted toast, interruption exclusion and shared chat feed passed.",
-  );
-} finally {
-  await browser.close();
-}
+});

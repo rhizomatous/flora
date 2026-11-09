@@ -45,11 +45,12 @@ func TestProjectsBrowser(t *testing.T) {
 	})
 	srv.StartTLS()
 	defer srv.Close()
-	script, err := filepath.Abs("../../../scripts/projects.browser.ts")
+	root, err := filepath.Abs("../../..")
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("node", script)
+	cmd := exec.Command("node", "node_modules/@playwright/test/cli.js", "test", "--config", "web/playwright.config.ts", "--project=backend", "projects.spec.ts", "--output", "test-results/backend/projects")
+	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "FLORA_BROWSER_URL="+srv.URL)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

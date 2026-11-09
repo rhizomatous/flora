@@ -34,11 +34,12 @@ func TestSettingsBrowser(t *testing.T) {
 	srv.Config.Handler = New(webassets.FS(), authentication, configuration, origin, svc)
 	srv.StartTLS()
 	defer srv.Close()
-	script, err := filepath.Abs("../../../scripts/settings.browser.ts")
+	root, err := filepath.Abs("../../..")
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("node", script)
+	cmd := exec.Command("node", "node_modules/@playwright/test/cli.js", "test", "--config", "web/playwright.config.ts", "--project=backend", "settings.spec.ts", "--output", "test-results/backend/settings")
+	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "FLORA_BROWSER_URL="+srv.URL)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

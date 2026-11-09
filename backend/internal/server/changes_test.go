@@ -119,11 +119,12 @@ func TestChangesBrowser(t *testing.T) {
 	srv.Config.Handler = New(webassets.FS(), auth, settings.New(store), "https://"+srv.Listener.Addr().String(), svc)
 	srv.StartTLS()
 	defer srv.Close()
-	script, err := filepath.Abs("../../../scripts/changes.browser.ts")
+	root, err := filepath.Abs("../../..")
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("node", script)
+	cmd := exec.Command("node", "node_modules/@playwright/test/cli.js", "test", "--config", "web/playwright.config.ts", "--project=backend", "changes.spec.ts", "--output", "test-results/backend/changes")
+	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "FLORA_BROWSER_URL="+srv.URL, "FLORA_BROWSER_CHAT="+c.ID)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

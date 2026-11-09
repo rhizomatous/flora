@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 
-import { chromium, expect } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
-import { openWorkspaceMenu, assertFitsPhone, origin, pageErrors } from "./browser.ts";
+import { openWorkspaceMenu, assertFitsPhone, origin, pageErrors } from "../helpers.ts";
 
-const browser = await chromium.launch();
-try {
-  const page = await browser.newPage({ ignoreHTTPSErrors: true });
+test("administrator enrollment and logout", async ({ page }) => {
   const errors = pageErrors(page);
   page.on("request", (request) => {
     assert.equal(request.url().includes("fixture-installer-enrollment-code"), false);
@@ -49,6 +47,4 @@ try {
   await page.reload();
   await expect(page.getByRole("heading", { name: "Log in", exact: true })).toBeVisible();
   assert.deepEqual(errors, []);
-} finally {
-  await browser.close();
-}
+});

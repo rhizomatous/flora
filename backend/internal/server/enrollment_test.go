@@ -72,11 +72,12 @@ func TestEnrollmentBrowser(t *testing.T) {
 	srv.Config.Handler = New(webassets.FS(), authentication, settings.New(store), origin)
 	srv.StartTLS()
 	defer srv.Close()
-	script, err := filepath.Abs("../../../scripts/enrollment.browser.ts")
+	root, err := filepath.Abs("../../..")
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("node", script)
+	cmd := exec.Command("node", "node_modules/@playwright/test/cli.js", "test", "--config", "web/playwright.config.ts", "--project=backend", "enrollment.spec.ts", "--output", "test-results/backend/enrollment")
+	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "FLORA_BROWSER_URL="+srv.URL)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

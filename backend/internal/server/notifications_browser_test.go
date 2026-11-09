@@ -32,11 +32,12 @@ func TestChatBrowserNotifications(t *testing.T) {
 	srv.Config.Handler = New(webassets.FS(), authentication, settings.New(store), origin, svc)
 	srv.StartTLS()
 	defer srv.Close()
-	script, err := filepath.Abs("../../../scripts/notifications.browser.ts")
+	root, err := filepath.Abs("../../..")
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("node", script)
+	cmd := exec.Command("node", "node_modules/@playwright/test/cli.js", "test", "--config", "web/playwright.config.ts", "--project=backend", "notifications.spec.ts", "--output", "test-results/backend/notifications")
+	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "FLORA_BROWSER_URL="+srv.URL, "FLORA_OTHER_CHAT="+other.ID)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

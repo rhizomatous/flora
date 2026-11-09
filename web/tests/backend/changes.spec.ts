@@ -1,13 +1,10 @@
 import assert from "node:assert/strict";
 
-import { chromium, expect } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
-import { assertFitsPhone, logIn, origin, pageErrors, requiredEnv } from "./browser.ts";
+import { assertFitsPhone, logIn, origin, pageErrors, requiredEnv } from "../helpers.ts";
 
-const browser = await chromium.launch();
-try {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true });
-  const page = await context.newPage();
+test("chat omits saved review data and requests", async ({ page }) => {
   const errors = pageErrors(page);
   const reviewRequests: string[] = [];
   page.on("request", (request) => {
@@ -24,9 +21,4 @@ try {
   await assertFitsPhone(page);
   assert.deepEqual(reviewRequests, []);
   assert.deepEqual(errors, []);
-  console.log(
-    "Chromium: chat omits saved changes and PR sections without fetching review data, including after reload and at phone width.",
-  );
-} finally {
-  await browser.close();
-}
+});

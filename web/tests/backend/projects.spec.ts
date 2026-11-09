@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 
-import { chromium } from "@playwright/test";
+import { test } from "@playwright/test";
 
-import { assertFitsPhone, logIn, origin, pageErrors } from "./browser.ts";
+import { assertFitsPhone, logIn, origin, pageErrors } from "../helpers.ts";
 
-const browser = await chromium.launch();
-try {
-  const page = await browser.newPage({ ignoreHTTPSErrors: true });
+test("project repositories, validation, and keyboard focus", async ({ page }) => {
   const errors = pageErrors(page);
   await logIn(page);
   await page.goto(`${origin}/#projects/new`);
@@ -116,9 +114,4 @@ try {
     .getByText("third/extra.git · Branch: next · Fetched on demand", { exact: true })
     .waitFor();
   assert.deepEqual(errors, []);
-  console.log(
-    "Chromium: multi-repository create/edit, extra branch validation, add/remove field preservation, persisted roles/branches, project list, and mobile width passed.",
-  );
-} finally {
-  await browser.close();
-}
+});
