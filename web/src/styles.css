@@ -23,7 +23,7 @@
 .composer-topbar {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px;
   padding: 0 8px 2px;
 }
@@ -46,6 +46,9 @@
 .composer-control[data-state="open"] {
   background: var(--composer-hover);
   color: var(--foreground);
+}
+.composer-topbar .composer-control {
+  padding-inline: 4px;
 }
 .composer-topbar .composer-control,
 .composer-topbar .composer-control:hover,
@@ -72,9 +75,13 @@
   opacity: 0.6;
 }
 .composer-project {
+  flex: 0 1 auto;
+  min-width: 0;
   max-width: 180px;
+  justify-content: flex-start;
 }
 .composer-branch {
+  flex-shrink: 0;
   margin-left: auto;
 }
 .composer-box {
@@ -233,22 +240,6 @@
   .composer-control > svg,
   .composer-control > .composer-model-mark {
     transform: none;
-  }
-  .composer-topbar {
-    flex-wrap: nowrap;
-    gap: 2px;
-    padding: 0 0 2px;
-  }
-  .composer-topbar .composer-control {
-    padding-inline: 4px;
-  }
-  .composer-project {
-    flex: 1 1 0;
-    min-width: 0;
-    justify-content: flex-start;
-  }
-  .composer-branch {
-    flex-shrink: 0;
   }
   .composer-textarea {
     padding: 14px;
