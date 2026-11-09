@@ -77,6 +77,7 @@ export {
 } from "@radix-ui/react-icons";
 
 export {
+  ChevronDown as ChevronDownStrokeIcon,
   ArrowUpIcon,
   CheckIcon,
   CloudIcon,

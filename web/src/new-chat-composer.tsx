@@ -2,7 +2,7 @@ import { useState, type SubmitEvent, type ReactNode } from "react";
 
 import {
   Button,
-  ChevronDownIcon,
+  ChevronDownStrokeIcon,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
@@ -63,7 +63,7 @@ function PlaceholderMenu({
           aria-label={label}
         >
           {children}
-          {!iconOnly && <ChevronDownIcon className="composer-chevron" />}
+          {!iconOnly && <ChevronDownStrokeIcon className="composer-chevron" />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="composer-menu" align="start">
@@ -125,7 +125,7 @@ export function NewChatComposer({
             >
               <InboxIcon />
               <span className="composer-label truncate">{selectedProject?.name}</span>
-              <ChevronDownIcon className="composer-chevron" />
+              <ChevronDownStrokeIcon className="composer-chevron" />
             </Button>
           </PopoverTrigger>
           <PopoverContent
