@@ -97,6 +97,7 @@ export {
   SlidersHorizontalIcon,
   SparklesIcon,
   TagIcon,
+  FlowerIcon,
   TerminalIcon,
   UsersIcon,
   FilesIcon,
