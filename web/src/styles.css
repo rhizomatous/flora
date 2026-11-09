@@ -120,7 +120,7 @@
   height: 16px;
   border-radius: 7px;
   background: var(--composer-blue);
-  color: #101735;
+  color: white;
 }
 .composer-model-mark svg {
   width: 14px;
