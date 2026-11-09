@@ -4,7 +4,8 @@
     "container-check": {
       "inputs": [
         "go",
-        "image"
+        "image",
+        "{workspaceRoot}/scripts/check-agent.sh"
       ],
       "command": "bash scripts/check-agent.sh"
     }

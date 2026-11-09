@@ -112,7 +112,7 @@
       }
     },
     {
-      "files": ["*.config.ts", "web/tests/global-setup.ts"],
+      "files": ["*.config.ts"],
       "rules": { "import/no-default-export": "off" }
     },
     {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures.ts";
 
 test("preview navigation and pauseable chat replay", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
