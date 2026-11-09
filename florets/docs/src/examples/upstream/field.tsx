@@ -1,5 +1,4 @@
 // oxlint-disable import/max-dependencies -- The upstream collection demonstrates compositions across several components.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/field-example.json
 "use client";
 
 import { REGEXP_ONLY_DIGITS } from "input-otp";
@@ -160,35 +159,70 @@ function TextareaFields() {
 }
 
 function SelectFields() {
+  const basicItems = [
+    { label: "Choose an option", value: null },
+    { label: "Option 1", value: "option1" },
+    { label: "Option 2", value: "option2" },
+    { label: "Option 3", value: "option3" },
+  ];
+  const countryItems = [
+    { label: "Select your country", value: null },
+    { label: "United States", value: "us" },
+    { label: "United Kingdom", value: "uk" },
+    { label: "Canada", value: "ca" },
+  ];
+  const timezoneItems = [
+    { label: "Select timezone", value: null },
+    { label: "UTC", value: "utc" },
+    { label: "Eastern Time", value: "est" },
+    { label: "Pacific Time", value: "pst" },
+  ];
+  const invalidItems = [
+    { label: "This field has an error", value: null },
+    { label: "Option 1", value: "option1" },
+    { label: "Option 2", value: "option2" },
+    { label: "Option 3", value: "option3" },
+  ];
+  const disabledItems = [
+    { label: "Cannot select", value: null },
+    { label: "Option 1", value: "option1" },
+    { label: "Option 2", value: "option2" },
+    { label: "Option 3", value: "option3" },
+  ];
+
   return (
     <Example title="Select Fields">
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="select-basic">Basic Select</FieldLabel>
-          <Select>
+          <Select items={basicItems}>
             <SelectTrigger id="select-basic">
-              <SelectValue placeholder="Choose an option" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="option1">Option 1</SelectItem>
-                <SelectItem value="option2">Option 2</SelectItem>
-                <SelectItem value="option3">Option 3</SelectItem>
+                {basicItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
               </SelectGroup>
             </SelectContent>
           </Select>
         </Field>
         <Field>
           <FieldLabel htmlFor="select-country">Country</FieldLabel>
-          <Select>
+          <Select items={countryItems}>
             <SelectTrigger id="select-country">
-              <SelectValue placeholder="Select your country" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="us">United States</SelectItem>
-                <SelectItem value="uk">United Kingdom</SelectItem>
-                <SelectItem value="ca">Canada</SelectItem>
+                {countryItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -197,30 +231,34 @@ function SelectFields() {
         <Field>
           <FieldLabel htmlFor="select-timezone">Timezone</FieldLabel>
           <FieldDescription>Choose your local timezone for accurate scheduling.</FieldDescription>
-          <Select>
+          <Select items={timezoneItems}>
             <SelectTrigger id="select-timezone">
-              <SelectValue placeholder="Select timezone" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="utc">UTC</SelectItem>
-                <SelectItem value="est">Eastern Time</SelectItem>
-                <SelectItem value="pst">Pacific Time</SelectItem>
+                {timezoneItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
               </SelectGroup>
             </SelectContent>
           </Select>
         </Field>
         <Field data-invalid>
           <FieldLabel htmlFor="select-invalid">Invalid Select</FieldLabel>
-          <Select>
+          <Select items={invalidItems}>
             <SelectTrigger id="select-invalid" aria-invalid>
-              <SelectValue placeholder="This field has an error" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="option1">Option 1</SelectItem>
-                <SelectItem value="option2">Option 2</SelectItem>
-                <SelectItem value="option3">Option 3</SelectItem>
+                {invalidItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -228,15 +266,17 @@ function SelectFields() {
         </Field>
         <Field data-disabled>
           <FieldLabel htmlFor="select-disabled-field">Disabled Field</FieldLabel>
-          <Select disabled>
+          <Select items={disabledItems} disabled>
             <SelectTrigger id="select-disabled-field">
-              <SelectValue placeholder="Cannot select" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="option1">Option 1</SelectItem>
-                <SelectItem value="option2">Option 2</SelectItem>
-                <SelectItem value="option3">Option 3</SelectItem>
+                {disabledItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -540,14 +580,24 @@ function SliderFields() {
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="slider-volume">Volume</FieldLabel>
-          <Slider id="slider-volume" value={volume} onValueChange={setVolume} max={100} step={1} />
+          <Slider
+            id="slider-volume"
+            value={volume}
+            onValueChange={(value) => {
+              setVolume(typeof value === "number" ? [value] : [...value]);
+            }}
+            max={100}
+            step={1}
+          />
         </Field>
         <Field>
           <FieldLabel htmlFor="slider-brightness">Screen Brightness</FieldLabel>
           <Slider
             id="slider-brightness"
             value={brightness}
-            onValueChange={setBrightness}
+            onValueChange={(value) => {
+              setBrightness(typeof value === "number" ? [value] : [...value]);
+            }}
             max={100}
             step={5}
           />
@@ -563,13 +613,15 @@ function SliderFields() {
           <Slider
             id="slider-temperature"
             value={temperature}
-            onValueChange={setTemperature}
+            onValueChange={(value) => {
+              setTemperature(typeof value === "number" ? [value] : [...value]);
+            }}
             min={0}
             max={1}
             step={0.1}
           />
           <FieldDescription>
-            Range: {(temperature[0] ?? 0).toFixed(1)} - {(temperature[1] ?? 1).toFixed(1)}
+            Range: {(temperature[0] ?? 0).toFixed(1)} - {(temperature[1] ?? 0).toFixed(1)}
           </FieldDescription>
         </Field>
         <Field>
@@ -577,7 +629,9 @@ function SliderFields() {
           <Slider
             id="slider-price-range"
             value={priceRange}
-            onValueChange={setPriceRange}
+            onValueChange={(value) => {
+              setPriceRange(typeof value === "number" ? [value] : [...value]);
+            }}
             max={100}
             step={5}
           />
@@ -590,7 +644,9 @@ function SliderFields() {
           <Slider
             id="slider-color-balance"
             value={colorBalance}
-            onValueChange={setColorBalance}
+            onValueChange={(value) => {
+              setColorBalance(typeof value === "number" ? [value] : [...value]);
+            }}
             max={100}
             step={10}
           />
@@ -716,6 +772,13 @@ function InputOTPFields() {
 }
 
 function HorizontalFields() {
+  const basicItems = [
+    { label: "Select a fruit", value: null },
+    { label: "Apple", value: "apple" },
+    { label: "Banana", value: "banana" },
+    { label: "Orange", value: "orange" },
+  ];
+
   return (
     <Example title="Horizontal Fields">
       <FieldGroup className="**:data-[slot=field-content]:min-w-48">
@@ -745,15 +808,17 @@ function HorizontalFields() {
             <FieldLabel htmlFor="horizontal-select">Favorite Fruit</FieldLabel>
             <FieldDescription>Choose your favorite fruit.</FieldDescription>
           </FieldContent>
-          <Select>
+          <Select items={basicItems}>
             <SelectTrigger id="horizontal-select">
-              <SelectValue placeholder="Select a fruit" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="apple">Apple</SelectItem>
-                <SelectItem value="banana">Banana</SelectItem>
-                <SelectItem value="orange">Orange</SelectItem>
+                {basicItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
               </SelectGroup>
             </SelectContent>
           </Select>

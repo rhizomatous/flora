@@ -65,9 +65,15 @@
             "@flora/web"
           ],
           "target": "build"
+        },
+        {
+          "projects": [
+            "@flora/florets"
+          ],
+          "target": "styleguide"
         }
       ],
-      "command": "npx playwright install --with-deps --only-shell chromium && make browser-test"
+      "command": "npx playwright install --with-deps --only-shell chromium && make browser-test && npm run docs:test"
     }
   }
 }

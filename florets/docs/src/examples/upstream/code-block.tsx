@@ -1,9 +1,7 @@
 // oxlint-disable import/max-dependencies -- The upstream collection demonstrates compositions across several components.
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
 // oxlint-disable react/no-array-index-key -- These fixed demo sequences use positions to distinguish repeated entries.
 // oxlint-disable typescript/strict-boolean-expressions -- The upstream examples use truthiness for optional props and React children.
 // oxlint-disable unicorn/no-nested-ternary -- The upstream rendering branches show the same conditional states.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/code-block-example.json
 "use client";
 
 import {
@@ -13,7 +11,8 @@ import {
   TerminalIcon,
   WrapTextIcon,
 } from "lucide-react";
-import * as React from "react";
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/code-block-example.json
+import { type ComponentProps, useEffect, useId, useState } from "react";
 import { Streamdown, useIsCodeFenceIncomplete, type ExtraProps } from "streamdown";
 
 import { Bubble, BubbleContent } from "@flora/florets/components/bubble";
@@ -106,7 +105,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
 export function Chat() {
-  const [input, setInput] = React.useState("")
+  const [input, setInput] = useState("")
   const { messages, sendMessage, status } = useChat()
 
   return (
@@ -466,7 +465,7 @@ function CodeBlockTypeset() {
 }
 
 function CodeBlockWithActions() {
-  const [wrap, setWrap] = React.useState(false);
+  const [wrap, setWrap] = useState(false);
   const lines = useHighlightedCode(source, "ts");
 
   return (
@@ -520,9 +519,9 @@ function download(code: string, filename: string) {
 }
 
 function CodeBlockShowMore() {
-  const [expanded, setExpanded] = React.useState(false);
+  const [expanded, setExpanded] = useState(false);
   const lines = useHighlightedCode(chat, "tsx");
-  const id = React.useId();
+  const id = useId();
 
   return (
     <Example title="Show More">
@@ -562,9 +561,9 @@ function CodeBlockShowMore() {
 }
 
 function CodeBlockShowMoreScroll() {
-  const [expanded, setExpanded] = React.useState(false);
+  const [expanded, setExpanded] = useState(false);
   const lines = useHighlightedCode(chat, "tsx");
-  const id = React.useId();
+  const id = useId();
 
   return (
     <Example title="Show More with Max Height">
@@ -680,9 +679,9 @@ const answer = `Wrap the input in a \`useDebounce\` hook:
 
 \`\`\`tsx
 export function useDebounce<T>(value: T, delay = 300) {
-  const [debounced, setDebounced] = React.useState(value)
+  const [debounced, setDebounced] = useState(value)
 
-  React.useEffect(() => {
+  useEffect(() => {
     const timeout = setTimeout(() => setDebounced(value), delay)
     return () => clearTimeout(timeout)
   }, [value, delay])
@@ -712,7 +711,7 @@ function Highlighted({
   code,
   language,
   ...props
-}: React.ComponentProps<typeof CodeBlockContent> & {
+}: ComponentProps<typeof CodeBlockContent> & {
   code: string;
   language: string;
 }) {
@@ -885,7 +884,7 @@ const streamed: {
     lineNumbers: true,
     diff: true,
     code: ` export function Search() {
-   const [query, setQuery] = React.useState("")
+   const [query, setQuery] = useState("")
 -  const results = useSearch(query)
 +  const debounced = useDebounce(query, 300)
 +  const results = useSearch(debounced)
@@ -940,9 +939,9 @@ function StreamedBlock({ block, code }: { block: (typeof streamed)[number]; code
 }
 
 function useStream(length: number) {
-  const [position, setPosition] = React.useState(length);
+  const [position, setPosition] = useState(length);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (position >= length) {
       return;
     }
@@ -998,7 +997,7 @@ function MarkdownCode({
   className,
   children,
   ...props
-}: React.ComponentProps<"code"> & ExtraProps) {
+}: ComponentProps<"code"> & ExtraProps) {
   const incomplete = useIsCodeFenceIncomplete();
   const block = "data-block" in props;
   const code = typeof children === "string" ? children : "";
@@ -1108,9 +1107,7 @@ function CodeBlockInCard() {
           </CardContent>
         </Card>
         <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="outline">View route</Button>
-          </DialogTrigger>
+          <DialogTrigger render={<Button variant="outline">View route</Button>} />
           <DialogContent className="sm:max-w-xl">
             <DialogHeader>
               <DialogTitle>app/api/chat/route.ts</DialogTitle>

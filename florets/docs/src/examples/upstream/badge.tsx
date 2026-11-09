@@ -1,11 +1,10 @@
+// oxlint-disable jsx-a11y/anchor-ambiguous-text -- The sample link text is preserved from the upstream examples.
+// oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 import { ArrowRightIcon, ArrowUpRightIcon, BadgeCheck } from "lucide-react";
 
 import { Badge } from "@flora/florets/components/badge";
 import { Spinner } from "@flora/florets/components/spinner";
 
-// oxlint-disable jsx-a11y/anchor-ambiguous-text -- The sample link text is preserved from the upstream examples.
-// oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/badge-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {
@@ -140,36 +139,37 @@ function BadgeAsLink() {
   return (
     <Example title="asChild">
       <div className="style-sera:gap-6 flex flex-wrap gap-2">
-        <Badge asChild>
-          <a href="#">
-            Link <ArrowUpRightIcon data-icon="inline-end" />
-          </a>
-        </Badge>
-        <Badge asChild variant="secondary">
-          <a href="#">
-            Link <ArrowUpRightIcon data-icon="inline-end" />
-          </a>
-        </Badge>
-        <Badge asChild variant="destructive">
-          <a href="#">
-            Link <ArrowUpRightIcon data-icon="inline-end" />
-          </a>
-        </Badge>
-        <Badge asChild variant="outline">
-          <a href="#">
-            Link <ArrowUpRightIcon data-icon="inline-end" />
-          </a>
-        </Badge>
-        <Badge asChild variant="ghost">
-          <a href="#">
-            Link <ArrowUpRightIcon data-icon="inline-end" />
-          </a>
-        </Badge>
-        <Badge asChild variant="link">
-          <a href="#">
-            Link <ArrowUpRightIcon data-icon="inline-end" />
-          </a>
-        </Badge>
+        <Badge
+          render={
+            <a href="#">
+              Link <ArrowUpRightIcon data-icon="inline-end" />
+            </a>
+          }
+        />
+        <Badge
+          variant="secondary"
+          render={
+            <a href="#">
+              Link <ArrowUpRightIcon data-icon="inline-end" />
+            </a>
+          }
+        />
+        <Badge
+          variant="destructive"
+          render={
+            <a href="#">
+              Link <ArrowUpRightIcon data-icon="inline-end" />
+            </a>
+          }
+        />
+        <Badge
+          variant="ghost"
+          render={
+            <a href="#">
+              Link <ArrowUpRightIcon data-icon="inline-end" />
+            </a>
+          }
+        />
       </div>
     </Example>
   );

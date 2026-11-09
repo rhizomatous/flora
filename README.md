@@ -274,16 +274,18 @@ examples run in isolated preview frames. The site supports light and dark themes
 and mobile navigation, and needs no backend. Import components from `@flora/florets`
 and the shared theme from `@flora/florets/styles.css`. The `@flora/florets/ai` entry
 point uses the same components and theme. `florets/components.json` records the
-Radix/Nova registry configuration. `florets/docs/src/examples/upstream.json` records
+Base UI/Nova registry configuration. `florets/docs/src/examples/upstream.json` records
 the source URLs and original source hashes for the imported example collections.
 Use `npm run docs:build` to produce a standalone static site in `florets/docs-dist/`,
-and `npm run docs:preview` to preview that build. `make check` builds the guide too.
+and `npm run docs:preview` to preview that build. Run `npm run docs:test` after building
+to check component rendering, keyboard navigation, and popup focus in Chromium.
+`make check` builds the guide too.
 
 ## Repository layout
 
 - `backend/`: Go module, HTTP server, executable, and embedded web assets.
 - `web/`: React/TypeScript application, built with Vite and Tailwind.
-- `florets/`: shared shadcn Radix/Nova components, AI elements, and theme.
+- `florets/`: shared shadcn Base UI/Nova components, AI elements, and theme.
 - `agent/`: pinned agent image and container integration checks.
 - `specs/`: authoritative product requirements and visual direction.
 - `scripts/`: standalone-binary smoke test.

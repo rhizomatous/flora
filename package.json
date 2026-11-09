@@ -21,7 +21,8 @@
     "docs:preview": "npm run docs:preview --workspace @flora/florets",
     "preview:chat": "npm run dev --workspace @flora/web -- --mode chat-preview",
     "preview:capture": "node scripts/capture-chat-preview.ts",
-    "ci:affected": "nx affected -t frontend-check,styleguide,go-check,race,smoke,browser,container-check,package-check"
+    "ci:affected": "nx affected -t frontend-check,styleguide,go-check,race,smoke,browser,container-check,package-check",
+    "docs:test": "node scripts/florets.browser.ts"
   },
   "devDependencies": {
     "@opencode-ai/sdk": "1.2.27",

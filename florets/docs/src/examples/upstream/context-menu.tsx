@@ -1,5 +1,3 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/context-menu-example.json
 "use client";
 
 import {
@@ -11,7 +9,7 @@ import {
   ShareIcon,
   TrashIcon,
 } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 
 import { Button } from "@flora/florets/components/button";
 import {
@@ -45,8 +43,8 @@ export function Preview() {
   return (
     <ExampleWrapper>
       <ContextMenuBasic />
-      <ContextMenuWithSides />
       <ContextMenuWithIcons />
+      <ContextMenuWithSides />
       <ContextMenuWithShortcuts />
       <ContextMenuWithSubmenu />
       <ContextMenuWithGroups />
@@ -228,7 +226,9 @@ function ContextMenuWithGroups() {
               Redo
               <ContextMenuShortcut>⇧⌘Z</ContextMenuShortcut>
             </ContextMenuItem>
-            <ContextMenuSeparator />
+          </ContextMenuGroup>
+          <ContextMenuSeparator />
+          <ContextMenuGroup>
             <ContextMenuItem>
               Cut
               <ContextMenuShortcut>⌘X</ContextMenuShortcut>
@@ -256,10 +256,6 @@ function ContextMenuWithGroups() {
 }
 
 function ContextMenuWithCheckboxes() {
-  const [showBookmarksBar, setShowBookmarksBar] = React.useState(true);
-  const [showFullUrls, setShowFullUrls] = React.useState(false);
-  const [showDeveloperTools, setShowDeveloperTools] = React.useState(false);
-
   return (
     <Example title="With Checkboxes">
       <ContextMenu>
@@ -268,21 +264,9 @@ function ContextMenuWithCheckboxes() {
         </ContextMenuTrigger>
         <ContextMenuContent>
           <ContextMenuGroup>
-            <ContextMenuCheckboxItem
-              checked={showBookmarksBar}
-              onCheckedChange={setShowBookmarksBar}
-            >
-              Show Bookmarks Bar
-            </ContextMenuCheckboxItem>
-            <ContextMenuCheckboxItem checked={showFullUrls} onCheckedChange={setShowFullUrls}>
-              Show Full URLs
-            </ContextMenuCheckboxItem>
-            <ContextMenuCheckboxItem
-              checked={showDeveloperTools}
-              onCheckedChange={setShowDeveloperTools}
-            >
-              Show Developer Tools
-            </ContextMenuCheckboxItem>
+            <ContextMenuCheckboxItem defaultChecked>Show Bookmarks Bar</ContextMenuCheckboxItem>
+            <ContextMenuCheckboxItem>Show Full URLs</ContextMenuCheckboxItem>
+            <ContextMenuCheckboxItem defaultChecked>Show Developer Tools</ContextMenuCheckboxItem>
           </ContextMenuGroup>
         </ContextMenuContent>
       </ContextMenu>
@@ -291,8 +275,8 @@ function ContextMenuWithCheckboxes() {
 }
 
 function ContextMenuWithRadio() {
-  const [user, setUser] = React.useState("pedro");
-  const [theme, setTheme] = React.useState("light");
+  const [user, setUser] = useState("pedro");
+  const [theme, setTheme] = useState("light");
 
   return (
     <Example title="With Radio Group">
@@ -360,56 +344,22 @@ function ContextMenuWithDestructive() {
 
 function ContextMenuWithSides() {
   return (
-    <Example title="With Sides">
-      <div className="grid grid-cols-2 gap-6">
-        <ContextMenu>
-          <ContextMenuTrigger className="flex aspect-[2/0.5] w-full items-center justify-center rounded-lg border text-sm">
-            Right click (top)
-          </ContextMenuTrigger>
-          <ContextMenuContent side="top">
-            <ContextMenuGroup>
-              <ContextMenuItem>Back</ContextMenuItem>
-              <ContextMenuItem>Forward</ContextMenuItem>
-              <ContextMenuItem>Reload</ContextMenuItem>
-            </ContextMenuGroup>
-          </ContextMenuContent>
-        </ContextMenu>
-        <ContextMenu>
-          <ContextMenuTrigger className="flex aspect-[2/0.5] w-full items-center justify-center rounded-lg border text-sm">
-            Right click (right)
-          </ContextMenuTrigger>
-          <ContextMenuContent side="right">
-            <ContextMenuGroup>
-              <ContextMenuItem>Back</ContextMenuItem>
-              <ContextMenuItem>Forward</ContextMenuItem>
-              <ContextMenuItem>Reload</ContextMenuItem>
-            </ContextMenuGroup>
-          </ContextMenuContent>
-        </ContextMenu>
-        <ContextMenu>
-          <ContextMenuTrigger className="flex aspect-[2/0.5] w-full items-center justify-center rounded-lg border text-sm">
-            Right click (bottom)
-          </ContextMenuTrigger>
-          <ContextMenuContent side="bottom">
-            <ContextMenuGroup>
-              <ContextMenuItem>Back</ContextMenuItem>
-              <ContextMenuItem>Forward</ContextMenuItem>
-              <ContextMenuItem>Reload</ContextMenuItem>
-            </ContextMenuGroup>
-          </ContextMenuContent>
-        </ContextMenu>
-        <ContextMenu>
-          <ContextMenuTrigger className="flex aspect-[2/0.5] w-full items-center justify-center rounded-lg border text-sm">
-            Right click (left)
-          </ContextMenuTrigger>
-          <ContextMenuContent side="left">
-            <ContextMenuGroup>
-              <ContextMenuItem>Back</ContextMenuItem>
-              <ContextMenuItem>Forward</ContextMenuItem>
-              <ContextMenuItem>Reload</ContextMenuItem>
-            </ContextMenuGroup>
-          </ContextMenuContent>
-        </ContextMenu>
+    <Example title="With Sides" containerClassName="col-span-2">
+      <div className="flex flex-wrap justify-center gap-2">
+        {(["inline-start", "left", "top", "bottom", "right", "inline-end"] as const).map((side) => (
+          <ContextMenu key={side}>
+            <ContextMenuTrigger className="flex aspect-[2/0.5] items-center justify-center rounded-lg border p-4 text-sm capitalize">
+              {side.replace("-", " ")}
+            </ContextMenuTrigger>
+            <ContextMenuContent side={side}>
+              <ContextMenuGroup>
+                <ContextMenuItem>Back</ContextMenuItem>
+                <ContextMenuItem>Forward</ContextMenuItem>
+                <ContextMenuItem>Reload</ContextMenuItem>
+              </ContextMenuGroup>
+            </ContextMenuContent>
+          </ContextMenu>
+        ))}
       </div>
     </Example>
   );
@@ -419,9 +369,7 @@ function ContextMenuInDialog() {
   return (
     <Example title="In Dialog">
       <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline">Open Dialog</Button>
-        </DialogTrigger>
+        <DialogTrigger render={<Button variant="outline" />}>Open Dialog</DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Context Menu Example</DialogTitle>
@@ -479,9 +427,9 @@ function ContextMenuInDialog() {
 }
 
 function ContextMenuWithInset() {
-  const [showBookmarks, setShowBookmarks] = React.useState(true);
-  const [showUrls, setShowUrls] = React.useState(false);
-  const [theme, setTheme] = React.useState("system");
+  const [showBookmarks, setShowBookmarks] = useState(true);
+  const [showUrls, setShowUrls] = useState(false);
+  const [theme, setTheme] = useState("system");
 
   return (
     <Example title="With Inset">

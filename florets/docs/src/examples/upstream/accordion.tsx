@@ -1,3 +1,4 @@
+// oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 import { ArrowUpRightIcon } from "lucide-react";
 
 import {
@@ -15,8 +16,6 @@ import {
   CardTitle,
 } from "@flora/florets/components/card";
 
-// oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/accordion-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {
@@ -52,7 +51,7 @@ function AccordionBasic() {
 
   return (
     <Example title="Basic">
-      <Accordion type="single" collapsible className="mx-auto max-w-lg">
+      <Accordion className="mx-auto max-w-lg">
         {items.map((item) => (
           <AccordionItem key={item.value} value={item.value}>
             <AccordionTrigger>{item.trigger}</AccordionTrigger>
@@ -84,7 +83,7 @@ function AccordionMultiple() {
 
   return (
     <Example title="Multiple">
-      <Accordion type="multiple" className="mx-auto max-w-lg">
+      <Accordion multiple className="mx-auto max-w-lg">
         {items.map((item) => (
           <AccordionItem key={item.value} value={item.value}>
             <AccordionTrigger>{item.trigger}</AccordionTrigger>
@@ -127,11 +126,7 @@ function AccordionWithBorders() {
 
   return (
     <Example title="With Borders">
-      <Accordion
-        type="single"
-        collapsible
-        className="style-vega:gap-2 style-nova:gap-2 style-lyra:gap-2 mx-auto max-w-lg"
-      >
+      <Accordion className="style-vega:gap-2 style-nova:gap-2 style-lyra:gap-2 mx-auto max-w-lg">
         {items.map((item) => (
           <AccordionItem
             key={item.value}
@@ -257,9 +252,8 @@ function AccordionInCard() {
         </CardHeader>
         <CardContent>
           <Accordion
-            type="single"
-            collapsible
-            defaultValue="plans"
+            multiple
+            defaultValue={["plans"]}
             className="style-maia:rounded-md style-mira:rounded-md"
           >
             {items.map((item) => (
@@ -302,22 +296,18 @@ function AccordionWithDisabled() {
 
   return (
     <Example title="With Disabled">
-      <Accordion
-        type="single"
-        collapsible
-        className="style-vega:rounded-lg style-nova:rounded-lg style-lyra:rounded-none style-maia:rounded-lg style-mira:rounded-lg style-luma:rounded-xl style-sera:rounded-none mx-auto max-w-lg overflow-hidden border"
-      >
+      <Accordion className="style-vega:rounded-lg style-nova:rounded-lg style-lyra:rounded-none style-maia:rounded-lg style-mira:rounded-lg style-luma:rounded-xl mx-auto max-w-lg overflow-hidden border">
         {items.map((item) => (
           <AccordionItem
             key={item.value}
             value={item.value}
             disabled={item.disabled}
-            className="style-sera:p-0 p-1 data-open:bg-muted/50"
+            className="p-1 data-open:bg-muted/50"
           >
-            <AccordionTrigger className="style-vega:px-4 style-nova:px-2.5 style-lyra:px-2 style-sera:px-4">
+            <AccordionTrigger className="style-vega:px-4 style-nova:px-2.5 style-lyra:px-2">
               {item.trigger}
             </AccordionTrigger>
-            <AccordionContent className="style-vega:px-4 style-nova:px-2.5 style-lyra:px-2 style-sera:px-4">
+            <AccordionContent className="style-vega:px-4 style-nova:px-2.5 style-lyra:px-2">
               {item.content}
             </AccordionContent>
           </AccordionItem>

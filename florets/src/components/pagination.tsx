@@ -1,6 +1,5 @@
-import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from "lucide-react";
-// oxlint-disable jsx-a11y/anchor-has-content -- Anchor content and its accessible name are supplied through native props.
 // oxlint-disable typescript/strict-boolean-expressions -- The upstream component uses truthiness for optional props and React children.
+import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 
 import { cn } from "../lib/utils";
@@ -39,14 +38,21 @@ type PaginationLinkProps = {
 
 function PaginationLink({ className, isActive, size = "icon", ...props }: PaginationLinkProps) {
   return (
-    <Button asChild variant={isActive ? "outline" : "ghost"} size={size} className={cn(className)}>
-      <a
-        aria-current={isActive ? "page" : undefined}
-        data-slot="pagination-link"
-        data-active={isActive}
-        {...props}
-      />
-    </Button>
+    <Button
+      role="link"
+      variant={isActive ? "outline" : "ghost"}
+      size={size}
+      className={cn(className)}
+      nativeButton={false}
+      render={
+        <a
+          aria-current={isActive ? "page" : undefined}
+          data-slot="pagination-link"
+          data-active={isActive}
+          {...props}
+        />
+      }
+    />
   );
 }
 

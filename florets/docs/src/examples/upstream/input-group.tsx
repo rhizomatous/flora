@@ -1,6 +1,5 @@
 // oxlint-disable import/max-dependencies -- The upstream collection demonstrates compositions across several components.
 // oxlint-disable typescript/strict-void-return -- React ignores return values from these upstream event handlers.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/input-group-example.json
 "use client";
 
 import {
@@ -25,6 +24,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@flora/florets/components/button";
+import { ButtonGroup, ButtonGroupText } from "@flora/florets/components/button-group";
 import {
   Card,
   CardContent,
@@ -282,10 +282,10 @@ function InputGroupWithTooltip({
             <InputGroupInput id="input-tooltip-20" />
             <InputGroupAddon align="inline-end">
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <InputGroupButton className="rounded-full" size="icon-xs">
-                    <InfoIcon />
-                  </InputGroupButton>
+                <TooltipTrigger
+                  render={<InputGroupButton className="rounded-full" size="icon-xs" />}
+                >
+                  <InfoIcon />
                 </TooltipTrigger>
                 <TooltipContent>This is content in a tooltip.</TooltipContent>
               </Tooltip>
@@ -299,10 +299,10 @@ function InputGroupWithTooltip({
             <InputGroupInput id="input-dropdown-21" />
             <InputGroupAddon>
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <InputGroupButton className="text-muted-foreground tabular-nums">
-                    {country} <ChevronDownIcon />
-                  </InputGroupButton>
+                <DropdownMenuTrigger
+                  render={<InputGroupButton className="text-muted-foreground tabular-nums" />}
+                >
+                  {country} <ChevronDownIcon />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="start"
@@ -341,12 +341,10 @@ function InputGroupWithTooltip({
           <FieldLabel htmlFor="input-secure-19">Popover</FieldLabel>
           <InputGroup>
             <Popover>
-              <PopoverTrigger asChild>
-                <InputGroupAddon>
-                  <InputGroupButton variant="secondary" size="icon-xs">
-                    <InfoIcon />
-                  </InputGroupButton>
-                </InputGroupAddon>
+              <PopoverTrigger render={<InputGroupAddon />} nativeButton={false}>
+                <InputGroupButton variant="secondary" size="icon-xs">
+                  <InfoIcon />
+                </InputGroupButton>
               </PopoverTrigger>
               <PopoverContent align="start">
                 <PopoverHeader>
@@ -365,6 +363,20 @@ function InputGroupWithTooltip({
               </InputGroupButton>
             </InputGroupAddon>
           </InputGroup>
+          <FieldDescription>This is a description of the input group.</FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="url">Button Group</FieldLabel>
+          <ButtonGroup>
+            <ButtonGroupText>https://</ButtonGroupText>
+            <InputGroup>
+              <InputGroupInput id="url" />
+              <InputGroupAddon align="inline-end">
+                <InfoIcon />
+              </InputGroupAddon>
+            </InputGroup>
+            <ButtonGroupText>.com</ButtonGroupText>
+          </ButtonGroup>
           <FieldDescription>This is a description of the input group.</FieldDescription>
         </Field>
       </FieldGroup>

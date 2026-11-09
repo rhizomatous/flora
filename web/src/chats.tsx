@@ -669,20 +669,22 @@ function FollowUpComposer({
         <InputGroupAddon align="block-end" className="justify-end">
           {!blocked && !stopped && (
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <InputGroupButton
-                  type="button"
-                  variant="ghost"
-                  className="mr-auto"
-                  aria-label="Chat actions"
-                >
-                  ⋯
-                </InputGroupButton>
-              </DropdownMenuTrigger>
+              <DropdownMenuTrigger
+                render={
+                  <InputGroupButton
+                    type="button"
+                    variant="ghost"
+                    className="mr-auto"
+                    aria-label="Chat actions"
+                  >
+                    ⋯
+                  </InputGroupButton>
+                }
+              />
               <DropdownMenuContent align="start">
                 <DropdownMenuItem
                   disabled={busy}
-                  onSelect={() => {
+                  onClick={() => {
                     onControl("stop");
                   }}
                 >

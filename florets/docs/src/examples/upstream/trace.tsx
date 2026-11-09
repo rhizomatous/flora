@@ -1,15 +1,14 @@
 // oxlint-disable default-case -- Only the documented message part types produce visible demo content.
 // oxlint-disable import/max-dependencies -- The upstream collection demonstrates compositions across several components.
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
 // oxlint-disable jsx-a11y/control-has-associated-label -- Nested title and code components provide the visible content.
 // oxlint-disable react/no-array-index-key -- These fixed demo sequences use positions to distinguish repeated entries.
 // oxlint-disable typescript/strict-boolean-expressions -- The upstream examples use truthiness for optional props and React children.
 // oxlint-disable typescript/switch-exhaustiveness-check -- Unsupported message parts intentionally produce no demo content.
 // oxlint-disable unicorn/no-array-for-each -- The upstream sample iterates its locally constructed data.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/trace-example.json
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/trace-example.json
 import {
   isToolUIPart,
   lastAssistantMessageIsCompleteWithApprovalResponses,
@@ -29,7 +28,7 @@ import {
   SunIcon,
   TerminalIcon,
 } from "lucide-react";
-import * as React from "react";
+import { type ReactNode, Fragment, useState } from "react";
 
 import { Badge } from "@flora/florets/components/badge";
 import { Bubble, BubbleContent } from "@flora/florets/components/bubble";
@@ -429,7 +428,7 @@ function groupParts(parts: ChatbotPart[]) {
 function ReasoningActivity({ part, isStreaming }: { part: ReasoningPart; isStreaming: boolean }) {
   const running = isStreaming && part.state === "streaming";
   const text = part.text.trim();
-  const [open, setOpen] = React.useState<boolean>();
+  const [open, setOpen] = useState<boolean>();
 
   if (!text) {
     return (
@@ -592,14 +591,14 @@ function ToolRow({
 }: {
   part: ToolPart;
   isStreaming: boolean;
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: {
     running: string;
     done: string;
     failed: string;
     denied?: string;
   };
-  children?: React.ReactNode;
+  children?: ReactNode;
 }) {
   const running = isStreaming ? "running" : undefined;
   const denied = title.denied ?? `Denied: ${title.running}`;
@@ -652,9 +651,9 @@ function ActivityRow({
   children,
 }: {
   status?: "running" | "error" | undefined;
-  icon: React.ReactNode;
-  title: React.ReactNode;
-  children?: React.ReactNode;
+  icon: ReactNode;
+  title: ReactNode;
+  children?: ReactNode;
 }) {
   if (!children) {
     return (
@@ -980,7 +979,7 @@ const transport = chat.transport({
 });
 
 function ThinkingTrace({ text, running }: { text: string; running: boolean }) {
-  const [open, setOpen] = React.useState<boolean>();
+  const [open, setOpen] = useState<boolean>();
 
   return (
     <TraceCollapsible open={open ?? (running && text.length > 0)} onOpenChange={setOpen}>
@@ -1046,7 +1045,7 @@ function TraceReasoning() {
             }
 
             return (
-              <React.Fragment key={message.id}>
+              <Fragment key={message.id}>
                 {runs.map((run, runIndex) =>
                   run.trace ? (
                     <Trace key={runIndex}>
@@ -1077,7 +1076,7 @@ function TraceReasoning() {
                     )
                   ),
                 )}
-              </React.Fragment>
+              </Fragment>
             );
           })}
           <Button

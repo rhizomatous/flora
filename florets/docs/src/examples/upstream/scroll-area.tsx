@@ -1,6 +1,4 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/scroll-area-example.json
-import * as React from "react";
+import { Fragment } from "react";
 
 import { ScrollArea, ScrollBar } from "@flora/florets/components/scroll-area";
 import { Separator } from "@flora/florets/components/separator";
@@ -37,14 +35,14 @@ export function Preview() {
 function ScrollAreaVertical() {
   return (
     <Example title="Vertical">
-      <ScrollArea className="style-lyra:rounded-none style-maia:rounded-2xl style-luma:rounded-2xl style-sera:rounded-none style-rhea:rounded-2xl mx-auto h-72 w-48 overflow-hidden rounded-md border">
+      <ScrollArea className="style-luma:rounded-2xl style-rhea:rounded-2xl mx-auto h-72 w-48 rounded-md border">
         <div className="p-4">
           <h4 className="mb-4 text-sm leading-none font-medium">Tags</h4>
           {tags.map((tag) => (
-            <React.Fragment key={tag}>
+            <Fragment key={tag}>
               <div className="text-sm">{tag}</div>
               <Separator className="my-2" />
-            </React.Fragment>
+            </Fragment>
           ))}
         </div>
       </ScrollArea>
@@ -55,15 +53,15 @@ function ScrollAreaVertical() {
 function ScrollAreaHorizontal() {
   return (
     <Example title="Horizontal">
-      <ScrollArea className="style-lyra:rounded-none style-lyra:**:data-[slot=scroll-area-viewport]:rounded-none style-maia:rounded-2xl style-luma:rounded-2xl style-sera:rounded-none style-sera:**:data-[slot=scroll-area-viewport]:rounded-none style-rhea:rounded-2xl mx-auto w-full max-w-96 overflow-hidden rounded-md border p-4 **:data-[slot=scroll-area-viewport]:rounded-md">
+      <ScrollArea className="style-luma:rounded-2xl style-rhea:rounded-2xl mx-auto w-full max-w-96 rounded-md border p-4">
         <div className="flex gap-4">
           {works.map((artwork) => (
             <figure key={artwork.artist} className="shrink-0">
-              <div className="style-lyra:rounded-none style-sera:rounded-none overflow-hidden rounded-md">
+              <div className="overflow-hidden rounded-md">
                 <Image
                   src={artwork.art}
                   alt={`Photo by ${artwork.artist}`}
-                  className="aspect-3/4 h-fit w-fit object-cover"
+                  className="aspect-[3/4] h-fit w-fit object-cover"
                   width={300}
                   height={400}
                 />

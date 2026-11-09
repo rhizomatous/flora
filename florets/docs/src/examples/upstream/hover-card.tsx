@@ -13,7 +13,6 @@ import {
   HoverCardTrigger,
 } from "@flora/florets/components/hover-card";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/hover-card-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {
@@ -25,27 +24,25 @@ export function Preview() {
   );
 }
 
-const HOVER_CARD_SIDES = ["top", "right", "bottom", "left"] as const;
+const HOVER_CARD_SIDES = ["inline-start", "left", "top", "bottom", "right", "inline-end"] as const;
 
 function HoverCardSides() {
   return (
-    <Example title="Sides">
-      <div className="flex flex-wrap items-center justify-center gap-4">
+    <Example title="Sides" containerClassName="col-span-2">
+      <div className="flex flex-wrap items-center justify-center gap-2">
         {HOVER_CARD_SIDES.map((side) => (
-          <HoverCard key={side} openDelay={100} closeDelay={100}>
-            <HoverCardTrigger asChild>
-              <Button variant="outline" className="style-sera:uppercase capitalize">
-                {side}
-              </Button>
+          <HoverCard key={side}>
+            <HoverCardTrigger
+              delay={100}
+              closeDelay={100}
+              render={<Button variant="outline" className="capitalize" />}
+            >
+              {side.replace("-", " ")}
             </HoverCardTrigger>
-            <HoverCardContent side={side} className="w-64">
-              <div className="style-vega:gap-2 style-nova:gap-1.5 style-lyra:gap-1 style-maia:gap-2 style-mira:gap-1 style-luma:gap-2 style-sera:gap-2 flex flex-col">
-                <h4 className="style-sera:font-heading style-sera:font-semibold style-sera:tracking-wide font-medium">
-                  Hover Card
-                </h4>
-                <p className="style-sera:leading-relaxed">
-                  This hover card appears on the {side} side of the trigger.
-                </p>
+            <HoverCardContent side={side}>
+              <div className="style-vega:gap-2 style-nova:gap-1.5 style-lyra:gap-1 style-maia:gap-2 style-mira:gap-1 style-luma:gap-2 flex flex-col">
+                <h4 className="font-medium">Hover Card</h4>
+                <p>This hover card appears on the {side.replace("-", " ")} side of the trigger.</p>
               </div>
             </HoverCardContent>
           </HoverCard>
@@ -59,9 +56,7 @@ function HoverCardInDialog() {
   return (
     <Example title="In Dialog">
       <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline">Open Dialog</Button>
-        </DialogTrigger>
+        <DialogTrigger render={<Button variant="outline" />}>Open Dialog</DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Hover Card Example</DialogTitle>
@@ -69,20 +64,18 @@ function HoverCardInDialog() {
               Hover over the button below to see the hover card.
             </DialogDescription>
           </DialogHeader>
-          <HoverCard openDelay={100} closeDelay={100}>
-            <HoverCardTrigger asChild>
-              <Button variant="outline" className="w-fit">
-                Hover me
-              </Button>
+          <HoverCard>
+            <HoverCardTrigger
+              delay={100}
+              closeDelay={100}
+              render={<Button variant="outline" className="w-fit" />}
+            >
+              Hover me
             </HoverCardTrigger>
-            <HoverCardContent className="w-64">
-              <div className="style-vega:gap-2 style-nova:gap-1.5 style-lyra:gap-1 style-maia:gap-2 style-mira:gap-1 style-luma:gap-2 style-sera:gap-2 flex flex-col">
-                <h4 className="style-sera:font-heading style-sera:font-semibold style-sera:tracking-wide font-medium">
-                  Hover Card
-                </h4>
-                <p className="style-sera:leading-relaxed">
-                  This hover card appears inside a dialog. Hover over the button to see it.
-                </p>
+            <HoverCardContent>
+              <div className="style-vega:gap-2 style-nova:gap-1.5 style-lyra:gap-1 style-maia:gap-2 style-mira:gap-1 style-luma:gap-2 flex flex-col">
+                <h4 className="font-medium">Hover Card</h4>
+                <p>This hover card appears inside a dialog. Hover over the button to see it.</p>
               </div>
             </HoverCardContent>
           </HoverCard>

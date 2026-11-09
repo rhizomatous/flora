@@ -1,5 +1,3 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/toggle-group-example.json
 "use client";
 
 import {
@@ -13,7 +11,7 @@ import {
   TrendingUpIcon,
   UnderlineIcon,
 } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 
 import { Field, FieldDescription, FieldLabel } from "@flora/florets/components/field";
 import { Input } from "@flora/florets/components/input";
@@ -54,7 +52,7 @@ export function Preview() {
 function ToggleGroupBasic() {
   return (
     <Example title="Basic">
-      <ToggleGroup type="multiple" spacing={1}>
+      <ToggleGroup multiple spacing={1}>
         <ToggleGroupItem value="bold" aria-label="Toggle bold">
           <BoldIcon />
         </ToggleGroupItem>
@@ -72,7 +70,7 @@ function ToggleGroupBasic() {
 function ToggleGroupOutline() {
   return (
     <Example title="Outline">
-      <ToggleGroup variant="outline" type="single" defaultValue="all">
+      <ToggleGroup variant="outline" defaultValue={["all"]}>
         <ToggleGroupItem value="all" aria-label="Toggle all">
           All
         </ToggleGroupItem>
@@ -87,7 +85,7 @@ function ToggleGroupOutline() {
 function ToggleGroupOutlineWithIcons() {
   return (
     <Example title="Outline With Icons">
-      <ToggleGroup variant="outline" type="multiple" size="sm">
+      <ToggleGroup variant="outline" multiple size="sm">
         <ToggleGroupItem value="bold" aria-label="Toggle bold">
           <BoldIcon />
         </ToggleGroupItem>
@@ -106,7 +104,7 @@ function ToggleGroupSizes() {
   return (
     <Example title="Sizes">
       <div className="flex flex-col gap-4">
-        <ToggleGroup type="single" size="sm" defaultValue="top" variant="outline">
+        <ToggleGroup size="sm" defaultValue={["top"]} variant="outline">
           <ToggleGroupItem value="top" aria-label="Toggle top">
             Top
           </ToggleGroupItem>
@@ -120,7 +118,7 @@ function ToggleGroupSizes() {
             Right
           </ToggleGroupItem>
         </ToggleGroup>
-        <ToggleGroup type="single" defaultValue="top" variant="outline">
+        <ToggleGroup defaultValue={["top"]} variant="outline">
           <ToggleGroupItem value="top" aria-label="Toggle top">
             Top
           </ToggleGroupItem>
@@ -142,7 +140,7 @@ function ToggleGroupSizes() {
 function ToggleGroupSpacing() {
   return (
     <Example title="With Spacing">
-      <ToggleGroup type="single" size="sm" defaultValue="top" spacing={2}>
+      <ToggleGroup size="sm" defaultValue={["top"]} spacing={2}>
         <ToggleGroupItem value="top" aria-label="Toggle top">
           Top
         </ToggleGroupItem>
@@ -163,13 +161,13 @@ function ToggleGroupSpacing() {
 function ToggleGroupWithIcons() {
   return (
     <Example title="With Icons">
-      <ToggleGroup type="multiple" variant="outline" spacing={1} size="sm">
+      <ToggleGroup multiple variant="outline" spacing={2} size="sm">
         <ToggleGroupItem
           value="star"
           aria-label="Toggle star"
-          className="aria-pressed:*:[svg]:stroke-foregfill-foreground aria-pressed:bg-transparent aria-pressed:*:[svg]:fill-foreground"
+          className="aria-pressed:bg-transparent aria-pressed:*:[svg]:fill-foreground aria-pressed:*:[svg]:stroke-foreground"
         >
-          <StarIcon data-icon="inline-start" />
+          <StarIcon />
           Star
         </ToggleGroupItem>
         <ToggleGroupItem
@@ -177,7 +175,7 @@ function ToggleGroupWithIcons() {
           aria-label="Toggle heart"
           className="aria-pressed:bg-transparent aria-pressed:*:[svg]:fill-foreground aria-pressed:*:[svg]:stroke-foreground"
         >
-          <HeartIcon data-icon="inline-start" />
+          <HeartIcon />
           Heart
         </ToggleGroupItem>
         <ToggleGroupItem
@@ -185,7 +183,7 @@ function ToggleGroupWithIcons() {
           aria-label="Toggle bookmark"
           className="aria-pressed:bg-transparent aria-pressed:*:[svg]:fill-foreground aria-pressed:*:[svg]:stroke-foreground"
         >
-          <BookmarkIcon data-icon="inline-start" />
+          <BookmarkIcon />
           Bookmark
         </ToggleGroupItem>
       </ToggleGroup>
@@ -196,7 +194,7 @@ function ToggleGroupWithIcons() {
 function ToggleGroupFilter() {
   return (
     <Example title="Filter">
-      <ToggleGroup type="single" defaultValue="all" variant="outline" size="sm">
+      <ToggleGroup defaultValue={["all"]} variant="outline" size="sm">
         <ToggleGroupItem value="all" aria-label="All">
           All
         </ToggleGroupItem>
@@ -217,7 +215,7 @@ function ToggleGroupFilter() {
 function ToggleGroupDateRange() {
   return (
     <Example title="Date Range">
-      <ToggleGroup type="single" defaultValue="today" variant="outline" size="sm" spacing={2}>
+      <ToggleGroup defaultValue={["today"]} variant="outline" size="sm" spacing={2}>
         <ToggleGroupItem value="today" aria-label="Today">
           Today
         </ToggleGroupItem>
@@ -238,17 +236,17 @@ function ToggleGroupDateRange() {
 function ToggleGroupSort() {
   return (
     <Example title="Sort">
-      <ToggleGroup type="single" defaultValue="newest" variant="outline" size="sm">
+      <ToggleGroup defaultValue={["newest"]} variant="outline" size="sm">
         <ToggleGroupItem value="newest" aria-label="Newest">
-          <ArrowDownIcon data-icon="inline-start" />
+          <ArrowDownIcon />
           Newest
         </ToggleGroupItem>
         <ToggleGroupItem value="oldest" aria-label="Oldest">
-          <ArrowUpIcon data-icon="inline-start" />
+          <ArrowUpIcon />
           Oldest
         </ToggleGroupItem>
         <ToggleGroupItem value="popular" aria-label="Popular">
-          <TrendingUpIcon data-icon="inline-start" />
+          <TrendingUpIcon />
           Popular
         </ToggleGroupItem>
       </ToggleGroup>
@@ -257,23 +255,30 @@ function ToggleGroupSort() {
 }
 
 function ToggleGroupWithInputAndSelect() {
+  const items = [
+    { label: "All", value: "all" },
+    { label: "Active", value: "active" },
+    { label: "Archived", value: "archived" },
+  ];
   return (
     <Example title="With Input and Select">
       <div className="flex items-center gap-2">
         <Input type="search" placeholder="Search..." className="flex-1" />
-        <Select defaultValue="all">
+        <Select items={items} defaultValue={items[0]}>
           <SelectTrigger className="w-32">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="archived">Archived</SelectItem>
+              {items.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
             </SelectGroup>
           </SelectContent>
         </Select>
-        <ToggleGroup type="single" defaultValue="grid" variant="outline">
+        <ToggleGroup defaultValue={["grid"]} variant="outline">
           <ToggleGroupItem value="grid" aria-label="Grid view">
             Grid
           </ToggleGroupItem>
@@ -289,7 +294,7 @@ function ToggleGroupWithInputAndSelect() {
 function ToggleGroupVertical() {
   return (
     <Example title="Vertical">
-      <ToggleGroup type="multiple" orientation="vertical" spacing={2}>
+      <ToggleGroup multiple orientation="vertical" spacing={1}>
         <ToggleGroupItem value="bold" aria-label="Toggle bold">
           <BoldIcon />
         </ToggleGroupItem>
@@ -307,13 +312,7 @@ function ToggleGroupVertical() {
 function ToggleGroupVerticalOutline() {
   return (
     <Example title="Vertical Outline">
-      <ToggleGroup
-        variant="outline"
-        type="single"
-        defaultValue="all"
-        orientation="vertical"
-        size="sm"
-      >
+      <ToggleGroup variant="outline" defaultValue={["all"]} orientation="vertical" size="sm">
         <ToggleGroupItem value="all" aria-label="Toggle all">
           All
         </ToggleGroupItem>
@@ -334,7 +333,7 @@ function ToggleGroupVerticalOutline() {
 function ToggleGroupVerticalOutlineWithIcons() {
   return (
     <Example title="Vertical Outline With Icons">
-      <ToggleGroup variant="outline" type="multiple" orientation="vertical" size="sm">
+      <ToggleGroup variant="outline" multiple orientation="vertical" size="sm">
         <ToggleGroupItem value="bold" aria-label="Toggle bold">
           <BoldIcon />
         </ToggleGroupItem>
@@ -350,16 +349,15 @@ function ToggleGroupVerticalOutlineWithIcons() {
 }
 
 function ToggleGroupFontWeightSelector() {
-  const [fontWeight, setFontWeight] = React.useState("normal");
+  const [fontWeight, setFontWeight] = useState("normal");
   return (
     <Example title="Font Weight Selector">
       <Field>
         <FieldLabel>Font Weight</FieldLabel>
         <ToggleGroup
-          type="single"
-          value={fontWeight}
+          value={[fontWeight]}
           onValueChange={(value) => {
-            setFontWeight(value);
+            setFontWeight(value[0] ?? "");
           }}
           variant="outline"
           spacing={2}
@@ -410,7 +408,7 @@ function ToggleGroupFontWeightSelector() {
 function ToggleGroupVerticalWithSpacing() {
   return (
     <Example title="Vertical With Spacing">
-      <ToggleGroup type="single" size="sm" defaultValue="top" orientation="vertical" spacing={2}>
+      <ToggleGroup size="sm" defaultValue={["top"]} orientation="vertical" spacing={1}>
         <ToggleGroupItem value="top" aria-label="Toggle top">
           Top
         </ToggleGroupItem>

@@ -1,11 +1,9 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 // oxlint-disable jsx-a11y/img-redundant-alt -- Image descriptions are preserved from the upstream examples.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/card-example.json
 "use client";
 
 import { CaptionsIcon, PlusIcon } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 
 import {
   Avatar,
@@ -110,18 +108,17 @@ function CardContentEdgeToEdge() {
 }
 
 function CardCustomSpacing() {
-  const [spacing, setSpacing] = React.useState("4");
+  const [spacing, setSpacing] = useState("4");
   const selectedSpacing = spacingOptions.find((option) => option.value === spacing);
 
   return (
     <Example title="Custom Spacing">
       <div className="mx-auto grid w-full max-w-sm gap-4">
         <ToggleGroup
-          type="single"
-          value={spacing}
+          value={[spacing]}
           onValueChange={(value) => {
-            if (value) {
-              setSpacing(value);
+            if (value[0] !== undefined && value[0] !== "") {
+              setSpacing(value[0]);
             }
           }}
           variant="outline"
@@ -191,7 +188,7 @@ function CardLogin() {
           <Button variant="outline" className="w-full">
             Login with Google
           </Button>
-          <div className="style-nova:mt-2 mt-4 text-center">
+          <div className="mt-4 text-center">
             Don&apos;t have an account?{" "}
             <a href="#" className="underline underline-offset-4">
               Sign up

@@ -1,3 +1,4 @@
+// oxlint-disable react/no-array-index-key -- These fixed demo sequences use positions to distinguish repeated entries.
 import { Button } from "@flora/florets/components/button";
 import { Field, FieldGroup, FieldLabel } from "@flora/florets/components/field";
 import { Input } from "@flora/florets/components/input";
@@ -12,8 +13,6 @@ import {
   SheetTrigger,
 } from "@flora/florets/components/sheet";
 
-// oxlint-disable react/no-array-index-key -- These fixed demo sequences use positions to distinguish repeated entries.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/sheet-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {
@@ -30,9 +29,7 @@ function SheetWithForm() {
   return (
     <Example title="With Form">
       <Sheet>
-        <SheetTrigger asChild>
-          <Button variant="outline">Open</Button>
-        </SheetTrigger>
+        <SheetTrigger render={<Button variant="outline" />}>Open</SheetTrigger>
         <SheetContent>
           <SheetHeader>
             <SheetTitle>Edit profile</SheetTitle>
@@ -40,7 +37,7 @@ function SheetWithForm() {
               Make changes to your profile here. Click save when you&apos;re done.
             </SheetDescription>
           </SheetHeader>
-          <div className="style-vega:px-4 style-nova:px-4 style-lyra:px-4 style-maia:px-6 style-mira:px-6 style-luma:px-6 style-sera:px-8 style-rhea:px-6">
+          <div className="style-vega:px-4 style-nova:px-4 style-lyra:px-4 style-maia:px-6 style-mira:px-6 style-luma:px-6 style-rhea:px-6">
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="sheet-demo-name">Name</FieldLabel>
@@ -54,9 +51,7 @@ function SheetWithForm() {
           </div>
           <SheetFooter>
             <Button type="submit">Save changes</Button>
-            <SheetClose asChild>
-              <Button variant="outline">Close</Button>
-            </SheetClose>
+            <SheetClose render={<Button variant="outline" />}>Close</SheetClose>
           </SheetFooter>
         </SheetContent>
       </Sheet>
@@ -68,9 +63,7 @@ function SheetNoCloseButton() {
   return (
     <Example title="No Close Button">
       <Sheet>
-        <SheetTrigger asChild>
-          <Button variant="outline">No Close Button</Button>
-        </SheetTrigger>
+        <SheetTrigger render={<Button variant="outline" />}>No Close Button</SheetTrigger>
         <SheetContent showCloseButton={false}>
           <SheetHeader>
             <SheetTitle>No Close Button</SheetTitle>
@@ -93,10 +86,8 @@ function SheetWithSides() {
       <div className="flex flex-wrap gap-2">
         {SHEET_SIDES.map((side) => (
           <Sheet key={side}>
-            <SheetTrigger asChild>
-              <Button variant="outline" className="style-sera:uppercase capitalize">
-                {side}
-              </Button>
+            <SheetTrigger render={<Button variant="outline" className="capitalize" />}>
+              {side}
             </SheetTrigger>
             <SheetContent
               side={side}
@@ -108,11 +99,11 @@ function SheetWithSides() {
                   Make changes to your profile here. Click save when you&apos;re done.
                 </SheetDescription>
               </SheetHeader>
-              <div className="style-vega:px-4 style-nova:px-4 style-lyra:px-4 style-maia:px-6 style-mira:px-6 style-luma:px-6 style-sera:px-8 style-rhea:px-6 no-scrollbar overflow-y-auto">
+              <div className="style-vega:px-4 style-nova:px-4 style-lyra:px-4 style-maia:px-6 style-mira:px-6 style-luma:px-6 style-rhea:px-6 no-scrollbar overflow-y-auto">
                 {Array.from({ length: 10 }).map((_, index) => (
                   <p
                     key={index}
-                    className="style-lyra:mb-2 style-lyra:leading-relaxed style-sera:leading-relaxed mb-4 leading-normal"
+                    className="style-lyra:mb-2 style-lyra:leading-relaxed mb-4 leading-normal"
                   >
                     Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor
                     incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
@@ -125,9 +116,7 @@ function SheetWithSides() {
               </div>
               <SheetFooter>
                 <Button type="submit">Save changes</Button>
-                <SheetClose asChild>
-                  <Button variant="outline">Cancel</Button>
-                </SheetClose>
+                <SheetClose render={<Button variant="outline" />}>Cancel</SheetClose>
               </SheetFooter>
             </SheetContent>
           </Sheet>

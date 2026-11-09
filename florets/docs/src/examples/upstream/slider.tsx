@@ -1,8 +1,6 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/slider-example.json
 "use client";
 
-import * as React from "react";
+import { useState } from "react";
 
 import { Label } from "@flora/florets/components/label";
 import { Slider } from "@flora/florets/components/slider";
@@ -25,7 +23,7 @@ export function Preview() {
 function SliderBasic() {
   return (
     <Example title="Basic">
-      <Slider defaultValue={[50]} max={100} step={1} />
+      <Slider defaultValue={50} max={100} step={1} />
     </Example>
   );
 }
@@ -58,7 +56,7 @@ function SliderVertical() {
 }
 
 function SliderControlled() {
-  const [value, setValue] = React.useState([0.3, 0.7]);
+  const [value, setValue] = useState([0.3, 0.7]);
 
   return (
     <Example title="Controlled">
@@ -70,7 +68,9 @@ function SliderControlled() {
         <Slider
           id="slider-demo-temperature"
           value={value}
-          onValueChange={setValue}
+          onValueChange={(nextValue) => {
+            setValue(typeof nextValue === "number" ? [nextValue] : [...nextValue]);
+          }}
           min={0}
           max={1}
           step={0.1}
