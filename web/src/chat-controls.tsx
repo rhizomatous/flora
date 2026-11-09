@@ -1,6 +1,18 @@
 import { useState, type ReactNode } from "react";
 
 import {
+  Share2Icon,
+  CrownIcon,
+  PencilIcon,
+  RefreshCwIcon,
+  GitForkIcon,
+  HashIcon,
+  MailIcon,
+  ArchiveIcon,
+  Trash2Icon,
+  PinIcon,
+  FolderIcon,
+  TagIcon,
   Button,
   DropdownButton,
   DropdownMenu,
@@ -92,8 +104,14 @@ export function ChatHeaderActions() {
             </Button>
           }
         />
-        <DropdownMenuContent align="end" className="max-h-[70dvh] overflow-y-auto">
-          <DropdownMenuItem disabled>Share</DropdownMenuItem>
+        <DropdownMenuContent
+          align="end"
+          className="composer-menu max-h-[70dvh] overflow-y-auto [&_[role=menuitem]]:whitespace-nowrap"
+        >
+          <DropdownMenuItem disabled>
+            <Share2Icon />
+            Share
+          </DropdownMenuItem>
           <DropdownMenuItem
             render={
               <a href={window.location.hash} target="_blank" rel="noreferrer">
@@ -103,13 +121,19 @@ export function ChatHeaderActions() {
             }
             nativeButton={false}
           />
-          {["Pin", "Move to", "Tags", "Promote to Captain", "Rename", "Regenerate title"].map(
-            (label) => (
-              <DropdownMenuItem key={label} disabled>
-                {label}
-              </DropdownMenuItem>
-            ),
-          )}
+          {[
+            { label: "Pin", icon: <PinIcon /> },
+            { label: "Move to", icon: <FolderIcon /> },
+            { label: "Tags", icon: <TagIcon /> },
+            { label: "Promote to Captain", icon: <CrownIcon /> },
+            { label: "Rename", icon: <PencilIcon /> },
+            { label: "Regenerate title", icon: <RefreshCwIcon /> },
+          ].map(({ label, icon }) => (
+            <DropdownMenuItem key={label} disabled>
+              {icon}
+              {label}
+            </DropdownMenuItem>
+          ))}
           <DropdownMenuItem
             onClick={() => {
               void copyLink();
@@ -118,17 +142,30 @@ export function ChatHeaderActions() {
             <CopyIcon />
             {copyState}
           </DropdownMenuItem>
-          {["Fork", "Device access", "Slack", "Make an automation"].map((label) => (
+          {[
+            { label: "Fork", icon: <GitForkIcon /> },
+            { label: "Device access", icon: <MonitorIcon /> },
+            { label: "Slack", icon: <HashIcon /> },
+            { label: "Make an automation", icon: <ClockIcon /> },
+          ].map(({ label, icon }) => (
             <DropdownMenuItem key={label} disabled>
+              {icon}
               {label}
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          {["Mark as unread", "Archive", "Delete"].map((label) => (
-            <DropdownMenuItem key={label} disabled>
-              {label}
-            </DropdownMenuItem>
-          ))}
+          <DropdownMenuItem disabled>
+            <MailIcon />
+            Mark as unread
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled>
+            <ArchiveIcon />
+            Archive
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled variant="destructive">
+            <Trash2Icon />
+            Delete
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <Button

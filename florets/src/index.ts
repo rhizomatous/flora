@@ -78,6 +78,15 @@ export {
 } from "@radix-ui/react-icons";
 
 export {
+  Share2Icon,
+  CrownIcon,
+  PencilIcon,
+  RefreshCwIcon,
+  GitForkIcon,
+  HashIcon,
+  MailIcon,
+  ArchiveIcon,
+  Trash2Icon,
   ArrowUpIcon,
   ArrowDownIcon,
   SquareIcon,
