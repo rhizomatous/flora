@@ -365,7 +365,7 @@ export function Chats({
   return (
     <section
       aria-labelledby="chats-heading"
-      className={isNew ? "mx-auto my-12 w-full max-w-[960px] md:mt-[25svh]" : chatLayout}
+      className={isNew ? "mx-auto my-12 w-full max-w-[720px] md:mt-[25svh]" : chatLayout}
     >
       <div className={isNew ? "sr-only" : headerLayout}>
         {existingChat && <SidebarTrigger aria-label="Menu" />}
