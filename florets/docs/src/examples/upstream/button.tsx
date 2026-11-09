@@ -1,4 +1,4 @@
-import { ArrowLeftCircleIcon, ArrowRightIcon } from "lucide-react";
+import { ArrowLeftCircleIcon, ArrowRightIcon, PlusIcon } from "lucide-react";
 
 import { Button } from "@flora/florets/components/button";
 
@@ -8,6 +8,7 @@ import { Example, ExampleWrapper } from "../example";
 export function Preview() {
   return (
     <ExampleWrapper className="lg:grid-cols-1 2xl:grid-cols-1">
+      <ButtonActionStyles />
       <ButtonVariantsAndSizes />
       <ButtonIconRight />
       <ButtonIconLeft />
@@ -451,6 +452,28 @@ function ButtonInvalidStates() {
           Link
         </Button>
       </div>
+    </Example>
+  );
+}
+
+function ButtonActionStyles() {
+  return (
+    <Example title="Action hierarchy">
+      {(["primary", "secondary", "ghost", "tertiary"] as const).map((variant) => (
+        <div key={variant} className="flex flex-wrap items-center gap-3">
+          <Button variant={variant} size="sm">
+            <PlusIcon />
+            {variant}
+          </Button>
+          <Button variant={variant} size="icon-sm" aria-label={`Add (${variant})`}>
+            <PlusIcon />
+          </Button>
+          <Button variant={variant} size="sm" disabled>
+            <PlusIcon />
+            Unavailable
+          </Button>
+        </div>
+      ))}
     </Example>
   );
 }

@@ -2,7 +2,7 @@ import { useState, type SubmitEvent, type ReactNode } from "react";
 
 import {
   Button,
-  ChevronDownStrokeIcon,
+  DropdownButton,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
@@ -48,24 +48,26 @@ function PlaceholderMenu({
   children,
   items,
   iconOnly = false,
+  variant = "ghost",
 }: {
   label: string;
   children: ReactNode;
   items: { label: string; icon?: ReactNode; detail?: string; separator?: boolean }[];
   iconOnly?: boolean;
+  variant?: "ghost" | "tertiary";
 }) {
+  const TriggerButton = iconOnly ? Button : DropdownButton;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
+        <TriggerButton
           type="button"
-          variant="ghost"
+          variant={variant}
           className={`composer-control ${iconOnly ? "composer-icon" : ""}`}
           aria-label={label}
         >
           {children}
-          {!iconOnly && <ChevronDownStrokeIcon className="composer-chevron" />}
-        </Button>
+        </TriggerButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="composer-menu" align="start">
         {items.map((item) => (
@@ -117,17 +119,16 @@ export function NewChatComposer({
           }}
         >
           <PopoverTrigger asChild>
-            <Button
+            <DropdownButton
               type="button"
-              variant="ghost"
+              variant="tertiary"
               className="composer-control composer-project"
               disabled={busy}
               aria-label={`Project: ${selectedProject?.name ?? ""}`}
             >
               <InboxIcon />
               <span className="composer-label truncate">{selectedProject?.name}</span>
-              <ChevronDownStrokeIcon className="composer-chevron" />
-            </Button>
+            </DropdownButton>
           </PopoverTrigger>
           <PopoverContent
             align="start"
@@ -176,6 +177,7 @@ export function NewChatComposer({
           </PopoverContent>
         </Popover>
         <PlaceholderMenu
+          variant="tertiary"
           label="Execution environment"
           items={[
             { label: "Cloud", icon: <CloudIcon /> },
@@ -187,7 +189,7 @@ export function NewChatComposer({
         </PlaceholderMenu>
         <Button
           type="button"
-          variant="ghost"
+          variant="tertiary"
           className="composer-control"
           title="Setup assistance (coming soon)"
           aria-disabled="true"
@@ -197,6 +199,7 @@ export function NewChatComposer({
         </Button>
         <div className="composer-branch">
           <PlaceholderMenu
+            variant="tertiary"
             label="Base branch"
             items={[{ label: "Project default branch", icon: <GitBranchIcon /> }]}
           >
@@ -273,6 +276,8 @@ export function NewChatComposer({
           </PlaceholderMenu>
           {message.trim() ? (
             <Button
+              variant="primary"
+              size="icon-sm"
               className="composer-send"
               type="submit"
               disabled={busy}
@@ -283,6 +288,8 @@ export function NewChatComposer({
             </Button>
           ) : (
             <Button
+              variant="primary"
+              size="icon-sm"
               className="composer-send"
               type="button"
               disabled={busy}

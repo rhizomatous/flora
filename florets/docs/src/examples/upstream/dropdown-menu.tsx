@@ -3,6 +3,7 @@
 "use client";
 
 import {
+  CloudIcon,
   ActivityIcon,
   ArchiveIcon,
   ArrowDownIcon,
@@ -43,6 +44,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@flora/florets/components/dialog";
+import { DropdownButton } from "@flora/florets/components/dropdown-button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -66,6 +68,7 @@ import { Example, ExampleWrapper } from "../example";
 export function Preview() {
   return (
     <ExampleWrapper>
+      <DropdownTriggerStyles />
       <DropdownMenuBasic />
       <DropdownMenuComplex />
       <DropdownMenuWithIcons />
@@ -718,6 +721,40 @@ function DropdownMenuComplex() {
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
+    </Example>
+  );
+}
+
+function DropdownTriggerStyles() {
+  return (
+    <Example title="Trigger styles">
+      <div className="flex flex-wrap gap-3">
+        {(["primary", "secondary", "ghost", "tertiary"] as const).map((variant) => (
+          <DropdownMenu key={variant}>
+            <DropdownMenuTrigger asChild>
+              <DropdownButton variant={variant}>
+                <CloudIcon />
+                {variant}
+              </DropdownButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-60">
+              <DropdownMenuItem>
+                <CloudIcon />
+                Cloud
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <SettingsIcon />
+                Environment settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled>
+                <PlusCircleIcon />
+                Add environment
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ))}
+      </div>
     </Example>
   );
 }
