@@ -103,7 +103,7 @@ export function NewChatComposer({
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
   const [projectOpen, setProjectOpen] = useState(false);
-  const [voiceNotice, setVoiceNotice] = useState(false);
+  const [notice, setNotice] = useState("");
   const filtered = projects.filter((project) =>
     project.name.toLowerCase().includes(search.toLowerCase()),
   );
@@ -187,16 +187,18 @@ export function NewChatComposer({
           <CloudIcon />
           <span className="composer-label">Cloud</span>
         </PlaceholderMenu>
-        <PlaceholderMenu
-          label="Set up environment"
-          items={[
-            { label: "Setup and snapshots", icon: <TerminalIcon /> },
-            { label: "Environment variables", icon: <KeyRoundIcon /> },
-          ]}
+        <Button
+          type="button"
+          variant="ghost"
+          className="composer-control"
+          title="Setup assistance (coming soon)"
+          onClick={() => {
+            setNotice("Setup assistance is coming soon.");
+          }}
         >
           <DatabaseIcon />
           <span className="composer-label">Ask Flora to set up</span>
-        </PlaceholderMenu>
+        </Button>
         <div className="composer-branch">
           <PlaceholderMenu
             label="Base branch"
@@ -291,7 +293,7 @@ export function NewChatComposer({
               aria-label="Voice input (coming soon)"
               title="Voice input (coming soon)"
               onClick={() => {
-                setVoiceNotice(true);
+                setNotice("Voice input is coming soon. Type a message to start a chat.");
               }}
             >
               <MicIcon />
@@ -299,9 +301,9 @@ export function NewChatComposer({
           )}
         </InputGroupAddon>
       </InputGroup>
-      {voiceNotice && (
+      {notice !== "" && (
         <p role="status" className="composer-notice">
-          Voice input is coming soon. Type a message to start a chat.
+          {notice}
         </p>
       )}
     </form>

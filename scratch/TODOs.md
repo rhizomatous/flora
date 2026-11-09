@@ -13,7 +13,7 @@
 The menus open, but their unfinished actions are disabled and marked as coming soon. Default model, reasoning, and branch labels do not claim a particular backend configuration.
 
 - [ ] Cloud: show actual runtime status and machine details; implement machine selection and wake controls.
-- [ ] Ask Flora to set up: implement setup assistance and snapshots.
+- [ ] Ask Flora to set up: implement setup assistance and snapshots. The plain button currently displays a coming-soon message.
 - [ ] Branch: load the project's actual branches and allow a per-chat base branch override. Currently the server uses the saved project configuration.
 - [ ] Attachments: upload, store, preview, remove, and send attachments with messages.
 - [ ] Context: add environment variables, people, threads, pull requests, skills, and files to a message.
