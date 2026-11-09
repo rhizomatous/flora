@@ -25,7 +25,7 @@
   align-items: center;
   flex-wrap: nowrap;
   gap: 4px;
-  padding: 0 8px 2px;
+  padding: 0 8px 2px 12px;
 }
 .composer-control {
   height: 28px;
@@ -237,6 +237,9 @@
 }
 /* Adapt to the space beside the sidebar as well as narrow browser windows. */
 @container (max-width: 560px) {
+  .composer-topbar {
+    padding-left: 10px;
+  }
   .composer-control > svg,
   .composer-control > .composer-model-mark {
     transform: none;
