@@ -62,7 +62,7 @@ try {
   await page.getByRole("menuitem", { name: "Enable notification sound", exact: true }).click();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   await page.getByRole("button", { name: /^Project:/ }).click();
-  await page.getByRole("menuitemradio", { name: "Browser project", exact: true }).click();
+  await page.getByRole("button", { name: "Browser project", exact: true }).click();
   await page.getByLabel("Message", { exact: true }).fill("Sound enabled");
   await page.getByRole("button", { name: "Start chat", exact: true }).click();
   await page.getByRole("form", { name: "Questions", exact: true }).waitFor();

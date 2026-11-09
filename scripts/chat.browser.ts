@@ -22,7 +22,16 @@ try {
     .click();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   await page.getByRole("button", { name: /^Project:/ }).click();
-  await page.getByRole("menuitemradio", { name: "Browser project", exact: true }).click();
+  const projectSearch = page.getByRole("textbox", { name: "Search projects", exact: true });
+  await expect(projectSearch).toBeFocused();
+  await projectSearch.fill("No matching project");
+  await expect(page.getByText("No projects found.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Browser project", exact: true })).toHaveCount(0);
+  await projectSearch.fill("Browser");
+  await page.getByRole("button", { name: "Browser project", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Project: Browser project", exact: true }),
+  ).toBeFocused();
   await assertFitsPhone(page);
   const message = page.getByLabel("Message", { exact: true });
   const compactHeight = await message.evaluate((element) => element.getBoundingClientRect().height);
