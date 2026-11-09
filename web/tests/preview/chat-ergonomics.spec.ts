@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures.ts";
 
 test("chat drafts, activity, and responsive layout", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures.ts";
 
 test("questionnaire validation, navigation, and retry", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
