@@ -25,7 +25,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 0 8px;
+  padding: 0 8px 2px;
 }
 .composer-control {
   height: 28px;
@@ -237,7 +237,7 @@
   .composer-topbar {
     flex-wrap: nowrap;
     gap: 2px;
-    padding: 0;
+    padding: 0 0 2px;
   }
   .composer-topbar .composer-control {
     padding-inline: 4px;
