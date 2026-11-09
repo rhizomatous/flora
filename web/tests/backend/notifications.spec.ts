@@ -1,20 +1,18 @@
 import assert from "node:assert/strict";
 
-import { chromium } from "@playwright/test";
+import { test } from "../fixtures.ts";
 
 import {
   openWorkspaceMenu,
   openSettings,
   assertFitsPhone,
   logIn,
-  origin,
   pageErrors,
-  requiredEnv,
-} from "./browser.ts";
+} from "../helpers.ts";
 
-const browser = await chromium.launch();
-try {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true });
+test.use({ scenario: "notifications" });
+
+test("completion notifications, reconnects, and sound preferences", async ({ page, context, browser, backend }) => {
   // Control only the browser audio boundary. All chat, event, notification and
   // settings requests use the TLS Go server and its saved runtime fixture.
   await context.addInitScript(() => {
@@ -60,7 +58,6 @@ try {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Intentional partial fake of a DOM class.
     window.AudioContext = FakeAudioContext as unknown as typeof AudioContext;
   });
-  const page = await context.newPage();
   const errors = pageErrors(page);
   const requests: string[] = [];
   page.on("request", (r) => {
@@ -83,12 +80,12 @@ try {
   const chatURL = page.url();
   const chatID = new URL(chatURL).hash.slice("#chats/".length);
   await page.getByRole("form", { name: "Questions", exact: true }).waitFor();
-  await page.goto(`${origin}/#chats/${requiredEnv("FLORA_OTHER_CHAT")}`);
+  await page.goto(`${backend.url}/#chats/${backend.otherChatID}`);
   await page.getByRole("heading", { name: "Other conversation", exact: true }).waitFor();
   const reply = await context.request.post(
-    `${origin}/api/chats/${chatID}/questions/que_browser/reply`,
+    `${backend.url}/api/chats/${chatID}/questions/que_browser/reply`,
     {
-      headers: { Origin: origin },
+      headers: { Origin: backend.url },
       data: { answers: [["Yes"]] },
     },
   );
@@ -170,7 +167,7 @@ try {
   assert.equal(requests.includes("/api/chats"), false, "chat list has a duplicate poll");
   await assertFitsPhone(page);
   assert.deepEqual(errors, []);
-  const realAudio = await browser.newContext({ ignoreHTTPSErrors: true });
+  const realAudio = await browser.newContext({ ignoreHTTPSErrors: true, baseURL: backend.url });
   const realPage = await realAudio.newPage();
   await logIn(realPage, "enter");
   await openSettings(realPage);
@@ -183,9 +180,4 @@ try {
     .getByRole("menuitem", { name: "Sound enabled for this page", exact: true })
     .waitFor();
   await realAudio.close();
-  console.log(
-    "Chromium: background completion, correct chat keyboard navigation/focus, denied audio guidance, gesture retry, missed completion on reconnect, no replay on reconnect/reload, muted toast, interruption exclusion and shared chat feed passed.",
-  );
-} finally {
-  await browser.close();
-}
+});

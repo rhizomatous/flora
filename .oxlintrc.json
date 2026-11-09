@@ -112,7 +112,7 @@
       }
     },
     {
-      "files": ["*.config.ts"],
+      "files": ["*.config.ts", "web/tests/global-setup.ts"],
       "rules": { "import/no-default-export": "off" }
     },
     {
@@ -120,8 +120,9 @@
       "rules": { "react/only-export-components": "off" }
     },
     {
-      "files": ["scripts/**"],
+      "files": ["scripts/**", "**/*.test.{ts,tsx}", "web/tests/**"],
       "rules": {
+        "import/no-nodejs-modules": "off",
         "class-methods-use-this": "off",
         "max-classes-per-file": "off",
         "no-await-in-loop": "off",

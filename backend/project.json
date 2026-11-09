@@ -62,12 +62,6 @@
       "dependsOn": [
         {
           "projects": [
-            "@flora/web"
-          ],
-          "target": "build"
-        },
-        {
-          "projects": [
             "@flora/florets"
           ],
           "target": "styleguide"

@@ -1,19 +1,18 @@
 import assert from "node:assert/strict";
 
-import { chromium, expect } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
-import type { Message, Part } from "../web/src/transcript.ts";
+import type { Message, Part } from "../../src/transcript.ts";
 
 function message(id: string, parts: Part[], role = "assistant"): Message {
   return { ID: id, Role: role, Text: "", Provider: "", Model: "", Payload: { parts } };
 }
 
-const browser = await chromium.launch();
-try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+test("live work grouping, disclosure state, and focus", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5202";
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
   let phase = 0;
   let sequence = 0;
   await page.route("**/api/chats/working/events", (route) => {
@@ -131,9 +130,4 @@ try {
   await expect(page.getByText("File not found", { exact: true })).toBeVisible();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
   assert.deepEqual(errors, []);
-  console.log(
-    "Work summaries: cross-message grouping, live inspection focus, persistent expansion, neutral historical failures, update boundaries, reload, and phone layout passed.",
-  );
-} finally {
-  await browser.close();
-}
+});

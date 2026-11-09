@@ -10,3 +10,6 @@ env.test.sh
 flora-data/
 /florets/docs-dist/
 /.nx/
+
+/test-results/
+/playwright-report/

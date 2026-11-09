@@ -5,6 +5,7 @@
   "namedInputs": {
     "shared": [
       "{workspaceRoot}/*.{json,lock,nix}",
+      "{workspaceRoot}/*.config.ts",
       "{workspaceRoot}/Makefile",
       "{workspaceRoot}/.*",
       "{workspaceRoot}/.github/**/*",

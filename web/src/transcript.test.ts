@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+
+import { test } from "vitest";
 
 import {
   buildTranscript,
@@ -7,7 +8,7 @@ import {
   formatDuration,
   type Message,
   type Part,
-} from "../web/src/transcript.ts";
+} from "./transcript.ts";
 
 function message(id: string, parts: Part[], role = "assistant"): Message {
   return { ID: id, Role: role, Text: "", Provider: "", Model: "", Payload: { parts } };

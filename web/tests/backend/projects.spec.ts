@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 
-import { chromium } from "@playwright/test";
+import { test } from "../fixtures.ts";
 
-import { assertFitsPhone, logIn, origin, pageErrors } from "./browser.ts";
+import { assertFitsPhone, logIn, pageErrors } from "../helpers.ts";
 
-const browser = await chromium.launch();
-try {
-  const page = await browser.newPage({ ignoreHTTPSErrors: true });
+test.use({ scenario: "projects" });
+
+test("project repositories, validation, and keyboard focus", async ({ page, backend }) => {
   const errors = pageErrors(page);
   await logIn(page);
-  await page.goto(`${origin}/#projects/new`);
+  await page.goto(`${backend.url}/#projects/new`);
   await page.getByLabel("Project name", { exact: true }).fill("Collection");
   await page.getByLabel("GitHub repository", { exact: true }).fill("first/app");
   await page.getByRole("button", { name: "Add repository", exact: true }).focus();
@@ -116,9 +116,4 @@ try {
     .getByText("third/extra.git · Branch: next · Fetched on demand", { exact: true })
     .waitFor();
   assert.deepEqual(errors, []);
-  console.log(
-    "Chromium: multi-repository create/edit, extra branch validation, add/remove field preservation, persisted roles/branches, project list, and mobile width passed.",
-  );
-} finally {
-  await browser.close();
-}
+});

@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
 
-import { chromium, expect } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
-const browser = await chromium.launch();
-try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+test("chat drafts, activity, and responsive layout", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
   page.setDefaultTimeout(10_000);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -97,9 +96,4 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
   assert.equal(await page.evaluate(() => document.documentElement.scrollHeight), 844);
   assert.deepEqual(errors, []);
-  console.log(
-    "Chat ergonomics: drafts, keyboard behavior, send failure/retry, collapsed failures, scrolling, and mobile questions passed.",
-  );
-} finally {
-  await browser.close();
-}
+});

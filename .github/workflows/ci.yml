@@ -90,6 +90,15 @@ jobs:
             nix develop --command npx nx run-many -t "$CHECK_TARGETS" --parallel=1 --output-style=static
           fi
 
+      - name: Save browser failure traces and screenshots
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-failures
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
   agent-image:
     needs: changes
     if: needs.changes.outputs.agent == 'true'
