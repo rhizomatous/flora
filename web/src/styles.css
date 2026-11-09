@@ -225,7 +225,7 @@
 }
 /* Adapt to the space beside the sidebar as well as narrow browser windows. */
 @container (max-width: 560px) {
-  .composer-control > svg:not(.composer-chevron),
+  .composer-control > svg,
   .composer-control > .composer-model-mark {
     transform: none;
   }
