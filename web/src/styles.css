@@ -39,6 +39,12 @@
   line-height: 16px;
   box-shadow: none;
 }
+/* Align the visible letters with the icons, allowing for the font's descender space. */
+.composer-label {
+  position: relative;
+  top: -0.5px;
+  line-height: 16px;
+}
 .composer-control:hover,
 .composer-control[data-state="open"] {
   background: var(--composer-hover);
@@ -147,8 +153,15 @@
 .composer-menu [role="menuitem"] {
   min-height: 28px;
   padding: 6px 10px;
-  gap: 12px;
+  gap: 10px;
   font-size: 13px;
+  line-height: 16px;
+}
+.composer-menu [role="menuitem"] > svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  stroke-width: 1.8;
 }
 .composer-menu [role="menuitem"][data-disabled] {
   opacity: 0.65;
@@ -184,7 +197,7 @@
 .composer-project-links a {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
   padding: 8px 10px;
   font-size: 13px;
