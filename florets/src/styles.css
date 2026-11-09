@@ -25,6 +25,10 @@
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+  --color-action: var(--action);
+  --color-action-hover: var(--action-hover);
+  --color-action-foreground: var(--action-foreground);
+  --color-action-border: var(--action-border);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
@@ -62,6 +66,14 @@
 }
 
 :root {
+  --action: #5b7cff;
+  --action-hover: #4565f6;
+  --action-foreground: #fff;
+  --action-border: #819aff;
+  --control-muted: #737373;
+  --control-hover: #ededed;
+  --menu-surface: #fff;
+  --menu-border: #dedede;
   color-scheme: light;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -107,6 +119,10 @@
 }
 
 .dark {
+  --control-muted: #999;
+  --control-hover: #292929;
+  --menu-surface: #202020;
+  --menu-border: #333;
   color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -157,4 +173,92 @@
   body {
     @apply bg-background font-sans text-foreground antialiased;
   }
+}
+
+.cn-button-primary {
+  background: var(--action);
+  color: var(--action-foreground);
+  border-color: var(--action-border);
+  box-shadow:
+    0 1px 3px #0005,
+    inset 0 1px 1px #ffffff25;
+}
+.cn-button-primary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.cn-button-primary:hover {
+  background: var(--action-hover);
+}
+.cn-button-ghost,
+.cn-button-tertiary {
+  color: var(--control-muted);
+}
+.cn-button-ghost:hover,
+.cn-button-ghost[aria-expanded="true"] {
+  background: var(--control-hover);
+  color: var(--foreground);
+}
+.cn-button-tertiary,
+.cn-button-tertiary:hover,
+.cn-button-tertiary[aria-expanded="true"] {
+  background: transparent;
+}
+.cn-button-tertiary:hover,
+.cn-button-tertiary[aria-expanded="true"] {
+  color: var(--foreground);
+}
+.cn-dropdown-button {
+  gap: 4px;
+}
+.cn-dropdown-button > [data-slot="dropdown-chevron"] {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  stroke-width: 1.8;
+  opacity: 0.6;
+}
+.cn-menu-surface {
+  border: 1px solid var(--menu-border);
+  border-radius: 9px;
+  background: var(--menu-surface);
+  box-shadow: 0 12px 28px #0003;
+}
+.cn-dropdown-content {
+  padding: 6px;
+}
+.cn-dropdown-content
+  :is(
+    [data-slot="dropdown-menu-item"],
+    [data-slot="dropdown-menu-checkbox-item"],
+    [data-slot="dropdown-menu-radio-item"],
+    [data-slot="dropdown-menu-sub-trigger"]
+  ) {
+  min-height: 28px;
+  padding-block: 6px;
+  padding-left: 10px;
+  padding-right: 10px;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 16px;
+}
+.cn-dropdown-content
+  :is([data-slot="dropdown-menu-radio-item"], [data-slot="dropdown-menu-checkbox-item"]) {
+  padding-right: 32px;
+}
+.cn-dropdown-content [data-inset="true"] {
+  padding-left: 34px;
+}
+.cn-dropdown-content [data-disabled] {
+  opacity: 0.65;
+}
+.cn-dropdown-content [data-slot^="dropdown-menu-"] > svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  stroke-width: 1.8;
+}
+.cn-dropdown-content [data-slot="dropdown-menu-separator"] {
+  margin: 6px -6px;
+  background: var(--menu-border);
 }

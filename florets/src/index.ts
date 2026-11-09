@@ -26,6 +26,7 @@ export * from "./components/dialog";
 export * from "./components/direction";
 export * from "./components/drawer";
 export * from "./components/dropdown-menu";
+export * from "./components/dropdown-button";
 export * from "./components/empty";
 export * from "./components/feedback";
 export * from "./components/field";
@@ -77,7 +78,6 @@ export {
 } from "@radix-ui/react-icons";
 
 export {
-  ChevronDown as ChevronDownStrokeIcon,
   ArrowUpIcon,
   CheckIcon,
   CloudIcon,
