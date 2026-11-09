@@ -1,11 +1,8 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/progress-example.json
 "use client";
 
 import { FileIcon } from "lucide-react";
-import * as React from "react";
+import { useMemo, useState } from "react";
 
-import { Field, FieldLabel } from "@flora/florets/components/field";
 import {
   Item,
   ItemActions,
@@ -14,7 +11,7 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@flora/florets/components/item";
-import { Progress } from "@flora/florets/components/progress";
+import { Progress, ProgressLabel, ProgressValue } from "@flora/florets/components/progress";
 import { Slider } from "@flora/florets/components/slider";
 
 import { Example, ExampleWrapper } from "../example";
@@ -47,32 +44,37 @@ function ProgressValues() {
 function ProgressWithLabel() {
   return (
     <Example title="With Label">
-      <Field>
-        <FieldLabel htmlFor="progress-upload">
-          <span>Upload progress</span>
-          <span className="ml-auto">66%</span>
-        </FieldLabel>
-        <Progress value={66} className="w-full" id="progress-upload" />
-      </Field>
+      <Progress value={56}>
+        <ProgressLabel>Upload progress</ProgressLabel>
+        <ProgressValue />
+      </Progress>
     </Example>
   );
 }
 
 function ProgressControlled() {
-  const [value, setValue] = React.useState([50]);
+  const [value, setValue] = useState(50);
 
   return (
     <Example title="Controlled">
       <div className="flex w-full flex-col gap-4">
-        <Progress value={value[0]} className="w-full" />
-        <Slider value={value} onValueChange={setValue} min={0} max={100} step={1} />
+        <Progress value={value} className="w-full" />
+        <Slider
+          value={value}
+          onValueChange={(nextValue) => {
+            setValue(typeof nextValue === "number" ? nextValue : (nextValue[0] ?? 0));
+          }}
+          min={0}
+          max={100}
+          step={1}
+        />
       </div>
     </Example>
   );
 }
 
 function FileUploadList() {
-  const files = React.useMemo(
+  const files = useMemo(
     () => [
       {
         id: "1",

@@ -49,12 +49,16 @@ function Citation({ source }: { source: Source }) {
   const host = hostname(source.url);
 
   return (
-    <HoverCard openDelay={10} closeDelay={100}>
-      <HoverCardTrigger asChild>
-        <Button variant="secondary" size="xs">
-          {host}
-        </Button>
-      </HoverCardTrigger>
+    <HoverCard>
+      <HoverCardTrigger
+        delay={10}
+        closeDelay={100}
+        render={
+          <Button variant="secondary" size="xs">
+            {host}
+          </Button>
+        }
+      />
       <HoverCardContent className="flex w-64 flex-col gap-1">
         <div className="font-medium">{source.title}</div>
         <p className="text-muted-foreground">{source.description}</p>

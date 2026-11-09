@@ -101,6 +101,10 @@
   },
   "overrides": [
     {
+      "files": ["florets/src/components/badge.tsx", "florets/src/components/direction.tsx"],
+      "rules": { "react/jsx-filename-extension": "off" }
+    },
+    {
       "files": ["web/src/**", "florets/src/**", "florets/docs/src/**"],
       "rules": {
         "import/no-nodejs-modules": "error",

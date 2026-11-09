@@ -58,11 +58,19 @@
     "browser": {
       "inputs": [
         "go",
-        "frontend"
+        "frontend",
+        "{workspaceRoot}/florets/docs/**/*",
+        "{workspaceRoot}/scripts/florets.browser.ts"
       ],
-      "command": "npx playwright install --with-deps --only-shell chromium && FLORA_BROWSER_PREBUILT=1 npm run test:browser",
+      "command": "npx playwright install --with-deps --only-shell chromium && FLORA_BROWSER_PREBUILT=1 npm run test:browser && npm run docs:test",
       "dependsOn": [
-        "browser-build"
+        "browser-build",
+        {
+          "projects": [
+            "@flora/florets"
+          ],
+          "target": "styleguide"
+        }
       ]
     },
     "browser-build": {

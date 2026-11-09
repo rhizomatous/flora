@@ -78,7 +78,7 @@ function TraceDescription({ className, ...props }: ComponentProps<"span">) {
 function TraceCollapsible({
   className,
   ...props
-}: Omit<ComponentProps<typeof Collapsible>, "asChild" | "open"> &
+}: Omit<ComponentProps<typeof Collapsible>, "render" | "open"> &
   (
     | { open?: undefined }
     | {
@@ -99,7 +99,7 @@ function TraceCollapsibleTrigger({
   className,
   children,
   ...props
-}: Omit<ComponentProps<typeof CollapsibleTrigger>, "asChild">) {
+}: Omit<ComponentProps<typeof CollapsibleTrigger>, "render">) {
   return (
     <CollapsibleTrigger
       data-slot="trace-collapsible-trigger"
@@ -121,11 +121,11 @@ function TraceCollapsibleContent({
   className,
   children,
   ...props
-}: Omit<ComponentProps<typeof CollapsibleContent>, "asChild">) {
+}: Omit<ComponentProps<typeof CollapsibleContent>, "render">) {
   return (
     <CollapsibleContent
       data-slot="trace-collapsible-content"
-      className="min-w-0 overflow-hidden duration-200 [--radix-accordion-content-height:var(--radix-collapsible-content-height)] data-open:animate-accordion-down data-closed:animate-accordion-up"
+      className="min-w-0 overflow-hidden duration-200 [--accordion-panel-height:var(--collapsible-panel-height)] data-open:animate-accordion-down data-closed:animate-accordion-up"
       {...props}
     >
       <div

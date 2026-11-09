@@ -1,5 +1,6 @@
-// Adapted from https://github.com/shadcn-ui/ui/blob/main/apps/v4/examples/radix/card-rtl.tsx
 "use client";
+
+// Adapted from https://github.com/shadcn-ui/ui/blob/main/apps/v4/examples/radix/card-rtl.tsx
 
 import { useState } from "react";
 
@@ -84,7 +85,7 @@ export function Preview() {
           <NativeSelectOption value="he">Hebrew (עברית)</NativeSelectOption>
           <NativeSelectOption value="en">English</NativeSelectOption>
         </NativeSelect>
-        <DirectionProvider dir={dir === "rtl" ? "rtl" : "ltr"}>
+        <DirectionProvider direction={dir === "rtl" ? "rtl" : "ltr"}>
           <Card className="w-full max-w-sm" dir={dir}>
             <CardHeader>
               <CardTitle>{t.title}</CardTitle>

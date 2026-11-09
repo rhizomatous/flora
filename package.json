@@ -22,6 +22,7 @@
     "preview:chat": "npm run dev --workspace @flora/web -- --mode chat-preview",
     "preview:capture": "node scripts/capture-chat-preview.ts",
     "ci:affected": "nx affected -t frontend-check,styleguide,go-check,race,smoke,browser,container-check,package-check",
+    "docs:test": "node scripts/florets.browser.ts",
     "test:watch": "vitest",
     "test:browser": "playwright test --config web/playwright.config.ts"
   },

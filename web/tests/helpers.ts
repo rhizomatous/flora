@@ -39,7 +39,8 @@ export async function openWorkspaceMenu(page: Page) {
     await expect(menu).toHaveCount(0);
     await trigger.click();
   }
-  await expect(menu).toHaveAttribute("data-state", "open");
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await expect(menu).toBeVisible();
 }
 
 /** Opens settings through the workspace menu. */

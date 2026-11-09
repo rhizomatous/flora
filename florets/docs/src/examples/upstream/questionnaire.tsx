@@ -1,11 +1,9 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
 // oxlint-disable typescript/no-base-to-string -- The sample displays the upstream value as text.
 // oxlint-disable typescript/no-deprecated -- The upstream example demonstrates the dependency API it was authored against.
 // oxlint-disable typescript/restrict-template-expressions -- Demo values are converted to strings for display.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/questionnaire-example.json
 "use client";
 
-import * as React from "react";
+import { type FormEvent, useId } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@flora/florets/components/button";
@@ -201,9 +199,7 @@ function QuestionnaireDialog() {
       containerClassName="md:col-span-2"
     >
       <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline">Open questionnaire</Button>
-        </DialogTrigger>
+        <DialogTrigger render={<Button variant="outline" />}>Open questionnaire</DialogTrigger>
         <DialogContent>
           <Questionnaire defaultItem="direction" items={questionnaireItems} onSubmit={handleSubmit}>
             <DialogHeader>
@@ -232,9 +228,9 @@ function QuestionnaireDialog() {
 }
 
 function QuestionnaireCardQuestions() {
-  const directionTitleId = React.useId();
-  const signalsTitleId = React.useId();
-  const timingTitleId = React.useId();
+  const directionTitleId = useId();
+  const signalsTitleId = useId();
+  const timingTitleId = useId();
 
   return (
     <>
@@ -410,7 +406,7 @@ function QuestionnaireNavigation() {
   );
 }
 
-function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+function handleSubmit(event: FormEvent<HTMLFormElement>) {
   event.preventDefault();
 
   const formData = new FormData(event.currentTarget);

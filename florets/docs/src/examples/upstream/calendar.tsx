@@ -1,15 +1,15 @@
 // oxlint-disable import/max-dependencies -- The upstream collection demonstrates compositions across several components.
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
 // oxlint-disable react/no-unstable-nested-components -- The calendar accepts custom render components through its components prop.
 // oxlint-disable react/purity -- The upstream samples use current dates and generated demo values.
 // oxlint-disable typescript/strict-boolean-expressions -- The upstream examples use truthiness for optional props and React children.
 // oxlint-disable unicorn/max-nested-calls -- The sample transport builds scripted conversations with chained calls.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/calendar-example.json
 "use client";
+
+// Adapted from https://ui.shadcn.com/r/styles/radix-nova/calendar-example.json
 
 import { addDays, format } from "date-fns";
 import { CalendarIcon, ChevronDownIcon, Clock2Icon } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { es } from "react-day-picker/locale";
 
@@ -63,12 +63,14 @@ function CalendarInPopover() {
   return (
     <Example title="In Popover">
       <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" className="px-2.5 font-normal">
-            <CalendarIcon data-icon="inline-start" />
-            Open Calendar
-          </Button>
-        </PopoverTrigger>
+        <PopoverTrigger
+          render={
+            <Button variant="outline" className="px-2.5 font-normal">
+              <CalendarIcon data-icon="inline-start" />
+              Open Calendar
+            </Button>
+          }
+        />
         <PopoverContent className="w-auto p-0" align="start">
           <Calendar mode="single" />
         </PopoverContent>
@@ -78,7 +80,7 @@ function CalendarInPopover() {
 }
 
 function CalendarSingle() {
-  const [date, setDate] = React.useState<Date | undefined>(
+  const [date, setDate] = useState<Date | undefined>(
     new Date(new Date().getFullYear(), new Date().getMonth(), 12),
   );
   return (
@@ -105,7 +107,7 @@ function CalendarMultiple() {
 }
 
 function CalendarRange() {
-  const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), 0, 12),
     to: addDays(new Date(new Date().getFullYear(), 0, 12), 30),
   });
@@ -129,7 +131,7 @@ function CalendarRange() {
 }
 
 function CalendarRangeMultipleMonths() {
-  const [range, setRange] = React.useState<DateRange | undefined>({
+  const [range, setRange] = useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), 3, 12),
     to: addDays(new Date(new Date().getFullYear(), 3, 12), 60),
   });
@@ -158,9 +160,7 @@ function CalendarRangeMultipleMonths() {
 }
 
 function CalendarBookedDates() {
-  const [date, setDate] = React.useState<Date | undefined>(
-    new Date(new Date().getFullYear(), 1, 3),
-  );
+  const [date, setDate] = useState<Date | undefined>(new Date(new Date().getFullYear(), 1, 3));
   const bookedDates = Array.from(
     { length: 15 },
     (_, i) => new Date(new Date().getFullYear(), 1, 12 + i),
@@ -190,7 +190,7 @@ function CalendarBookedDates() {
 }
 
 function CalendarWithTime() {
-  const [date, setDate] = React.useState<Date | undefined>(
+  const [date, setDate] = useState<Date | undefined>(
     new Date(new Date().getFullYear(), new Date().getMonth(), 12),
   );
 
@@ -240,7 +240,7 @@ function CalendarWithTime() {
 }
 
 function CalendarCustomDays() {
-  const [range, setRange] = React.useState<DateRange | undefined>({
+  const [range, setRange] = useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), 11, 8),
     to: addDays(new Date(new Date().getFullYear(), 11, 8), 10),
   });
@@ -282,10 +282,8 @@ function CalendarCustomDays() {
 }
 
 function CalendarWithPresets() {
-  const [date, setDate] = React.useState<Date | undefined>(
-    new Date(new Date().getFullYear(), 1, 12),
-  );
-  const [currentMonth, setCurrentMonth] = React.useState<Date>(
+  const [date, setDate] = useState<Date | undefined>(new Date(new Date().getFullYear(), 1, 12));
+  const [currentMonth, setCurrentMonth] = useState<Date>(
     new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   );
 
@@ -332,23 +330,25 @@ function CalendarWithPresets() {
 }
 
 function DatePickerSimple() {
-  const [date, setDate] = React.useState<Date>();
+  const [date, setDate] = useState<Date>();
 
   return (
     <Example title="Date Picker Simple">
       <Field className="mx-auto w-72">
         <FieldLabel htmlFor="date-picker-simple">Date</FieldLabel>
         <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              id="date-picker-simple"
-              className="justify-start px-2.5 font-normal"
-            >
-              <CalendarIcon data-icon="inline-start" />
-              {date ? format(date, "PPP") : <span>Pick a date</span>}
-            </Button>
-          </PopoverTrigger>
+          <PopoverTrigger
+            render={
+              <Button
+                variant="outline"
+                id="date-picker-simple"
+                className="justify-start px-2.5 font-normal"
+              >
+                <CalendarIcon data-icon="inline-start" />
+                {date ? format(date, "PPP") : <span>Pick a date</span>}
+              </Button>
+            }
+          />
           <PopoverContent className="w-auto p-0" align="start">
             <Calendar mode="single" selected={date} onSelect={setDate} />
           </PopoverContent>
@@ -359,7 +359,7 @@ function DatePickerSimple() {
 }
 
 function DatePickerWithRange() {
-  const [date, setDate] = React.useState<DateRange | undefined>({
+  const [date, setDate] = useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), 0, 20),
     to: addDays(new Date(new Date().getFullYear(), 0, 20), 20),
   });
@@ -369,26 +369,28 @@ function DatePickerWithRange() {
       <Field className="mx-auto w-72">
         <FieldLabel htmlFor="date-picker-range">Date Picker Range</FieldLabel>
         <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              id="date-picker-range"
-              variant="outline"
-              className="justify-start px-2.5 font-normal"
-            >
-              <CalendarIcon data-icon="inline-start" />
-              {date?.from ? (
-                date.to ? (
-                  <>
-                    {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
-                  </>
+          <PopoverTrigger
+            render={
+              <Button
+                id="date-picker-range"
+                variant="outline"
+                className="justify-start px-2.5 font-normal"
+              >
+                <CalendarIcon data-icon="inline-start" />
+                {date?.from ? (
+                  date.to ? (
+                    <>
+                      {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
+                    </>
+                  ) : (
+                    format(date.from, "LLL dd, y")
+                  )
                 ) : (
-                  format(date.from, "LLL dd, y")
-                )
-              ) : (
-                <span>Pick a date</span>
-              )}
-            </Button>
-          </PopoverTrigger>
+                  <span>Pick a date</span>
+                )}
+              </Button>
+            }
+          />
           <PopoverContent className="w-auto p-0" align="start">
             <Calendar
               mode="range"
@@ -405,24 +407,26 @@ function DatePickerWithRange() {
 }
 
 function DataPickerWithDropdowns() {
-  const [date, setDate] = React.useState<Date>();
-  const [open, setOpen] = React.useState(false);
+  const [date, setDate] = useState<Date>();
+  const [open, setOpen] = useState(false);
 
   return (
     <Example title="Date Picker with Dropdowns">
       <Field className="mx-auto w-72">
         <Popover open={open} onOpenChange={setOpen}>
           <FieldLabel htmlFor="date-picker-with-dropdowns-desktop">Date</FieldLabel>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              id="date-picker-with-dropdowns-desktop"
-              className="justify-start px-2.5 font-normal"
-            >
-              {date ? format(date, "PPP") : <span>Pick a date</span>}
-              <ChevronDownIcon data-icon="inline-start" className="ml-auto" />
-            </Button>
-          </PopoverTrigger>
+          <PopoverTrigger
+            render={
+              <Button
+                variant="outline"
+                id="date-picker-with-dropdowns-desktop"
+                className="justify-start px-2.5 font-normal"
+              >
+                {date ? format(date, "PPP") : <span>Pick a date</span>}
+                <ChevronDownIcon data-icon="inline-start" className="ml-auto" />
+              </Button>
+            }
+          />
           <PopoverContent className="w-auto p-0" align="start">
             <Calendar mode="single" selected={date} onSelect={setDate} captionLayout="dropdown" />
             <div className="flex gap-2 border-t p-2">
@@ -445,9 +449,7 @@ function DataPickerWithDropdowns() {
 }
 
 function CalendarWeekNumbers() {
-  const [date, setDate] = React.useState<Date | undefined>(
-    new Date(new Date().getFullYear(), 1, 3),
-  );
+  const [date, setDate] = useState<Date | undefined>(new Date(new Date().getFullYear(), 1, 3));
 
   return (
     <Example title="Week Numbers" className="justify-center">

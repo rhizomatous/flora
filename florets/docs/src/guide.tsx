@@ -454,24 +454,24 @@ export function Guide() {
             {section.pages.map((item) => (
               <SidebarMenuItem key={item.route}>
                 <SidebarMenuButton
-                  asChild
+                  render={
+                    <a
+                      href={href(item.route)}
+                      onClick={() => {
+                        setMenuOpen(false);
+                      }}
+                      aria-current={route === item.route ? "page" : undefined}
+                    >
+                      {item.title}
+                    </a>
+                  }
                   isActive={
                     route === item.route ||
                     ((item.route === "components" || item.route === "ai") &&
                       route.startsWith(`${item.route}/`))
                   }
-                  className="docs-menu-link h-[30px] w-fit overflow-visible rounded-md border border-transparent px-2 text-[0.8rem] font-medium data-[active=true]:border-accent data-[active=true]:bg-accent"
-                >
-                  <a
-                    href={href(item.route)}
-                    onClick={() => {
-                      setMenuOpen(false);
-                    }}
-                    aria-current={route === item.route ? "page" : undefined}
-                  >
-                    {item.title}
-                  </a>
-                </SidebarMenuButton>
+                  className="docs-menu-link h-[30px] w-fit overflow-visible rounded-md border border-transparent px-2 text-[0.8rem] font-medium data-active:border-accent data-active:bg-accent"
+                />
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
@@ -542,22 +542,30 @@ export function Guide() {
                 { route: "components", title: "Components" },
                 { route: "ai", title: "AI Elements" },
               ].map((item) => (
-                <Button key={item.route} asChild variant="ghost" size="sm" className="px-2.5">
-                  <a
-                    href={href(item.route)}
-                    aria-current={
-                      (
-                        item.route === "introduction"
-                          ? !route.includes("/") && !isIndex
-                          : route.startsWith(item.route)
-                      )
-                        ? "page"
-                        : undefined
-                    }
-                  >
-                    {item.title}
-                  </a>
-                </Button>
+                <Button
+                  role="link"
+                  key={item.route}
+                  render={
+                    <a
+                      href={href(item.route)}
+                      aria-current={
+                        (
+                          item.route === "introduction"
+                            ? !route.includes("/") && !isIndex
+                            : route.startsWith(item.route)
+                        )
+                          ? "page"
+                          : undefined
+                      }
+                    >
+                      {item.title}
+                    </a>
+                  }
+                  nativeButton={false}
+                  variant="ghost"
+                  size="sm"
+                  className="px-2.5"
+                />
               ))}
             </nav>
             <div className="ml-auto flex items-center gap-2">
@@ -574,14 +582,21 @@ export function Guide() {
                 <Kbd>⌘ K</Kbd>
               </Button>
               <Separator orientation="vertical" className="hidden h-4! lg:block" />
-              <Button asChild variant="ghost" size="icon" className="docs-github">
-                <a
-                  href="https://github.com/rhizomatous/flora/tree/main/florets"
-                  aria-label="Florets on GitHub"
-                >
-                  <GitBranch className="size-4" />
-                </a>
-              </Button>
+              <Button
+                role="link"
+                render={
+                  <a
+                    href="https://github.com/rhizomatous/flora/tree/main/florets"
+                    aria-label="Florets on GitHub"
+                  >
+                    <GitBranch className="size-4" />
+                  </a>
+                }
+                nativeButton={false}
+                variant="ghost"
+                size="icon"
+                className="docs-github"
+              />
               <Button
                 variant="ghost"
                 size="icon"
@@ -632,26 +647,40 @@ export function Guide() {
                 </Button>
                 <nav aria-label="Adjacent pages" className="flex gap-2">
                   {previous && (
-                    <Button asChild variant="secondary" size="icon-sm" className="size-8 md:size-7">
-                      <a
-                        href={href(previous.route)}
-                        aria-label={`Previous: ${previous.title}`}
-                        title={previous.title}
-                      >
-                        <ArrowLeft />
-                      </a>
-                    </Button>
+                    <Button
+                      role="link"
+                      render={
+                        <a
+                          href={href(previous.route)}
+                          aria-label={`Previous: ${previous.title}`}
+                          title={previous.title}
+                        >
+                          <ArrowLeft />
+                        </a>
+                      }
+                      nativeButton={false}
+                      variant="secondary"
+                      size="icon-sm"
+                      className="size-8 md:size-7"
+                    />
                   )}
                   {next && (
-                    <Button asChild variant="secondary" size="icon-sm" className="size-8 md:size-7">
-                      <a
-                        href={href(next.route)}
-                        aria-label={`Next: ${next.title}`}
-                        title={next.title}
-                      >
-                        <ArrowRight />
-                      </a>
-                    </Button>
+                    <Button
+                      role="link"
+                      render={
+                        <a
+                          href={href(next.route)}
+                          aria-label={`Next: ${next.title}`}
+                          title={next.title}
+                        >
+                          <ArrowRight />
+                        </a>
+                      }
+                      nativeButton={false}
+                      variant="secondary"
+                      size="icon-sm"
+                      className="size-8 md:size-7"
+                    />
                   )}
                 </nav>
               </div>
@@ -660,26 +689,29 @@ export function Guide() {
             {toc.length > 0 && (
               <div className="mb-6 xl:hidden">
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <Menu />
-                      On this page
-                    </Button>
-                  </DropdownMenuTrigger>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button variant="outline" size="sm">
+                        <Menu />
+                        On this page
+                      </Button>
+                    }
+                  />
                   <DropdownMenuContent align="start" className="max-h-[60svh] overflow-y-auto">
                     {toc.map((item) => (
                       <DropdownMenuItem
                         key={item.id}
-                        asChild
+                        render={
+                          <a
+                            href={`#${route}/${item.id}`}
+                            aria-current={activeHeading === item.id ? "location" : undefined}
+                          >
+                            {item.title}
+                          </a>
+                        }
+                        nativeButton={false}
                         className={item.depth === 3 ? "pl-6" : undefined}
-                      >
-                        <a
-                          href={`#${route}/${item.id}`}
-                          aria-current={activeHeading === item.id ? "location" : undefined}
-                        >
-                          {item.title}
-                        </a>
-                      </DropdownMenuItem>
+                      />
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -694,22 +726,34 @@ export function Guide() {
             <div key={route}>{pageContent}</div>
             <footer className="docs-footer">
               {previous ? (
-                <Button asChild variant="secondary" size="sm">
-                  <a href={href(previous.route)}>
-                    <ArrowLeft className="size-4" />
-                    {previous.title}
-                  </a>
-                </Button>
+                <Button
+                  role="link"
+                  render={
+                    <a href={href(previous.route)}>
+                      <ArrowLeft className="size-4" />
+                      {previous.title}
+                    </a>
+                  }
+                  nativeButton={false}
+                  variant="secondary"
+                  size="sm"
+                />
               ) : (
                 <span />
               )}
               {next && (
-                <Button asChild variant="secondary" size="sm">
-                  <a href={href(next.route)}>
-                    {next.title}
-                    <ArrowRight className="size-4" />
-                  </a>
-                </Button>
+                <Button
+                  role="link"
+                  render={
+                    <a href={href(next.route)}>
+                      {next.title}
+                      <ArrowRight className="size-4" />
+                    </a>
+                  }
+                  nativeButton={false}
+                  variant="secondary"
+                  size="sm"
+                />
               )}
             </footer>
           </main>

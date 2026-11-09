@@ -19,8 +19,11 @@ export function Link({ className, children, ...props }: ComponentProps<"a">) {
 
 export function ButtonLink({ className, children, ...props }: ComponentProps<"a">) {
   return (
-    <Button asChild className={className}>
-      <a {...props}>{children}</a>
-    </Button>
+    <Button
+      role="link"
+      render={<a {...props}>{children}</a>}
+      nativeButton={false}
+      className={className}
+    />
   );
 }

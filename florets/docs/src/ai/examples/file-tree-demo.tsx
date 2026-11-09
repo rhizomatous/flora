@@ -63,17 +63,19 @@ function FileTreeNode({
     case "folder": {
       return (
         <Collapsible defaultOpen className="group/folder">
-          <CollapsibleTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start font-normal aria-expanded:bg-transparent aria-expanded:hover:bg-muted dark:aria-expanded:hover:bg-muted/50"
-            >
-              <ChevronRightIcon className="transition-transform group-data-[state=open]/folder:rotate-90" />
-              <FolderIcon />
-              {node.name}
-            </Button>
-          </CollapsibleTrigger>
+          <CollapsibleTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start font-normal aria-expanded:bg-transparent aria-expanded:hover:bg-muted dark:aria-expanded:hover:bg-muted/50"
+              >
+                <ChevronRightIcon className="transition-transform group-data-[state=open]/folder:rotate-90" />
+                <FolderIcon />
+                {node.name}
+              </Button>
+            }
+          />
           <CollapsibleContent>
             <div className="ml-4 flex flex-col">
               {node.children.map((child) => (

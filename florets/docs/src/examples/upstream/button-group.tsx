@@ -1,5 +1,4 @@
 // oxlint-disable import/max-dependencies -- The upstream collection demonstrates compositions across several components.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/button-group-example.json
 "use client";
 
 import {
@@ -20,9 +19,8 @@ import {
   ShareIcon,
   TrashIcon,
   UserRoundXIcon,
-  VolumeOffIcon,
+  VolumeX,
 } from "lucide-react";
-import { useState } from "react";
 
 import { Button } from "@flora/florets/components/button";
 import { ButtonGroup, ButtonGroupText } from "@flora/florets/components/button-group";
@@ -117,9 +115,7 @@ function ButtonGroupWithText() {
           <Button variant="outline">Another Button</Button>
         </ButtonGroup>
         <ButtonGroup>
-          <ButtonGroupText asChild>
-            <Label htmlFor="input-text">GPU Size</Label>
-          </ButtonGroupText>
+          <ButtonGroupText render={<Label htmlFor="input-text" />}>GPU Size</ButtonGroupText>
           <Input
             id="input-text"
             placeholder="Type something here..."
@@ -138,10 +134,8 @@ function ButtonGroupWithDropdown() {
         <ButtonGroup>
           <Button variant="outline">Update</Button>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                <ChevronDownIcon />
-              </Button>
+            <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
+              <ChevronDownIcon />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem>Disable</DropdownMenuItem>
@@ -152,15 +146,13 @@ function ButtonGroupWithDropdown() {
         <ButtonGroup>
           <Button variant="outline">Follow</Button>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                <ChevronDownIcon />
-              </Button>
+            <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
+              <ChevronDownIcon />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-50">
               <DropdownMenuGroup>
                 <DropdownMenuItem>
-                  <VolumeOffIcon />
+                  <VolumeX />
                   Mute Conversation
                 </DropdownMenuItem>
                 <DropdownMenuItem>
@@ -199,23 +191,29 @@ function ButtonGroupWithDropdown() {
   );
 }
 
-function ButtonGroupWithSelect() {
-  const [currency, setCurrency] = useState("$");
+const currencyItems = [
+  { label: "$", value: "$" },
+  { label: "€", value: "€" },
+  { label: "£", value: "£" },
+];
 
+function ButtonGroupWithSelect() {
   return (
     <Example title="With Select">
       <Field>
         <Label htmlFor="amount">Amount</Label>
         <ButtonGroup>
-          <Select value={currency} onValueChange={setCurrency}>
+          <Select items={currencyItems} defaultValue={currencyItems[0]}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent align="start">
+            <SelectContent>
               <SelectGroup>
-                <SelectItem value="$">$</SelectItem>
-                <SelectItem value="€">€</SelectItem>
-                <SelectItem value="£">£</SelectItem>
+                {currencyItems.map((item) => (
+                  <SelectItem key={item.value} value={item}>
+                    {item.label}
+                  </SelectItem>
+                ))}
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -298,27 +296,41 @@ function ButtonGroupWithLike() {
         <Button variant="outline">
           <HeartIcon data-icon="inline-start" /> Like
         </Button>
-        <Button variant="outline" asChild size="icon" className="w-12">
-          <span>1.2K</span>
+        <Button
+          variant="outline"
+          size="icon"
+          className="w-12"
+          render={<span />}
+          nativeButton={false}
+        >
+          1.2K
         </Button>
       </ButtonGroup>
     </Example>
   );
 }
 
+const durationItems = [
+  { label: "Hours", value: "hours" },
+  { label: "Days", value: "days" },
+  { label: "Weeks", value: "weeks" },
+];
+
 function ButtonGroupWithSelectAndInput() {
   return (
     <Example title="With Select and Input">
       <ButtonGroup>
-        <Select defaultValue="hours">
+        <Select items={durationItems} defaultValue={durationItems[0]}>
           <SelectTrigger id="duration">
-            <SelectValue placeholder="Select duration" />
+            <SelectValue />
           </SelectTrigger>
           <SelectContent align="start">
             <SelectGroup>
-              <SelectItem value="hours">Hours</SelectItem>
-              <SelectItem value="days">Days</SelectItem>
-              <SelectItem value="weeks">Weeks</SelectItem>
+              {durationItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -341,10 +353,8 @@ function ButtonGroupNested() {
           <InputGroup>
             <InputGroupInput placeholder="Send a message..." />
             <Tooltip>
-              <TooltipTrigger asChild>
-                <InputGroupAddon align="inline-end">
-                  <AudioLinesIcon />
-                </InputGroupAddon>
+              <TooltipTrigger render={<InputGroupAddon align="inline-end" />}>
+                <AudioLinesIcon />
               </TooltipTrigger>
               <TooltipContent>Voice Mode</TooltipContent>
             </Tooltip>

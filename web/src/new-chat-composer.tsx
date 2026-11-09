@@ -59,16 +59,18 @@ function PlaceholderMenu({
   const TriggerButton = iconOnly ? Button : DropdownButton;
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <TriggerButton
-          type="button"
-          variant={variant}
-          className={`composer-control ${iconOnly ? "composer-icon" : ""}`}
-          aria-label={label}
-        >
-          {children}
-        </TriggerButton>
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger
+        render={
+          <TriggerButton
+            type="button"
+            variant={variant}
+            className={`composer-control ${iconOnly ? "composer-icon" : ""}`}
+            aria-label={label}
+          >
+            {children}
+          </TriggerButton>
+        }
+      />
       <DropdownMenuContent className="composer-menu" align="start">
         {items.map((item) => (
           <div key={item.label}>
@@ -118,18 +120,20 @@ export function NewChatComposer({
             if (!open) setSearch("");
           }}
         >
-          <PopoverTrigger asChild>
-            <DropdownButton
-              type="button"
-              variant="tertiary"
-              className="composer-control composer-project"
-              disabled={busy}
-              aria-label={`Project: ${selectedProject?.name ?? ""}`}
-            >
-              <InboxIcon />
-              <span className="composer-label truncate">{selectedProject?.name}</span>
-            </DropdownButton>
-          </PopoverTrigger>
+          <PopoverTrigger
+            render={
+              <DropdownButton
+                type="button"
+                variant="tertiary"
+                className="composer-control composer-project"
+                disabled={busy}
+                aria-label={`Project: ${selectedProject?.name ?? ""}`}
+              >
+                <InboxIcon />
+                <span className="composer-label truncate">{selectedProject?.name}</span>
+              </DropdownButton>
+            }
+          />
           <PopoverContent
             align="start"
             className="composer-menu composer-project-menu"
