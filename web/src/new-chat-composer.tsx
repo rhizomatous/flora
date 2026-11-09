@@ -197,7 +197,7 @@ export function NewChatComposer({
           }}
         >
           <DatabaseIcon />
-          <span className="composer-label">Ask Flora to set up</span>
+          <span className="composer-label">Setup</span>
         </Button>
         <div className="composer-branch">
           <PlaceholderMenu
