@@ -576,7 +576,7 @@ function ChatDetail({
           <MessageScrollerButton
             aria-label="Jump to latest"
             size="sm"
-            className="chat-scroll-latest"
+            className="composer-accessory chat-scroll-latest"
           >
             <ArrowDownIcon />
             Scroll to end

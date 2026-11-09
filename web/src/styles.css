@@ -270,14 +270,14 @@
   gap: 6px;
   padding-bottom: 6px;
 }
-.composer-review-trigger {
+.composer-accessory {
   height: 28px;
   gap: 6px;
   padding-inline: 10px;
   font-size: 12px;
   border: 1px solid var(--border);
 }
-.composer-review-trigger svg {
+.composer-accessory svg {
   width: 13px;
   height: 13px;
 }
@@ -298,11 +298,6 @@
 }
 .chat-header h1 [data-slot="dropdown-chevron"] {
   display: none;
-}
-.chat-scroll-latest {
-  height: 28px;
-  padding-inline: 10px;
-  font-size: 12px;
 }
 @media (max-width: 560px) {
   .chat-header {

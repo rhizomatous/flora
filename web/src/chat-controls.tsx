@@ -257,7 +257,7 @@ export function ChatReviewStrip({ children }: { children: ReactNode }) {
         <Button
           variant="secondary"
           size="sm"
-          className="composer-review-trigger"
+          className="composer-accessory"
           aria-label="Pull requests and terminals"
           aria-expanded={open}
           aria-controls="chat-review-details"
