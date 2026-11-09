@@ -79,6 +79,15 @@ export {
 
 export {
   ArrowUpIcon,
+  ArrowDownIcon,
+  SquareIcon,
+  EllipsisIcon,
+  PanelRightIcon,
+  ExternalLinkIcon,
+  CopyIcon,
+  ListIcon,
+  MonitorIcon,
+  ClockIcon,
   CheckIcon,
   CloudIcon,
   DatabaseIcon,

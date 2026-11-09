@@ -1,13 +1,13 @@
 @import "@flora/florets/styles.css";
 @source "./";
 
-.new-chat-composer {
+.chat-composer {
   --composer-surface: #fafafa;
   --composer-border: #dedede;
   width: 100%;
   container-type: inline-size;
 }
-.dark .new-chat-composer {
+.dark .chat-composer {
   --composer-surface: #161616;
   --composer-border: #333;
 }
@@ -217,4 +217,128 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+}
+
+/* Chat reuses the start-screen controls in a shorter input with a wider reading column. */
+.follow-up-composer .composer-textarea {
+  min-height: 38px;
+  max-height: 25dvh;
+  padding: 12px 15px 4px;
+}
+.follow-up-composer .composer-bottom-bar {
+  flex-wrap: nowrap;
+}
+.follow-up-composer .composer-bottom-bar > [aria-label="Model"] {
+  min-width: 0;
+  flex-shrink: 1;
+}
+.follow-up-composer .composer-bottom-bar > [aria-label="Model"] .composer-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.composer-runtime {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 4px;
+  color: var(--muted-foreground);
+}
+.composer-up [data-slot="dropdown-chevron"] {
+  rotate: 180deg;
+}
+.runtime-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.composer-context {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+}
+.context-ring {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--muted-foreground);
+  border-radius: 50%;
+}
+.context-row {
+  display: flex;
+  justify-content: space-between;
+  padding-block: 3px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+.composer-review {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 6px;
+}
+.composer-review-trigger {
+  height: 28px;
+  gap: 6px;
+  padding-inline: 10px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+}
+.composer-review-trigger svg {
+  width: 13px;
+  height: 13px;
+}
+.composer-review-details {
+  width: 100%;
+  border-radius: 10px;
+  padding: 12px 16px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.chat-header h1 {
+  flex: 0 1 auto;
+}
+.chat-header h1 .composer-control {
+  max-width: 100%;
+  background: var(--secondary);
+}
+.chat-header h1 [data-slot="dropdown-chevron"] {
+  display: none;
+}
+.chat-scroll-latest {
+  height: 28px;
+  padding-inline: 10px;
+  font-size: 12px;
+}
+@media (max-width: 560px) {
+  .chat-header {
+    gap: 2px;
+  }
+  .chat-header h1 {
+    flex: 1;
+  }
+  .chat-header > [aria-disabled="true"] {
+    display: none;
+  }
+  .follow-up-composer .composer-textarea {
+    font-size: 16px;
+  }
+}
+
+.composer-accessories {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+}
+.composer-accessories .chat-scroll-latest {
+  position: static;
+  translate: none;
+  transform: none;
+}
+.composer-accessories .chat-scroll-latest[data-active="false"] {
+  display: none;
 }
