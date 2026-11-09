@@ -79,8 +79,6 @@ function PlaceholderMenu({
             </DropdownMenuItem>
           </div>
         ))}
-        <DropdownMenuSeparator />
-        <p className="composer-menu-note">Coming soon. These controls are not connected yet.</p>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -103,7 +101,6 @@ export function NewChatComposer({
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
   const [projectOpen, setProjectOpen] = useState(false);
-  const [notice, setNotice] = useState("");
   const filtered = projects.filter((project) =>
     project.name.toLowerCase().includes(search.toLowerCase()),
   );
@@ -192,9 +189,7 @@ export function NewChatComposer({
           variant="ghost"
           className="composer-control"
           title="Setup assistance (coming soon)"
-          onClick={() => {
-            setNotice("Setup assistance is coming soon.");
-          }}
+          aria-disabled="true"
         >
           <DatabaseIcon />
           <span className="composer-label">Setup</span>
@@ -292,20 +287,13 @@ export function NewChatComposer({
               disabled={busy}
               aria-label="Voice input (coming soon)"
               title="Voice input (coming soon)"
-              onClick={() => {
-                setNotice("Voice input is coming soon. Type a message to start a chat.");
-              }}
+              aria-disabled="true"
             >
               <MicIcon />
             </Button>
           )}
         </InputGroupAddon>
       </InputGroup>
-      {notice !== "" && (
-        <p role="status" className="composer-notice">
-          {notice}
-        </p>
-      )}
     </form>
   );
 }
