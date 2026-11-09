@@ -223,7 +223,8 @@ npx nx graph
 
 Nx caches web and styleguide builds locally in `.nx/cache`. Tests run fresh when
 selected. Task inputs are declared in `nx.json`, package manifests, and
-`project.json` files. Container and packaging tasks require a disposable native
+`project.json` files. Preview script changes no longer select container or packaging checks;
+container and release scripts still select their respective checks. Container and packaging tasks require a disposable native
 Linux runner with Docker; packaging also requires systemd, shellcheck, and sudo.
 The `result` CI job fails if task selection or any check fails or is cancelled.
 It can be used as the required branch check.
@@ -242,14 +243,19 @@ preview tooling in `scripts/preview/`.
 Browser tests use Playwright Test and live in `web/tests/`. Install Chromium with
 `npx playwright install --with-deps --only-shell chromium`, then run
 `npm run test:browser` (or `make browser`) for the full browser suite. Playwright
-starts the preview server and builds the app and fixture executable once.
+starts the preview server only for preview tests. Backend tests request the cached
+Nx `backend:browser-build` target, which builds the frontend and fixture executable
+as needed. CI declares that target as a browser-check dependency, sharing the
+frontend build with Go checks.
 A Playwright fixture starts a fresh Go process for each backend test, with its
 own temporary database, fake runtime, and HTTPS app server. It stops the process
 after the test. The process also cleans up when its parent closes stdin.
 The fixture executable is excluded from normal builds by the `browserfixture`
 build tag. Backend logs are saved with the test's output.
 
-Use `npm run test:browser -- --project=backend` to run backend scenarios, or
+Use `npm run test:browser -- --project=preview` for preview scenarios without a
+Go build. Use `npm run test:browser -- --project=backend` to run backend scenarios
+without starting a preview server, or
 `npm run test:browser -- --project=backend changes.spec.ts` to run one file.
 Playwright's `--ui`, `--debug`, and `--grep` options work with the same command.
 Failed browser tests save traces and screenshots in `test-results/`.

@@ -52,7 +52,8 @@
       "frontend-check": {
         "inputs": [
           "frontend",
-          "{workspaceRoot}/florets/docs/**/*"
+          "{workspaceRoot}/florets/docs/**/*",
+          "{workspaceRoot}/scripts/**/*.ts"
         ],
         "command": "npm run check"
       }

@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 
-import { test, expect } from "@playwright/test";
-
 import type { Message, Part } from "../../src/transcript.ts";
+import { test, expect } from "./fixtures.ts";
 
 function message(id: string, parts: Part[], role = "assistant"): Message {
   return { ID: id, Role: role, Text: "", Provider: "", Model: "", Payload: { parts } };
