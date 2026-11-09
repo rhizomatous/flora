@@ -72,9 +72,9 @@ function PlaceholderMenu({
             {item.separator === true && <DropdownMenuSeparator />}
             <DropdownMenuItem disabled>
               {item.icon}
-              {item.label}
+              <span className="composer-label">{item.label}</span>
               {item.detail !== undefined && (
-                <span className="ml-auto text-muted-foreground">{item.detail}</span>
+                <span className="composer-label ml-auto text-muted-foreground">{item.detail}</span>
               )}
             </DropdownMenuItem>
           </div>
@@ -127,7 +127,7 @@ export function NewChatComposer({
               aria-label={`Project: ${selectedProject?.name ?? ""}`}
             >
               <InboxIcon />
-              <span className="truncate">{selectedProject?.name}</span>
+              <span className="composer-label truncate">{selectedProject?.name}</span>
               <ChevronDownIcon className="composer-chevron" />
             </Button>
           </PopoverTrigger>
@@ -159,7 +159,7 @@ export function NewChatComposer({
                   }}
                 >
                   <InboxIcon />
-                  <span className="truncate">{project.name}</span>
+                  <span className="composer-label truncate">{project.name}</span>
                   {selectedProject?.id === project.id && <CheckIcon className="ml-auto" />}
                 </button>
               ))}
@@ -168,11 +168,11 @@ export function NewChatComposer({
             <div className="composer-project-links">
               <a href="#projects/new">
                 <PlusIcon />
-                New project
+                <span className="composer-label">New project</span>
               </a>
               <a href="#projects">
                 <Settings2Icon />
-                Manage projects
+                <span className="composer-label">Manage projects</span>
               </a>
             </div>
           </PopoverContent>
@@ -185,7 +185,7 @@ export function NewChatComposer({
           ]}
         >
           <CloudIcon />
-          Cloud
+          <span className="composer-label">Cloud</span>
         </PlaceholderMenu>
         <PlaceholderMenu
           label="Set up environment"
@@ -195,7 +195,7 @@ export function NewChatComposer({
           ]}
         >
           <DatabaseIcon />
-          <span>Ask Flora to set up</span>
+          <span className="composer-label">Ask Flora to set up</span>
         </PlaceholderMenu>
         <div className="composer-branch">
           <PlaceholderMenu
@@ -203,7 +203,7 @@ export function NewChatComposer({
             items={[{ label: "Project default branch", icon: <GitBranchIcon /> }]}
           >
             <GitBranchIcon />
-            Default
+            <span className="composer-label">Default</span>
           </PlaceholderMenu>
         </div>
       </div>
@@ -268,10 +268,10 @@ export function NewChatComposer({
             <span className="composer-model-mark">
               <TerminalIcon />
             </span>
-            <span>Default model</span>
+            <span className="composer-label">Default model</span>
           </PlaceholderMenu>
           <PlaceholderMenu label="Reasoning effort" items={[{ label: "Default reasoning effort" }]}>
-            Default
+            <span className="composer-label">Default</span>
           </PlaceholderMenu>
           {message.trim() ? (
             <Button
