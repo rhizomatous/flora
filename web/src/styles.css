@@ -31,6 +31,10 @@
 }
 .composer-label {
   line-height: 16px;
+  /* Center artwork on the capital height; padding leaves room for clipped labels' descenders. */
+  text-box-trim: trim-both;
+  text-box-edge: cap alphabetic;
+  padding-block: 3px;
 }
 .composer-topbar .composer-control {
   padding-inline: 4px;
@@ -39,14 +43,6 @@
   width: 14px;
   height: 14px;
   stroke-width: 1.8;
-}
-/* Geist's visible capitals sit above the line-box center. Move the artwork, not the text. */
-.composer-control > svg,
-.composer-control > .composer-model-mark,
-.composer-menu [role="menuitem"] > svg,
-.composer-project-option > svg,
-.composer-project-links a > svg {
-  transform: translateY(-1px);
 }
 .composer-project {
   flex: 0 1 auto;
@@ -179,10 +175,6 @@
 @container (max-width: 560px) {
   .composer-topbar {
     padding-left: 10px;
-  }
-  .composer-control > svg,
-  .composer-control > .composer-model-mark {
-    transform: none;
   }
   .composer-textarea {
     padding: 14px;

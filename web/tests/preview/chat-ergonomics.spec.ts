@@ -116,6 +116,23 @@ test("shared composer stays compact and exposes honest placeholders", async ({ p
     const send = await page
       .getByRole("button", { name: "Send message", exact: true })
       .boundingBox();
+    for (const name of ["Model", "Reasoning effort", "Chat actions", "Chat branch"]) {
+      const offsets = await page.getByRole("button", { name, exact: true }).evaluate((button) => {
+        const label = button.querySelector(".composer-label")?.getBoundingClientRect();
+        if (!label) throw new Error("Missing composer label");
+        const center = label.y + label.height / 2;
+        return [...button.querySelectorAll(":scope > svg, :scope > .composer-model-mark")].map(
+          (icon) => {
+            const rect = icon.getBoundingClientRect();
+            return Math.abs(rect.y + rect.height / 2 - center);
+          },
+        );
+      });
+      assert.ok(
+        offsets.length > 0 && offsets.every((offset) => offset < 0.1),
+        `${name} at ${width}px`,
+      );
+    }
     assert.ok(start && send && start.width === send.width && start.height === send.height);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
     await page.getByRole("button", { name: "Add attachments and context", exact: true }).click();

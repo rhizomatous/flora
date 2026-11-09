@@ -167,7 +167,7 @@ export function ChatComposerFooter({
               aria-label="Chat actions"
             >
               <CloudIcon />
-              <span>Cloud</span>
+              <span className="composer-label">Cloud</span>
               <span className="runtime-dot" />
             </DropdownButton>
           }
