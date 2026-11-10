@@ -33,6 +33,7 @@ The menus open, but their unfinished actions are disabled. Default model, reason
 
 ### Connected
 
+- [x] Title summary opens on hover, keyboard focus, or tap; shows saved chat ID, title, status, and last update.
 - [x] Scroll to end keeps the composer fixed while returning to the latest message.
 - [x] Cloud menu stops the container through the existing API.
 - [x] Open in new tab and Copy link use the current chat route.
@@ -44,6 +45,7 @@ The menus open, but their unfinished actions are disabled. Default model, reason
 - [ ] Terminals: list active shells, open a terminal, and reflect their count in the summary strip.
 - [ ] Runtime: report actual machine size, CPU, memory, disk, awake/asleep state, and wake controls. The neutral dot does not report machine health.
 - [ ] Context: report usage, limits, system prompt, native tools, rules, codemode catalog, environment, and conversation breakdown; implement compaction thresholds. Unknown values are shown as dashes.
+- [ ] Title summary: connect actual model details and associated PR count. Both are currently shown as unavailable.
 - [ ] Cost: report actual spend instead of the unavailable dash.
 - [ ] Plus menu: search views; add diffs, machine files, setup, browser, side threads, new shell, desktop, and keep-awake controls. Overview is the current chat view.
 - [ ] Split review: open a resizable review pane next to the conversation.

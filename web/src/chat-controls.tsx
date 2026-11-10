@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import {
   Share2Icon,
@@ -13,6 +13,10 @@ import {
   PinIcon,
   FolderIcon,
   TagIcon,
+  HoverCard,
+  HoverCardTrigger,
+  HoverCardContent,
+  FlowerIcon,
   Button,
   PlayIcon,
   SquareIcon,
@@ -46,6 +50,101 @@ import {
 } from "@flora/florets";
 
 import { PlaceholderMenu } from "./composer";
+import type { Chat } from "./notifications";
+
+/** Summarizes saved chat metadata; unavailable model and PR data stay explicitly unknown. */
+export function ChatTitle({ title, chat }: { title: string; chat: Chat | undefined }) {
+  const [open, setOpen] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!open) return;
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 60_000);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [open]);
+  const updated = chat ? new Date(chat.UpdatedAt) : undefined;
+  const age = updated ? Math.max(0, now - updated.getTime()) : Number.NaN;
+  let ageLabel = "Unavailable";
+  if (Number.isFinite(age)) {
+    let unit: "day" | "hour" | "minute" = "minute";
+    if (age >= 86_400_000) unit = "day";
+    else if (age >= 3_600_000) unit = "hour";
+    const divisor = { day: 86_400_000, hour: 3_600_000, minute: 60_000 }[unit];
+    ageLabel =
+      age < 60_000
+        ? "Just now"
+        : new Intl.RelativeTimeFormat(undefined, { numeric: "always" }).format(
+            -Math.floor(age / divisor),
+            unit,
+          );
+  }
+  return (
+    <HoverCard
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setNow(Date.now());
+      }}
+    >
+      <HoverCardTrigger
+        delay={200}
+        render={
+          <Button
+            variant="secondary"
+            className="composer-control chat-title"
+            aria-label={title}
+            onClick={() => {
+              setOpen(true);
+              setNow(Date.now());
+            }}
+            onFocus={() => {
+              setOpen(true);
+              setNow(Date.now());
+            }}
+          >
+            <CloudIcon />
+            <span className="composer-label truncate">{title}</span>
+          </Button>
+        }
+      />
+      <HoverCardContent
+        align="start"
+        alignOffset={0}
+        className="chat-title-card cn-menu-surface"
+        aria-label="Chat summary"
+      >
+        <div className="chat-summary-meta">
+          <span className="truncate" title={chat?.ID}>
+            {chat?.ID ?? "—"}
+          </span>
+          <span className="chat-summary-model" title="Model details unavailable">
+            <FlowerIcon />
+            Model —
+          </span>
+        </div>
+        <p className="chat-summary-title">{title}</p>
+        <div className="chat-summary-footer">
+          <span>
+            {chat ? chat.Status.charAt(0).toUpperCase() + chat.Status.slice(1) : "Loading"}
+          </span>
+          <time dateTime={chat?.UpdatedAt} title={updated?.toLocaleString()}>
+            {ageLabel}
+          </time>
+          <span
+            className="chat-summary-pr"
+            aria-label="Pull request count unavailable"
+            title="Pull request count unavailable"
+          >
+            <GitPullRequestIcon />—
+          </span>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
 
 function ChatViewMenu() {
   return (

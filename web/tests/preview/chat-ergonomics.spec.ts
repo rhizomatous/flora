@@ -156,3 +156,29 @@ test("shared composer stays compact and exposes honest placeholders", async ({ p
   }
   assert.deepEqual(errors, []);
 });
+
+test("title summary opens independently of the plus menu", async ({ page }) => {
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  await page.goto(`${base}/#chats/completed`);
+  await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+  const title = page.getByRole("button", { name: "Review the workspace changes", exact: true });
+  const summary = page.getByLabel("Chat summary", { exact: true });
+  await title.hover();
+  await expect(summary).toBeVisible();
+  await expect(summary.getByText("Idle", { exact: true })).toBeVisible();
+  await expect(summary.getByText("completed", { exact: true })).toBeVisible();
+  await expect(summary.locator("time")).toHaveAttribute("datetime", /.+/);
+  await page.keyboard.press("Escape");
+  await expect(summary).toBeHidden();
+  await title.focus();
+  await expect(summary).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Chat views", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "New shell", exact: true })).toBeVisible();
+  await expect(summary).toBeHidden();
+  await page.keyboard.press("Escape");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await title.click();
+  await expect(summary).toBeVisible();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+});

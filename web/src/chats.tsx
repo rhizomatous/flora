@@ -3,7 +3,6 @@ import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState } from "rea
 import {
   Alert,
   ArrowDownIcon,
-  CloudIcon,
   Button,
   ButtonLink,
   FlowerMark,
@@ -35,7 +34,7 @@ import {
   ItemDescription,
 } from "@flora/florets";
 
-import { ChatHeaderActions, ChatComposerFooter, ChatReviewStrip } from "./chat-controls";
+import { ChatTitle, ChatHeaderActions, ChatComposerFooter, ChatReviewStrip } from "./chat-controls";
 import { Composer } from "./composer";
 import { NewChatComposer } from "./new-chat-composer";
 import type { Chat } from "./notifications";
@@ -372,14 +371,7 @@ export function Chats({
           tabIndex={-1}
           className="min-w-0 truncate text-base"
         >
-          {existingChat ? (
-            <span className="composer-control chat-title">
-              <CloudIcon />
-              <span className="composer-label truncate">{title()}</span>
-            </span>
-          ) : (
-            title()
-          )}
+          {existingChat ? <ChatTitle title={title()} chat={detail?.chat} /> : title()}
         </Heading>
         {existingChat && <ChatHeaderActions />}
       </div>

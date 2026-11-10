@@ -419,3 +419,43 @@
 .cloud-machine-specs {
   color: var(--muted-foreground);
 }
+
+.chat-title-card {
+  width: 288px;
+  max-width: calc(100vw - 24px);
+  padding: 12px;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 400;
+}
+.chat-summary-meta,
+.chat-summary-footer,
+.chat-summary-model,
+.chat-summary-pr {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted-foreground);
+}
+.chat-summary-meta {
+  justify-content: space-between;
+  gap: 12px;
+}
+.chat-summary-model {
+  flex-shrink: 0;
+}
+.chat-summary-model svg,
+.chat-summary-pr svg {
+  width: 14px;
+  height: 14px;
+}
+.chat-summary-title {
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+.chat-summary-footer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  gap: 16px;
+}
