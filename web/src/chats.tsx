@@ -2,23 +2,15 @@ import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState } from "rea
 
 import {
   Alert,
+  ArrowDownIcon,
   Button,
   ButtonLink,
-  FieldLabel,
   FlowerMark,
   SidebarTrigger,
-  DropdownMenuItem,
   Heading,
   Link,
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
   CrossCircledIcon,
   Text,
-  InputGroup,
-  InputGroupTextarea,
-  InputGroupAddon,
-  InputGroupButton,
   Message as ChatMessage,
   MessageContent,
   MessageScrollerProvider,
@@ -42,6 +34,8 @@ import {
   ItemDescription,
 } from "@flora/florets";
 
+import { ChatTitle, ChatHeaderActions, ChatComposerFooter, ChatReviewStrip } from "./chat-controls";
+import { Composer } from "./composer";
 import { NewChatComposer } from "./new-chat-composer";
 import type { Chat } from "./notifications";
 import { QuestionForm, type Question } from "./question";
@@ -133,14 +127,14 @@ function forgetIdentity(scope: string) {
 
 export function Chats({
   path,
-  onExpired,
   messageBytes,
+  onExpired,
   list,
   listError,
 }: {
   path: string;
-  onExpired: () => void;
   messageBytes: number;
+  onExpired: () => void;
   list: Chat[] | undefined;
   listError: string;
 }) {
@@ -351,7 +345,7 @@ export function Chats({
 
   const existingChat = !isNew && id !== "";
   const headerLayout = existingChat
-    ? "-mx-4 flex h-14 shrink-0 items-center gap-3 border-b px-4 sm:-mx-8"
+    ? "chat-header -mx-4 flex h-11 shrink-0 items-center gap-1 border-b px-3 sm:-mx-8"
     : "mx-auto flex w-full max-w-[880px] shrink-0 items-center justify-between gap-4 pb-3";
   const chatLayout = id === "" ? "mx-auto max-w-4xl min-w-0" : "flex min-h-0 flex-1 flex-col";
 
@@ -372,12 +366,14 @@ export function Chats({
         <Heading
           level={1}
           id="chats-heading"
+          aria-label={title()}
           ref={heading}
           tabIndex={-1}
           className="min-w-0 truncate text-base"
         >
-          {title()}
+          {existingChat ? <ChatTitle title={title()} chat={detail?.chat} /> : title()}
         </Heading>
+        {existingChat && <ChatHeaderActions />}
       </div>
       {error !== "" && (
         <Alert role="alert" className="mt-6">
@@ -423,7 +419,6 @@ export function Chats({
           activity={activity}
           disconnected={disconnected}
           busy={busy}
-          messageBytes={messageBytes}
           onControl={(action) => {
             void controlWork(action);
           }}
@@ -511,7 +506,6 @@ function ChatDetail({
   activity,
   disconnected,
   busy,
-  messageBytes,
   onControl,
   onSend,
   children,
@@ -521,7 +515,6 @@ function ChatDetail({
   activity: Activity[];
   disconnected: boolean;
   busy: boolean;
-  messageBytes: number;
   onControl: (action: "interrupt" | "stop") => void;
   onSend: (event: React.SubmitEvent<HTMLFormElement>) => void;
   children: React.ReactNode;
@@ -536,8 +529,8 @@ function ChatDetail({
   return (
     <MessageScrollerProvider autoScroll>
       <MessageScroller className="flex-1">
-        <MessageScrollerViewport aria-label="Conversation">
-          <MessageScrollerContent className="mx-auto w-full max-w-[880px] gap-8 px-1 py-6">
+        <MessageScrollerViewport aria-label="Conversation" className="chat-transcript-viewport">
+          <MessageScrollerContent className="mx-auto w-full max-w-[900px] gap-6 px-4 py-6">
             {disconnected && <Alert role="status">Disconnected. Reconnecting…</Alert>}
             {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
               <Alert role="note">
@@ -569,12 +562,21 @@ function ChatDetail({
               chat.StatusReason !== "" && <Text role="status">{chat.StatusReason}</Text>}
           </MessageScrollerContent>
         </MessageScrollerViewport>
-        <MessageScrollerButton aria-label="Jump to latest" />
       </MessageScroller>
-      <div className="mx-auto max-h-[70dvh] w-full max-w-[880px] shrink-0 overflow-y-auto bg-background pt-3 pb-[env(safe-area-inset-bottom)]">
-        <div className="max-h-[50dvh] overflow-y-auto empty:hidden [&_form]:mt-0 [&_form]:mb-3">
+      <div className="chat-composer-dock mx-auto max-h-[70dvh] w-full max-w-[900px] shrink-0 overflow-y-auto pt-2 pb-[env(safe-area-inset-bottom)]">
+        <div className="chat-pending-questions max-h-[50dvh] overflow-y-auto empty:hidden [&_form]:mt-0 [&_form]:mb-3">
           {children}
         </div>
+        <ChatReviewStrip key={`review-${id}`}>
+          <MessageScrollerButton
+            aria-label="Jump to latest"
+            size="sm"
+            className="composer-accessory chat-scroll-latest"
+          >
+            <ArrowDownIcon />
+            Scroll to end
+          </MessageScrollerButton>
+        </ChatReviewStrip>
         <FollowUpComposer
           key={id}
           id={id}
@@ -582,7 +584,6 @@ function ChatDetail({
           activeTurn={activeTurn}
           blocked={blocked}
           stopped={stopped}
-          messageBytes={messageBytes}
           onSend={onSend}
           onControl={onControl}
         />
@@ -613,7 +614,6 @@ function FollowUpComposer({
   activeTurn,
   blocked,
   stopped,
-  messageBytes,
   onSend,
   onControl,
 }: {
@@ -622,7 +622,6 @@ function FollowUpComposer({
   activeTurn: boolean;
   blocked: boolean;
   stopped: boolean;
-  messageBytes: number;
   onSend: (event: React.SubmitEvent<HTMLFormElement>) => void;
   onControl: (action: "interrupt" | "stop") => void;
 }) {
@@ -632,6 +631,7 @@ function FollowUpComposer({
 
   return (
     <form
+      className="chat-composer follow-up-composer"
       onSubmit={(event) => {
         if (!canSend) {
           event.preventDefault();
@@ -643,80 +643,26 @@ function FollowUpComposer({
         setDraft("");
       }}
     >
-      <FieldLabel htmlFor="follow-up-message" className="sr-only">
-        Follow-up
-      </FieldLabel>
-      <InputGroup className="rounded-xl">
-        <InputGroupTextarea
-          id="follow-up-message"
-          name="text"
-          className="max-h-[25dvh] min-h-12"
-          placeholder="Message…"
-          value={draft}
-          required
-          disabled={busy || blocked}
-          onChange={(event) => {
-            setDraft(event.target.value);
-            saveDraft(id, event.target.value);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              if (canSend) event.currentTarget.form?.requestSubmit();
-            }
-          }}
-        />
-        <InputGroupAddon align="block-end" className="justify-end">
-          {!blocked && !stopped && (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <InputGroupButton
-                    type="button"
-                    variant="ghost"
-                    className="mr-auto"
-                    aria-label="Chat actions"
-                  >
-                    ⋯
-                  </InputGroupButton>
-                }
-              />
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem
-                  disabled={busy}
-                  onClick={() => {
-                    onControl("stop");
-                  }}
-                >
-                  Stop container
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          {activeTurn && !blocked ? (
-            <InputGroupButton
-              type="button"
-              variant="outline"
-              disabled={busy}
-              onClick={() => {
+      <Composer
+        id="follow-up-message"
+        label="Follow-up"
+        message={draft}
+        onChange={(value) => {
+          setDraft(value);
+          saveDraft(id, value);
+        }}
+        disabled={busy || blocked}
+        canSend={canSend}
+        sendLabel={blocked ? "Continuation unavailable" : sendLabel}
+        onInterrupt={
+          activeTurn && !blocked
+            ? () => {
                 onControl("interrupt");
-              }}
-              title="Interrupt work and keep the container running"
-            >
-              Interrupt
-            </InputGroupButton>
-          ) : (
-            <InputGroupButton
-              type="submit"
-              variant="default"
-              disabled={!canSend}
-              title={`Up to ${messageBytes.toLocaleString()} UTF-8 bytes`}
-            >
-              {blocked ? "Continuation unavailable" : sendLabel}
-            </InputGroupButton>
-          )}
-        </InputGroupAddon>
-      </InputGroup>
+              }
+            : undefined
+        }
+      />
+      <ChatComposerFooter busy={busy} blocked={blocked} stopped={stopped} onControl={onControl} />
     </form>
   );
 }
@@ -747,7 +693,7 @@ function ConversationMessage({ message: m }: { message: Message }) {
         <MessageContent>
           <span className="sr-only">{m.Role === "user" ? "You" : "Flora"}</span>
           <Bubble variant={m.Role === "user" ? "muted" : "ghost"}>
-            <BubbleContent className="space-y-4 text-[15px] leading-7">
+            <BubbleContent className="space-y-4 text-sm leading-6">
               {parts.length > 0 ? (
                 parts.map((part, index) => (
                   <MessagePart key={part.id ?? index} part={part} user={m.Role === "user"} />

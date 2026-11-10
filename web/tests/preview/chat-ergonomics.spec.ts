@@ -27,7 +27,7 @@ test("chat drafts, activity, and responsive layout", async ({ page }) => {
   assert.ok(
     menu && heading && Math.abs(menu.y + menu.height / 2 - heading.y - heading.height / 2) < 2,
   );
-  const composer = await page.locator("form").filter({ has: draft }).boundingBox();
+  const composer = await page.locator(".composer-box").filter({ has: draft }).boundingBox();
   assert.ok(composer && composer.height < 110);
   await page.request.post(`${base}/__preview/control?action=play`);
   await expect(
@@ -96,4 +96,89 @@ test("chat drafts, activity, and responsive layout", async ({ page }) => {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
   assert.equal(await page.evaluate(() => document.documentElement.scrollHeight), 844);
   assert.deepEqual(errors, []);
+});
+
+test("shared composer stays compact and exposes honest placeholders", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  for (const width of [1512, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(`${base}/#chats/new`);
+    const message = page.getByLabel("Message", { exact: true });
+    await message.fill("Draft a task");
+    const start = await page.getByRole("button", { name: "Start chat", exact: true }).boundingBox();
+    await page.goto(`${base}/#chats/completed`);
+    const followUp = page.getByLabel("Follow-up", { exact: true });
+    await followUp.fill("Draft a follow-up");
+    const send = await page
+      .getByRole("button", { name: "Send message", exact: true })
+      .boundingBox();
+    for (const name of ["Model", "Reasoning effort", "Chat actions"]) {
+      const offsets = await page.getByRole("button", { name, exact: true }).evaluate((button) => {
+        const label = button.querySelector(".composer-label")?.getBoundingClientRect();
+        if (!label) throw new Error("Missing composer label");
+        const center = label.y + label.height / 2;
+        return [...button.querySelectorAll(":scope > svg, :scope > .composer-model-mark")].map(
+          (icon) => {
+            const rect = icon.getBoundingClientRect();
+            return Math.abs(rect.y + rect.height / 2 - center);
+          },
+        );
+      });
+      assert.ok(
+        offsets.length > 0 && offsets.every((offset) => offset < 0.1),
+        `${name} at ${width}px`,
+      );
+    }
+    assert.ok(start && send && start.width === send.width && start.height === send.height);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
+    await page.getByRole("button", { name: "Add attachments and context", exact: true }).click();
+    await expect(
+      page.getByRole("menuitem", { name: "Upload attachment", exact: true }),
+    ).toBeDisabled();
+    await page.keyboard.press("Escape");
+    await expect(followUp).toHaveValue("Draft a follow-up");
+    await page.getByRole("button", { name: "Context usage", exact: true }).click();
+    await expect(page.getByText("Unavailable", { exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
+    const review = page.getByRole("button", { name: "Pull requests and terminals", exact: true });
+    await review.click();
+    await expect(page.getByText("Pull request details unavailable", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Review changes", exact: true })).toBeDisabled();
+    await review.click();
+    await expect(page.getByText("Pull request details unavailable", { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(followUp).toHaveValue("Draft a follow-up");
+  }
+  assert.deepEqual(errors, []);
+});
+
+test("title summary opens independently of the plus menu", async ({ page }) => {
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  await page.goto(`${base}/#chats/completed`);
+  await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+  const title = page.getByRole("button", { name: "Review the workspace changes", exact: true });
+  const summary = page.getByLabel("Chat summary", { exact: true });
+  await title.hover();
+  await expect(summary).toBeVisible();
+  await expect(summary.getByText("Idle", { exact: true })).toBeVisible();
+  await expect(summary.getByText("completed", { exact: true })).toBeVisible();
+  await expect(summary.locator("time")).toHaveAttribute("datetime", /.+/);
+  await page.keyboard.press("Escape");
+  await expect(summary).toBeHidden();
+  await title.focus();
+  await expect(summary).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Chat views", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "New shell", exact: true })).toBeVisible();
+  await expect(summary).toBeHidden();
+  await page.keyboard.press("Escape");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await title.click();
+  await expect(summary).toBeVisible();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
 });

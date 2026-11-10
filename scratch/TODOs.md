@@ -1,4 +1,4 @@
-# Main screen chatbox
+# Chat composers
 
 ## Connected
 
@@ -25,6 +25,31 @@ The menus open, but their unfinished actions are disabled. Default model, reason
 
 ## Other reference views
 
-- [ ] Apply the chatbox styling to the existing-chat composer, preserving interrupt, stop, follow-up drafts, and blocked-state behavior.
+- [x] Share the input and toolbar between New Chat and existing chats, preserving interrupt, stop, resume, follow-up drafts, and blocked-state behavior.
 - [ ] Existing-chat PR summary and menu: connect branch/PR details, checks, diff counts, and actions.
 - [ ] Existing-chat context meter: connect token usage, breakdown, and compaction controls.
+
+## Chat page controls
+
+### Connected
+
+- [x] Title summary opens on hover, keyboard focus, or tap; shows saved chat ID, title, status, and last update.
+- [x] Scroll to end keeps the composer fixed while returning to the latest message.
+- [x] Cloud menu stops the container through the existing API.
+- [x] Open in new tab and Copy link use the current chat route.
+- [x] PR/terminal summary expands and collapses without inventing backend data.
+
+### Disconnected placeholders
+
+- [ ] PR summary: fetch associated PRs, titles, status, additions/deletions, checks, and review/open actions. The strip shows “PRs”, not a fabricated count.
+- [ ] Terminals: list active shells, open a terminal, and reflect their count in the summary strip.
+- [ ] Runtime: report actual machine size, CPU, memory, disk, awake/asleep state, and wake controls. The neutral dot does not report machine health.
+- [ ] Context: report usage, limits, system prompt, native tools, rules, codemode catalog, environment, and conversation breakdown; implement compaction thresholds. Unknown values are shown as dashes.
+- [ ] Title summary: connect actual model details and associated PR count. Both are currently shown as unavailable.
+- [ ] Cost: report actual spend instead of the unavailable dash.
+- [ ] Plus menu: search views; add diffs, machine files, setup, browser, side threads, new shell, desktop, and keep-awake controls. Overview is the current chat view.
+- [ ] Split review: open a resizable review pane next to the conversation.
+- [ ] Chat actions: share, pin, move to folder, tags, promote to Captain, rename, regenerate title, fork, device access, Slack, automation, mark unread, archive, and delete.
+- [ ] Rich PR references: render linked PR cards and CI status in the transcript when structured metadata is available.
+
+Attachment/context, model, reasoning, slash-command, and voice placeholders listed above apply to both composers.

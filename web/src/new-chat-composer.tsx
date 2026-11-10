@@ -1,93 +1,31 @@
-import { useState, type SubmitEvent, type ReactNode } from "react";
+import { useState, type SubmitEvent } from "react";
 
 import {
   Button,
   DropdownButton,
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  FieldLabel,
-  InputGroup,
-  InputGroupTextarea,
-  InputGroupAddon,
   Popover,
   PopoverTrigger,
   PopoverContent,
-  ArrowUpIcon,
   CheckIcon,
   CloudIcon,
   DatabaseIcon,
   FolderIcon,
   GitBranchIcon,
-  GitPullRequestIcon,
   GlobeIcon,
   InboxIcon,
   KeyRoundIcon,
-  MicIcon,
-  PaperclipIcon,
   PinIcon,
   PlusIcon,
   PuzzleIcon,
   Settings2Icon,
   SlidersHorizontalIcon,
-  SparklesIcon,
   TagIcon,
-  FlowerIcon,
   TerminalIcon,
-  UsersIcon,
-  FilesIcon,
-  MessageSquareIcon,
 } from "@flora/florets";
 
-export type ComposerProject = { id: string; name: string };
+import { Composer, PlaceholderMenu } from "./composer";
 
-function PlaceholderMenu({
-  label,
-  children,
-  items,
-  iconOnly = false,
-  variant = "ghost",
-}: {
-  label: string;
-  children: ReactNode;
-  items: { label: string; icon?: ReactNode; detail?: string; separator?: boolean }[];
-  iconOnly?: boolean;
-  variant?: "ghost" | "tertiary";
-}) {
-  const TriggerButton = iconOnly ? Button : DropdownButton;
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <TriggerButton
-            type="button"
-            variant={variant}
-            className={`composer-control ${iconOnly ? "composer-icon" : ""}`}
-            aria-label={label}
-          >
-            {children}
-          </TriggerButton>
-        }
-      />
-      <DropdownMenuContent className="composer-menu" align="start">
-        {items.map((item) => (
-          <div key={item.label}>
-            {item.separator === true && <DropdownMenuSeparator />}
-            <DropdownMenuItem disabled>
-              {item.icon}
-              <span className="composer-label">{item.label}</span>
-              {item.detail !== undefined && (
-                <span className="composer-label ml-auto text-muted-foreground">{item.detail}</span>
-              )}
-            </DropdownMenuItem>
-          </div>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+export type ComposerProject = { id: string; name: string };
 
 /** Selects the saved project and submits text; unfinished controls expose their availability in menus. */
 export function NewChatComposer({
@@ -110,7 +48,7 @@ export function NewChatComposer({
     project.name.toLowerCase().includes(search.toLowerCase()),
   );
   return (
-    <form onSubmit={onSend} className="new-chat-composer">
+    <form onSubmit={onSend} className="chat-composer new-chat-composer">
       <div className="composer-topbar">
         <input type="hidden" name="project" value={selectedProject?.id ?? ""} />
         <Popover
@@ -212,44 +150,15 @@ export function NewChatComposer({
           </PlaceholderMenu>
         </div>
       </div>
-      <InputGroup className="composer-box">
-        <FieldLabel className="sr-only" htmlFor="new-chat-message">
-          Message
-        </FieldLabel>
-        <InputGroupTextarea
-          id="new-chat-message"
-          name="text"
-          className="composer-textarea"
-          placeholder="Ask anything, / for commands, @ for context"
-          value={message}
-          onChange={(event) => {
-            setMessage(event.target.value);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              if (!busy && message.trim()) event.currentTarget.form?.requestSubmit();
-            }
-          }}
-          required
-          disabled={busy}
-        />
-        <InputGroupAddon align="block-end" className="composer-bottom-bar">
-          <PlaceholderMenu
-            label="Add attachments and context"
-            iconOnly
-            items={[
-              { label: "Upload attachment", icon: <PaperclipIcon /> },
-              { label: "Environment variables", icon: <KeyRoundIcon /> },
-              { label: "People", icon: <UsersIcon />, separator: true },
-              { label: "Threads", icon: <MessageSquareIcon /> },
-              { label: "Pull requests", icon: <GitPullRequestIcon /> },
-              { label: "Skills", icon: <SparklesIcon /> },
-              { label: "Files", icon: <FilesIcon /> },
-            ]}
-          >
-            <PlusIcon />
-          </PlaceholderMenu>
+      <Composer
+        id="new-chat-message"
+        label="Message"
+        message={message}
+        onChange={setMessage}
+        disabled={busy}
+        canSend={!busy && message.trim() !== ""}
+        sendLabel={busy ? "Starting chat" : "Start chat"}
+        settings={
           <PlaceholderMenu
             label="Chat settings"
             iconOnly
@@ -266,46 +175,8 @@ export function NewChatComposer({
           >
             <SlidersHorizontalIcon />
           </PlaceholderMenu>
-          <PlaceholderMenu
-            label="Model"
-            items={[{ label: "Server default model", icon: <FlowerIcon /> }]}
-          >
-            <span className="composer-model-mark">
-              <FlowerIcon />
-            </span>
-            <span className="composer-label">Default model</span>
-          </PlaceholderMenu>
-          <PlaceholderMenu label="Reasoning effort" items={[{ label: "Default reasoning effort" }]}>
-            <span className="composer-label">Default</span>
-          </PlaceholderMenu>
-          {message.trim() ? (
-            <Button
-              variant="primary"
-              size="icon-sm"
-              className="composer-send"
-              type="submit"
-              disabled={busy}
-              aria-label={busy ? "Starting chat" : "Start chat"}
-              title="Start chat"
-            >
-              <ArrowUpIcon />
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              size="icon-sm"
-              className="composer-send"
-              type="button"
-              disabled={busy}
-              aria-label="Voice input (coming soon)"
-              title="Voice input (coming soon)"
-              aria-disabled="true"
-            >
-              <MicIcon />
-            </Button>
-          )}
-        </InputGroupAddon>
-      </InputGroup>
+        }
+      />
     </form>
   );
 }
