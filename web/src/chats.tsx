@@ -534,7 +534,7 @@ function ChatDetail({
   return (
     <MessageScrollerProvider autoScroll>
       <MessageScroller className="flex-1">
-        <MessageScrollerViewport aria-label="Conversation">
+        <MessageScrollerViewport aria-label="Conversation" className="chat-transcript-viewport">
           <MessageScrollerContent className="mx-auto w-full max-w-[900px] gap-6 px-4 py-6">
             {disconnected && <Alert role="status">Disconnected. Reconnecting…</Alert>}
             {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
@@ -568,8 +568,8 @@ function ChatDetail({
           </MessageScrollerContent>
         </MessageScrollerViewport>
       </MessageScroller>
-      <div className="mx-auto max-h-[70dvh] w-full max-w-[900px] shrink-0 overflow-y-auto bg-background pt-2 pb-[env(safe-area-inset-bottom)]">
-        <div className="max-h-[50dvh] overflow-y-auto empty:hidden [&_form]:mt-0 [&_form]:mb-3">
+      <div className="chat-composer-dock mx-auto max-h-[70dvh] w-full max-w-[900px] shrink-0 overflow-y-auto pt-2 pb-[env(safe-area-inset-bottom)]">
+        <div className="chat-pending-questions max-h-[50dvh] overflow-y-auto empty:hidden [&_form]:mt-0 [&_form]:mb-3">
           {children}
         </div>
         <ChatReviewStrip key={`review-${id}`}>

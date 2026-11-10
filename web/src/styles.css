@@ -329,3 +329,22 @@
 .composer-accessories .chat-scroll-latest[data-active="false"] {
   display: none;
 }
+
+.chat-transcript-viewport {
+  --scroll-fade-b-size: 12px;
+}
+/* Let text reach the input edge behind the floating accessory row. */
+.chat-composer-dock {
+  position: relative;
+  pointer-events: none;
+}
+.chat-composer-dock:has(> .chat-pending-questions:empty) {
+  margin-top: -34px;
+}
+.chat-composer-dock > * {
+  pointer-events: auto;
+}
+.chat-composer-dock .follow-up-composer,
+.chat-pending-questions {
+  background: var(--background);
+}
