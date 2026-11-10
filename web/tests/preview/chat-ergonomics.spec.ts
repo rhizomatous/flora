@@ -142,9 +142,7 @@ test("shared composer stays compact and exposes honest placeholders", async ({ p
     await page.keyboard.press("Escape");
     await expect(followUp).toHaveValue("Draft a follow-up");
     await page.getByRole("button", { name: "Context usage", exact: true }).click();
-    await expect(
-      page.getByText("Token usage and compaction controls are not connected yet."),
-    ).toBeVisible();
+    await expect(page.getByText("Unavailable", { exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
     const review = page.getByRole("button", { name: "Pull requests and terminals", exact: true });
     await review.click();

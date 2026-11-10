@@ -256,12 +256,56 @@
   border-top-color: var(--muted-foreground);
   border-radius: 50%;
 }
+.context-popover {
+  width: 288px;
+  max-width: calc(100vw - 24px);
+  padding: 12px;
+  gap: 0;
+  font-size: 13px;
+  line-height: 20px;
+}
+.context-header,
 .context-row {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  padding-block: 3px;
-  font-size: 13px;
+  gap: 12px;
+}
+.context-value {
   color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.context-meter {
+  height: 6px;
+  margin-block: 12px 10px;
+  border-radius: 999px;
+  background: var(--border);
+}
+.context-row {
+  min-height: 22px;
+}
+.context-row dt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.context-swatch {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 3px;
+}
+.context-compaction {
+  width: 100%;
+  height: 28px;
+  margin-top: 12px;
+  padding-inline: 8px;
+  justify-content: space-between;
+  font-size: inherit;
+  font-weight: 400;
+}
+.context-compaction:disabled {
+  opacity: 1;
 }
 .composer-review {
   display: flex;

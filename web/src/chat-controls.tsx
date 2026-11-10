@@ -23,6 +23,8 @@ import {
   Popover,
   PopoverTrigger,
   PopoverContent,
+  PopoverTitle,
+  PopoverDescription,
   CloudIcon,
   DatabaseIcon,
   GitBranchIcon,
@@ -245,31 +247,43 @@ export function ChatComposerFooter({
             </Button>
           }
         />
-        <PopoverContent side="top" align="end" className="composer-menu">
-          <div className="flex justify-between text-sm">
-            <strong>Context</strong>
-            <span className="text-muted-foreground">Unavailable</span>
+        <PopoverContent side="top" align="end" className="context-popover">
+          <div className="context-header">
+            <PopoverTitle>Context</PopoverTitle>
+            <span className="context-value">Unavailable</span>
           </div>
-          <div className="my-2 h-1.5 rounded-full bg-muted" />
-          {[
-            "System prompt",
-            "Native tools",
-            "Rules",
-            "Codemode catalog",
-            "Environment",
-            "Conversation",
-          ].map((label) => (
-            <div key={label} className="context-row">
-              <span>{label}</span>
-              <span>—</span>
-            </div>
-          ))}
-          <Button variant="secondary" className="mt-3 w-full justify-between" disabled>
-            Compact at<span>—</span>
-          </Button>
-          <p className="composer-menu-note">
+          <PopoverDescription className="sr-only">
             Token usage and compaction controls are not connected yet.
-          </p>
+          </PopoverDescription>
+          <div className="context-meter" aria-hidden="true" />
+          <dl className="context-breakdown">
+            {[
+              { label: "System prompt", color: "#808080" },
+              { label: "Native tools", color: "#8b5cf6" },
+              { label: "Rules", color: "#10b981" },
+              { label: "Codemode catalog", color: "#ec4899" },
+              { label: "Environment", color: "#0099ff" },
+              { label: "Conversation", color: "var(--action)" },
+            ].map(({ label, color }) => (
+              <div key={label} className="context-row">
+                <dt>
+                  <span
+                    className="context-swatch"
+                    style={{ backgroundColor: color }}
+                    aria-hidden="true"
+                  />
+                  {label}
+                </dt>
+                <dd className="context-value" aria-label="Unavailable">
+                  —
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <Button variant="outline" className="context-compaction" disabled>
+            <span>Compact at</span>
+            <span className="context-value">— / —</span>
+          </Button>
         </PopoverContent>
       </Popover>
     </div>
