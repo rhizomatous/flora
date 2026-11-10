@@ -76,7 +76,7 @@ test("chat drafts, activity, and responsive layout", async ({ page }) => {
   );
   await page.goto(`${base}/#chats/long`);
   await page.locator('[data-slot="markdown"]').first().waitFor();
-  const viewport = page.getByLabel("Conversation");
+  const viewport = page.getByLabel("Conversation", { exact: true });
   await viewport.hover();
   await page.mouse.wheel(0, -10_000);
   await expect(page.getByRole("button", { name: "Jump to latest" })).toHaveAttribute(
