@@ -47,10 +47,12 @@ import {
 
 import { PlaceholderMenu } from "./composer";
 
-export function ChatViewMenu({ title }: { title: string }) {
+function ChatViewMenu() {
   return (
     <PlaceholderMenu
       label="Chat views"
+      iconOnly
+      variant="tertiary"
       items={[
         { label: "Overview", icon: <ListIcon />, detail: "Current view" },
         { label: "Diffs", icon: <GitBranchIcon /> },
@@ -63,8 +65,7 @@ export function ChatViewMenu({ title }: { title: string }) {
         { label: "Keep awake 4h", icon: <ClockIcon />, separator: true },
       ]}
     >
-      <CloudIcon />
-      <span className="composer-label truncate">{title}</span>
+      <PlusIcon />
     </PlaceholderMenu>
   );
 }
@@ -81,16 +82,7 @@ export function ChatHeaderActions() {
   }
   return (
     <>
-      <Button
-        render={<a href="#chats/new" aria-label="New chat" />}
-        nativeButton={false}
-        role="link"
-        variant="tertiary"
-        size="icon-sm"
-        aria-label="New chat"
-      >
-        <PlusIcon />
-      </Button>
+      <ChatViewMenu />
       <span className="ml-auto" />
       <Button
         variant="tertiary"

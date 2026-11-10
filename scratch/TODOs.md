@@ -35,7 +35,7 @@ The menus open, but their unfinished actions are disabled. Default model, reason
 
 - [x] Scroll to end keeps the composer fixed while returning to the latest message.
 - [x] Cloud menu stops the container through the existing API.
-- [x] New chat, Open in new tab, and Copy link use the current routes.
+- [x] Open in new tab and Copy link use the current chat route.
 - [x] PR/terminal summary expands and collapses without inventing backend data.
 
 ### Disconnected placeholders
@@ -45,7 +45,7 @@ The menus open, but their unfinished actions are disabled. Default model, reason
 - [ ] Runtime: report actual machine size, CPU, memory, disk, awake/asleep state, and wake controls. The neutral dot does not report machine health.
 - [ ] Context: report usage, limits, system prompt, native tools, rules, codemode catalog, environment, and conversation breakdown; implement compaction thresholds. Unknown values are shown as dashes.
 - [ ] Cost: report actual spend instead of the unavailable dash.
-- [ ] View menu: search views; add diffs, machine files, setup, browser, side threads, new shell, desktop, and keep-awake controls. Overview is the current chat view.
+- [ ] Plus menu: search views; add diffs, machine files, setup, browser, side threads, new shell, desktop, and keep-awake controls. Overview is the current chat view.
 - [ ] Split review: open a resizable review pane next to the conversation.
 - [ ] Chat actions: share, pin, move to folder, tags, promote to Captain, rename, regenerate title, fork, device access, Slack, automation, mark unread, archive, and delete.
 - [ ] Rich PR references: render linked PR cards and CI status in the transcript when structured metadata is available.
