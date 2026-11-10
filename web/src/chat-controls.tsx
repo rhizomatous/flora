@@ -151,7 +151,7 @@ function ChatViewMenu() {
     <PlaceholderMenu
       label="Chat views"
       iconOnly
-      variant="tertiary"
+      variant="ghost"
       items={[
         { label: "Overview", icon: <ListIcon />, detail: "Current view" },
         { label: "Diffs", icon: <GitBranchIcon /> },
@@ -184,7 +184,7 @@ export function ChatHeaderActions() {
       <ChatViewMenu />
       <span className="ml-auto" />
       <Button
-        variant="tertiary"
+        variant="ghost"
         className="composer-control"
         aria-disabled="true"
         title="Cost tracking is not available yet"
@@ -194,7 +194,7 @@ export function ChatHeaderActions() {
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
-            <Button variant="tertiary" size="icon-sm" aria-label="More chat actions">
+            <Button variant="ghost" size="icon-sm" aria-label="More chat actions">
               <EllipsisIcon />
             </Button>
           }
@@ -264,7 +264,7 @@ export function ChatHeaderActions() {
         </DropdownMenuContent>
       </DropdownMenu>
       <Button
-        variant="tertiary"
+        variant="ghost"
         size="icon-sm"
         aria-label="Split review (coming soon)"
         title="Split review (coming soon)"
