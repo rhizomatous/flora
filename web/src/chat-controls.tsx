@@ -14,6 +14,8 @@ import {
   FolderIcon,
   TagIcon,
   Button,
+  PlayIcon,
+  SquareIcon,
   DropdownButton,
   DropdownMenu,
   DropdownMenuTrigger,
@@ -211,13 +213,26 @@ export function ChatComposerFooter({
             </DropdownButton>
           }
         />
-        <DropdownMenuContent side="top" align="start" className="composer-menu">
-          <p className="composer-menu-note">Machine details unavailable</p>
+        <DropdownMenuContent side="top" align="start" className="cloud-menu">
+          <div className="cloud-machine-summary">
+            <div className="cloud-machine-heading">
+              <span>Cloud machine</span>
+              <span className="cloud-machine-status">
+                <span className="runtime-dot" />
+                Unknown
+              </span>
+            </div>
+            <p
+              className="cloud-machine-specs"
+              aria-label="CPU, memory, and disk details unavailable"
+            >
+              CPU — · Memory — · Disk —
+            </p>
+          </div>
           <DropdownMenuItem disabled>
-            <DatabaseIcon />
-            Machine size
+            <PlayIcon />
+            Wake machine
           </DropdownMenuItem>
-          <DropdownMenuItem disabled>Wake machine</DropdownMenuItem>
           {!blocked && !stopped && (
             <>
               <DropdownMenuSeparator />
@@ -227,6 +242,7 @@ export function ChatComposerFooter({
                   onControl("stop");
                 }}
               >
+                <SquareIcon />
                 Stop container
               </DropdownMenuItem>
             </>

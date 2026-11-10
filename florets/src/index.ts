@@ -90,6 +90,7 @@ export {
   ArrowUpIcon,
   ArrowDownIcon,
   SquareIcon,
+  PlayIcon,
   EllipsisIcon,
   PanelRightIcon,
   ExternalLinkIcon,

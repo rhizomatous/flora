@@ -392,3 +392,30 @@
 .chat-pending-questions {
   background: var(--background);
 }
+
+.cloud-menu {
+  width: 288px;
+  max-width: calc(100vw - 24px);
+  padding: 6px;
+  font-size: 13px;
+}
+.cloud-machine-summary {
+  padding: 5px 6px 6px;
+  line-height: 20px;
+}
+.cloud-machine-heading,
+.cloud-machine-status {
+  display: flex;
+  align-items: center;
+}
+.cloud-machine-heading {
+  justify-content: space-between;
+  gap: 12px;
+}
+.cloud-machine-status {
+  gap: 6px;
+  color: var(--muted-foreground);
+}
+.cloud-machine-specs {
+  color: var(--muted-foreground);
+}
