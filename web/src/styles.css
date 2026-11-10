@@ -339,7 +339,7 @@
 .chat-title {
   display: inline-flex;
   align-items: center;
-  color: var(--muted-foreground);
+  color: var(--secondary-foreground);
   max-width: 100%;
   background: var(--secondary);
 }
