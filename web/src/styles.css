@@ -375,7 +375,8 @@
 }
 
 .chat-transcript-viewport {
-  --scroll-fade-b-size: 12px;
+  --scroll-fade-size: 28px;
+  --scroll-fade-reveal: 28px;
 }
 /* Let text reach the input edge behind the floating accessory row. */
 .chat-composer-dock {
@@ -383,7 +384,7 @@
   pointer-events: none;
 }
 .chat-composer-dock:has(> .chat-pending-questions:empty) {
-  margin-top: -34px;
+  margin-top: -42px;
 }
 .chat-composer-dock > * {
   pointer-events: auto;
