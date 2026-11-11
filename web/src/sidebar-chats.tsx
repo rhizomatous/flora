@@ -2,8 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   Button,
-  CloudIcon,
-  FlowerMark,
   InboxIcon,
   ChevronRightIcon,
   SearchIcon,
@@ -25,6 +23,7 @@ import {
 } from "@flora/florets";
 
 import type { Chat } from "./notifications";
+import { sidebarStatus, useSeenSidebarChats } from "./sidebar-status";
 
 type Project = { id: string; name: string };
 
@@ -42,13 +41,15 @@ function ChatRow({
   path,
   close,
   now,
+  seen,
 }: {
   chat: Chat;
   path: string;
   close: () => void;
   now: number;
+  seen: boolean;
 }) {
-  const status = chat.Status.charAt(0).toUpperCase() + chat.Status.slice(1);
+  const status = sidebarStatus(chat, seen);
   return (
     <li className="florets-navigation-row" data-active={path === `chats/${chat.ID}` || undefined}>
       <HoverCard>
@@ -61,14 +62,18 @@ function ChatRow({
               className="florets-navigation-link"
               onClick={close}
             >
-              {chat.Status === "working" ? (
-                <FlowerMark className="florets-navigation-icon motion-safe:animate-pulse" />
-              ) : (
-                <CloudIcon className="florets-navigation-icon" />
-              )}
+              <span
+                className="florets-navigation-icon sidebar-status"
+                aria-hidden="true"
+                data-tone={status.tone}
+                data-filled={status.filled || undefined}
+                data-pulse={status.pulse || undefined}
+              >
+                <span />
+              </span>
               <span className="min-w-0 flex-1">
                 <span className="florets-navigation-title">{chat.Title || "Chat"}</span>
-                <span className="florets-navigation-meta">{status}</span>
+                <span className="florets-navigation-meta">{status.label}</span>
               </span>
               <time
                 className="florets-navigation-age"
@@ -88,7 +93,7 @@ function ChatRow({
         >
           <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
             <span className="truncate">{chat.ID}</span>
-            <span>{status}</span>
+            <span>{status.label}</span>
           </div>
           <p className="mt-2">{chat.Title || "Chat"}</p>
           <p className="mt-3 text-xs text-muted-foreground">
@@ -165,6 +170,7 @@ export function SidebarChats({
   searching: boolean;
   setSearching: (value: boolean) => void;
 }) {
+  const isSeen = useSeenSidebarChats(chats, path);
   const focusSearch = useCallback((node: HTMLInputElement | null) => {
     node?.focus();
   }, []);
@@ -331,7 +337,14 @@ export function SidebarChats({
             {expanded && (
               <ul>
                 {rows.map((chat) => (
-                  <ChatRow key={chat.ID} chat={chat} path={path} close={close} now={now} />
+                  <ChatRow
+                    key={chat.ID}
+                    chat={chat}
+                    seen={isSeen(chat)}
+                    path={path}
+                    close={close}
+                    now={now}
+                  />
                 ))}
                 {chats !== undefined && rows.length === 0 && (
                   <li>
