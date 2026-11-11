@@ -231,7 +231,7 @@ function App() {
       )}
       <Content id="main-content" tabIndex={-1} className={ready ? frameLayout : undefined}>
         {ready && !conversation && (
-          <header className="app-topbar flex shrink-0 items-center border-b px-3">
+          <header className="cn-topbar flex shrink-0 items-center border-b px-3">
             <span className="sidebar-toggle-space" aria-hidden="true" />
           </header>
         )}

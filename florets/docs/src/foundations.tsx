@@ -154,6 +154,58 @@ export function FoundationPage({ id }: { id: string }) {
               }
             />
           </Section>
+          <Section id="compact-patterns" title="Compact navigation and controls">
+            <p>
+              Use Button size <code>compact</code> or <code>icon-compact</code> for 28px controls.
+              Wrap labels in cn-control-label to center icons on the capital height at every
+              viewport size. DropdownButton supplies the shared caret spacing.
+            </p>
+            <p>
+              Ghost buttons gain a background on hover and keyboard focus. Popup triggers retain
+              that highlight while open. An expanded panel toggle stays transparent at rest.
+              Tertiary controls brighten without a background.
+            </p>
+            <p>
+              Navigation styles are composable classes. Use data-active only on the selected row,
+              and <code>data-expanded=&quot;true&quot;</code> only on expanded groups. Place group
+              carets after their labels. Apply <code>data-density=&quot;compact&quot;</code> to a
+              sidebar container for compact menu buttons.
+            </p>
+            <Demo>
+              <section className="cn-navigation-group w-64" data-expanded="true">
+                <div className="cn-navigation-group-heading">Project</div>
+                <ul>
+                  <li className="cn-navigation-row" data-active="">
+                    <a href="#theming" className="cn-navigation-link">
+                      <FlowerMark className="cn-navigation-icon" />
+                      <span className="min-w-0 flex-1">
+                        <span className="cn-navigation-title">Selected conversation</span>
+                        <span className="cn-navigation-meta">Supporting information</span>
+                      </span>
+                      <span className="cn-navigation-age">2h</span>
+                    </a>
+                  </li>
+                  <li className="cn-navigation-row">
+                    <a href="#theming" className="cn-navigation-link">
+                      <FlowerMark className="cn-navigation-icon" />
+                      <span className="cn-navigation-title">Another conversation</span>
+                    </a>
+                  </li>
+                </ul>
+              </section>
+            </Demo>
+            <CodeExample
+              code={
+                '<li className="cn-navigation-row" data-active={selected || undefined}>\n  <a className="cn-navigation-link" href={href}>\n    <Icon className="cn-navigation-icon" />\n    <span className="min-w-0 flex-1">\n      <span className="cn-navigation-title">Title</span>\n      <span className="cn-navigation-meta">Details</span>\n    </span>\n  </a>\n</li>'
+              }
+            />
+            <p>
+              HoverCardContent and PopoverContent accept <code>density=&quot;compact&quot;</code>{" "}
+              for shared preview typography, padding, and viewport limits. Use cn-topbar and
+              --topbar-height to align page headers. Sidebar movement uses --sidebar-motion-duration
+              and --sidebar-motion-easing and respects reduced motion.
+            </p>
+          </Section>
           <Section id="custom-tokens" title="Customize tokens">
             <p>
               Override CSS variables after importing the shared stylesheet. Set values for both
@@ -196,7 +248,9 @@ export function FoundationPage({ id }: { id: string }) {
           <Section id="text" title="Text">
             <p>
               Text renders a paragraph by default. Use <code>as=&quot;span&quot;</code> for inline
-              content. Choose from three sizes and default, muted, or inherited color.
+              content. Choose from three sizes and default, muted, subtle, or inherited color. Use
+              subtle for group labels, muted for supporting text, and default for selected or
+              hovered navigation.
             </p>
             <Demo>
               <div className="w-full space-y-4">
@@ -205,6 +259,9 @@ export function FoundationPage({ id }: { id: string }) {
                 <Text size="xs">Describe a task. Come back to review the work.</Text>
                 <div className="flex flex-wrap gap-6 border-t pt-4">
                   <Text as="span">Default</Text>
+                  <Text as="span" tone="subtle">
+                    Group label
+                  </Text>
                   <Text as="span" tone="muted">
                     Muted
                   </Text>

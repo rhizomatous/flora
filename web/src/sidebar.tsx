@@ -105,7 +105,11 @@ export function Sidebar({
           return target ?? document.querySelector<HTMLElement>("#main-content");
         }}
       >
-        <nav aria-label="Main" className="flora-sidebar flex min-h-0 flex-1 flex-col">
+        <nav
+          data-density="compact"
+          aria-label="Main"
+          className="flora-sidebar flex min-h-0 flex-1 flex-col"
+        >
           <SidebarHeader>
             <a
               href="#main-content"

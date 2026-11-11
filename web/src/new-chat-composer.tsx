@@ -63,12 +63,13 @@ export function NewChatComposer({
               <DropdownButton
                 type="button"
                 variant="tertiary"
-                className="composer-control composer-project"
+                size="compact"
+                className="composer-project"
                 disabled={busy}
                 aria-label={`Project: ${selectedProject?.name ?? ""}`}
               >
                 <InboxIcon />
-                <span className="composer-label truncate">{selectedProject?.name}</span>
+                <span className="cn-control-label truncate">{selectedProject?.name}</span>
               </DropdownButton>
             }
           />
@@ -100,7 +101,7 @@ export function NewChatComposer({
                   }}
                 >
                   <InboxIcon />
-                  <span className="composer-label truncate">{project.name}</span>
+                  <span className="cn-control-label truncate">{project.name}</span>
                   {selectedProject?.id === project.id && <CheckIcon className="ml-auto" />}
                 </button>
               ))}
@@ -109,11 +110,11 @@ export function NewChatComposer({
             <div className="composer-project-links">
               <a href="#projects/new">
                 <PlusIcon />
-                <span className="composer-label">New project</span>
+                <span className="cn-control-label">New project</span>
               </a>
               <a href="#projects">
                 <Settings2Icon />
-                <span className="composer-label">Manage projects</span>
+                <span className="cn-control-label">Manage projects</span>
               </a>
             </div>
           </PopoverContent>
@@ -127,17 +128,17 @@ export function NewChatComposer({
           ]}
         >
           <CloudIcon />
-          <span className="composer-label">Cloud</span>
+          <span className="cn-control-label">Cloud</span>
         </PlaceholderMenu>
         <Button
           type="button"
           variant="tertiary"
-          className="composer-control"
+          size="compact"
           title="Setup assistance (coming soon)"
           aria-disabled="true"
         >
           <DatabaseIcon />
-          <span className="composer-label">Setup</span>
+          <span className="cn-control-label">Setup</span>
         </Button>
         <div className="composer-branch">
           <PlaceholderMenu
@@ -146,7 +147,7 @@ export function NewChatComposer({
             items={[{ label: "Project default branch", icon: <GitBranchIcon /> }]}
           >
             <GitBranchIcon />
-            <span className="composer-label">Default</span>
+            <span className="cn-control-label">Default</span>
           </PlaceholderMenu>
         </div>
       </div>

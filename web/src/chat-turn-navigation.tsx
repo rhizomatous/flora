@@ -91,6 +91,7 @@ export function ChatTurnNavigation({ rows }: { rows: TranscriptRow[] }) {
           <HoverCardContent
             side="right"
             sideOffset={8}
+            density="compact"
             className="chat-turn-preview cn-menu-surface"
           >
             <p className="truncate">{turn.prompt}</p>

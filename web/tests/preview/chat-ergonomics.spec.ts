@@ -118,7 +118,7 @@ test("shared composer stays compact and exposes honest placeholders", async ({ p
       .boundingBox();
     for (const name of ["Model", "Reasoning effort", "Chat actions"]) {
       const offsets = await page.getByRole("button", { name, exact: true }).evaluate((button) => {
-        const label = button.querySelector(".composer-label")?.getBoundingClientRect();
+        const label = button.querySelector(".cn-control-label")?.getBoundingClientRect();
         if (!label) throw new Error("Missing composer label");
         const center = label.y + label.height / 2;
         return [...button.querySelectorAll(":scope > svg, :scope > .composer-model-mark")].map(

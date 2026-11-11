@@ -33,6 +33,17 @@ try {
 
   console.log(`Florets: ${files.length} component collections rendered.`);
 
+  await openExample("button");
+  const panelToggle = page.getByRole("button", { name: "Expanded panel", exact: true });
+  await expect(panelToggle).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(panelToggle).toHaveCSS("height", "28px");
+    await expect(panelToggle.locator("svg")).toHaveCSS("width", "14px");
+  }
+  await panelToggle.focus();
+  await expect(panelToggle).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+
   await openExample("dropdown-menu");
   const menuTrigger = page
     .getByRole("region", { name: "Basic", exact: true })

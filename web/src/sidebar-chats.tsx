@@ -50,7 +50,7 @@ function ChatRow({
 }) {
   const status = chat.Status.charAt(0).toUpperCase() + chat.Status.slice(1);
   return (
-    <li className="sidebar-chat-row" data-active={path === `chats/${chat.ID}` || undefined}>
+    <li className="cn-navigation-row" data-active={path === `chats/${chat.ID}` || undefined}>
       <HoverCard>
         <HoverCardTrigger
           delay={500}
@@ -58,20 +58,20 @@ function ChatRow({
             <a
               href={`#chats/${chat.ID}`}
               aria-current={path === `chats/${chat.ID}` ? "page" : undefined}
-              className="sidebar-chat-link"
+              className="cn-navigation-link"
               onClick={close}
             >
               {chat.Status === "working" ? (
-                <FlowerMark className="sidebar-chat-icon motion-safe:animate-pulse" />
+                <FlowerMark className="cn-navigation-icon motion-safe:animate-pulse" />
               ) : (
-                <CloudIcon className="sidebar-chat-icon" />
+                <CloudIcon className="cn-navigation-icon" />
               )}
               <span className="min-w-0 flex-1">
-                <span className="sidebar-chat-title">{chat.Title || "Chat"}</span>
-                <span className="sidebar-chat-meta">{status}</span>
+                <span className="cn-navigation-title">{chat.Title || "Chat"}</span>
+                <span className="cn-navigation-meta">{status}</span>
               </span>
               <time
-                className="sidebar-chat-age"
+                className="cn-navigation-age"
                 dateTime={chat.UpdatedAt}
                 title={new Date(chat.UpdatedAt).toLocaleString()}
               >
@@ -83,6 +83,7 @@ function ChatRow({
         <HoverCardContent
           side="right"
           align="start"
+          density="compact"
           className="sidebar-chat-preview cn-menu-surface"
         >
           <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
@@ -95,7 +96,7 @@ function ChatRow({
           </p>
         </HoverCardContent>
       </HoverCard>
-      <div className="sidebar-chat-actions">
+      <div className="cn-navigation-actions">
         <Button
           variant="ghost"
           size="icon-sm"
@@ -303,14 +304,14 @@ export function SidebarChats({
           <section
             key={project.id}
             aria-label={project.name}
-            className="sidebar-project"
+            className="cn-navigation-group"
             data-expanded={expanded}
           >
-            <div className="sidebar-project-heading">
+            <div className="cn-navigation-group-heading">
               <a href={`#projects/${project.id}`} onClick={close}>
                 <InboxIcon />
                 <span className="truncate">{project.name}</span>
-                <span className="sidebar-project-count">{rows.length}</span>
+                <span className="cn-navigation-count">{rows.length}</span>
               </a>
               <button
                 type="button"

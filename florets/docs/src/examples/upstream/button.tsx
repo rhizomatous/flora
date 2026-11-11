@@ -8,6 +8,16 @@ export function Preview() {
   return (
     <ExampleWrapper className="lg:grid-cols-1 2xl:grid-cols-1">
       <ButtonActionStyles />
+      <Example title="Compact controls">
+        <Button variant="ghost" size="compact" aria-expanded>
+          <PlusIcon />
+          <span className="cn-control-label">Expanded panel</span>
+        </Button>
+        <Button variant="tertiary" size="compact">
+          <ArrowRightIcon />
+          <span className="cn-control-label">Open project</span>
+        </Button>
+      </Example>
       <ButtonVariantsAndSizes />
       <ButtonIconRight />
       <ButtonIconLeft />
