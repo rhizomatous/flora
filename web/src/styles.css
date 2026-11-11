@@ -629,7 +629,10 @@
   color: var(--foreground);
 }
 .sidebar-project {
-  margin-bottom: 14px;
+  margin-bottom: 0;
+}
+.sidebar-project[data-expanded="true"] {
+  margin-bottom: 10px;
 }
 .sidebar-project-heading {
   display: flex;

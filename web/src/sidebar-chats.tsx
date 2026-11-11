@@ -300,7 +300,12 @@ export function SidebarChats({
       {groups.map(({ project, rows }) => {
         const expanded = !!filter || !collapsed.includes(project.id);
         return (
-          <section key={project.id} aria-label={project.name} className="sidebar-project">
+          <section
+            key={project.id}
+            aria-label={project.name}
+            className="sidebar-project"
+            data-expanded={expanded}
+          >
             <div className="sidebar-project-heading">
               <a href={`#projects/${project.id}`} onClick={close}>
                 <InboxIcon />
