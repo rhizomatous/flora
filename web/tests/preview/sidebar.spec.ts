@@ -108,3 +108,26 @@ test("mobile sidebar focuses its toggle and keeps the skip link keyboard accessi
     )
     .toBe(true);
 });
+
+test("one desktop toggle moves between sidebar and page without losing focus", async ({ page }) => {
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  await page.goto(`${base}/#chats/pagination`);
+  await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+  const toggle = page.getByRole("button", { name: "Menu", exact: true });
+  await expect(page.locator('[data-slot="sidebar-trigger"]')).toHaveCount(1);
+  const original = await toggle.elementHandle();
+  const opened = await toggle.boundingBox();
+  if (!original || !opened) throw new Error("Missing sidebar toggle");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(toggle).toBeFocused();
+  await expect.poll(async () => (await toggle.boundingBox())?.x).toBe(20);
+  expect(await original.evaluate((node) => node.isConnected)).toBe(true);
+  expect(opened.x).toBeGreaterThan(200);
+  await toggle.press("Enter");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(async () => (await toggle.boundingBox())?.x).toBe(opened.x);
+  expect(await original.evaluate((node) => node.isConnected)).toBe(true);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(toggle).toHaveCSS("transition-duration", "0s");
+});

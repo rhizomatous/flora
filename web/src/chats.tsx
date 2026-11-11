@@ -6,7 +6,6 @@ import {
   Button,
   ButtonLink,
   FlowerMark,
-  SidebarTrigger,
   Heading,
   Link,
   CrossCircledIcon,
@@ -368,7 +367,7 @@ export function Chats({
       className={isNew ? "mx-auto my-12 w-full max-w-[720px] md:mt-[25svh]" : chatLayout}
     >
       <div className={isNew ? "sr-only" : headerLayout}>
-        {existingChat && <SidebarTrigger aria-label="Menu" />}
+        {existingChat && <span className="sidebar-toggle-space" aria-hidden="true" />}
         <Heading
           level={1}
           id="chats-heading"

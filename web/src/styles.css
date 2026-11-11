@@ -776,3 +776,44 @@
 .dark .flora-sidebar {
   --sidebar-label-foreground: color-mix(in srgb, var(--muted-foreground) 80%, var(--sidebar));
 }
+
+.sidebar-floating-toggle {
+  position: fixed;
+  top: 17px;
+  left: 0;
+  z-index: 40;
+  width: 26px;
+  height: 26px;
+  color: var(--muted-foreground);
+  transform: translateX(20px);
+  transition: transform 200ms ease-linear;
+}
+.sidebar-floating-toggle[data-expanded="true"] {
+  transform: translateX(calc(var(--sidebar-width) - 42px));
+}
+.sidebar-toggle-space {
+  display: block;
+  flex-shrink: 0;
+  width: 30px;
+  transition: width 200ms ease-linear;
+}
+[data-slot="sidebar-wrapper"]:has(.sidebar-floating-toggle[data-expanded="true"])
+  .sidebar-toggle-space {
+  width: 0;
+}
+@media (max-width: 767px) {
+  .sidebar-floating-toggle {
+    top: 9px;
+    transform: translateX(13px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-floating-toggle,
+  .sidebar-toggle-space {
+    transition: none;
+  }
+  .flora-navigation,
+  [data-slot="sidebar-gap"] {
+    transition: none;
+  }
+}
