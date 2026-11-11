@@ -123,7 +123,7 @@ export function Sidebar({
             >
               Skip to content
             </a>
-            <div className="sidebar-brand-row">
+            <div className="sidebar-brand-row flex h-(--topbar-height) items-center px-2">
               <a
                 href="#chats/new"
                 aria-label="Flora home"
@@ -231,7 +231,9 @@ export function Sidebar({
             />
           </SidebarContent>
         </nav>
-        <SidebarFooter className="sidebar-account">{children}</SidebarFooter>
+        <SidebarFooter className="sidebar-account border-t border-border p-2">
+          {children}
+        </SidebarFooter>
       </NavigationSidebar>
     </>
   );

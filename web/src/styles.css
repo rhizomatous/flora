@@ -1,12 +1,11 @@
 @import "@flora/florets/styles.css";
 
 /* Keep feature styles after Florets so their component overrides remain predictable.
-   Use Tailwind in markup for local layout; keep coordinated states, responsive rules,
-   and animations in the owning feature stylesheet. */
+   Prefer Tailwind utilities in components, including responsive and state variants.
+   Keep custom CSS for rules that are clearer as named selectors or keyframes. */
 @import "./composer.css";
 @import "./chat-controls.css";
 @import "./chats.css";
-@import "./chat-turn-navigation.css";
 @import "./sidebar.css";
 
 @source "./";

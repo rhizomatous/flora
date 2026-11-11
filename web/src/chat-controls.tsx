@@ -95,7 +95,7 @@ export function ChatTitle({ title, chat }: { title: string; chat: Chat | undefin
           <Button
             variant="secondary"
             size="compact"
-            className="chat-title"
+            className="chat-title inline-flex max-w-full items-center bg-secondary! text-secondary-foreground!"
             aria-label={title}
             onClick={() => {
               setOpen(true);
@@ -115,20 +115,23 @@ export function ChatTitle({ title, chat }: { title: string; chat: Chat | undefin
         align="start"
         alignOffset={0}
         density="compact"
-        className="chat-title-card florets-menu-surface"
+        className="chat-title-card florets-menu-surface font-normal"
         aria-label="Chat summary"
       >
-        <div className="chat-summary-meta">
+        <div className="chat-summary-meta flex items-center justify-between gap-3 text-muted-foreground">
           <span className="truncate" title={chat?.ID}>
             {chat?.ID ?? "—"}
           </span>
-          <span className="chat-summary-model" title="Model details unavailable">
+          <span
+            className="chat-summary-model flex shrink-0 items-center gap-1.5 text-muted-foreground [&_svg]:size-3.5"
+            title="Model details unavailable"
+          >
             <FlowerIcon />
             Model —
           </span>
         </div>
-        <p className="chat-summary-title">{title}</p>
-        <div className="chat-summary-footer">
+        <p className="chat-summary-title mt-[3px] wrap-anywhere">{title}</p>
+        <div className="chat-summary-footer mt-2.5 flex items-center gap-4 border-t border-border pt-2.5 text-muted-foreground">
           <span>
             {chat ? chat.Status.charAt(0).toUpperCase() + chat.Status.slice(1) : "Loading"}
           </span>
@@ -136,7 +139,7 @@ export function ChatTitle({ title, chat }: { title: string; chat: Chat | undefin
             {ageLabel}
           </time>
           <span
-            className="chat-summary-pr"
+            className="chat-summary-pr flex items-center gap-1.5 text-muted-foreground [&_svg]:size-3.5"
             aria-label="Pull request count unavailable"
             title="Pull request count unavailable"
           >
@@ -203,7 +206,7 @@ export function ChatHeaderActions() {
         />
         <DropdownMenuContent
           align="end"
-          className="composer-menu max-h-[70dvh] overflow-y-auto [&_[role=menuitem]]:whitespace-nowrap"
+          className="composer-menu max-h-[70dvh] w-[260px]! max-w-[calc(100vw-24px)] overflow-y-auto [&_[role=menuitem]]:whitespace-nowrap"
         >
           <DropdownMenuItem disabled>
             <Share2Icon />
@@ -291,33 +294,37 @@ export function ChatComposerFooter({
   onControl: (action: "interrupt" | "stop") => void;
 }) {
   return (
-    <div className="composer-runtime">
+    <div className="composer-runtime flex items-center gap-1 px-2 pt-[3px] pb-1 text-muted-foreground">
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
             <DropdownButton
               variant="tertiary"
               size="compact"
-              className="composer-up"
+              className="composer-up [&_[data-slot=dropdown-chevron]]:rotate-180"
               aria-label="Chat actions"
             >
               <CloudIcon />
               <span className="florets-control-label">Cloud</span>
-              <span className="runtime-dot" />
+              <span className="runtime-dot size-[5px] rounded-full bg-muted-foreground" />
             </DropdownButton>
           }
         />
-        <DropdownMenuContent side="top" align="start" className="cloud-menu">
-          <div className="cloud-machine-summary">
-            <div className="cloud-machine-heading">
+        <DropdownMenuContent
+          side="top"
+          align="start"
+          className="cloud-menu w-72! max-w-[calc(100vw-24px)] p-1.5 text-[13px]"
+        >
+          <div className="cloud-machine-summary px-1.5 pt-[5px] pb-1.5 leading-5">
+            <div className="cloud-machine-heading flex items-center justify-between gap-3">
               <span>Cloud machine</span>
-              <span className="cloud-machine-status">
-                <span className="runtime-dot" />
+              <span className="cloud-machine-status flex items-center gap-1.5 text-muted-foreground">
+                <span className="runtime-dot size-[5px] rounded-full bg-muted-foreground" />
                 Unknown
               </span>
             </div>
             <p
-              className="cloud-machine-specs"
+              className="cloud-machine-specs text-muted-foreground"
               aria-label="CPU, memory, and disk details unavailable"
             >
               CPU — · Memory — · Disk —
@@ -349,23 +356,26 @@ export function ChatComposerFooter({
             <Button
               variant="ghost"
               size="icon-sm"
-              className="composer-context"
+              className="composer-context ml-auto size-7!"
               aria-label="Context usage"
               title="Context usage"
             >
-              <span className="context-ring" />
+              <span className="context-ring size-3.5 rounded-full border-2 border-border border-t-muted-foreground" />
             </Button>
           }
         />
-        <PopoverContent side="top" align="end" density="compact" className="context-popover">
-          <div className="context-header">
+        <PopoverContent side="top" align="end" density="compact" className="context-popover gap-0">
+          <div className="context-header flex items-center justify-between gap-3">
             <PopoverTitle>Context</PopoverTitle>
-            <span className="context-value">Unavailable</span>
+            <span className="context-value text-muted-foreground tabular-nums">Unavailable</span>
           </div>
           <PopoverDescription className="sr-only">
             Token usage and compaction controls are not connected yet.
           </PopoverDescription>
-          <div className="context-meter" aria-hidden="true" />
+          <div
+            className="context-meter mt-3 mb-2.5 h-1.5 rounded-full bg-border"
+            aria-hidden="true"
+          />
           <dl className="context-breakdown">
             {[
               { label: "System prompt", color: "#808080" },
@@ -375,24 +385,34 @@ export function ChatComposerFooter({
               { label: "Environment", color: "#0099ff" },
               { label: "Conversation", color: "var(--action)" },
             ].map(({ label, color }) => (
-              <div key={label} className="context-row">
+              <div
+                key={label}
+                className="context-row flex min-h-[22px] items-center justify-between gap-3 [&_dt]:flex [&_dt]:items-center [&_dt]:gap-2"
+              >
                 <dt>
                   <span
-                    className="context-swatch"
+                    className="context-swatch size-2 shrink-0 rounded-[3px]"
                     style={{ backgroundColor: color }}
                     aria-hidden="true"
                   />
                   {label}
                 </dt>
-                <dd className="context-value" aria-label="Unavailable">
+                <dd
+                  className="context-value text-muted-foreground tabular-nums"
+                  aria-label="Unavailable"
+                >
                   —
                 </dd>
               </div>
             ))}
           </dl>
-          <Button variant="outline" className="context-compaction" disabled>
+          <Button
+            variant="outline"
+            className="context-compaction mt-3 h-7 w-full justify-between px-2 text-[length:inherit] font-normal disabled:opacity-100"
+            disabled
+          >
             <span>Compact at</span>
-            <span className="context-value">— / —</span>
+            <span className="context-value text-muted-foreground tabular-nums">— / —</span>
           </Button>
         </PopoverContent>
       </Popover>
@@ -403,13 +423,13 @@ export function ChatComposerFooter({
 export function ChatReviewStrip({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="composer-review">
-      <div className="composer-accessories">
+    <div className="composer-review flex flex-col items-center gap-1.5 pb-1.5">
+      <div className="composer-accessories flex min-h-7 items-center justify-center gap-1.5">
         {children}
         <Button
           variant="secondary"
           size="sm"
-          className="composer-accessory"
+          className="composer-accessory h-7 gap-1.5 border border-border px-2.5 text-xs [&_svg]:size-[13px]!"
           aria-label="Pull requests and terminals"
           aria-expanded={open}
           aria-controls="chat-review-details"
@@ -425,7 +445,10 @@ export function ChatReviewStrip({ children }: { children: ReactNode }) {
         </Button>
       </div>
       {open && (
-        <div id="chat-review-details" className="composer-review-details">
+        <div
+          id="chat-review-details"
+          className="composer-review-details w-full rounded-[10px] bg-muted px-4 py-3 text-[13px] text-muted-foreground"
+        >
           <div className="flex items-center gap-2">
             <GitPullRequestIcon className="size-4" />
             <span>Pull request details unavailable</span>

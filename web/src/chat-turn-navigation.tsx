@@ -49,7 +49,10 @@ export function ChatTurnNavigation({ rows }: { rows: TranscriptRow[] }) {
   const visible = new Set(visibleMessageIds);
   if (turns.length < 2) return null;
   return (
-    <nav aria-label="Conversation turns" className="chat-turn-navigation">
+    <nav
+      aria-label="Conversation turns"
+      className="chat-turn-navigation absolute start-2 top-1/2 flex max-h-[60%] -translate-y-1/2 [scrollbar-width:none] flex-col overflow-y-auto p-0.5 max-[560px]:px-0"
+    >
       {turns.map((turn, index) => (
         <HoverCard
           key={turn.id}
@@ -66,7 +69,7 @@ export function ChatTurnNavigation({ rows }: { rows: TranscriptRow[] }) {
             render={
               <button
                 type="button"
-                className="chat-turn-marker"
+                className="chat-turn-marker group/turn flex min-h-2.5 w-7 cursor-pointer items-center rounded-[3px] p-1 focus-visible:outline-1 focus-visible:outline-ring max-[560px]:w-6 max-[560px]:px-0.5"
                 aria-label={`Turn ${index + 1}: ${turn.prompt}`}
                 data-visible={turn.rowIDs.some((id) => visible.has(id)) || undefined}
                 onFocus={() => {
@@ -84,7 +87,7 @@ export function ChatTurnNavigation({ rows }: { rows: TranscriptRow[] }) {
                   });
                 }}
               >
-                <span />
+                <span className="h-0.5 w-2 rounded-[2px] bg-muted-foreground opacity-50 transition-[width,opacity] duration-100 group-hover/turn:w-5 group-hover/turn:opacity-100 group-focus-visible/turn:w-5 group-focus-visible/turn:opacity-100 group-data-[visible]/turn:opacity-85" />
               </button>
             }
           />
@@ -92,11 +95,11 @@ export function ChatTurnNavigation({ rows }: { rows: TranscriptRow[] }) {
             side="right"
             sideOffset={8}
             density="compact"
-            className="chat-turn-preview florets-menu-surface"
+            className="chat-turn-preview florets-menu-surface w-[300px]! max-w-[calc(100vw-60px)]! p-2.5! leading-[18px]! wrap-anywhere"
           >
             <p className="truncate">{turn.prompt}</p>
             {turn.reply && (
-              <div className="chat-turn-reply mt-1 line-clamp-3 text-muted-foreground">
+              <div className="chat-turn-reply mt-1 line-clamp-3 max-h-[54px] overflow-hidden text-muted-foreground [&_p]:m-0 [&_p]:line-clamp-3">
                 <Suspense fallback={turn.reply}>
                   <Markdown>{turn.reply}</Markdown>
                 </Suspense>

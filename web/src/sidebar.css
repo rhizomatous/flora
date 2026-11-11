@@ -6,12 +6,6 @@
   padding: 8px;
   gap: 8px;
 }
-.sidebar-brand-row {
-  display: flex;
-  align-items: center;
-  height: var(--topbar-height);
-  padding: 0 8px;
-}
 .sidebar-brand-row button {
   color: var(--muted-foreground);
 }
@@ -19,17 +13,6 @@
   --scroll-fade-size: 32px;
   --scroll-fade-reveal: 32px;
   gap: 0;
-}
-.sidebar-chats {
-  padding: 16px 8px;
-}
-.sidebar-section-heading {
-  display: flex;
-  align-items: center;
-  min-height: 32px;
-  padding-inline: 8px 0;
-  color: var(--subtle-foreground);
-  font-size: 12px;
 }
 .sidebar-section-heading button,
 .sidebar-brand-row button {
@@ -40,13 +23,6 @@
   width: 14px;
   height: 14px;
 }
-.sidebar-search {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  flex: 1;
-  gap: 6px;
-}
 .sidebar-search input {
   width: 100%;
   min-width: 0;
@@ -54,20 +30,6 @@
   background: transparent;
   font-size: 13px;
   color: var(--foreground);
-}
-.sidebar-chat-preview {
-  width: 320px;
-  max-width: calc(100vw - 32px);
-  overflow-wrap: anywhere;
-}
-.sidebar-empty {
-  padding: 6px 16px;
-  color: var(--muted-foreground);
-  font-size: 12px;
-}
-.sidebar-account {
-  border-top: 1px solid var(--border);
-  padding: 8px;
 }
 .sidebar-account [data-slot="sidebar-menu-button"] {
   height: 44px;

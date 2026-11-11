@@ -89,7 +89,7 @@ function ChatRow({
           side="right"
           align="start"
           density="compact"
-          className="sidebar-chat-preview florets-menu-surface"
+          className="sidebar-chat-preview florets-menu-surface w-80! max-w-[calc(100vw-32px)]! wrap-anywhere"
         >
           <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
             <span className="truncate">{chat.ID}</span>
@@ -204,10 +204,10 @@ export function SidebarChats({
     }))
     .filter(({ rows }) => !filter || rows.length > 0);
   return (
-    <section aria-label="Chats" className="sidebar-chats">
-      <div className="sidebar-section-heading">
+    <section aria-label="Chats" className="sidebar-chats px-2 py-4">
+      <div className="sidebar-section-heading flex min-h-8 items-center ps-2 pe-0 text-xs text-subtle-foreground">
         {searching ? (
-          <div className="sidebar-search">
+          <div className="sidebar-search flex min-w-0 flex-1 items-center gap-1.5">
             <SearchIcon />
             <input
               aria-label="Search chats"
@@ -300,7 +300,7 @@ export function SidebarChats({
         </DropdownMenu>
       </div>
       {chats === undefined && (
-        <p className="sidebar-empty" role="status">
+        <p className="sidebar-empty px-4 py-1.5 text-xs text-muted-foreground" role="status">
           Loading chats…
         </p>
       )}
@@ -349,7 +349,7 @@ export function SidebarChats({
                 {chats !== undefined && rows.length === 0 && (
                   <li>
                     <a
-                      className="sidebar-empty block"
+                      className="sidebar-empty block px-4 py-1.5 text-xs text-muted-foreground"
                       href={`#chats/new?project=${encodeURIComponent(project.id)}`}
                       onClick={close}
                     >
@@ -363,7 +363,7 @@ export function SidebarChats({
         );
       })}
       {filter && groups.length === 0 && (
-        <p className="sidebar-empty" role="status">
+        <p className="sidebar-empty px-4 py-1.5 text-xs text-muted-foreground" role="status">
           No chats found.
         </p>
       )}
