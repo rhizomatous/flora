@@ -14,7 +14,7 @@ test("turn navigation previews replies and jumps without losing the draft", asyn
   const preview = page.locator(".chat-turn-preview[data-open]");
   await expect(preview).toContainText("Old timestamp-only cursors still work.");
   await first.click();
-  await expect(first).toHaveAttribute("aria-current", "location");
+  await expect(first).toHaveAttribute("data-visible", "true");
   const viewport = page.getByRole("region", { name: "Conversation", exact: true });
   await expect.poll(() => viewport.evaluate((el) => el.scrollTop)).toBeLessThan(60);
   await expect(draft).toHaveValue("Keep my draft");
@@ -22,9 +22,18 @@ test("turn navigation previews replies and jumps without losing the draft", asyn
   await expect(second).toBeFocused();
   await expect(preview).toContainText("Old timestamp-only cursors still work.");
   await second.press("Enter");
-  await expect(second).toHaveAttribute("aria-current", "location");
+  await expect(second).toHaveAttribute("data-visible", "true");
+  await expect(nav.getByRole("button", { name: /^Turn 3:/ })).toHaveAttribute(
+    "data-visible",
+    "true",
+  );
   await second.press("Escape");
   await expect(preview).not.toBeVisible();
+  await draft.focus();
+  await page.mouse.move(700, 30);
+  await expect
+    .poll(() => second.locator("span").evaluate((el) => el.getBoundingClientRect().width))
+    .toBe(8);
   await page.setViewportSize({ width: 390, height: 844 });
   await first.click();
   await expect(preview).toBeVisible();

@@ -492,8 +492,7 @@
     width 100ms,
     opacity 100ms;
 }
-.chat-turn-marker[aria-current] span {
-  width: 14px;
+.chat-turn-marker[data-visible] span {
   opacity: 0.85;
 }
 .chat-turn-marker:hover span,

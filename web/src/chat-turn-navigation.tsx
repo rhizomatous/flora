@@ -17,19 +17,25 @@ const Markdown = lazy(async () => {
 
 /** Each user prompt starts an exchange; work rows stay with its following reply. */
 function exchanges(rows: TranscriptRow[]) {
-  const turns: { id: string; prompt: string; reply: string }[] = [];
+  const turns: { id: string; prompt: string; reply: string; rowIDs: string[] }[] = [];
   for (const row of rows) {
-    if (row.kind !== "message") continue;
+    if (row.kind !== "message") {
+      turns.at(-1)?.rowIDs.push(row.id);
+      continue;
+    }
     const text =
       (row.message.Payload.parts ?? [])
         .filter((part) => part.type === "text")
         .map((part) => part.text ?? "")
         .join("\n") || row.message.Text;
     if (row.message.Role === "user") {
-      turns.push({ id: row.id, prompt: text, reply: "" });
+      turns.push({ id: row.id, prompt: text, reply: "", rowIDs: [row.id] });
     } else {
       const last = turns.at(-1);
-      if (last) last.reply = text;
+      if (last) {
+        last.reply = text;
+        last.rowIDs.push(row.id);
+      }
     }
   }
   return turns;
@@ -37,9 +43,10 @@ function exchanges(rows: TranscriptRow[]) {
 
 export function ChatTurnNavigation({ rows }: { rows: TranscriptRow[] }) {
   const { scrollToMessage } = useMessageScroller();
-  const { currentAnchorId } = useMessageScrollerVisibility();
+  const { visibleMessageIds } = useMessageScrollerVisibility();
   const [preview, setPreview] = useState<string | null>(null);
   const turns = exchanges(rows);
+  const visible = new Set(visibleMessageIds);
   if (turns.length < 2) return null;
   return (
     <nav aria-label="Conversation turns" className="chat-turn-navigation">
@@ -61,7 +68,7 @@ export function ChatTurnNavigation({ rows }: { rows: TranscriptRow[] }) {
                 type="button"
                 className="chat-turn-marker"
                 aria-label={`Turn ${index + 1}: ${turn.prompt}`}
-                aria-current={currentAnchorId === turn.id ? "location" : undefined}
+                data-visible={turn.rowIDs.some((id) => visible.has(id)) || undefined}
                 onFocus={() => {
                   setPreview(turn.id);
                 }}
