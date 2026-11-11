@@ -103,18 +103,7 @@ test("preview serves isolated fixtures and replays saved events with resumable I
       assert.ok(
         typeof review.pulls === "object" && review.pulls !== null && "items" in review.pulls,
       );
-      const project = fixtureProjects.find((p) => p.id === story.projectID);
-      assert.ok(project);
-      const repository = project.configuration.repositories[0];
-      assert.ok(repository);
-      assert.deepEqual(
-        review.pulls.items,
-        story.pulls.map((pull) => ({
-          ...pull,
-          repository: repository.name,
-          url: `${repository.url}/pull/${pull.number}`,
-        })),
-      );
+      assert.deepEqual(review.pulls.items, story.pulls);
       for (const file of story.files) assert.ok(reviewText.includes(file.path));
       await fetch(`${base}/__preview/control?action=restart&chat=${story.id}`, { method: "POST" });
       await fetch(`${base}/__preview/control?action=pause&chat=${story.id}`, { method: "POST" });

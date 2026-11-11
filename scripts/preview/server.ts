@@ -297,14 +297,7 @@ export function chatPreview(): Plugin {
         stale: false,
         error: "",
         pulls: {
-          items:
-            story && finished
-              ? story.pulls.map((pull) => ({
-                  ...pull,
-                  repository: repository.name,
-                  url: `${repository.url}/pull/${pull.number}`,
-                }))
-              : [],
+          items: story && finished ? story.pulls : [],
           error: "",
           checkedAt: epoch,
         },

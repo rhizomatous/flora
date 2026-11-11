@@ -3,8 +3,6 @@ import type { Message, Part } from "@opencode-ai/sdk/v2";
 import type { Pull } from "../../web/src/pull.ts";
 import type { Frame } from "./server.ts";
 
-type FixturePull = Pick<Pull, "number" | "state" | "draft">;
-
 export const projects = [
   {
     id: "preview",
@@ -150,7 +148,15 @@ export const stories = [
     id: "checkout",
     projectID: "garden",
     title: "Keep the cart after signing in",
-    pulls: [{ number: 42, state: "open", draft: true }] satisfies FixturePull[],
+    pulls: [
+      {
+        repository: "example/storefront",
+        url: "https://github.com/example/storefront/pull/42",
+        number: 42,
+        state: "open",
+        draft: true,
+      },
+    ] satisfies Pull[],
     files: [
       {
         path: "src/cart.ts",
@@ -238,9 +244,21 @@ export const stories = [
     projectID: "fieldnotes",
     title: "Fix duplicate notes between pages",
     pulls: [
-      { number: 18, state: "closed", draft: false },
-      { number: 19, state: "open", draft: false },
-    ] satisfies FixturePull[],
+      {
+        repository: "example/fieldnotes",
+        url: "https://github.com/example/fieldnotes/pull/18",
+        number: 18,
+        state: "closed",
+        draft: false,
+      },
+      {
+        repository: "example/fieldnotes",
+        url: "https://github.com/example/fieldnotes/pull/19",
+        number: 19,
+        state: "open",
+        draft: false,
+      },
+    ] satisfies Pull[],
     files: [
       {
         path: "internal/notes/list.go",
@@ -325,7 +343,15 @@ export const stories = [
     id: "focus",
     projectID: "preview",
     title: "Restore focus after removing a repository",
-    pulls: [{ number: 73, state: "merged", draft: false }] satisfies FixturePull[],
+    pulls: [
+      {
+        repository: "example/flora",
+        url: "https://github.com/example/flora/pull/73",
+        number: 73,
+        state: "merged",
+        draft: false,
+      },
+    ] satisfies Pull[],
     files: [
       {
         path: "web/src/projects.tsx",
