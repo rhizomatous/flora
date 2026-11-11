@@ -98,8 +98,23 @@ test("preview serves isolated fixtures and replays saved events with resumable I
       assert.ok((detailText.match(/"Role":"user"/g) ?? []).length >= 3);
       const reviewResponse = await fetch(`${base}/api/chats/${story.id}/changes`);
       const reviewText = await reviewResponse.text();
-      assert.ok(reviewText.includes(`"number":${story.pull.number}`));
-      assert.ok(reviewText.includes(`"state":"${story.pull.state}"`));
+      const review: unknown = JSON.parse(reviewText);
+      assert.ok(typeof review === "object" && review !== null && "pulls" in review);
+      assert.ok(
+        typeof review.pulls === "object" && review.pulls !== null && "items" in review.pulls,
+      );
+      const project = fixtureProjects.find((p) => p.id === story.projectID);
+      assert.ok(project);
+      const repository = project.configuration.repositories[0];
+      assert.ok(repository);
+      assert.deepEqual(
+        review.pulls.items,
+        story.pulls.map((pull) => ({
+          ...pull,
+          repository: repository.name,
+          url: `${repository.url}/pull/${pull.number}`,
+        })),
+      );
       for (const file of story.files) assert.ok(reviewText.includes(file.path));
       await fetch(`${base}/__preview/control?action=restart&chat=${story.id}`, { method: "POST" });
       await fetch(`${base}/__preview/control?action=pause&chat=${story.id}`, { method: "POST" });

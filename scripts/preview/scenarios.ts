@@ -147,7 +147,7 @@ export const stories = [
     id: "checkout",
     projectID: "garden",
     title: "Keep the cart after signing in",
-    pull: { number: 42, state: "open", draft: true },
+    pulls: [{ number: 42, state: "open", draft: true }],
     files: [
       {
         path: "src/cart.ts",
@@ -234,7 +234,10 @@ export const stories = [
     id: "pagination",
     projectID: "fieldnotes",
     title: "Fix duplicate notes between pages",
-    pull: { number: 18, state: "open", draft: false },
+    pulls: [
+      { number: 18, state: "closed", draft: false },
+      { number: 19, state: "open", draft: false },
+    ],
     files: [
       {
         path: "internal/notes/list.go",
@@ -300,13 +303,26 @@ export const stories = [
           },
         ],
       },
+      {
+        user: "The release branch is ready. Close this PR and open a replacement against release.",
+        steps: [
+          check("gh pr close 18", "Closed pull request #18 (Stabilize notes pagination)"),
+          check(
+            "gh pr create --base release --title 'Stabilize notes pagination'",
+            "https://github.com/example/fieldnotes/pull/19",
+          ),
+          {
+            text: "Closed [PR #18](https://github.com/example/fieldnotes/pull/18) without merging and opened [PR #19](https://github.com/example/fieldnotes/pull/19) against release with the same pagination fix and cursor compatibility coverage.",
+          },
+        ],
+      },
     ],
   },
   {
     id: "focus",
     projectID: "preview",
     title: "Restore focus after removing a repository",
-    pull: { number: 73, state: "merged", draft: false },
+    pulls: [{ number: 73, state: "merged", draft: false }],
     files: [
       {
         path: "web/src/projects.tsx",

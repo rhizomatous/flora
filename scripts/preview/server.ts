@@ -299,13 +299,11 @@ export function chatPreview(): Plugin {
         pulls: {
           items:
             story && finished
-              ? [
-                  {
-                    ...story.pull,
-                    repository: repository.name,
-                    url: `${repository.url}/pull/${story.pull.number}`,
-                  },
-                ]
+              ? story.pulls.map((pull) => ({
+                  ...pull,
+                  repository: repository.name,
+                  url: `${repository.url}/pull/${pull.number}`,
+                }))
               : [],
           error: "",
           checkedAt: epoch,
