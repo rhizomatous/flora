@@ -786,7 +786,7 @@
   height: 26px;
   color: var(--muted-foreground);
   transform: translateX(20px);
-  transition: transform 200ms ease-linear;
+  transition: transform 150ms ease-out;
 }
 .sidebar-floating-toggle[data-expanded="true"] {
   transform: translateX(calc(var(--sidebar-width) - 42px));
@@ -795,7 +795,7 @@
   display: block;
   flex-shrink: 0;
   width: 30px;
-  transition: width 200ms ease-linear;
+  transition: width 150ms ease-out;
 }
 [data-slot="sidebar-wrapper"]:has(.sidebar-floating-toggle[data-expanded="true"])
   .sidebar-toggle-space {
@@ -806,6 +806,11 @@
     top: 9px;
     transform: translateX(13px);
   }
+}
+.flora-navigation,
+[data-slot="sidebar-gap"] {
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
   .sidebar-floating-toggle,
