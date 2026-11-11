@@ -35,6 +35,7 @@ const textSizes = {
 const textTones = {
   default: "text-foreground",
   muted: "text-muted-foreground",
+  subtle: "text-subtle-foreground",
   inherit: "text-inherit",
 } as const;
 

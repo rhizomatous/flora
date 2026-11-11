@@ -1,13 +1,6 @@
 @import "@flora/florets/styles.css";
 @source "./";
 
-:root {
-  --app-topbar-height: 44px;
-}
-.app-topbar {
-  height: var(--app-topbar-height);
-}
-
 .chat-composer {
   --composer-surface: #fafafa;
   --composer-border: #dedede;
@@ -25,31 +18,8 @@
   gap: 4px;
   padding: 0 8px 2px 12px;
 }
-.composer-control {
-  height: 28px;
-  padding: 0 8px;
-  gap: 4px;
-  border: 0;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 450;
-  line-height: 16px;
-  box-shadow: none;
-}
-.composer-label {
-  line-height: 16px;
-  /* Center artwork on the capital height; padding leaves room for clipped labels' descenders. */
-  text-box-trim: trim-both;
-  text-box-edge: cap alphabetic;
-  padding-block: 3px;
-}
-.composer-topbar .composer-control {
+.composer-topbar .cn-compact-control {
   padding-inline: 4px;
-}
-.composer-control svg {
-  width: 14px;
-  height: 14px;
-  stroke-width: 1.8;
 }
 .composer-project {
   flex: 0 1 auto;
@@ -96,10 +66,6 @@
   gap: 4px;
   padding: 0 8px 6px;
   flex-wrap: wrap;
-}
-.composer-icon {
-  width: 28px;
-  padding: 0;
 }
 .composer-model-mark {
   flex-shrink: 0;
@@ -193,25 +159,25 @@
     gap: 2px;
     padding: 0 6px 6px;
   }
-  .composer-bottom-bar .composer-control {
+  .composer-bottom-bar .cn-compact-control {
     padding-inline: 5px;
     gap: 4px;
   }
-  .composer-bottom-bar .composer-icon {
+  .composer-bottom-bar .cn-compact-icon {
     width: 28px;
     padding: 0;
   }
 }
 @container (max-width: 360px) {
-  .composer-bottom-bar .composer-control {
+  .composer-bottom-bar .cn-compact-control {
     padding-inline: 3px;
     gap: 3px;
   }
-  .composer-bottom-bar > .composer-control:nth-child(3) {
+  .composer-bottom-bar > .cn-compact-control:nth-child(3) {
     flex-shrink: 1;
     min-width: 0;
   }
-  .composer-bottom-bar > .composer-control:nth-child(3) .composer-label {
+  .composer-bottom-bar > .cn-compact-control:nth-child(3) .cn-control-label {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -231,7 +197,7 @@
   min-width: 0;
   flex-shrink: 1;
 }
-.follow-up-composer .composer-bottom-bar > [aria-label="Model"] .composer-label {
+.follow-up-composer .composer-bottom-bar > [aria-label="Model"] .cn-control-label {
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -264,12 +230,7 @@
   border-radius: 50%;
 }
 .context-popover {
-  width: 288px;
-  max-width: calc(100vw - 24px);
-  padding: 12px;
   gap: 0;
-  font-size: 13px;
-  line-height: 20px;
 }
 .context-header,
 .context-row {
@@ -429,11 +390,6 @@
 }
 
 .chat-title-card {
-  width: 288px;
-  max-width: calc(100vw - 24px);
-  padding: 12px;
-  font-size: 13px;
-  line-height: 20px;
   font-weight: 400;
 }
 .chat-summary-meta,
@@ -514,7 +470,6 @@
   width: 300px;
   max-width: calc(100vw - 60px);
   padding: 10px;
-  font-size: 13px;
   line-height: 18px;
   overflow-wrap: anywhere;
 }
@@ -548,7 +503,6 @@
 }
 
 .flora-sidebar {
-  --sidebar-label-foreground: var(--muted-foreground);
   --sidebar-accent: var(--secondary);
   font-size: 13px;
 }
@@ -559,34 +513,11 @@
 .sidebar-brand-row {
   display: flex;
   align-items: center;
-  height: var(--app-topbar-height);
+  height: var(--topbar-height);
   padding: 0 8px;
 }
 .sidebar-brand-row button {
   color: var(--muted-foreground);
-}
-.flora-sidebar [data-slot="sidebar-menu"] {
-  gap: 0;
-}
-.flora-sidebar [data-slot="sidebar-menu-button"] {
-  height: 29px;
-  gap: 9px;
-  padding-inline: 8px;
-  font-size: 13px;
-  color: var(--muted-foreground);
-  border-radius: 6px;
-}
-.flora-sidebar
-  [data-slot="sidebar-menu-button"]:not(:disabled):is(:hover, :focus-visible, [data-active]) {
-  color: var(--foreground);
-  font-weight: 450;
-}
-.flora-sidebar [data-slot="sidebar-menu-button"]:disabled {
-  opacity: 0.65;
-}
-.flora-sidebar [data-slot="sidebar-menu-button"] svg {
-  width: 13px;
-  height: 13px;
 }
 .flora-sidebar [data-slot="sidebar-content"] {
   --scroll-fade-size: 32px;
@@ -601,7 +532,7 @@
   align-items: center;
   min-height: 32px;
   padding-inline: 8px 0;
-  color: var(--sidebar-label-foreground);
+  color: var(--subtle-foreground);
   font-size: 12px;
 }
 .sidebar-section-heading button,
@@ -628,123 +559,9 @@
   font-size: 13px;
   color: var(--foreground);
 }
-.sidebar-project {
-  margin-bottom: 0;
-}
-.sidebar-project[data-expanded="true"] {
-  margin-bottom: 10px;
-}
-.sidebar-project-heading {
-  display: flex;
-  align-items: center;
-  min-height: 28px;
-  color: var(--sidebar-label-foreground);
-  padding-inline: 8px;
-  gap: 4px;
-}
-.sidebar-project-heading > button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 20px;
-  height: 24px;
-  cursor: pointer;
-}
-.sidebar-project-heading > button svg {
-  width: 10px;
-  height: 10px;
-}
-.sidebar-project-heading a {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: 9px;
-}
-.sidebar-project-heading a:hover {
-  color: var(--foreground);
-}
-.sidebar-project-heading a svg {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-}
-.sidebar-project-count {
-  opacity: 0.65;
-  margin-left: -4px;
-}
-.sidebar-chat-row {
-  position: relative;
-  border-radius: 6px;
-}
-.sidebar-chat-row:hover,
-.sidebar-chat-row:focus-within,
-.sidebar-chat-row[data-active] {
-  background: var(--secondary);
-}
-.sidebar-chat-link {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  padding: 7px 8px;
-  color: var(--muted-foreground);
-  border-radius: 6px;
-}
-.sidebar-chat-row[data-active] .sidebar-chat-link,
-.sidebar-chat-row:hover .sidebar-chat-link,
-.sidebar-chat-row:focus-within .sidebar-chat-link {
-  color: var(--foreground);
-}
-.sidebar-chat-icon {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-.sidebar-chat-title {
-  display: block;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  line-height: 18px;
-  font-size: 13px;
-}
-.sidebar-chat-meta {
-  display: block;
-  font-size: 11px;
-  line-height: 17px;
-  color: var(--muted-foreground);
-}
-.sidebar-chat-age {
-  flex-shrink: 0;
-  font-size: 11px;
-  line-height: 18px;
-}
-.sidebar-chat-actions {
-  display: none;
-  position: absolute;
-  right: 4px;
-  top: 3px;
-  background: var(--secondary);
-  border-radius: 4px;
-}
-.sidebar-chat-row:hover .sidebar-chat-actions,
-.sidebar-chat-row:focus-within .sidebar-chat-actions {
-  display: flex;
-}
-.sidebar-chat-actions button {
-  width: 23px;
-  height: 23px;
-}
-.sidebar-chat-actions svg {
-  width: 13px;
-  height: 13px;
-}
 .sidebar-chat-preview {
   width: 320px;
   max-width: calc(100vw - 32px);
-  padding: 12px;
-  font-size: 13px;
   overflow-wrap: anywhere;
 }
 .sidebar-empty {
@@ -761,20 +578,10 @@
   gap: 8px;
   font-size: 13px;
 }
-.sidebar-project-heading button:focus-visible,
-.sidebar-chat-link:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: -2px;
-}
-
 @media (max-width: 767px) {
   .flora-sidebar [data-slot="sidebar-header"] {
     padding-top: 0;
   }
-}
-
-.dark .flora-sidebar {
-  --sidebar-label-foreground: color-mix(in srgb, var(--muted-foreground) 80%, var(--sidebar));
 }
 
 .sidebar-floating-toggle {
@@ -786,7 +593,7 @@
   height: 26px;
   color: var(--muted-foreground);
   transform: translateX(20px);
-  transition: transform 150ms ease-out;
+  transition: transform var(--sidebar-motion-duration) var(--sidebar-motion-easing);
 }
 .sidebar-floating-toggle[data-expanded="true"] {
   transform: translateX(calc(var(--sidebar-width) - 42px));
@@ -795,7 +602,7 @@
   display: block;
   flex-shrink: 0;
   width: 30px;
-  transition: width 150ms ease-out;
+  transition: width var(--sidebar-motion-duration) var(--sidebar-motion-easing);
 }
 [data-slot="sidebar-wrapper"]:has(.sidebar-floating-toggle[data-expanded="true"])
   .sidebar-toggle-space {
@@ -807,26 +614,13 @@
     transform: translateX(13px);
   }
 }
-.flora-navigation,
-[data-slot="sidebar-gap"] {
-  transition-duration: 150ms;
-  transition-timing-function: ease-out;
-}
 @media (prefers-reduced-motion: reduce) {
   .sidebar-floating-toggle,
   .sidebar-toggle-space {
     transition: none;
   }
-  .flora-navigation,
-  [data-slot="sidebar-gap"] {
-    transition: none;
-  }
 }
 
-.sidebar-floating-toggle[aria-expanded="true"]:not(:hover):not(:focus-visible) {
-  background: transparent;
-  color: var(--muted-foreground);
-}
 .sidebar-floating-toggle:focus-visible {
   background: var(--control-hover);
   color: var(--foreground);

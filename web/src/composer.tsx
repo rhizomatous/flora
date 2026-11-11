@@ -49,7 +49,7 @@ export function PlaceholderMenu({
           <TriggerButton
             type="button"
             variant={variant}
-            className={`composer-control ${iconOnly ? "composer-icon" : ""}`}
+            size={iconOnly ? "icon-compact" : "compact"}
             aria-label={label}
           >
             {children}
@@ -62,9 +62,11 @@ export function PlaceholderMenu({
             {item.separator === true && <DropdownMenuSeparator />}
             <DropdownMenuItem disabled>
               {item.icon}
-              <span className="composer-label">{item.label}</span>
+              <span className="cn-control-label">{item.label}</span>
               {item.detail !== undefined && (
-                <span className="composer-label ml-auto text-muted-foreground">{item.detail}</span>
+                <span className="cn-control-label ml-auto text-muted-foreground">
+                  {item.detail}
+                </span>
               )}
             </DropdownMenuItem>
           </div>
@@ -189,10 +191,10 @@ export function Composer({
           <span className="composer-model-mark">
             <FlowerIcon />
           </span>
-          <span className="composer-label">Default model</span>
+          <span className="cn-control-label">Default model</span>
         </PlaceholderMenu>
         <PlaceholderMenu label="Reasoning effort" items={[{ label: "Default reasoning effort" }]}>
-          <span className="composer-label">Default</span>
+          <span className="cn-control-label">Default</span>
         </PlaceholderMenu>
         {action}
       </InputGroupAddon>

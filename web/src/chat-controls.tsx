@@ -94,7 +94,8 @@ export function ChatTitle({ title, chat }: { title: string; chat: Chat | undefin
         render={
           <Button
             variant="secondary"
-            className="composer-control chat-title"
+            size="compact"
+            className="chat-title"
             aria-label={title}
             onClick={() => {
               setOpen(true);
@@ -106,13 +107,14 @@ export function ChatTitle({ title, chat }: { title: string; chat: Chat | undefin
             }}
           >
             <CloudIcon />
-            <span className="composer-label truncate">{title}</span>
+            <span className="cn-control-label truncate">{title}</span>
           </Button>
         }
       />
       <HoverCardContent
         align="start"
         alignOffset={0}
+        density="compact"
         className="chat-title-card cn-menu-surface"
         aria-label="Chat summary"
       >
@@ -185,7 +187,7 @@ export function ChatHeaderActions() {
       <span className="ml-auto" />
       <Button
         variant="ghost"
-        className="composer-control"
+        size="compact"
         aria-disabled="true"
         title="Cost tracking is not available yet"
       >
@@ -295,11 +297,12 @@ export function ChatComposerFooter({
           render={
             <DropdownButton
               variant="tertiary"
-              className="composer-control composer-up"
+              size="compact"
+              className="composer-up"
               aria-label="Chat actions"
             >
               <CloudIcon />
-              <span className="composer-label">Cloud</span>
+              <span className="cn-control-label">Cloud</span>
               <span className="runtime-dot" />
             </DropdownButton>
           }
@@ -354,7 +357,7 @@ export function ChatComposerFooter({
             </Button>
           }
         />
-        <PopoverContent side="top" align="end" className="context-popover">
+        <PopoverContent side="top" align="end" density="compact" className="context-popover">
           <div className="context-header">
             <PopoverTitle>Context</PopoverTitle>
             <span className="context-value">Unavailable</span>
