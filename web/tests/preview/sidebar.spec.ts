@@ -66,3 +66,20 @@ test("sidebar and page topbars share vertical alignment", async ({ page }) => {
   if (!header || !brand) throw new Error("Missing mobile topbar");
   expect(brand.y + brand.height / 2).toBe(header.y + header.height / 2);
 });
+
+test("selected sidebar links retain the hover foreground", async ({ page }) => {
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  await page.goto(`${base}/#chats/new`);
+  const nav = page.getByRole("navigation", { name: "Main", exact: true });
+  const selected = nav.getByRole("link", { name: "New chat", exact: true });
+  const other = nav.getByRole("link", { name: "All chats", exact: true });
+  await expect(selected).toHaveAttribute("aria-current", "page");
+  const resting = await selected.evaluate((node) => getComputedStyle(node).color);
+  expect(resting).not.toBe(await other.evaluate((node) => getComputedStyle(node).color));
+  await selected.hover();
+  await expect(selected).toHaveCSS("color", resting);
+  await other.click();
+  await expect(other).toHaveAttribute("aria-current", "page");
+  await page.mouse.move(700, 100);
+  await expect(other).toHaveCSS("color", resting);
+});

@@ -577,11 +577,7 @@
   border-radius: 6px;
 }
 .flora-sidebar
-  [data-slot="sidebar-menu-button"]:not(:disabled):is(
-    :hover,
-    :focus-visible,
-    [data-active="true"]
-  ) {
+  [data-slot="sidebar-menu-button"]:not(:disabled):is(:hover, :focus-visible, [data-active]) {
   color: var(--foreground);
   font-weight: 450;
 }
