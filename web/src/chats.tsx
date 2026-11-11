@@ -34,7 +34,13 @@ import {
   ItemDescription,
 } from "@flora/florets";
 
-import { ChatTitle, ChatHeaderActions, ChatComposerFooter, ChatReviewStrip } from "./chat-controls";
+import {
+  ChatTurnNavigation,
+  ChatTitle,
+  ChatHeaderActions,
+  ChatComposerFooter,
+  ChatReviewStrip,
+} from "./chat-controls";
 import { Composer } from "./composer";
 import { NewChatComposer } from "./new-chat-composer";
 import type { Chat } from "./notifications";
@@ -528,7 +534,7 @@ function ChatDetail({
 
   return (
     <MessageScrollerProvider autoScroll>
-      <MessageScroller className="flex-1">
+      <MessageScroller className="-mx-4 w-auto flex-1 sm:-mx-8">
         <MessageScrollerViewport aria-label="Conversation" className="chat-transcript-viewport">
           <MessageScrollerContent className="mx-auto w-full max-w-[900px] gap-6 px-4 py-6">
             {disconnected && <Alert role="status">Disconnected. Reconnecting…</Alert>}
@@ -562,6 +568,7 @@ function ChatDetail({
               chat.StatusReason !== "" && <Text role="status">{chat.StatusReason}</Text>}
           </MessageScrollerContent>
         </MessageScrollerViewport>
+        <ChatTurnNavigation rows={rows} />
       </MessageScroller>
       <div className="chat-composer-dock mx-auto max-h-[70dvh] w-full max-w-[900px] shrink-0 overflow-y-auto pt-2 pb-[env(safe-area-inset-bottom)]">
         <div className="chat-pending-questions max-h-[50dvh] overflow-y-auto empty:hidden [&_form]:mt-0 [&_form]:mb-3">
