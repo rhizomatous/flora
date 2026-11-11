@@ -232,7 +232,7 @@ function App() {
       )}
       <Content id="main-content" tabIndex={-1} className={ready ? frameLayout : undefined}>
         {ready && !conversation && (
-          <header className="flex h-14 shrink-0 items-center border-b px-4">
+          <header className="app-topbar flex shrink-0 items-center border-b px-3">
             <SidebarTrigger aria-label="Menu" />
           </header>
         )}

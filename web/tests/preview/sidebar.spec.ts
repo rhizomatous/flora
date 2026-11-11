@@ -48,3 +48,21 @@ test("sidebar searches, collapses projects, and preserves navigation on narrow s
     .poll(() => heading.evaluate((node) => node.contains(document.activeElement)))
     .toBe(true);
 });
+
+test("sidebar and page topbars share vertical alignment", async ({ page }) => {
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  for (const route of ["chats/pagination", "settings"]) {
+    await page.goto(`${base}/#${route}`);
+    const header = await page.locator(".app-topbar").boundingBox();
+    const brand = await page.locator(".sidebar-brand-row").boundingBox();
+    if (!header || !brand) throw new Error("Missing topbar");
+    expect(header.height).toBe(44);
+    expect(brand.y + brand.height / 2).toBe(header.y + header.height / 2);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  const header = await page.locator(".app-topbar").boundingBox();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  const brand = await page.locator(".sidebar-brand-row").boundingBox();
+  if (!header || !brand) throw new Error("Missing mobile topbar");
+  expect(brand.y + brand.height / 2).toBe(header.y + header.height / 2);
+});

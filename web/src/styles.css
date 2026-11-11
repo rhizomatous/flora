@@ -1,6 +1,13 @@
 @import "@flora/florets/styles.css";
 @source "./";
 
+:root {
+  --app-topbar-height: 44px;
+}
+.app-topbar {
+  height: var(--app-topbar-height);
+}
+
 .chat-composer {
   --composer-surface: #fafafa;
   --composer-border: #dedede;
@@ -551,7 +558,8 @@
 .sidebar-brand-row {
   display: flex;
   align-items: center;
-  padding: 8px 8px 10px;
+  height: var(--app-topbar-height);
+  padding: 0 8px;
 }
 .sidebar-brand-row button {
   color: var(--muted-foreground);
@@ -761,4 +769,10 @@
 .sidebar-chat-link:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: -2px;
+}
+
+@media (max-width: 767px) {
+  .flora-sidebar [data-slot="sidebar-header"] {
+    padding-top: 0;
+  }
 }

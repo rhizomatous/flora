@@ -351,7 +351,7 @@ export function Chats({
 
   const existingChat = !isNew && id !== "";
   const headerLayout = existingChat
-    ? "chat-header -mx-4 flex h-11 shrink-0 items-center gap-1 border-b px-3 sm:-mx-8"
+    ? "app-topbar chat-header -mx-4 flex shrink-0 items-center gap-1 border-b px-3 sm:-mx-8"
     : "mx-auto flex w-full max-w-[880px] shrink-0 items-center justify-between gap-4 pb-3";
   const chatLayout = id === "" ? "mx-auto max-w-4xl min-w-0" : "flex min-h-0 flex-1 flex-col";
 
