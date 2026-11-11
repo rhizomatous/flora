@@ -548,6 +548,7 @@
 }
 
 .flora-sidebar {
+  --sidebar-label-foreground: var(--muted-foreground);
   --sidebar-accent: var(--secondary);
   font-size: 13px;
 }
@@ -602,7 +603,7 @@
   align-items: center;
   min-height: 32px;
   padding-inline: 8px 0;
-  color: var(--muted-foreground);
+  color: var(--sidebar-label-foreground);
   font-size: 12px;
 }
 .sidebar-section-heading button,
@@ -636,7 +637,7 @@
   display: flex;
   align-items: center;
   min-height: 28px;
-  color: var(--muted-foreground);
+  color: var(--sidebar-label-foreground);
   gap: 2px;
 }
 .sidebar-project-heading > button {
@@ -764,4 +765,8 @@
   .flora-sidebar [data-slot="sidebar-header"] {
     padding-top: 0;
   }
+}
+
+.dark .flora-sidebar {
+  --sidebar-label-foreground: color-mix(in srgb, var(--muted-foreground) 80%, var(--sidebar));
 }
