@@ -64,7 +64,7 @@ export function NewChatComposer({
                 type="button"
                 variant="tertiary"
                 size="compact"
-                className="composer-project"
+                className="composer-project max-w-[180px] min-w-0 flex-[0_1_auto] justify-start!"
                 disabled={busy}
                 aria-label={`Project: ${selectedProject?.name ?? ""}`}
               >
@@ -75,11 +75,11 @@ export function NewChatComposer({
           />
           <PopoverContent
             align="start"
-            className="composer-menu composer-project-menu"
+            className="composer-menu composer-project-menu w-[260px]! max-w-[calc(100vw-24px)] gap-0 overflow-hidden p-0!"
             aria-label="Choose project"
           >
             <input
-              className="composer-search"
+              className="composer-search w-full border-b border-(--menu-border) bg-transparent px-3 py-2.5 text-[13px] outline-none"
               aria-label="Search projects"
               placeholder="Search projects"
               value={search}
@@ -87,7 +87,7 @@ export function NewChatComposer({
                 setSearch(event.target.value);
               }}
             />
-            <div className="composer-project-list">
+            <div className="composer-project-list max-h-60 overflow-y-auto p-1.5">
               {filtered.map((project) => (
                 <button
                   type="button"
@@ -105,9 +105,13 @@ export function NewChatComposer({
                   {selectedProject?.id === project.id && <CheckIcon className="ml-auto" />}
                 </button>
               ))}
-              {filtered.length === 0 && <p className="composer-menu-note">No projects found.</p>}
+              {filtered.length === 0 && (
+                <p className="composer-menu-note px-2.5 py-1.5 text-xs leading-normal text-muted-foreground">
+                  No projects found.
+                </p>
+              )}
             </div>
-            <div className="composer-project-links">
+            <div className="composer-project-links border-t border-(--menu-border) p-1.5">
               <a href="#projects/new">
                 <PlusIcon />
                 <span className="florets-control-label">New project</span>
@@ -140,7 +144,7 @@ export function NewChatComposer({
           <DatabaseIcon />
           <span className="florets-control-label">Setup</span>
         </Button>
-        <div className="composer-branch">
+        <div className="composer-branch ml-auto shrink-0">
           <PlaceholderMenu
             variant="tertiary"
             label="Base branch"

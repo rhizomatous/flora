@@ -1,0 +1,25 @@
+.chat-transcript-viewport {
+  --scroll-fade-size: 28px;
+  --scroll-fade-reveal: 28px;
+}
+/* Let text reach the input edge behind the floating accessory row. */
+.chat-composer-dock {
+  position: relative;
+  pointer-events: none;
+}
+.chat-composer-dock:has(> .chat-pending-questions:empty) {
+  margin-top: -42px;
+}
+.chat-composer-dock > * {
+  pointer-events: auto;
+}
+.chat-composer-dock .follow-up-composer,
+.chat-pending-questions {
+  background: var(--background);
+}
+
+@media (max-width: 1100px) {
+  .chat-transcript-viewport > [data-slot="message-scroller-content"] {
+    padding-inline-start: 32px;
+  }
+}

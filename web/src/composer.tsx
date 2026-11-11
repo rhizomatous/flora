@@ -56,7 +56,11 @@ export function PlaceholderMenu({
           </TriggerButton>
         }
       />
-      <DropdownMenuContent className="composer-menu" align="start" side={side}>
+      <DropdownMenuContent
+        className="composer-menu w-[260px]! max-w-[calc(100vw-24px)]"
+        align="start"
+        side={side}
+      >
         {items.map((item) => (
           <div key={item.label}>
             {item.separator === true && <DropdownMenuSeparator />}
@@ -104,7 +108,7 @@ export function Composer({
       <Button
         variant="primary"
         size="icon-sm"
-        className="composer-send"
+        className="composer-send ml-auto size-7! rounded-lg! p-0! [&_svg]:size-[15px]!"
         type="button"
         disabled={disabled}
         onClick={onInterrupt}
@@ -119,7 +123,7 @@ export function Composer({
       <Button
         variant="primary"
         size="icon-sm"
-        className="composer-send"
+        className="composer-send ml-auto size-7! rounded-lg! p-0! [&_svg]:size-[15px]!"
         type="submit"
         disabled={!canSend}
         aria-label={sendLabel}
@@ -133,7 +137,7 @@ export function Composer({
       <Button
         variant="primary"
         size="icon-sm"
-        className="composer-send"
+        className="composer-send ml-auto size-7! rounded-lg! p-0! [&_svg]:size-[15px]!"
         type="button"
         aria-label="Voice input (coming soon)"
         title="Voice input (coming soon)"
@@ -188,7 +192,7 @@ export function Composer({
           label="Model"
           items={[{ label: "Server default model", icon: <FlowerIcon /> }]}
         >
-          <span className="composer-model-mark">
+          <span className="composer-model-mark grid size-4 shrink-0 place-items-center rounded-[7px] bg-action text-action-foreground [&_svg]:size-3.5">
             <FlowerIcon />
           </span>
           <span className="florets-control-label">Default model</span>

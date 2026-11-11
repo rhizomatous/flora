@@ -1,0 +1,139 @@
+.chat-composer {
+  --composer-surface: #fafafa;
+  --composer-border: #dedede;
+  width: 100%;
+  container-type: inline-size;
+}
+.dark .chat-composer {
+  --composer-surface: #161616;
+  --composer-border: #333;
+}
+.composer-topbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding: 0 8px 2px 12px;
+}
+.composer-topbar .florets-compact-control {
+  padding-inline: 4px;
+}
+.composer-box {
+  border: 1px solid var(--composer-border);
+  border-radius: 9px;
+  background: var(--composer-surface);
+  box-shadow: 0 12px 24px #00000012;
+}
+.dark .composer-box {
+  background: var(--composer-surface);
+}
+.composer-box:has(textarea:focus-visible) {
+  border-color: var(--composer-border);
+  box-shadow: 0 12px 24px #00000012;
+}
+.composer-textarea {
+  min-height: 80px;
+  max-height: 320px;
+  padding: 15px 15px 9px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.composer-textarea:focus-visible,
+.composer-search:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.composer-textarea::placeholder {
+  color: #777;
+}
+.dark .composer-textarea::placeholder {
+  color: #646464;
+}
+.composer-bottom-bar {
+  gap: 4px;
+  padding: 0 8px 6px;
+  flex-wrap: wrap;
+}
+.composer-project-option,
+.composer-project-links a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  text-align: left;
+}
+.composer-project-option:hover,
+.composer-project-links a:hover {
+  background: var(--control-hover);
+}
+.composer-project-menu svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+/* Adapt to the space beside the sidebar as well as narrow browser windows. */
+@container (max-width: 560px) {
+  .composer-topbar {
+    padding-left: 10px;
+  }
+  .composer-textarea {
+    padding: 14px;
+    font-size: 16px;
+    min-height: 106px;
+  }
+  .composer-bottom-bar {
+    flex-wrap: nowrap;
+    gap: 2px;
+    padding: 0 6px 6px;
+  }
+  .composer-bottom-bar .florets-compact-control {
+    padding-inline: 5px;
+    gap: 4px;
+  }
+  .composer-bottom-bar .florets-compact-icon {
+    width: 28px;
+    padding: 0;
+  }
+}
+@container (max-width: 360px) {
+  .composer-bottom-bar .florets-compact-control {
+    padding-inline: 3px;
+    gap: 3px;
+  }
+  .composer-bottom-bar > .florets-compact-control:nth-child(3) {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+  .composer-bottom-bar > .florets-compact-control:nth-child(3) .florets-control-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Chat reuses the start-screen controls in a shorter input with a wider reading column. */
+.follow-up-composer .composer-textarea {
+  min-height: 38px;
+  max-height: 25dvh;
+  padding: 12px 15px 4px;
+}
+.follow-up-composer .composer-bottom-bar {
+  flex-wrap: nowrap;
+}
+.follow-up-composer .composer-bottom-bar > [aria-label="Model"] {
+  min-width: 0;
+  flex-shrink: 1;
+}
+.follow-up-composer .composer-bottom-bar > [aria-label="Model"] .florets-control-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 560px) {
+  .follow-up-composer .composer-textarea {
+    font-size: 16px;
+  }
+}

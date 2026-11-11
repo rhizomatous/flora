@@ -350,7 +350,7 @@ export function Chats({
 
   const existingChat = !isNew && id !== "";
   const headerLayout = existingChat
-    ? "florets-topbar chat-header -mx-4 flex shrink-0 items-center gap-1 border-b px-3 sm:-mx-8"
+    ? "florets-topbar chat-header [&_h1]:flex-[0_1_auto] max-[560px]:gap-0.5 max-[560px]:[&_h1]:flex-1 max-[560px]:[&>[aria-disabled=true]]:hidden -mx-4 flex shrink-0 items-center gap-1 border-b px-3 sm:-mx-8"
     : "mx-auto flex w-full max-w-[880px] shrink-0 items-center justify-between gap-4 pb-3";
   const chatLayout = id === "" ? "mx-auto max-w-4xl min-w-0" : "flex min-h-0 flex-1 flex-col";
 
@@ -577,7 +577,7 @@ function ChatDetail({
           <MessageScrollerButton
             aria-label="Jump to latest"
             size="sm"
-            className="composer-accessory chat-scroll-latest"
+            className="composer-accessory chat-scroll-latest h-7 gap-1.5 border border-border px-2.5 text-xs [&_svg]:size-[13px]!"
           >
             <ArrowDownIcon />
             Scroll to end
