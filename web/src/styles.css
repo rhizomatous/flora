@@ -585,8 +585,8 @@
   opacity: 0.65;
 }
 .flora-sidebar [data-slot="sidebar-menu-button"] svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
 .flora-sidebar [data-slot="sidebar-content"] {
   --scroll-fade-size: 32px;
@@ -688,8 +688,8 @@
   color: var(--foreground);
 }
 .sidebar-chat-icon {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
   margin-top: 1px;
 }
