@@ -117,16 +117,26 @@ test("one desktop toggle moves between sidebar and page without losing focus", a
   await expect(page.locator('[data-slot="sidebar-trigger"]')).toHaveCount(1);
   const original = await toggle.elementHandle();
   const opened = await toggle.boundingBox();
-  if (!original || !opened) throw new Error("Missing sidebar toggle");
+  if (!opened) throw new Error("Missing sidebar toggle");
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await expect(toggle).toBeFocused();
-  await expect.poll(async () => (await toggle.boundingBox())?.x).toBe(20);
+  await expect
+    .poll(async () => {
+      const bounds = await toggle.boundingBox();
+      return bounds?.x;
+    })
+    .toBe(20);
   expect(await original.evaluate((node) => node.isConnected)).toBe(true);
   expect(opened.x).toBeGreaterThan(200);
   await toggle.press("Enter");
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
-  await expect.poll(async () => (await toggle.boundingBox())?.x).toBe(opened.x);
+  await expect
+    .poll(async () => {
+      const bounds = await toggle.boundingBox();
+      return bounds?.x;
+    })
+    .toBe(opened.x);
   expect(await original.evaluate((node) => node.isConnected)).toBe(true);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(toggle).toHaveCSS("transition-duration", "0s");
