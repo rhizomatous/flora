@@ -1,6 +1,9 @@
 import type { Message, Part } from "@opencode-ai/sdk/v2";
 
+import type { Pull } from "../../web/src/pull.ts";
 import type { Frame } from "./server.ts";
+
+type FixturePull = Pick<Pull, "number" | "state" | "draft">;
 
 export const projects = [
   {
@@ -147,7 +150,7 @@ export const stories = [
     id: "checkout",
     projectID: "garden",
     title: "Keep the cart after signing in",
-    pulls: [{ number: 42, state: "open", draft: true }],
+    pulls: [{ number: 42, state: "open", draft: true }] satisfies FixturePull[],
     files: [
       {
         path: "src/cart.ts",
@@ -237,7 +240,7 @@ export const stories = [
     pulls: [
       { number: 18, state: "closed", draft: false },
       { number: 19, state: "open", draft: false },
-    ],
+    ] satisfies FixturePull[],
     files: [
       {
         path: "internal/notes/list.go",
@@ -322,7 +325,7 @@ export const stories = [
     id: "focus",
     projectID: "preview",
     title: "Restore focus after removing a repository",
-    pulls: [{ number: 73, state: "merged", draft: false }],
+    pulls: [{ number: 73, state: "merged", draft: false }] satisfies FixturePull[],
     files: [
       {
         path: "web/src/projects.tsx",
