@@ -544,9 +544,6 @@
   --sidebar-accent: var(--secondary);
   font-size: 13px;
 }
-.dark .flora-sidebar {
-  background: #0a0a0a;
-}
 .flora-sidebar [data-slot="sidebar-header"] {
   padding: 8px;
   gap: 8px;
@@ -755,9 +752,6 @@
   border-top: 1px solid var(--border);
   padding: 8px;
 }
-.dark .sidebar-account {
-  background: #0a0a0a;
-}
 .sidebar-account [data-slot="sidebar-menu-button"] {
   height: 44px;
   gap: 8px;
@@ -767,8 +761,4 @@
 .sidebar-chat-link:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: -2px;
-}
-
-.dark .flora-navigation {
-  background: #0a0a0a;
 }
