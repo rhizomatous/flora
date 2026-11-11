@@ -185,7 +185,7 @@ export function Sidebar({
             ))}
           </SidebarMenu>
         </SidebarHeader>
-        <SidebarContent>
+        <SidebarContent className="scroll-fade-y">
           {error !== "" && (
             <SidebarGroup>
               <Text size="xs" role="status">

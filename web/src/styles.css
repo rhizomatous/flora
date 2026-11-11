@@ -593,6 +593,8 @@
   height: 14px;
 }
 .flora-sidebar [data-slot="sidebar-content"] {
+  --scroll-fade-size: 32px;
+  --scroll-fade-reveal: 32px;
   gap: 0;
 }
 .sidebar-chats {
