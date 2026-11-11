@@ -53,3 +53,23 @@ The menus open, but their unfinished actions are disabled. Default model, reason
 - [ ] Rich PR references: render linked PR cards and CI status in the transcript when structured metadata is available.
 
 Attachment/context, model, reasoning, slash-command, and voice placeholders listed above apply to both composers.
+
+
+## Sidebar refinement
+
+### Connected
+
+- [x] Search chats by title, project, or ID; clear search to restore the full list.
+- [x] Collapse individual projects or all projects and sort chats by update time or title for this session.
+- [x] Show saved status, relative update time, project counts, and a hover summary for each chat.
+- [x] Keep project settings, chat navigation, mobile dismissal, notification sound, and logout connected.
+
+### Disconnected placeholders
+
+- [ ] Add Issues, Pull requests, Automations, Explore, More, and Captains destinations.
+- [ ] Implement pinned chats and a pinned section, archive actions, and custom folders.
+- [ ] Add grouping preferences, display controls, filters, and read/unread tracking. Persist sidebar preferences.
+- [ ] Populate hover summaries with model, PR/check details, and diff counts when backend metadata is available.
+- [ ] Add workspace identity/avatar data, usage, desktop app integration, appearance settings, and workspace switching.
+
+Sidebar actions that are not connected are disabled; timestamps and statuses come from the saved chat feed.

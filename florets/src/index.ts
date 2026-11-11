@@ -78,6 +78,13 @@ export {
 } from "@radix-ui/react-icons";
 
 export {
+  SearchIcon,
+  SquarePenIcon,
+  CircleDotIcon,
+  CompassIcon,
+  Repeat2Icon,
+  ChevronRightIcon,
+  XIcon,
   Share2Icon,
   CrownIcon,
   PencilIcon,

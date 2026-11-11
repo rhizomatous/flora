@@ -12,6 +12,11 @@ import {
   SpeakerLoudIcon,
   ExitIcon,
   ChevronUpIcon,
+  ClockIcon,
+  MonitorIcon,
+  CompassIcon,
+  UsersIcon,
+  FolderIcon,
 } from "@flora/florets";
 
 /** Keeps installation actions in one menu; sound activation stays inside the user's gesture. */
@@ -37,11 +42,12 @@ export function WorkspaceMenu({
       <DropdownMenuTrigger
         render={
           <SidebarMenuButton size="lg" aria-label="Workspace menu">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <span className="flex size-7 shrink-0 items-center justify-center">
               <FlowerMark className="text-2xl" />
             </span>
             <span className="min-w-0 flex-1 text-left">
               <span className="block">Flora</span>
+              <span className="block text-xs text-muted-foreground">Workspace</span>
             </span>
             <ChevronUpIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
           </SidebarMenuButton>
@@ -72,7 +78,7 @@ export function WorkspaceMenu({
         <DropdownMenuItem
           render={
             <a href="#projects">
-              <GearIcon aria-hidden="true" />
+              <FolderIcon aria-hidden="true" />
               Project settings
             </a>
           }
@@ -100,8 +106,24 @@ export function WorkspaceMenu({
             Missed sounds are not replayed.
           </p>
         )}
+        <DropdownMenuItem disabled>
+          <ClockIcon />
+          Usage
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled>
+          <MonitorIcon />
+          Open desktop app
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled>
+          <CompassIcon />
+          Appearance
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled>
+          <UsersIcon />
+          Switch workspace
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled={busy} onClick={onLogout}>
+        <DropdownMenuItem variant="destructive" disabled={busy} onClick={onLogout}>
           <ExitIcon aria-hidden="true" />
           Log out
         </DropdownMenuItem>

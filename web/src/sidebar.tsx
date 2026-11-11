@@ -9,7 +9,17 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
+  SidebarTrigger,
+  SearchIcon,
+  SquarePenIcon,
+  ListIcon,
+  CircleDotIcon,
+  GitPullRequestIcon,
+  Repeat2Icon,
+  CompassIcon,
+  EllipsisIcon,
+  CrownIcon,
+  PlusIcon,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
@@ -19,6 +29,7 @@ import {
 
 import type { Chat } from "./notifications";
 import { errorMessage, isExpired, request } from "./request";
+import { SidebarChats } from "./sidebar-chats";
 
 type Project = { id: string; name: string };
 
@@ -34,6 +45,7 @@ export function Sidebar({
   onExpired: () => void;
   children: ReactNode;
 }) {
+  const [searching, setSearching] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [error, setError] = useState("");
   const { openMobile, setOpenMobile } = useSidebar();
@@ -73,6 +85,7 @@ export function Sidebar({
   return (
     <NavigationSidebar
       variant="inset"
+      className="flora-navigation p-0"
       mobileFinalFocus={() => {
         // A destination heading may mount while the sheet still traps focus.
         const navigated = skipToContent.current || openedPath.current !== path;
@@ -84,7 +97,7 @@ export function Sidebar({
         return target ?? document.querySelector<HTMLElement>("#main-content");
       }}
     >
-      <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col">
+      <nav aria-label="Main" className="flora-sidebar flex min-h-0 flex-1 flex-col">
         <SidebarHeader>
           <a
             href="#main-content"
@@ -98,7 +111,7 @@ export function Sidebar({
           >
             Skip to content
           </a>
-          <div className="px-2 py-3">
+          <div className="sidebar-brand-row">
             <a
               href="#chats/new"
               aria-label="Flora home"
@@ -109,6 +122,19 @@ export function Sidebar({
             >
               <FlowerMark className="-ml-0.5 text-2xl" />
             </a>
+            <div className="ml-auto flex">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Search sidebar chats"
+                onClick={() => {
+                  setSearching(true);
+                }}
+              >
+                <SearchIcon />
+              </Button>
+              <SidebarTrigger aria-label="Toggle Sidebar" />
+            </div>
           </div>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -121,6 +147,7 @@ export function Sidebar({
                       setOpenMobile(false);
                     }}
                   >
+                    <SquarePenIcon />
                     New chat
                   </a>
                 }
@@ -137,12 +164,27 @@ export function Sidebar({
                       setOpenMobile(false);
                     }}
                   >
+                    <ListIcon />
                     All chats
                   </a>
                 }
                 isActive={path === "chats"}
               />
             </SidebarMenuItem>
+            {[
+              { label: "Issues", icon: <CircleDotIcon /> },
+              { label: "Pull requests", icon: <GitPullRequestIcon /> },
+              { label: "Automations", icon: <Repeat2Icon /> },
+              { label: "Explore", icon: <CompassIcon /> },
+              { label: "More", icon: <EllipsisIcon /> },
+            ].map(({ label, icon }) => (
+              <SidebarMenuItem key={label}>
+                <SidebarMenuButton disabled title={`${label} (coming soon)`}>
+                  {icon}
+                  <span>{label}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
@@ -161,75 +203,28 @@ export function Sidebar({
               </Button>
             </SidebarGroup>
           )}
-          {chats === undefined && (
-            <SidebarGroup>
-              <Text tone="muted" role="status">
-                Loading chats…
-              </Text>
-            </SidebarGroup>
-          )}
-          {projects.map((project) => (
-            <SidebarGroup key={project.id} aria-label={project.name}>
-              <SidebarGroupLabel
-                render={
-                  <a
-                    href={`#projects/${project.id}`}
-                    onClick={() => {
-                      setOpenMobile(false);
-                    }}
-                  >
-                    {project.name}
-                  </a>
-                }
-              />
-              <SidebarMenu>
-                {chats
-                  ?.filter((chat) => chat.ProjectID === project.id)
-                  .map((chat) => (
-                    <SidebarMenuItem key={chat.ID}>
-                      <SidebarMenuButton
-                        render={
-                          <a
-                            href={`#chats/${chat.ID}`}
-                            title={chat.Title}
-                            aria-current={path === `chats/${chat.ID}` ? "page" : undefined}
-                            onClick={() => {
-                              setOpenMobile(false);
-                            }}
-                          >
-                            <span className="min-w-0 flex-1 truncate">{chat.Title}</span>
-                            <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                              {chat.Status === "working" && <FlowerMark />}
-                              {chat.Status.charAt(0).toUpperCase() + chat.Status.slice(1)}
-                            </span>
-                          </a>
-                        }
-                        isActive={path === `chats/${chat.ID}`}
-                      />
-                    </SidebarMenuItem>
-                  ))}
-                {chats !== undefined && !chats.some((chat) => chat.ProjectID === project.id) && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      render={
-                        <a
-                          href={`#chats/new?project=${encodeURIComponent(project.id)}`}
-                          onClick={() => {
-                            setOpenMobile(false);
-                          }}
-                        >
-                          Start a chat
-                        </a>
-                      }
-                    />
-                  </SidebarMenuItem>
-                )}
-              </SidebarMenu>
-            </SidebarGroup>
-          ))}
+          <div className="sidebar-captains">
+            <span>
+              <CrownIcon />
+              Captains
+            </span>
+            <Button variant="ghost" size="icon-sm" disabled aria-label="Add captain (coming soon)">
+              <PlusIcon />
+            </Button>
+          </div>
+          <SidebarChats
+            projects={projects}
+            chats={chats}
+            path={path}
+            close={() => {
+              setOpenMobile(false);
+            }}
+            searching={searching}
+            setSearching={setSearching}
+          />
         </SidebarContent>
       </nav>
-      <SidebarFooter>{children}</SidebarFooter>
+      <SidebarFooter className="sidebar-account">{children}</SidebarFooter>
       <SidebarRail />
     </NavigationSidebar>
   );
