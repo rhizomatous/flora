@@ -56,7 +56,7 @@ function TraceTitle({ className, ...props }: ComponentProps<"span">) {
   return (
     <span
       data-slot="trace-title"
-      className={cn("cn-trace-title min-w-0 truncate motion-reduce:shimmer-none", className)}
+      className={cn("florets-trace-title min-w-0 truncate motion-reduce:shimmer-none", className)}
       {...props}
     />
   );
@@ -67,7 +67,7 @@ function TraceDescription({ className, ...props }: ComponentProps<"span">) {
     <span
       data-slot="trace-description"
       className={cn(
-        "cn-trace-description shrink-0 text-muted-foreground/70 tabular-nums",
+        "florets-trace-description shrink-0 text-muted-foreground/70 tabular-nums",
         className,
       )}
       {...props}
@@ -89,7 +89,7 @@ function TraceCollapsible({
   return (
     <Collapsible
       data-slot="trace-collapsible"
-      className={cn("cn-trace-collapsible flex w-full min-w-0 flex-col", className)}
+      className={cn("florets-trace-collapsible flex w-full min-w-0 flex-col", className)}
       {...props}
     />
   );

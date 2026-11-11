@@ -18,7 +18,7 @@ function DropdownButton({
       type={type}
       variant={variant}
       size={size}
-      className={cn("cn-dropdown-button", className)}
+      className={cn("florets-dropdown-button", className)}
       {...props}
     >
       {children}

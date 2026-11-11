@@ -78,7 +78,7 @@ function Markdown({
       data-slot="markdown"
       components={components}
       controls={controls}
-      className={cn("cn-markdown w-full min-w-0 overflow-hidden", className)}
+      className={cn("florets-markdown w-full min-w-0 overflow-hidden", className)}
       {...props}
     />
   );

@@ -33,7 +33,9 @@ test("sidebar searches, collapses projects, and preserves navigation on narrow s
   await nav.getByRole("button", { name: "Chat list options", exact: true }).click();
   await page.getByRole("menuitem", { name: "Sort: Updated", exact: true }).click();
   const fieldnotes = nav.getByRole("region", { name: "Fieldnotes API", exact: true });
-  await expect(fieldnotes.locator(".cn-navigation-link").first()).toContainText("Fix duplicate");
+  await expect(fieldnotes.locator(".florets-navigation-link").first()).toContainText(
+    "Fix duplicate",
+  );
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await expect(nav).toBeVisible();
@@ -53,14 +55,14 @@ test("sidebar and page topbars share vertical alignment", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
   for (const route of ["chats/pagination", "settings"]) {
     await page.goto(`${base}/#${route}`);
-    const header = await page.locator(".cn-topbar").boundingBox();
+    const header = await page.locator(".florets-topbar").boundingBox();
     const brand = await page.locator(".sidebar-brand-row").boundingBox();
     if (!header || !brand) throw new Error("Missing topbar");
     expect(header.height).toBe(44);
     expect(brand.y + brand.height / 2).toBe(header.y + header.height / 2);
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  const header = await page.locator(".cn-topbar").boundingBox();
+  const header = await page.locator(".florets-topbar").boundingBox();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const brand = await page.locator(".sidebar-brand-row").boundingBox();
   if (!header || !brand) throw new Error("Missing mobile topbar");

@@ -69,7 +69,7 @@ export function NewChatComposer({
                 aria-label={`Project: ${selectedProject?.name ?? ""}`}
               >
                 <InboxIcon />
-                <span className="cn-control-label truncate">{selectedProject?.name}</span>
+                <span className="florets-control-label truncate">{selectedProject?.name}</span>
               </DropdownButton>
             }
           />
@@ -101,7 +101,7 @@ export function NewChatComposer({
                   }}
                 >
                   <InboxIcon />
-                  <span className="cn-control-label truncate">{project.name}</span>
+                  <span className="florets-control-label truncate">{project.name}</span>
                   {selectedProject?.id === project.id && <CheckIcon className="ml-auto" />}
                 </button>
               ))}
@@ -110,11 +110,11 @@ export function NewChatComposer({
             <div className="composer-project-links">
               <a href="#projects/new">
                 <PlusIcon />
-                <span className="cn-control-label">New project</span>
+                <span className="florets-control-label">New project</span>
               </a>
               <a href="#projects">
                 <Settings2Icon />
-                <span className="cn-control-label">Manage projects</span>
+                <span className="florets-control-label">Manage projects</span>
               </a>
             </div>
           </PopoverContent>
@@ -128,7 +128,7 @@ export function NewChatComposer({
           ]}
         >
           <CloudIcon />
-          <span className="cn-control-label">Cloud</span>
+          <span className="florets-control-label">Cloud</span>
         </PlaceholderMenu>
         <Button
           type="button"
@@ -138,7 +138,7 @@ export function NewChatComposer({
           aria-disabled="true"
         >
           <DatabaseIcon />
-          <span className="cn-control-label">Setup</span>
+          <span className="florets-control-label">Setup</span>
         </Button>
         <div className="composer-branch">
           <PlaceholderMenu
@@ -147,7 +147,7 @@ export function NewChatComposer({
             items={[{ label: "Project default branch", icon: <GitBranchIcon /> }]}
           >
             <GitBranchIcon />
-            <span className="cn-control-label">Default</span>
+            <span className="florets-control-label">Default</span>
           </PlaceholderMenu>
         </div>
       </div>
