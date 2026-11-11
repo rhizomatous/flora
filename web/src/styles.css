@@ -817,3 +817,12 @@
     transition: none;
   }
 }
+
+.sidebar-floating-toggle[aria-expanded="true"]:not(:hover):not(:focus-visible) {
+  background: transparent;
+  color: var(--muted-foreground);
+}
+.sidebar-floating-toggle:focus-visible {
+  background: var(--control-hover);
+  color: var(--foreground);
+}
