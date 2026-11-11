@@ -13,7 +13,6 @@ import {
   Wordmark,
   SidebarProvider,
   SidebarInset,
-  SidebarTrigger,
 } from "@flora/florets";
 
 import { Chats } from "./chats";
@@ -232,8 +231,8 @@ function App() {
       )}
       <Content id="main-content" tabIndex={-1} className={ready ? frameLayout : undefined}>
         {ready && !conversation && (
-          <header className="flex h-14 shrink-0 items-center border-b px-4">
-            <SidebarTrigger aria-label="Menu" />
+          <header className="app-topbar flex shrink-0 items-center border-b px-3">
+            <span className="sidebar-toggle-space" aria-hidden="true" />
           </header>
         )}
         <div className={ready ? contentLayout : undefined}>

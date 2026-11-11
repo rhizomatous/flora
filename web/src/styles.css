@@ -1,6 +1,13 @@
 @import "@flora/florets/styles.css";
 @source "./";
 
+:root {
+  --app-topbar-height: 44px;
+}
+.app-topbar {
+  height: var(--app-topbar-height);
+}
+
 .chat-composer {
   --composer-surface: #fafafa;
   --composer-border: #dedede;
@@ -538,4 +545,289 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   overflow: hidden;
+}
+
+.flora-sidebar {
+  --sidebar-label-foreground: var(--muted-foreground);
+  --sidebar-accent: var(--secondary);
+  font-size: 13px;
+}
+.flora-sidebar [data-slot="sidebar-header"] {
+  padding: 8px;
+  gap: 8px;
+}
+.sidebar-brand-row {
+  display: flex;
+  align-items: center;
+  height: var(--app-topbar-height);
+  padding: 0 8px;
+}
+.sidebar-brand-row button {
+  color: var(--muted-foreground);
+}
+.flora-sidebar [data-slot="sidebar-menu"] {
+  gap: 0;
+}
+.flora-sidebar [data-slot="sidebar-menu-button"] {
+  height: 29px;
+  gap: 9px;
+  padding-inline: 8px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  border-radius: 6px;
+}
+.flora-sidebar
+  [data-slot="sidebar-menu-button"]:not(:disabled):is(:hover, :focus-visible, [data-active]) {
+  color: var(--foreground);
+  font-weight: 450;
+}
+.flora-sidebar [data-slot="sidebar-menu-button"]:disabled {
+  opacity: 0.65;
+}
+.flora-sidebar [data-slot="sidebar-menu-button"] svg {
+  width: 13px;
+  height: 13px;
+}
+.flora-sidebar [data-slot="sidebar-content"] {
+  --scroll-fade-size: 32px;
+  --scroll-fade-reveal: 32px;
+  gap: 0;
+}
+.sidebar-chats {
+  padding: 16px 8px;
+}
+.sidebar-section-heading {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding-inline: 8px 0;
+  color: var(--sidebar-label-foreground);
+  font-size: 12px;
+}
+.sidebar-section-heading button,
+.sidebar-brand-row button {
+  width: 26px;
+  height: 26px;
+}
+.sidebar-section-heading svg {
+  width: 14px;
+  height: 14px;
+}
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+  gap: 6px;
+}
+.sidebar-search input {
+  width: 100%;
+  min-width: 0;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--foreground);
+}
+.sidebar-project {
+  margin-bottom: 0;
+}
+.sidebar-project[data-expanded="true"] {
+  margin-bottom: 10px;
+}
+.sidebar-project-heading {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  color: var(--sidebar-label-foreground);
+  padding-inline: 8px;
+  gap: 4px;
+}
+.sidebar-project-heading > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 24px;
+  cursor: pointer;
+}
+.sidebar-project-heading > button svg {
+  width: 10px;
+  height: 10px;
+}
+.sidebar-project-heading a {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 9px;
+}
+.sidebar-project-heading a:hover {
+  color: var(--foreground);
+}
+.sidebar-project-heading a svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.sidebar-project-count {
+  opacity: 0.65;
+  margin-left: -4px;
+}
+.sidebar-chat-row {
+  position: relative;
+  border-radius: 6px;
+}
+.sidebar-chat-row:hover,
+.sidebar-chat-row:focus-within,
+.sidebar-chat-row[data-active] {
+  background: var(--secondary);
+}
+.sidebar-chat-link {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 8px;
+  color: var(--muted-foreground);
+  border-radius: 6px;
+}
+.sidebar-chat-row[data-active] .sidebar-chat-link,
+.sidebar-chat-row:hover .sidebar-chat-link,
+.sidebar-chat-row:focus-within .sidebar-chat-link {
+  color: var(--foreground);
+}
+.sidebar-chat-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.sidebar-chat-title {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 18px;
+  font-size: 13px;
+}
+.sidebar-chat-meta {
+  display: block;
+  font-size: 11px;
+  line-height: 17px;
+  color: var(--muted-foreground);
+}
+.sidebar-chat-age {
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 18px;
+}
+.sidebar-chat-actions {
+  display: none;
+  position: absolute;
+  right: 4px;
+  top: 3px;
+  background: var(--secondary);
+  border-radius: 4px;
+}
+.sidebar-chat-row:hover .sidebar-chat-actions,
+.sidebar-chat-row:focus-within .sidebar-chat-actions {
+  display: flex;
+}
+.sidebar-chat-actions button {
+  width: 23px;
+  height: 23px;
+}
+.sidebar-chat-actions svg {
+  width: 13px;
+  height: 13px;
+}
+.sidebar-chat-preview {
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  padding: 12px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.sidebar-empty {
+  padding: 6px 16px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.sidebar-account {
+  border-top: 1px solid var(--border);
+  padding: 8px;
+}
+.sidebar-account [data-slot="sidebar-menu-button"] {
+  height: 44px;
+  gap: 8px;
+  font-size: 13px;
+}
+.sidebar-project-heading button:focus-visible,
+.sidebar-chat-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+@media (max-width: 767px) {
+  .flora-sidebar [data-slot="sidebar-header"] {
+    padding-top: 0;
+  }
+}
+
+.dark .flora-sidebar {
+  --sidebar-label-foreground: color-mix(in srgb, var(--muted-foreground) 80%, var(--sidebar));
+}
+
+.sidebar-floating-toggle {
+  position: fixed;
+  top: 17px;
+  left: 0;
+  z-index: 40;
+  width: 26px;
+  height: 26px;
+  color: var(--muted-foreground);
+  transform: translateX(20px);
+  transition: transform 150ms ease-out;
+}
+.sidebar-floating-toggle[data-expanded="true"] {
+  transform: translateX(calc(var(--sidebar-width) - 42px));
+}
+.sidebar-toggle-space {
+  display: block;
+  flex-shrink: 0;
+  width: 30px;
+  transition: width 150ms ease-out;
+}
+[data-slot="sidebar-wrapper"]:has(.sidebar-floating-toggle[data-expanded="true"])
+  .sidebar-toggle-space {
+  width: 0;
+}
+@media (max-width: 767px) {
+  .sidebar-floating-toggle {
+    top: 9px;
+    transform: translateX(13px);
+  }
+}
+.flora-navigation,
+[data-slot="sidebar-gap"] {
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-floating-toggle,
+  .sidebar-toggle-space {
+    transition: none;
+  }
+  .flora-navigation,
+  [data-slot="sidebar-gap"] {
+    transition: none;
+  }
+}
+
+.sidebar-floating-toggle[aria-expanded="true"]:not(:hover):not(:focus-visible) {
+  background: transparent;
+  color: var(--muted-foreground);
+}
+.sidebar-floating-toggle:focus-visible {
+  background: var(--control-hover);
+  color: var(--foreground);
 }

@@ -124,11 +124,11 @@
   --menu-surface: #202020;
   --menu-border: #333;
   color-scheme: dark;
-  --background: oklch(0.145 0 0);
+  --background: #111;
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: #191919;
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: var(--menu-surface);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
@@ -148,7 +148,7 @@
   --chart-3: var(--color-blue-600);
   --chart-4: var(--color-blue-700);
   --chart-5: var(--color-blue-800);
-  --sidebar: oklch(0.205 0 0);
+  --sidebar: #0a0a0a;
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -261,4 +261,28 @@
 .cn-dropdown-content [data-slot="dropdown-menu-separator"] {
   margin: 6px -6px;
   background: var(--menu-border);
+}
+
+.cn-dropdown-content
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]):not(
+    [data-disabled]
+  ):not([data-variant="destructive"]):is(
+    :focus,
+    [data-highlighted],
+    [data-checked],
+    [data-popup-open]
+  ) {
+  color: var(--foreground);
+}
+.cn-dropdown-content
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]):not(
+    [data-disabled]
+  ):not([data-variant="destructive"]):is(
+    :focus,
+    [data-highlighted],
+    [data-checked],
+    [data-popup-open]
+  )
+  > svg {
+  color: var(--foreground);
 }

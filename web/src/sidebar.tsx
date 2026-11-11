@@ -9,16 +9,24 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
+  SidebarTrigger,
+  SearchIcon,
+  SquarePenIcon,
+  ListIcon,
+  CircleDotIcon,
+  GitPullRequestIcon,
+  Repeat2Icon,
+  CompassIcon,
+  EllipsisIcon,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarRail,
   useSidebar,
 } from "@flora/florets";
 
 import type { Chat } from "./notifications";
 import { errorMessage, isExpired, request } from "./request";
+import { SidebarChats } from "./sidebar-chats";
 
 type Project = { id: string; name: string };
 
@@ -34,9 +42,11 @@ export function Sidebar({
   onExpired: () => void;
   children: ReactNode;
 }) {
+  const [searching, setSearching] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [error, setError] = useState("");
-  const { openMobile, setOpenMobile } = useSidebar();
+  const { open, isMobile, openMobile, setOpenMobile } = useSidebar();
+  const mobileToggle = useRef<HTMLButtonElement>(null);
   const openedPath = useRef<string | undefined>(undefined);
   const skipToContent = useRef(false);
   useEffect(() => {
@@ -71,166 +81,154 @@ export function Sidebar({
   }, [path, retry]);
 
   return (
-    <NavigationSidebar
-      variant="inset"
-      mobileFinalFocus={() => {
-        // A destination heading may mount while the sheet still traps focus.
-        const navigated = skipToContent.current || openedPath.current !== path;
-        skipToContent.current = false;
-        openedPath.current = undefined;
-        const target = navigated
-          ? document.querySelector<HTMLElement>('#main-content h1[tabindex="-1"]')
-          : document.querySelector<HTMLElement>('[data-slot="sidebar-trigger"]');
-        return target ?? document.querySelector<HTMLElement>("#main-content");
-      }}
-    >
-      <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col">
-        <SidebarHeader>
-          <a
-            href="#main-content"
-            className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-sidebar focus:p-2"
-            onClick={(event) => {
-              event.preventDefault();
-              skipToContent.current = openMobile;
-              setOpenMobile(false);
-              document.querySelector<HTMLElement>("#main-content")?.focus();
-            }}
-          >
-            Skip to content
-          </a>
-          <div className="px-2 py-3">
+    <>
+      {(!isMobile || !openMobile) && (
+        <SidebarTrigger
+          aria-label="Menu"
+          aria-expanded={isMobile ? openMobile : open}
+          data-expanded={!isMobile && open}
+          className="sidebar-floating-toggle"
+        />
+      )}
+      <NavigationSidebar
+        variant="inset"
+        className="flora-navigation p-0"
+        mobileInitialFocus={() => mobileToggle.current}
+        mobileFinalFocus={() => {
+          // A destination heading may mount while the sheet still traps focus.
+          const navigated = skipToContent.current || openedPath.current !== path;
+          skipToContent.current = false;
+          openedPath.current = undefined;
+          const target = navigated
+            ? document.querySelector<HTMLElement>('#main-content h1[tabindex="-1"]')
+            : document.querySelector<HTMLElement>('[data-slot="sidebar-trigger"]');
+          return target ?? document.querySelector<HTMLElement>("#main-content");
+        }}
+      >
+        <nav aria-label="Main" className="flora-sidebar flex min-h-0 flex-1 flex-col">
+          <SidebarHeader>
             <a
-              href="#chats/new"
-              aria-label="Flora home"
-              className="inline-flex rounded-md focus-visible:outline-2 focus-visible:outline-ring"
-              onClick={() => {
+              href="#main-content"
+              className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-sidebar focus:p-2"
+              onClick={(event) => {
+                event.preventDefault();
+                skipToContent.current = openMobile;
                 setOpenMobile(false);
+                document.querySelector<HTMLElement>("#main-content")?.focus();
               }}
             >
-              <FlowerMark className="-ml-0.5 text-2xl" />
+              Skip to content
             </a>
-          </div>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                render={
-                  <a
-                    href="#chats/new"
-                    aria-current={path.startsWith("chats/new") ? "page" : undefined}
-                    onClick={() => {
-                      setOpenMobile(false);
-                    }}
-                  >
-                    New chat
-                  </a>
-                }
-                isActive={path.startsWith("chats/new")}
-              />
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                render={
-                  <a
-                    href="#chats"
-                    aria-current={path === "chats" ? "page" : undefined}
-                    onClick={() => {
-                      setOpenMobile(false);
-                    }}
-                  >
-                    All chats
-                  </a>
-                }
-                isActive={path === "chats"}
-              />
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarHeader>
-        <SidebarContent>
-          {error !== "" && (
-            <SidebarGroup>
-              <Text size="xs" role="status">
-                {error}
-              </Text>
-              <Button
-                variant="link"
+            <div className="sidebar-brand-row">
+              <a
+                href="#chats/new"
+                aria-label="Flora home"
+                className="inline-flex rounded-md focus-visible:outline-2 focus-visible:outline-ring"
                 onClick={() => {
-                  setRetry(retry + 1);
+                  setOpenMobile(false);
                 }}
               >
-                Retry projects
-              </Button>
-            </SidebarGroup>
-          )}
-          {chats === undefined && (
-            <SidebarGroup>
-              <Text tone="muted" role="status">
-                Loading chats…
-              </Text>
-            </SidebarGroup>
-          )}
-          {projects.map((project) => (
-            <SidebarGroup key={project.id} aria-label={project.name}>
-              <SidebarGroupLabel
-                render={
-                  <a
-                    href={`#projects/${project.id}`}
-                    onClick={() => {
-                      setOpenMobile(false);
-                    }}
-                  >
-                    {project.name}
-                  </a>
-                }
-              />
-              <SidebarMenu>
-                {chats
-                  ?.filter((chat) => chat.ProjectID === project.id)
-                  .map((chat) => (
-                    <SidebarMenuItem key={chat.ID}>
-                      <SidebarMenuButton
-                        render={
-                          <a
-                            href={`#chats/${chat.ID}`}
-                            title={chat.Title}
-                            aria-current={path === `chats/${chat.ID}` ? "page" : undefined}
-                            onClick={() => {
-                              setOpenMobile(false);
-                            }}
-                          >
-                            <span className="min-w-0 flex-1 truncate">{chat.Title}</span>
-                            <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                              {chat.Status === "working" && <FlowerMark />}
-                              {chat.Status.charAt(0).toUpperCase() + chat.Status.slice(1)}
-                            </span>
-                          </a>
-                        }
-                        isActive={path === `chats/${chat.ID}`}
-                      />
-                    </SidebarMenuItem>
-                  ))}
-                {chats !== undefined && !chats.some((chat) => chat.ProjectID === project.id) && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      render={
-                        <a
-                          href={`#chats/new?project=${encodeURIComponent(project.id)}`}
-                          onClick={() => {
-                            setOpenMobile(false);
-                          }}
-                        >
-                          Start a chat
-                        </a>
-                      }
-                    />
-                  </SidebarMenuItem>
+                <FlowerMark className="-ml-0.5 text-2xl" />
+              </a>
+              <div className="ml-auto flex">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Search sidebar chats"
+                  onClick={() => {
+                    setSearching(true);
+                  }}
+                >
+                  <SearchIcon />
+                </Button>
+                {isMobile && openMobile ? (
+                  <SidebarTrigger ref={mobileToggle} aria-label="Toggle Sidebar" />
+                ) : (
+                  <span className="w-[26px]" aria-hidden="true" />
                 )}
-              </SidebarMenu>
-            </SidebarGroup>
-          ))}
-        </SidebarContent>
-      </nav>
-      <SidebarFooter>{children}</SidebarFooter>
-      <SidebarRail />
-    </NavigationSidebar>
+              </div>
+            </div>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  render={
+                    <a
+                      href="#chats/new"
+                      aria-current={path.startsWith("chats/new") ? "page" : undefined}
+                      onClick={() => {
+                        setOpenMobile(false);
+                      }}
+                    >
+                      <SquarePenIcon />
+                      New chat
+                    </a>
+                  }
+                  isActive={path.startsWith("chats/new")}
+                />
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  render={
+                    <a
+                      href="#chats"
+                      aria-current={path === "chats" ? "page" : undefined}
+                      onClick={() => {
+                        setOpenMobile(false);
+                      }}
+                    >
+                      <ListIcon />
+                      All chats
+                    </a>
+                  }
+                  isActive={path === "chats"}
+                />
+              </SidebarMenuItem>
+              {[
+                { label: "Issues", icon: <CircleDotIcon /> },
+                { label: "Pull requests", icon: <GitPullRequestIcon /> },
+                { label: "Automations", icon: <Repeat2Icon /> },
+                { label: "Explore", icon: <CompassIcon /> },
+                { label: "More", icon: <EllipsisIcon /> },
+              ].map(({ label, icon }) => (
+                <SidebarMenuItem key={label}>
+                  <SidebarMenuButton disabled title={`${label} (coming soon)`}>
+                    {icon}
+                    <span>{label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarHeader>
+          <SidebarContent className="scroll-fade-y">
+            {error !== "" && (
+              <SidebarGroup>
+                <Text size="xs" role="status">
+                  {error}
+                </Text>
+                <Button
+                  variant="link"
+                  onClick={() => {
+                    setRetry(retry + 1);
+                  }}
+                >
+                  Retry projects
+                </Button>
+              </SidebarGroup>
+            )}
+            <SidebarChats
+              projects={projects}
+              chats={chats}
+              path={path}
+              close={() => {
+                setOpenMobile(false);
+              }}
+              searching={searching}
+              setSearching={setSearching}
+            />
+          </SidebarContent>
+        </nav>
+        <SidebarFooter className="sidebar-account">{children}</SidebarFooter>
+      </NavigationSidebar>
+    </>
   );
 }
