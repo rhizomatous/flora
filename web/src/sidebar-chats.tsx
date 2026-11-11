@@ -302,6 +302,11 @@ export function SidebarChats({
         return (
           <section key={project.id} aria-label={project.name} className="sidebar-project">
             <div className="sidebar-project-heading">
+              <a href={`#projects/${project.id}`} onClick={close}>
+                <InboxIcon />
+                <span className="truncate">{project.name}</span>
+                <span className="sidebar-project-count">{rows.length}</span>
+              </a>
               <button
                 type="button"
                 aria-label={`${expanded ? "Collapse" : "Expand"} ${project.name}`}
@@ -316,11 +321,6 @@ export function SidebarChats({
               >
                 <ChevronRightIcon className={expanded ? "rotate-90" : ""} />
               </button>
-              <a href={`#projects/${project.id}`} onClick={close}>
-                <InboxIcon />
-                <span className="truncate">{project.name}</span>
-                <span className="sidebar-project-count">{rows.length}</span>
-              </a>
             </div>
             {expanded && (
               <ul>

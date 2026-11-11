@@ -636,10 +636,15 @@
   align-items: center;
   min-height: 28px;
   color: var(--sidebar-label-foreground);
-  gap: 2px;
+  padding-inline: 8px;
+  gap: 4px;
 }
 .sidebar-project-heading > button {
-  width: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
   height: 24px;
   cursor: pointer;
 }
@@ -651,7 +656,7 @@
   display: flex;
   align-items: center;
   min-width: 0;
-  gap: 8px;
+  gap: 9px;
 }
 .sidebar-project-heading a:hover {
   color: var(--foreground);
