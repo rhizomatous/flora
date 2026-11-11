@@ -21,7 +21,6 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarRail,
   useSidebar,
 } from "@flora/florets";
 
@@ -216,7 +215,6 @@ export function Sidebar({
         </SidebarContent>
       </nav>
       <SidebarFooter className="sidebar-account">{children}</SidebarFooter>
-      <SidebarRail />
     </NavigationSidebar>
   );
 }
