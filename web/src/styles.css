@@ -575,7 +575,12 @@
   color: var(--muted-foreground);
   border-radius: 6px;
 }
-.flora-sidebar [data-slot="sidebar-menu-button"][data-active="true"] {
+.flora-sidebar
+  [data-slot="sidebar-menu-button"]:not(:disabled):is(
+    :hover,
+    :focus-visible,
+    [data-active="true"]
+  ) {
   color: var(--foreground);
   font-weight: 450;
 }
@@ -695,8 +700,9 @@
   color: var(--muted-foreground);
   border-radius: 6px;
 }
-.sidebar-chat-row[data-active] .sidebar-chat-title,
-.sidebar-chat-link:hover .sidebar-chat-title {
+.sidebar-chat-row[data-active] .sidebar-chat-link,
+.sidebar-chat-row:hover .sidebar-chat-link,
+.sidebar-chat-row:focus-within .sidebar-chat-link {
   color: var(--foreground);
 }
 .sidebar-chat-icon {

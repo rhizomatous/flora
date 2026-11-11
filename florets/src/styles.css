@@ -262,3 +262,27 @@
   margin: 6px -6px;
   background: var(--menu-border);
 }
+
+.cn-dropdown-content
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]):not(
+    [data-disabled]
+  ):not([data-variant="destructive"]):is(
+    :focus,
+    [data-highlighted],
+    [data-checked],
+    [data-popup-open]
+  ) {
+  color: var(--foreground);
+}
+.cn-dropdown-content
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]):not(
+    [data-disabled]
+  ):not([data-variant="destructive"]):is(
+    :focus,
+    [data-highlighted],
+    [data-checked],
+    [data-popup-open]
+  )
+  > svg {
+  color: var(--foreground);
+}
