@@ -1,11 +1,10 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
+// oxlint-disable jsx-a11y/control-has-associated-label -- Render elements receive their accessible content from the owning component.
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 // oxlint-disable typescript/strict-void-return -- React ignores return values from these upstream event handlers.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/bubble-example.json
 "use client";
 
 import { ChevronDownIcon, ThumbsDownIcon, ThumbsUpIcon } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -156,7 +155,7 @@ I also recommend keeping the change in the style file instead of the primitive s
 const previewLength = 180;
 
 function BubbleCollapsible() {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
   const isLong = text.length > previewLength;
   const preview = `${text.slice(0, previewLength)}...`;
 
@@ -168,14 +167,14 @@ function BubbleCollapsible() {
             <BubbleContent className="whitespace-pre-line">
               <div>{open || !isLong ? text : preview}</div>
               {isLong ? (
-                <CollapsibleTrigger asChild>
-                  <Button variant="link" className="gap-1 p-0 text-muted-foreground">
-                    {open ? "Show less" : "Show more"}
-                    <ChevronDownIcon
-                      data-icon="inline-end"
-                      className="group-data-open/button:rotate-180"
-                    />
-                  </Button>
+                <CollapsibleTrigger
+                  render={<Button variant="link" className="gap-1 p-0 text-muted-foreground" />}
+                >
+                  {open ? "Show less" : "Show more"}
+                  <ChevronDownIcon
+                    data-icon="inline-end"
+                    className="group-data-panel-open/button:rotate-180"
+                  />
                 </CollapsibleTrigger>
               ) : null}
             </BubbleContent>
@@ -419,20 +418,16 @@ function BubbleButtonLinks() {
     <Example title="Button & Links">
       <div className="flex w-full max-w-md flex-col gap-8">
         <Bubble>
-          <BubbleContent asChild>
-            <a href="#">This bubble is a link.</a>
-          </BubbleContent>
+          <BubbleContent render={<a href="#" />}>This bubble is a link.</BubbleContent>
         </Bubble>
         <Bubble variant="secondary">
-          <BubbleContent asChild>
-            <button type="button">This one is a button you can click.</button>
+          <BubbleContent render={<button type="button" />}>
+            This one is a button you can click.
           </BubbleContent>
         </Bubble>
         <Bubble variant="muted">
-          <BubbleContent asChild>
-            <button type="button">
-              You can also do tinted buttons. Even ones that are multilines.
-            </button>
+          <BubbleContent render={<button type="button" />}>
+            You can also do tinted buttons. Even ones that are multilines.
           </BubbleContent>
         </Bubble>
         <Marker variant="separator">
@@ -444,10 +439,11 @@ function BubbleButtonLinks() {
         <BubbleGroup>
           {quickReplies.map((reply) => (
             <Bubble key={reply.label} variant="outline" align="end">
-              <BubbleContent asChild className="border-dashed border-primary">
-                <button type="button" onClick={() => toast(reply.message)}>
-                  {reply.label}
-                </button>
+              <BubbleContent
+                className="border-dashed border-primary"
+                render={<button type="button" onClick={() => toast(reply.message)} />}
+              >
+                {reply.label}
               </BubbleContent>
             </Bubble>
           ))}

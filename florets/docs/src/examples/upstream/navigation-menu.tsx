@@ -1,11 +1,9 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/navigation-menu-example.json
 "use client";
 
 import { CircleAlertIcon } from "lucide-react";
-import * as React from "react";
+import type { ComponentPropsWithoutRef } from "react";
 
-import { Link } from "@flora/florets";
+import { Link } from "@flora/florets/components/link";
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -58,28 +56,27 @@ const components: { title: string; href: string; description: string }[] = [
 export function Preview() {
   return (
     <ExampleWrapper className="lg:grid-cols-1">
-      <NavigationMenuWithViewport />
-      <NavigationMenuWithoutViewport />
+      <NavigationMenuBasic />
     </ExampleWrapper>
   );
 }
 
-function NavigationMenuWithViewport() {
+function NavigationMenuBasic() {
   return (
-    <Example title="With Viewport">
+    <Example title="Basic">
       <NavigationMenu>
         <NavigationMenuList>
           <NavigationMenuItem>
             <NavigationMenuTrigger>Getting started</NavigationMenuTrigger>
             <NavigationMenuContent>
               <ul className="w-96">
-                <ListItem href="https://ui.shadcn.com/docs" title="Introduction">
+                <ListItem href="/docs" title="Introduction">
                   Re-usable components built with Tailwind CSS.
                 </ListItem>
-                <ListItem href="https://ui.shadcn.com/docs" title="Installation">
+                <ListItem href="/docs/installation" title="Installation">
                   How to install dependencies and structure your app.
                 </ListItem>
-                <ListItem href="https://ui.shadcn.com/docs" title="Typography">
+                <ListItem href="/docs/primitives/typography" title="Typography">
                   Styles for headings, paragraphs, lists...etc
                 </ListItem>
               </ul>
@@ -88,7 +85,7 @@ function NavigationMenuWithViewport() {
           <NavigationMenuItem>
             <NavigationMenuTrigger>Components</NavigationMenuTrigger>
             <NavigationMenuContent>
-              <ul className="grid w-[400px] gap-1 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
+              <ul className="grid w-[400px] gap-2 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
                 {components.map((component) => (
                   <ListItem key={component.title} title={component.title} href={component.href}>
                     {component.description}
@@ -98,115 +95,39 @@ function NavigationMenuWithViewport() {
             </NavigationMenuContent>
           </NavigationMenuItem>
           <NavigationMenuItem>
-            <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
-              <Link href="https://ui.shadcn.com/docs">Documentation</Link>
-            </NavigationMenuLink>
-          </NavigationMenuItem>
-        </NavigationMenuList>
-      </NavigationMenu>
-    </Example>
-  );
-}
-
-function NavigationMenuWithoutViewport() {
-  return (
-    <Example title="Without Viewport">
-      <NavigationMenu viewport={false}>
-        <NavigationMenuList>
-          <NavigationMenuItem>
-            <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
-              <Link href="https://ui.shadcn.com/docs">Documentation</Link>
-            </NavigationMenuLink>
-          </NavigationMenuItem>
-          <NavigationMenuItem>
-            <NavigationMenuTrigger>List</NavigationMenuTrigger>
-            <NavigationMenuContent>
-              <ul className="w-72">
-                <li>
-                  <NavigationMenuLink asChild>
-                    <Link href="#">
-                      <div className="flex flex-col">
-                        <div className="style-sera:font-heading style-sera:tracking-wide style-sera:uppercase font-medium">
-                          Components
-                        </div>
-                        <div className="style-sera:mt-0.5 style-sera:leading-relaxed text-muted-foreground">
-                          Browse all components in the library.
-                        </div>
-                      </div>
-                    </Link>
-                  </NavigationMenuLink>
-                  <NavigationMenuLink asChild>
-                    <Link href="#">
-                      <div className="flex flex-col">
-                        <div className="style-sera:font-heading style-sera:tracking-wide style-sera:uppercase font-medium">
-                          Documentation
-                        </div>
-                        <div className="style-sera:mt-0.5 style-sera:leading-relaxed text-muted-foreground">
-                          Learn how to use the library.
-                        </div>
-                      </div>
-                    </Link>
-                  </NavigationMenuLink>
-                  <NavigationMenuLink asChild>
-                    <Link href="#">
-                      <div className="flex flex-col">
-                        <div className="style-sera:font-heading style-sera:tracking-wide style-sera:uppercase font-medium">
-                          Blog
-                        </div>
-                        <div className="style-sera:mt-0.5 style-sera:leading-relaxed text-muted-foreground">
-                          Read our latest blog posts.
-                        </div>
-                      </div>
-                    </Link>
-                  </NavigationMenuLink>
-                </li>
-              </ul>
-            </NavigationMenuContent>
-          </NavigationMenuItem>
-          <NavigationMenuItem>
-            <NavigationMenuTrigger>Simple List</NavigationMenuTrigger>
-            <NavigationMenuContent>
-              <ul>
-                <li>
-                  <NavigationMenuLink asChild>
-                    <Link href="#">Components</Link>
-                  </NavigationMenuLink>
-                  <NavigationMenuLink asChild>
-                    <Link href="#">Documentation</Link>
-                  </NavigationMenuLink>
-                  <NavigationMenuLink asChild>
-                    <Link href="#">Blocks</Link>
-                  </NavigationMenuLink>
-                </li>
-              </ul>
-            </NavigationMenuContent>
-          </NavigationMenuItem>
-          <NavigationMenuItem>
             <NavigationMenuTrigger>With Icon</NavigationMenuTrigger>
             <NavigationMenuContent>
               <ul className="grid w-[200px]">
                 <li>
-                  <NavigationMenuLink asChild>
-                    <Link href="#" className="flex-row items-center gap-2">
-                      <CircleAlertIcon />
-                      Backlog
-                    </Link>
+                  <NavigationMenuLink
+                    render={<Link href="#" className="flex-row items-center gap-2" />}
+                  >
+                    <CircleAlertIcon />
+                    Backlog
                   </NavigationMenuLink>
-                  <NavigationMenuLink asChild>
-                    <Link href="#" className="flex-row items-center gap-2">
-                      <CircleAlertIcon />
-                      To Do
-                    </Link>
+                  <NavigationMenuLink
+                    render={<Link href="#" className="flex-row items-center gap-2" />}
+                  >
+                    <CircleAlertIcon />
+                    To Do
                   </NavigationMenuLink>
-                  <NavigationMenuLink asChild>
-                    <Link href="#">
-                      <CircleAlertIcon />
-                      Done
-                    </Link>
+                  <NavigationMenuLink
+                    render={<Link href="#" className="flex-row items-center gap-2" />}
+                  >
+                    <CircleAlertIcon />
+                    Done
                   </NavigationMenuLink>
                 </li>
               </ul>
             </NavigationMenuContent>
+          </NavigationMenuItem>
+          <NavigationMenuItem>
+            <NavigationMenuLink
+              render={<Link href="/docs" />}
+              className={navigationMenuTriggerStyle()}
+            >
+              Documentation
+            </NavigationMenuLink>
           </NavigationMenuItem>
         </NavigationMenuList>
       </NavigationMenu>
@@ -219,20 +140,14 @@ function ListItem({
   children,
   href,
   ...props
-}: React.ComponentPropsWithoutRef<"li"> & { href: string }) {
+}: ComponentPropsWithoutRef<"li"> & { href: string }) {
   return (
     <li {...props}>
-      <NavigationMenuLink asChild>
-        <Link href={href}>
-          <div className="style-vega:text-sm style-nova:text-sm style-lyra:text-xs style-maia:text-sm style-mira:text-xs style-luma:text-sm flex flex-col gap-1">
-            <div className="style-sera:font-heading style-sera:tracking-wide style-sera:uppercase leading-none font-medium">
-              {title}
-            </div>
-            <div className="style-sera:mt-0.5 style-sera:leading-relaxed line-clamp-2 text-muted-foreground">
-              {children}
-            </div>
-          </div>
-        </Link>
+      <NavigationMenuLink render={<Link href={href} />}>
+        <div className="style-vega:text-sm style-nova:text-sm style-lyra:text-xs style-maia:text-sm style-mira:text-xs style-luma:text-sm flex flex-col gap-1">
+          <div className="leading-none font-medium">{title}</div>
+          <div className="line-clamp-2 text-muted-foreground">{children}</div>
+        </div>
       </NavigationMenuLink>
     </li>
   );

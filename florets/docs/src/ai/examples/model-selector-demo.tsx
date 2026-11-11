@@ -89,17 +89,19 @@ export function ModelSelectorDemo() {
               <PlusIcon />
             </InputGroupButton>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <InputGroupButton
-                  size="sm"
-                  variant="outline"
-                  aria-label={`Model: ${currentModel.name}`}
-                  className="ml-auto"
-                >
-                  {currentModel.name}
-                  <ChevronDownIcon />
-                </InputGroupButton>
-              </DropdownMenuTrigger>
+              <DropdownMenuTrigger
+                render={
+                  <InputGroupButton
+                    size="sm"
+                    variant="outline"
+                    aria-label={`Model: ${currentModel.name}`}
+                    className="ml-auto"
+                  >
+                    {currentModel.name}
+                    <ChevronDownIcon />
+                  </InputGroupButton>
+                }
+              />
               <DropdownMenuContent align="start" className="w-48">
                 <DropdownMenuRadioGroup value={model} onValueChange={setModel}>
                   {providers.map((provider, index) => (
@@ -119,17 +121,19 @@ export function ModelSelectorDemo() {
               </DropdownMenuContent>
             </DropdownMenu>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <InputGroupButton
-                  size="sm"
-                  variant="outline"
-                  aria-label={`Effort: ${currentEffort.name}`}
-                >
-                  <span className="text-muted-foreground">Effort</span>
-                  {currentEffort.name}
-                  <ChevronDownIcon />
-                </InputGroupButton>
-              </DropdownMenuTrigger>
+              <DropdownMenuTrigger
+                render={
+                  <InputGroupButton
+                    size="sm"
+                    variant="outline"
+                    aria-label={`Effort: ${currentEffort.name}`}
+                  >
+                    <span className="text-muted-foreground">Effort</span>
+                    {currentEffort.name}
+                    <ChevronDownIcon />
+                  </InputGroupButton>
+                }
+              />
               <DropdownMenuContent align="start" className="w-36">
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>Effort</DropdownMenuLabel>

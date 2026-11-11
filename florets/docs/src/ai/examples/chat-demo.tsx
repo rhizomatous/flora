@@ -1,4 +1,5 @@
 "use client";
+
 import { useChat } from "@ai-sdk/react";
 import type { UIDataTypes, UIMessage } from "ai";
 import {
@@ -191,20 +192,22 @@ export function ChatDemo() {
               </div>
             </div>
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Reset conversation"
-                  onClick={() => {
-                    setMessages(initialMessages);
-                    setDraft(null);
-                  }}
-                  disabled={busy}
-                >
-                  <RotateCwIcon />
-                </Button>
-              </TooltipTrigger>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label="Reset conversation"
+                    onClick={() => {
+                      setMessages(initialMessages);
+                      setDraft(null);
+                    }}
+                    disabled={busy}
+                  >
+                    <RotateCwIcon />
+                  </Button>
+                }
+              />
               <TooltipContent>
                 <p>Reset</p>
               </TooltipContent>
@@ -300,16 +303,18 @@ export function ChatDemo() {
                 />
                 <InputGroupAddon align="block-end" className="pt-1">
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <InputGroupButton
-                        aria-label="Add context"
-                        type="button"
-                        size="icon-sm"
-                        variant="outline"
-                      >
-                        <PlusIcon />
-                      </InputGroupButton>
-                    </DropdownMenuTrigger>
+                    <DropdownMenuTrigger
+                      render={
+                        <InputGroupButton
+                          aria-label="Add context"
+                          type="button"
+                          size="icon-sm"
+                          variant="outline"
+                        >
+                          <PlusIcon />
+                        </InputGroupButton>
+                      }
+                    />
                     <DropdownMenuContent align="start" side="top" className="w-44">
                       <DropdownMenuItem>
                         <PaperclipIcon />

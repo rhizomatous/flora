@@ -1,7 +1,6 @@
 import { AspectRatio } from "@flora/florets/components/aspect-ratio";
 
 import { Example, ExampleWrapper } from "../example";
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/aspect-ratio-example.json
 import { PreviewImage as Image } from "../preview-image";
 
 export function Preview() {
@@ -18,15 +17,12 @@ export function Preview() {
 function AspectRatio16x9() {
   return (
     <Example title="16:9" className="items-center justify-center">
-      <AspectRatio
-        ratio={16 / 9}
-        className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none rounded-lg bg-muted"
-      >
+      <AspectRatio ratio={16 / 9} className="style-luma:rounded-3xl rounded-lg bg-muted">
         <Image
           src="https://avatar.vercel.sh/shadcn1"
           alt="Photo"
           fill
-          className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none h-full w-full rounded-lg object-cover grayscale dark:brightness-20"
+          className="style-luma:rounded-3xl h-full w-full rounded-lg object-cover grayscale dark:brightness-20"
         />
       </AspectRatio>
     </Example>
@@ -36,15 +32,12 @@ function AspectRatio16x9() {
 function AspectRatio1x1() {
   return (
     <Example title="1:1" className="items-start">
-      <AspectRatio
-        ratio={1 / 1}
-        className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none rounded-lg bg-muted"
-      >
+      <AspectRatio ratio={1 / 1} className="style-luma:rounded-3xl rounded-lg bg-muted">
         <Image
           src="https://avatar.vercel.sh/shadcn1"
           alt="Photo"
           fill
-          className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none h-full w-full rounded-lg object-cover grayscale dark:brightness-20"
+          className="style-luma:rounded-3xl h-full w-full rounded-lg object-cover grayscale dark:brightness-20"
         />
       </AspectRatio>
     </Example>
@@ -54,15 +47,12 @@ function AspectRatio1x1() {
 function AspectRatio9x16() {
   return (
     <Example title="9:16" className="items-center justify-center">
-      <AspectRatio
-        ratio={9 / 16}
-        className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none rounded-lg bg-muted"
-      >
+      <AspectRatio ratio={9 / 16} className="style-luma:rounded-3xl rounded-lg bg-muted">
         <Image
           src="https://avatar.vercel.sh/shadcn1"
           alt="Photo"
           fill
-          className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none h-full w-full rounded-lg object-cover grayscale dark:brightness-20"
+          className="style-luma:rounded-3xl h-full w-full rounded-lg object-cover grayscale dark:brightness-20"
         />
       </AspectRatio>
     </Example>
@@ -72,15 +62,12 @@ function AspectRatio9x16() {
 function AspectRatio21x9() {
   return (
     <Example title="21:9" className="items-center justify-center">
-      <AspectRatio
-        ratio={21 / 9}
-        className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none rounded-lg bg-muted"
-      >
+      <AspectRatio ratio={21 / 9} className="style-luma:rounded-3xl rounded-lg bg-muted">
         <Image
           src="https://avatar.vercel.sh/shadcn1"
           alt="Photo"
           fill
-          className="style-lyra:rounded-none style-luma:rounded-3xl style-sera:rounded-none h-full w-full rounded-lg object-cover grayscale dark:brightness-20"
+          className="style-luma:rounded-3xl h-full w-full rounded-lg object-cover grayscale dark:brightness-20"
         />
       </AspectRatio>
     </Example>

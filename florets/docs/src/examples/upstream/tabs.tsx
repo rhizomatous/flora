@@ -18,7 +18,6 @@ import {
 import { Input } from "@flora/florets/components/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@flora/florets/components/tabs";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/tabs-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {
@@ -110,11 +109,11 @@ function TabsWithIcons() {
       <Tabs defaultValue="preview">
         <TabsList>
           <TabsTrigger value="preview">
-            <AppWindowIcon data-icon="inline-start" />
+            <AppWindowIcon />
             Preview
           </TabsTrigger>
           <TabsTrigger value="code">
-            <CodeIcon data-icon="inline-start" />
+            <CodeIcon />
             Code
           </TabsTrigger>
         </TabsList>
@@ -167,7 +166,7 @@ function TabsWithContent() {
           <TabsTrigger value="password">Password</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
-        <div className="style-vega:rounded-lg style-vega:p-6 style-nova:rounded-lg style-nova:p-4 style-lyra:rounded-none style-lyra:p-4 style-maia:rounded-xl style-maia:p-6 style-mira:rounded-md style-mira:p-4 style-luma:rounded-xl style-luma:p-6 style-sera:rounded-none style-sera:p-6 style-rhea:rounded-xl style-rhea:p-6 border">
+        <div className="style-vega:rounded-lg style-vega:p-6 style-nova:rounded-lg style-nova:p-4 style-lyra:rounded-none style-lyra:p-4 style-maia:rounded-xl style-maia:p-6 style-mira:rounded-md style-mira:p-4 style-luma:rounded-xl style-luma:p-6 style-rhea:rounded-xl style-rhea:p-6 border">
           <TabsContent value="account">
             Manage your account preferences and profile information.
           </TabsContent>
@@ -192,7 +191,7 @@ function TabsLineWithContent() {
           <TabsTrigger value="password">Password</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
-        <div className="style-vega:rounded-lg style-vega:p-6 style-nova:rounded-lg style-nova:p-4 style-lyra:rounded-none style-lyra:p-4 style-maia:rounded-xl style-maia:p-6 style-mira:rounded-md style-mira:p-4 style-luma:rounded-xl style-luma:p-6 style-sera:rounded-none style-sera:p-6 style-rhea:rounded-xl style-rhea:p-6 border">
+        <div className="style-vega:rounded-lg style-vega:p-6 style-nova:rounded-lg style-nova:p-4 style-lyra:rounded-none style-lyra:p-4 style-maia:rounded-xl style-maia:p-6 style-mira:rounded-md style-mira:p-4 style-luma:rounded-xl style-luma:p-6 style-rhea:rounded-xl style-rhea:p-6 border">
           <TabsContent value="account">
             Manage your account preferences and profile information.
           </TabsContent>
@@ -235,11 +234,9 @@ function TabsWithDropdown() {
             <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-8">
-                <MoreHorizontalIcon />
-                <span className="sr-only">More options</span>
-              </Button>
+            <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="size-8" />}>
+              <MoreHorizontalIcon />
+              <span className="sr-only">More options</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem>Settings</DropdownMenuItem>
@@ -250,7 +247,7 @@ function TabsWithDropdown() {
           </DropdownMenu>
         </div>
 
-        <div className="style-vega:rounded-lg style-vega:p-6 style-nova:rounded-lg style-nova:p-4 style-lyra:rounded-none style-lyra:p-4 style-maia:rounded-xl style-maia:p-6 style-mira:rounded-md style-mira:p-4 style-luma:rounded-xl style-luma:p-6 style-sera:rounded-none style-sera:p-6 style-rhea:rounded-xl style-rhea:p-6 border">
+        <div className="style-vega:rounded-lg style-vega:p-6 style-nova:rounded-lg style-nova:p-4 style-lyra:rounded-none style-lyra:p-4 style-maia:rounded-xl style-maia:p-6 style-mira:rounded-md style-mira:p-4 style-luma:rounded-xl style-luma:p-6 style-rhea:rounded-xl style-rhea:p-6 border">
           <TabsContent value="overview">
             View your dashboard metrics and key performance indicators.
           </TabsContent>
@@ -273,7 +270,7 @@ function TabsVertical() {
           <TabsTrigger value="password">Password</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
-        <div className="style-vega:rounded-lg style-vega:p-6 style-nova:rounded-lg style-nova:p-4 style-lyra:rounded-none style-lyra:p-4 style-maia:rounded-xl style-maia:p-6 style-mira:rounded-md style-mira:p-4 style-luma:rounded-xl style-luma:p-6 style-sera:rounded-none style-sera:p-6 style-rhea:rounded-xl style-rhea:p-6 border">
+        <div className="style-vega:rounded-lg style-vega:p-6 style-nova:rounded-lg style-nova:p-4 style-lyra:rounded-none style-lyra:p-4 style-maia:rounded-xl style-maia:p-6 style-mira:rounded-md style-mira:p-4 style-luma:rounded-xl style-luma:p-6 style-rhea:rounded-xl style-rhea:p-6 border">
           <TabsContent value="account">
             Manage your account preferences and profile information.
           </TabsContent>
@@ -305,7 +302,7 @@ function TabsWithInputAndButton() {
             <Button>Action</Button>
           </div>
         </div>
-        <div className="style-vega:rounded-lg style-vega:p-6 style-nova:rounded-lg style-nova:p-4 style-lyra:rounded-none style-lyra:p-4 style-maia:rounded-xl style-maia:p-6 style-mira:rounded-md style-mira:p-4 style-luma:rounded-xl style-luma:p-6 style-sera:rounded-none style-sera:p-6 style-rhea:rounded-xl style-rhea:p-6 border">
+        <div className="style-vega:rounded-lg style-vega:p-6 style-nova:rounded-lg style-nova:p-4 style-lyra:rounded-none style-lyra:p-4 style-maia:rounded-xl style-maia:p-6 style-mira:rounded-md style-mira:p-4 style-luma:rounded-xl style-luma:p-6 style-rhea:rounded-xl style-rhea:p-6 border">
           <TabsContent value="overview">
             View your dashboard metrics and key performance indicators.
           </TabsContent>

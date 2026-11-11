@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
 
-import { chromium, expect } from "@playwright/test";
+import { test, expect } from "./fixtures.ts";
 
-const browser = await chromium.launch();
-try {
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+test("questionnaire validation, navigation, and retry", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   let accepted = false;
@@ -57,7 +56,7 @@ try {
       json: accepted ? {} : { error: "Retry this answer" },
     });
   });
-  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5200";
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
   await page.goto(`${base}/#chats/waiting`);
   const form = page.getByRole("form", { name: "Questions", exact: true });
   await expect(form).toHaveAttribute("data-slot", "questionnaire");
@@ -100,9 +99,4 @@ try {
   );
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
   assert.deepEqual(errors, []);
-  console.log(
-    "Questionnaire: required answers, multiple selections, custom replacement, navigation, retry, and phone layout passed.",
-  );
-} finally {
-  await browser.close();
-}
+});

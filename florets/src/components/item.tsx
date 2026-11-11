@@ -1,5 +1,6 @@
+import { mergeProps } from "@base-ui/react/merge-props";
+import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
-import { Slot } from "radix-ui";
 import type { ComponentProps } from "react";
 
 import { cn } from "../lib/utils";
@@ -11,7 +12,7 @@ function ItemGroup({ className, ...props }: ComponentProps<"div">) {
       role="list"
       data-slot="item-group"
       className={cn(
-        "gap-4 has-data-[size=sm]:gap-2.5 has-data-[size=xs]:gap-2 group/item-group flex w-full flex-col",
+        "group/item-group flex w-full flex-col gap-4 has-data-[size=sm]:gap-2.5 has-data-[size=xs]:gap-2",
         className,
       )}
       {...props}
@@ -37,7 +38,7 @@ const itemVariants = cva(
       variant: {
         default: "border-transparent",
         outline: "border-border",
-        muted: "bg-muted/50 border-transparent",
+        muted: "border-transparent bg-muted/50",
       },
       size: {
         default: "gap-2.5 px-3 py-2.5",
@@ -56,23 +57,29 @@ function Item({
   className,
   variant = "default",
   size = "default",
-  asChild = false,
+  render,
   ...props
-}: ComponentProps<"div"> & VariantProps<typeof itemVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot.Root : "div";
-  return (
-    <Comp
-      data-slot="item"
-      data-variant={variant}
-      data-size={size}
-      className={cn(itemVariants({ variant, size, className }))}
-      {...props}
-    />
-  );
+}: useRender.ComponentProps<"div"> & VariantProps<typeof itemVariants>) {
+  const classes = cn(itemVariants({ variant, size, className }));
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">(
+      {
+        className: classes,
+      },
+      props,
+    ),
+    render,
+    state: {
+      slot: "item",
+      variant,
+      size,
+    },
+  });
 }
 
 const itemMediaVariants = cva(
-  "gap-2 group-has-data-[slot=item-description]/item:translate-y-0.5 group-has-data-[slot=item-description]/item:self-start flex shrink-0 items-center justify-center [&_svg]:pointer-events-none",
+  "flex shrink-0 items-center justify-center gap-2 group-has-data-[slot=item-description]/item:translate-y-0.5 group-has-data-[slot=item-description]/item:self-start [&_svg]:pointer-events-none",
   {
     variants: {
       variant: {
@@ -121,7 +128,7 @@ function ItemTitle({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="item-title"
       className={cn(
-        "gap-2 text-sm leading-snug font-medium underline-offset-4 line-clamp-1 flex w-fit items-center",
+        "line-clamp-1 flex w-fit items-center gap-2 text-sm leading-snug font-medium underline-offset-4",
         className,
       )}
       {...props}
@@ -144,7 +151,7 @@ function ItemDescription({ className, ...props }: ComponentProps<"p">) {
 
 function ItemActions({ className, ...props }: ComponentProps<"div">) {
   return (
-    <div data-slot="item-actions" className={cn("gap-2 flex items-center", className)} {...props} />
+    <div data-slot="item-actions" className={cn("flex items-center gap-2", className)} {...props} />
   );
 }
 
@@ -152,7 +159,7 @@ function ItemHeader({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="item-header"
-      className={cn("gap-2 flex basis-full items-center justify-between", className)}
+      className={cn("flex basis-full items-center justify-between gap-2", className)}
       {...props}
     />
   );
@@ -162,7 +169,7 @@ function ItemFooter({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="item-footer"
-      className={cn("gap-2 flex basis-full items-center justify-between", className)}
+      className={cn("flex basis-full items-center justify-between gap-2", className)}
       {...props}
     />
   );

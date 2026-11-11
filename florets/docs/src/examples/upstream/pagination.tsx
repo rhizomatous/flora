@@ -17,7 +17,6 @@ import {
   SelectValue,
 } from "@flora/florets/components/select";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/pagination-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {
@@ -91,7 +90,7 @@ function PaginationSimple() {
 
 function PaginationIconsOnly() {
   return (
-    <Example title="With Select" containerClassName="col-span-2">
+    <Example title="With Select">
       <div className="flex items-center justify-between gap-4">
         <Field orientation="horizontal" className="w-fit">
           <FieldLabel htmlFor="select-rows-per-page">Rows per page</FieldLabel>

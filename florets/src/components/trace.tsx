@@ -56,7 +56,7 @@ function TraceTitle({ className, ...props }: ComponentProps<"span">) {
   return (
     <span
       data-slot="trace-title"
-      className={cn("cn-trace-title min-w-0 truncate motion-reduce:shimmer-none", className)}
+      className={cn("florets-trace-title min-w-0 truncate motion-reduce:shimmer-none", className)}
       {...props}
     />
   );
@@ -67,7 +67,7 @@ function TraceDescription({ className, ...props }: ComponentProps<"span">) {
     <span
       data-slot="trace-description"
       className={cn(
-        "cn-trace-description shrink-0 text-muted-foreground/70 tabular-nums",
+        "florets-trace-description shrink-0 text-muted-foreground/70 tabular-nums",
         className,
       )}
       {...props}
@@ -78,7 +78,7 @@ function TraceDescription({ className, ...props }: ComponentProps<"span">) {
 function TraceCollapsible({
   className,
   ...props
-}: Omit<ComponentProps<typeof Collapsible>, "asChild" | "open"> &
+}: Omit<ComponentProps<typeof Collapsible>, "render" | "open"> &
   (
     | { open?: undefined }
     | {
@@ -89,7 +89,7 @@ function TraceCollapsible({
   return (
     <Collapsible
       data-slot="trace-collapsible"
-      className={cn("cn-trace-collapsible flex w-full min-w-0 flex-col", className)}
+      className={cn("florets-trace-collapsible flex w-full min-w-0 flex-col", className)}
       {...props}
     />
   );
@@ -99,7 +99,7 @@ function TraceCollapsibleTrigger({
   className,
   children,
   ...props
-}: Omit<ComponentProps<typeof CollapsibleTrigger>, "asChild">) {
+}: Omit<ComponentProps<typeof CollapsibleTrigger>, "render">) {
   return (
     <CollapsibleTrigger
       data-slot="trace-collapsible-trigger"
@@ -121,11 +121,11 @@ function TraceCollapsibleContent({
   className,
   children,
   ...props
-}: Omit<ComponentProps<typeof CollapsibleContent>, "asChild">) {
+}: Omit<ComponentProps<typeof CollapsibleContent>, "render">) {
   return (
     <CollapsibleContent
       data-slot="trace-collapsible-content"
-      className="min-w-0 overflow-hidden duration-200 [--radix-accordion-content-height:var(--radix-collapsible-content-height)] data-open:animate-accordion-down data-closed:animate-accordion-up"
+      className="min-w-0 overflow-hidden duration-200 [--accordion-panel-height:var(--collapsible-panel-height)] data-open:animate-accordion-down data-closed:animate-accordion-up"
       {...props}
     >
       <div

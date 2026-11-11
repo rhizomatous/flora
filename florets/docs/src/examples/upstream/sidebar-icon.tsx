@@ -1,6 +1,5 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
+// oxlint-disable jsx-a11y/control-has-associated-label -- Render elements receive their accessible content from the owning component.
 // oxlint-disable typescript/no-unnecessary-condition -- The upstream examples retain guards for incomplete runtime payloads.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/sidebar-icon-example.json
 "use client";
 
 import {
@@ -14,7 +13,7 @@ import {
   Settings2Icon,
   TerminalSquareIcon,
 } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@flora/florets/components/avatar";
 import { Button } from "@flora/florets/components/button";
@@ -63,7 +62,7 @@ export function Preview() {
     user: {
       name: "shadcn",
       email: "m@example.com",
-      avatar: "https://ui.shadcn.com/avatars/shadcn.jpg",
+      avatar: "/avatars/shadcn.jpg",
     },
     teams: [
       {
@@ -185,10 +184,9 @@ export function Preview() {
     ],
   };
 
-  const [activeTeam, setActiveTeam] = React.useState(
-    data.teams[0] ?? { name: "Acme Inc", plan: "Enterprise" },
-  );
+  const [activeTeam, setActiveTeam] = useState(data.teams[0]);
 
+  if (!activeTeam) return null;
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon">
@@ -196,50 +194,52 @@ export function Preview() {
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton
-                    size="lg"
-                    className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
-                  >
-                    <Button size="icon-sm" asChild className="size-8">
-                      <span>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-                          <rect width="256" height="256" fill="none" />
-                          <line
-                            x1="208"
-                            y1="128"
-                            x2="128"
-                            y2="208"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="32"
-                          />
-                          <line
-                            x1="192"
-                            y1="40"
-                            x2="40"
-                            y2="192"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="32"
-                          />
-                        </svg>
-                      </span>
-                    </Button>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-medium">{activeTeam.name}</span>
-                      <span className="truncate text-xs">{activeTeam.plan}</span>
-                    </div>
-                    <ChevronsUpDownIcon />
-                  </SidebarMenuButton>
+                <DropdownMenuTrigger
+                  render={
+                    <SidebarMenuButton
+                      size="lg"
+                      className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
+                    />
+                  }
+                >
+                  <Button size="icon-sm" render={<span />} nativeButton={false} className="size-8">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+                      <rect width="256" height="256" fill="none" />
+                      <line
+                        x1="208"
+                        y1="128"
+                        x2="128"
+                        y2="208"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="32"
+                      />
+                      <line
+                        x1="192"
+                        y1="40"
+                        x2="40"
+                        y2="192"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="32"
+                      />
+                    </svg>
+                  </Button>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">{activeTeam.name}</span>
+                    <span className="truncate text-xs">{activeTeam.plan}</span>
+                  </div>
+                  <ChevronsUpDownIcon />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuGroup>
                     <DropdownMenuLabel>Teams</DropdownMenuLabel>
+                  </DropdownMenuGroup>
+                  <DropdownMenuGroup>
                     {data.teams.map((team) => (
                       <DropdownMenuItem
                         key={team.name}
@@ -263,24 +263,21 @@ export function Preview() {
               {data.navMain.map((item) => (
                 <Collapsible
                   key={item.title}
-                  asChild
                   defaultOpen={item.isActive}
                   className="group/collapsible"
                 >
                   <SidebarMenuItem>
-                    <SidebarMenuButton tooltip={item.title} asChild>
-                      <CollapsibleTrigger>
-                        {item.icon}
-                        <span>{item.title}</span>
-                        <ChevronRightIcon className="ml-auto transition-transform duration-100 group-data-open/collapsible:rotate-90" />
-                      </CollapsibleTrigger>
-                    </SidebarMenuButton>
+                    <CollapsibleTrigger render={<SidebarMenuButton tooltip={item.title} />}>
+                      {item.icon}
+                      <span>{item.title}</span>
+                      <ChevronRightIcon className="ml-auto transition-transform duration-100 group-data-open/collapsible:rotate-90" />
+                    </CollapsibleTrigger>
                     <CollapsibleContent>
                       <SidebarMenuSub>
                         {item.items?.map((subItem) => (
                           <SidebarMenuSubItem key={subItem.title}>
-                            <SidebarMenuSubButton asChild>
-                              <a href={subItem.url}>{subItem.title}</a>
+                            <SidebarMenuSubButton render={<a href={subItem.url} />}>
+                              {subItem.title}
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         ))}
@@ -296,11 +293,9 @@ export function Preview() {
             <SidebarMenu>
               {data.projects.map((item) => (
                 <SidebarMenuItem key={item.name}>
-                  <SidebarMenuButton asChild>
-                    <a href={item.url}>
-                      {item.icon}
-                      {item.name}
-                    </a>
+                  <SidebarMenuButton render={<a href={item.url} />}>
+                    {item.icon}
+                    {item.name}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -311,21 +306,23 @@ export function Preview() {
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton
-                    size="lg"
-                    className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
-                  >
-                    <Avatar>
-                      <AvatarImage src={data.user.avatar} alt={data.user.name} />
-                      <AvatarFallback className="rounded-lg">CN</AvatarFallback>
-                    </Avatar>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-medium">{data.user.name}</span>
-                      <span className="truncate text-xs">{data.user.email}</span>
-                    </div>
-                    <ChevronsUpDownIcon />
-                  </SidebarMenuButton>
+                <DropdownMenuTrigger
+                  render={
+                    <SidebarMenuButton
+                      size="lg"
+                      className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
+                    />
+                  }
+                >
+                  <Avatar>
+                    <AvatarImage src={data.user.avatar} alt={data.user.name} />
+                    <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                  </Avatar>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">{data.user.name}</span>
+                    <span className="truncate text-xs">{data.user.email}</span>
+                  </div>
+                  <ChevronsUpDownIcon />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuGroup>
@@ -367,7 +364,7 @@ export function Preview() {
             <SidebarTrigger className="-ml-1" />
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4">
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <div className="grid auto-rows-min gap-4 md:grid-cols-3">
             <div className="aspect-video rounded-xl bg-muted/50" />
             <div className="aspect-video rounded-xl bg-muted/50" />

@@ -1,5 +1,5 @@
+// oxlint-disable jsx-a11y/control-has-associated-label -- Render elements receive their accessible content from the owning component.
 // oxlint-disable typescript/strict-boolean-expressions -- The upstream examples use truthiness for optional props and React children.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/sidebar-inset-example.json
 "use client";
 
 import {
@@ -145,42 +145,36 @@ export function Preview() {
             <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
             <SidebarMenu>
               {data.navMain.map((item) => (
-                <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={item.title}
-                      isActive={item.isActive ?? false}
-                    >
-                      <a href={item.url}>
-                        {item.icon}
-                        <span>{item.title}</span>
-                      </a>
-                    </SidebarMenuButton>
-                    {item.items?.length ? (
-                      <>
-                        <CollapsibleTrigger asChild>
-                          <SidebarMenuAction className="data-[state=open]:rotate-90">
-                            <ChevronRightIcon />
-                            <span className="sr-only">Toggle</span>
-                          </SidebarMenuAction>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <SidebarMenuSub>
-                            {item.items.map((subItem) => (
-                              <SidebarMenuSubItem key={subItem.title}>
-                                <SidebarMenuSubButton asChild>
-                                  <a href={subItem.url}>
-                                    <span>{subItem.title}</span>
-                                  </a>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
-                            ))}
-                          </SidebarMenuSub>
-                        </CollapsibleContent>
-                      </>
-                    ) : null}
-                  </SidebarMenuItem>
+                <Collapsible
+                  key={item.title}
+                  defaultOpen={item.isActive}
+                  render={<SidebarMenuItem />}
+                >
+                  <SidebarMenuButton render={<a href={item.url} />} isActive={!!item.isActive}>
+                    {item.icon}
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                  {item.items?.length ? (
+                    <>
+                      <CollapsibleTrigger
+                        render={<SidebarMenuAction className="data-open:rotate-90" />}
+                      >
+                        <ChevronRightIcon />
+                        <span className="sr-only">Toggle</span>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {item.items.map((subItem) => (
+                            <SidebarMenuSubItem key={subItem.title}>
+                              <SidebarMenuSubButton render={<a href={subItem.url} />}>
+                                {subItem.title}
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </>
+                  ) : null}
                 </Collapsible>
               ))}
             </SidebarMenu>
@@ -190,11 +184,9 @@ export function Preview() {
               <SidebarMenu>
                 {data.navSecondary.map((item) => (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild size="sm">
-                      <a href={item.url}>
-                        {item.icon}
-                        <span>{item.title}</span>
-                      </a>
+                    <SidebarMenuButton render={<a href={item.url} />} size="sm">
+                      {item.icon}
+                      <span>{item.title}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}

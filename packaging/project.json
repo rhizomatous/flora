@@ -5,7 +5,11 @@
       "inputs": [
         "go",
         "image",
-        "{workspaceRoot}/packaging/**/*"
+        "{workspaceRoot}/packaging/**/*",
+        "webBuild",
+        "{workspaceRoot}/scripts/*.py",
+        "{workspaceRoot}/scripts/check-{deployment,package,release-linux}.sh",
+        "{workspaceRoot}/scripts/{install,package-release,publish-release}.sh"
       ],
       "command": "bash scripts/check-package.sh"
     }

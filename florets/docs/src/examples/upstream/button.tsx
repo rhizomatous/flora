@@ -1,13 +1,23 @@
-import { ArrowLeftCircleIcon, ArrowRightIcon } from "lucide-react";
+import { PlusIcon, ArrowLeftCircleIcon, ArrowRightIcon } from "lucide-react";
 
-import { Button } from "@flora/florets/components/button";
+import { Button, buttonVariants } from "@flora/florets/components/button";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/button-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {
   return (
     <ExampleWrapper className="lg:grid-cols-1 2xl:grid-cols-1">
+      <ButtonActionStyles />
+      <Example title="Compact controls">
+        <Button variant="ghost" size="compact" aria-expanded>
+          <PlusIcon />
+          <span className="florets-control-label">Expanded panel</span>
+        </Button>
+        <Button variant="tertiary" size="compact">
+          <ArrowRightIcon />
+          <span className="florets-control-label">Open project</span>
+        </Button>
+      </Example>
       <ButtonVariantsAndSizes />
       <ButtonIconRight />
       <ButtonIconLeft />
@@ -119,7 +129,7 @@ function ButtonIconRight() {
           Secondary <ArrowRightIcon data-icon="inline-end" />
         </Button>
         <Button size="sm" variant="outline">
-          Outline <ArrowRightIcon data-icon="inline-end" />
+          Outline <ArrowRightIcon />
         </Button>
         <Button size="sm" variant="ghost">
           Ghost <ArrowRightIcon data-icon="inline-end" />
@@ -266,82 +276,82 @@ function ButtonIconOnly() {
   return (
     <Example title="Icon Only">
       <div className="flex flex-wrap items-center gap-2">
-        <Button aria-label="Continue" size="icon-xs">
+        <Button size="icon-xs">
           <ArrowRightIcon />
         </Button>
-        <Button aria-label="Continue" size="icon-xs" variant="secondary">
+        <Button size="icon-xs" variant="secondary">
           <ArrowRightIcon />
         </Button>
-        <Button aria-label="Continue" size="icon-xs" variant="outline">
+        <Button size="icon-xs" variant="outline">
           <ArrowRightIcon />
         </Button>
-        <Button aria-label="Continue" size="icon-xs" variant="ghost">
+        <Button size="icon-xs" variant="ghost">
           <ArrowRightIcon />
         </Button>
-        <Button aria-label="Continue" size="icon-xs" variant="destructive">
+        <Button size="icon-xs" variant="destructive">
           <ArrowRightIcon />
         </Button>
-        <Button aria-label="Continue" size="icon-xs" variant="link">
-          <ArrowRightIcon />
-        </Button>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button aria-label="Continue" size="icon-sm">
-          <ArrowRightIcon />
-        </Button>
-        <Button aria-label="Continue" size="icon-sm" variant="secondary">
-          <ArrowRightIcon />
-        </Button>
-        <Button aria-label="Continue" size="icon-sm" variant="outline">
-          <ArrowRightIcon />
-        </Button>
-        <Button aria-label="Continue" size="icon-sm" variant="ghost">
-          <ArrowRightIcon />
-        </Button>
-        <Button aria-label="Continue" size="icon-sm" variant="destructive">
-          <ArrowRightIcon />
-        </Button>
-        <Button aria-label="Continue" size="icon-sm" variant="link">
+        <Button size="icon-xs" variant="link">
           <ArrowRightIcon />
         </Button>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button aria-label="Continue" size="icon">
+        <Button size="icon-sm">
           <ArrowRightIcon />
         </Button>
-        <Button aria-label="Continue" size="icon" variant="secondary">
+        <Button size="icon-sm" variant="secondary">
           <ArrowRightIcon />
         </Button>
-        <Button aria-label="Continue" size="icon" variant="outline">
+        <Button size="icon-sm" variant="outline">
           <ArrowRightIcon />
         </Button>
-        <Button aria-label="Continue" size="icon" variant="ghost">
+        <Button size="icon-sm" variant="ghost">
           <ArrowRightIcon />
         </Button>
-        <Button aria-label="Continue" size="icon" variant="destructive">
+        <Button size="icon-sm" variant="destructive">
           <ArrowRightIcon />
         </Button>
-        <Button aria-label="Continue" size="icon" variant="link">
+        <Button size="icon-sm" variant="link">
           <ArrowRightIcon />
         </Button>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button aria-label="Continue" size="icon-lg">
+        <Button size="icon">
           <ArrowRightIcon />
         </Button>
-        <Button aria-label="Continue" size="icon-lg" variant="secondary">
+        <Button size="icon" variant="secondary">
           <ArrowRightIcon />
         </Button>
-        <Button aria-label="Continue" size="icon-lg" variant="outline">
+        <Button size="icon" variant="outline">
           <ArrowRightIcon />
         </Button>
-        <Button aria-label="Continue" size="icon-lg" variant="ghost">
+        <Button size="icon" variant="ghost">
           <ArrowRightIcon />
         </Button>
-        <Button aria-label="Continue" size="icon-lg" variant="destructive">
+        <Button size="icon" variant="destructive">
           <ArrowRightIcon />
         </Button>
-        <Button aria-label="Continue" size="icon-lg" variant="link">
+        <Button size="icon" variant="link">
+          <ArrowRightIcon />
+        </Button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="icon-lg">
+          <ArrowRightIcon />
+        </Button>
+        <Button size="icon-lg" variant="secondary">
+          <ArrowRightIcon />
+        </Button>
+        <Button size="icon-lg" variant="outline">
+          <ArrowRightIcon />
+        </Button>
+        <Button size="icon-lg" variant="ghost">
+          <ArrowRightIcon />
+        </Button>
+        <Button size="icon-lg" variant="destructive">
+          <ArrowRightIcon />
+        </Button>
+        <Button size="icon-lg" variant="link">
           <ArrowRightIcon />
         </Button>
       </div>
@@ -361,10 +371,13 @@ function ButtonExamples() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="destructive">Delete</Button>
-          <Button aria-label="Continue" size="icon">
+          <Button size="icon">
             <ArrowRightIcon data-icon="inline-end" />
           </Button>
         </div>
+        <a href="#components/button" className={buttonVariants()}>
+          Button documentation
+        </a>
       </div>
     </Example>
   );
@@ -451,6 +464,28 @@ function ButtonInvalidStates() {
           Link
         </Button>
       </div>
+    </Example>
+  );
+}
+
+function ButtonActionStyles() {
+  return (
+    <Example title="Action hierarchy">
+      {(["primary", "secondary", "ghost", "tertiary"] as const).map((variant) => (
+        <div key={variant} className="flex flex-wrap items-center gap-3">
+          <Button variant={variant} size="sm">
+            <PlusIcon />
+            {variant}
+          </Button>
+          <Button variant={variant} size="icon-sm" aria-label={`Add (${variant})`}>
+            <PlusIcon />
+          </Button>
+          <Button variant={variant} size="sm" disabled>
+            <PlusIcon />
+            Unavailable
+          </Button>
+        </div>
+      ))}
     </Example>
   );
 }

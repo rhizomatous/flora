@@ -1,5 +1,3 @@
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/breadcrumb-example.json
-import { Link } from "@flora/florets";
 import {
   Breadcrumb,
   BreadcrumbEllipsis,
@@ -16,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@flora/florets/components/dropdown-menu";
+import { Link } from "@flora/florets/components/link";
 
 import { Example, ExampleWrapper } from "../example";
 
@@ -62,11 +61,9 @@ function BreadcrumbWithDropdown() {
           <BreadcrumbSeparator />
           <BreadcrumbItem>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="icon-sm" variant="ghost">
-                  <BreadcrumbEllipsis />
-                  <span className="sr-only">Toggle menu</span>
-                </Button>
+              <DropdownMenuTrigger render={<Button size="icon-sm" variant="ghost" />}>
+                <BreadcrumbEllipsis />
+                <span className="sr-only">Toggle menu</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem>Documentation</DropdownMenuItem>
@@ -95,9 +92,7 @@ function BreadcrumbWithLink() {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="#">Home</Link>
-            </BreadcrumbLink>
+            <BreadcrumbLink render={<Link href="#">Home</Link>} />
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
@@ -105,9 +100,7 @@ function BreadcrumbWithLink() {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="#">Components</Link>
-            </BreadcrumbLink>
+            <BreadcrumbLink render={<Link href="#">Components</Link>} />
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>

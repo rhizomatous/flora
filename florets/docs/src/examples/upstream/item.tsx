@@ -1,19 +1,10 @@
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 // oxlint-disable jsx-a11y/control-has-associated-label -- Nested title and code components provide the visible content.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/item-example.json
 "use client";
 
-import { FileIcon, FileSearchIcon, InboxIcon } from "lucide-react";
+import { InboxIcon } from "lucide-react";
 
 import { Button } from "@flora/florets/components/button";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@flora/florets/components/drawer";
 import {
   Item,
   ItemActions,
@@ -52,7 +43,6 @@ export function Preview() {
       <ItemHeaderExamples />
       <ItemFooterExamples />
       <ItemHeaderAndFooterExamples />
-      <ItemWithDrawer />
       <DefaultVariantItemsWithImage />
       <OutlineVariantItemsWithImage />
       <OutlineVariantItemsWithImageSmall />
@@ -641,11 +631,15 @@ function DefaultVariantItemsExtraSmall() {
       <Item size="xs">
         <ItemContent>
           <ItemTitle>Title + Description</ItemTitle>
+          <ItemDescription>This is a description that provides additional context.</ItemDescription>
         </ItemContent>
       </Item>
       <Item size="xs">
         <ItemContent>
           <ItemTitle>Title + Description + Button</ItemTitle>
+          <ItemDescription>
+            This item includes a title, description, and action button.
+          </ItemDescription>
         </ItemContent>
         <ItemActions>
           <Button variant="outline" size="sm">
@@ -678,6 +672,7 @@ function DefaultVariantItemsExtraSmall() {
         </ItemMedia>
         <ItemContent>
           <ItemTitle>Media + Title + Description</ItemTitle>
+          <ItemDescription>This item includes media, title, and description.</ItemDescription>
         </ItemContent>
       </Item>
       <Item size="xs">
@@ -686,6 +681,9 @@ function DefaultVariantItemsExtraSmall() {
         </ItemMedia>
         <ItemContent>
           <ItemTitle>Media + Title + Description + Button</ItemTitle>
+          <ItemDescription>
+            Complete item with all components: media, title, description, and button.
+          </ItemDescription>
         </ItemContent>
         <ItemActions>
           <Button size="sm">Action</Button>
@@ -694,6 +692,7 @@ function DefaultVariantItemsExtraSmall() {
       <Item size="xs">
         <ItemContent>
           <ItemTitle>Multiple Actions</ItemTitle>
+          <ItemDescription>Item with multiple action buttons in the actions area.</ItemDescription>
         </ItemContent>
         <ItemActions>
           <Button variant="outline" size="sm">
@@ -727,11 +726,15 @@ function OutlineVariantItemsExtraSmall() {
       <Item variant="outline" size="xs">
         <ItemContent>
           <ItemTitle>Title + Description</ItemTitle>
+          <ItemDescription>This is a description that provides additional context.</ItemDescription>
         </ItemContent>
       </Item>
       <Item variant="outline" size="xs">
         <ItemContent>
           <ItemTitle>Title + Description + Button</ItemTitle>
+          <ItemDescription>
+            This item includes a title, description, and action button.
+          </ItemDescription>
         </ItemContent>
         <ItemActions>
           <Button variant="outline" size="sm">
@@ -764,6 +767,7 @@ function OutlineVariantItemsExtraSmall() {
         </ItemMedia>
         <ItemContent>
           <ItemTitle>Media + Title + Description</ItemTitle>
+          <ItemDescription>This item includes media, title, and description.</ItemDescription>
         </ItemContent>
       </Item>
       <Item variant="outline" size="xs">
@@ -772,6 +776,9 @@ function OutlineVariantItemsExtraSmall() {
         </ItemMedia>
         <ItemContent>
           <ItemTitle>Media + Title + Description + Button</ItemTitle>
+          <ItemDescription>
+            Complete item with all components: media, title, description, and button.
+          </ItemDescription>
         </ItemContent>
         <ItemActions>
           <Button size="sm">Action</Button>
@@ -780,6 +787,7 @@ function OutlineVariantItemsExtraSmall() {
       <Item variant="outline" size="xs">
         <ItemContent>
           <ItemTitle>Multiple Actions</ItemTitle>
+          <ItemDescription>Item with multiple action buttons in the actions area.</ItemDescription>
         </ItemContent>
         <ItemActions>
           <Button variant="outline" size="sm">
@@ -813,11 +821,15 @@ function MutedVariantItemsExtraSmall() {
       <Item variant="muted" size="xs">
         <ItemContent>
           <ItemTitle>Title + Description</ItemTitle>
+          <ItemDescription>This is a description that provides additional context.</ItemDescription>
         </ItemContent>
       </Item>
       <Item variant="muted" size="xs">
         <ItemContent>
           <ItemTitle>Title + Description + Button</ItemTitle>
+          <ItemDescription>
+            This item includes a title, description, and action button.
+          </ItemDescription>
         </ItemContent>
         <ItemActions>
           <Button variant="outline" size="sm">
@@ -850,6 +862,7 @@ function MutedVariantItemsExtraSmall() {
         </ItemMedia>
         <ItemContent>
           <ItemTitle>Media + Title + Description</ItemTitle>
+          <ItemDescription>This item includes media, title, and description.</ItemDescription>
         </ItemContent>
       </Item>
       <Item variant="muted" size="xs">
@@ -858,6 +871,9 @@ function MutedVariantItemsExtraSmall() {
         </ItemMedia>
         <ItemContent>
           <ItemTitle>Media + Title + Description + Button</ItemTitle>
+          <ItemDescription>
+            Complete item with all components: media, title, description, and button.
+          </ItemDescription>
         </ItemContent>
         <ItemActions>
           <Button size="sm">Action</Button>
@@ -866,6 +882,7 @@ function MutedVariantItemsExtraSmall() {
       <Item variant="muted" size="xs">
         <ItemContent>
           <ItemTitle>Multiple Actions</ItemTitle>
+          <ItemDescription>Item with multiple action buttons in the actions area.</ItemDescription>
         </ItemContent>
         <ItemActions>
           <Button variant="outline" size="sm">
@@ -880,58 +897,48 @@ function MutedVariantItemsExtraSmall() {
 
 function DefaultLinkItems() {
   return (
-    <Example title="asChild">
+    <Example title="Render element">
       <ItemGroup>
-        <Item asChild>
-          <a href="#">
-            <ItemContent>
-              <ItemTitle>Title Only (Link)</ItemTitle>
-            </ItemContent>
-          </a>
+        <Item render={<a href="#" />}>
+          <ItemContent>
+            <ItemTitle>Title Only (Link)</ItemTitle>
+          </ItemContent>
         </Item>
-        <Item asChild>
-          <a href="#">
-            <ItemContent>
-              <ItemTitle>Title + Description (Link)</ItemTitle>
-              <ItemDescription>Clickable item with title and description.</ItemDescription>
-            </ItemContent>
-          </a>
+        <Item render={<a href="#" />}>
+          <ItemContent>
+            <ItemTitle>Title + Description (Link)</ItemTitle>
+            <ItemDescription>Clickable item with title and description.</ItemDescription>
+          </ItemContent>
         </Item>
-        <Item asChild>
-          <a href="#">
-            <ItemMedia variant="icon">
-              <InboxIcon />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>Media + Title (Link)</ItemTitle>
-            </ItemContent>
-          </a>
+        <Item render={<a href="#" />}>
+          <ItemMedia variant="icon">
+            <InboxIcon />
+          </ItemMedia>
+          <ItemContent>
+            <ItemTitle>Media + Title (Link)</ItemTitle>
+          </ItemContent>
         </Item>
-        <Item asChild>
-          <a href="#">
-            <ItemMedia variant="icon">
-              <InboxIcon />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>Media + Title + Description (Link)</ItemTitle>
-              <ItemDescription>
-                Complete link item with media, title, and description.
-              </ItemDescription>
-            </ItemContent>
-          </a>
+        <Item render={<a href="#" />}>
+          <ItemMedia variant="icon">
+            <InboxIcon />
+          </ItemMedia>
+          <ItemContent>
+            <ItemTitle>Media + Title + Description (Link)</ItemTitle>
+            <ItemDescription>
+              Complete link item with media, title, and description.
+            </ItemDescription>
+          </ItemContent>
         </Item>
-        <Item asChild>
-          <a href="#">
-            <ItemContent>
-              <ItemTitle>With Actions (Link)</ItemTitle>
-              <ItemDescription>Link item that also has action buttons.</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Button variant="outline" size="sm">
-                Share
-              </Button>
-            </ItemActions>
-          </a>
+        <Item render={<a href="#" />}>
+          <ItemContent>
+            <ItemTitle>With Actions (Link)</ItemTitle>
+            <ItemDescription>Link item that also has action buttons.</ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Button variant="outline" size="sm">
+              Share
+            </Button>
+          </ItemActions>
         </Item>
       </ItemGroup>
     </Example>
@@ -940,58 +947,48 @@ function DefaultLinkItems() {
 
 function OutlineLinkItems() {
   return (
-    <Example title="Outline - asChild">
+    <Example title="Outline - render element">
       <ItemGroup>
-        <Item variant="outline" asChild>
-          <a href="#">
-            <ItemContent>
-              <ItemTitle>Title Only (Link)</ItemTitle>
-            </ItemContent>
-          </a>
+        <Item variant="outline" render={<a href="#" />}>
+          <ItemContent>
+            <ItemTitle>Title Only (Link)</ItemTitle>
+          </ItemContent>
         </Item>
-        <Item variant="outline" asChild>
-          <a href="#">
-            <ItemContent>
-              <ItemTitle>Title + Description (Link)</ItemTitle>
-              <ItemDescription>Clickable item with title and description.</ItemDescription>
-            </ItemContent>
-          </a>
+        <Item variant="outline" render={<a href="#" />}>
+          <ItemContent>
+            <ItemTitle>Title + Description (Link)</ItemTitle>
+            <ItemDescription>Clickable item with title and description.</ItemDescription>
+          </ItemContent>
         </Item>
-        <Item variant="outline" asChild>
-          <a href="#">
-            <ItemMedia variant="icon">
-              <InboxIcon />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>Media + Title (Link)</ItemTitle>
-            </ItemContent>
-          </a>
+        <Item variant="outline" render={<a href="#" />}>
+          <ItemMedia variant="icon">
+            <InboxIcon />
+          </ItemMedia>
+          <ItemContent>
+            <ItemTitle>Media + Title (Link)</ItemTitle>
+          </ItemContent>
         </Item>
-        <Item variant="outline" asChild>
-          <a href="#">
-            <ItemMedia variant="icon">
-              <InboxIcon />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>Media + Title + Description (Link)</ItemTitle>
-              <ItemDescription>
-                Complete link item with media, title, and description.
-              </ItemDescription>
-            </ItemContent>
-          </a>
+        <Item variant="outline" render={<a href="#" />}>
+          <ItemMedia variant="icon">
+            <InboxIcon />
+          </ItemMedia>
+          <ItemContent>
+            <ItemTitle>Media + Title + Description (Link)</ItemTitle>
+            <ItemDescription>
+              Complete link item with media, title, and description.
+            </ItemDescription>
+          </ItemContent>
         </Item>
-        <Item variant="outline" asChild>
-          <a href="#">
-            <ItemContent>
-              <ItemTitle>With Actions (Link)</ItemTitle>
-              <ItemDescription>Link item that also has action buttons.</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Button variant="outline" size="sm">
-                Share
-              </Button>
-            </ItemActions>
-          </a>
+        <Item variant="outline" render={<a href="#" />}>
+          <ItemContent>
+            <ItemTitle>With Actions (Link)</ItemTitle>
+            <ItemDescription>Link item that also has action buttons.</ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Button variant="outline" size="sm">
+              Share
+            </Button>
+          </ItemActions>
         </Item>
       </ItemGroup>
     </Example>
@@ -1000,58 +997,48 @@ function OutlineLinkItems() {
 
 function MutedLinkItems() {
   return (
-    <Example title="Muted - asChild">
+    <Example title="Muted - render element">
       <ItemGroup>
-        <Item variant="muted" asChild>
-          <a href="#">
-            <ItemContent>
-              <ItemTitle>Title Only (Link)</ItemTitle>
-            </ItemContent>
-          </a>
+        <Item variant="muted" render={<a href="#" />}>
+          <ItemContent>
+            <ItemTitle>Title Only (Link)</ItemTitle>
+          </ItemContent>
         </Item>
-        <Item variant="muted" asChild>
-          <a href="#">
-            <ItemContent>
-              <ItemTitle>Title + Description (Link)</ItemTitle>
-              <ItemDescription>Clickable item with title and description.</ItemDescription>
-            </ItemContent>
-          </a>
+        <Item variant="muted" render={<a href="#" />}>
+          <ItemContent>
+            <ItemTitle>Title + Description (Link)</ItemTitle>
+            <ItemDescription>Clickable item with title and description.</ItemDescription>
+          </ItemContent>
         </Item>
-        <Item variant="muted" asChild>
-          <a href="#">
-            <ItemMedia variant="icon">
-              <InboxIcon />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>Media + Title (Link)</ItemTitle>
-            </ItemContent>
-          </a>
+        <Item variant="muted" render={<a href="#" />}>
+          <ItemMedia variant="icon">
+            <InboxIcon />
+          </ItemMedia>
+          <ItemContent>
+            <ItemTitle>Media + Title (Link)</ItemTitle>
+          </ItemContent>
         </Item>
-        <Item variant="muted" asChild>
-          <a href="#">
-            <ItemMedia variant="icon">
-              <InboxIcon />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>Media + Title + Description (Link)</ItemTitle>
-              <ItemDescription>
-                Complete link item with media, title, and description.
-              </ItemDescription>
-            </ItemContent>
-          </a>
+        <Item variant="muted" render={<a href="#" />}>
+          <ItemMedia variant="icon">
+            <InboxIcon />
+          </ItemMedia>
+          <ItemContent>
+            <ItemTitle>Media + Title + Description (Link)</ItemTitle>
+            <ItemDescription>
+              Complete link item with media, title, and description.
+            </ItemDescription>
+          </ItemContent>
         </Item>
-        <Item variant="muted" asChild>
-          <a href="#">
-            <ItemContent>
-              <ItemTitle>With Actions (Link)</ItemTitle>
-              <ItemDescription>Link item that also has action buttons.</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Button variant="outline" size="sm">
-                Share
-              </Button>
-            </ItemActions>
-          </a>
+        <Item variant="muted" render={<a href="#" />}>
+          <ItemContent>
+            <ItemTitle>With Actions (Link)</ItemTitle>
+            <ItemDescription>Link item that also has action buttons.</ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Button variant="outline" size="sm">
+              Share
+            </Button>
+          </ItemActions>
         </Item>
       </ItemGroup>
     </Example>
@@ -1340,51 +1327,6 @@ function ItemHeaderAndFooterExamples() {
           <span className="text-sm text-muted-foreground">Category: Technical • 3 attachments</span>
         </ItemFooter>
       </Item>
-    </Example>
-  );
-}
-
-function ItemWithDrawer() {
-  return (
-    <Example title="Item with Drawer">
-      <Drawer>
-        <Item asChild variant="outline">
-          <DrawerTrigger>
-            <ItemMedia variant="icon">
-              <FileSearchIcon />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>Explored 4 files</ItemTitle>
-              <ItemDescription>
-                Review the files that were searched for this answer.
-              </ItemDescription>
-            </ItemContent>
-          </DrawerTrigger>
-        </Item>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>Explored files</DrawerTitle>
-            <DrawerDescription>Files opened while generating the response.</DrawerDescription>
-          </DrawerHeader>
-          <div className="grid gap-3 p-4">
-            {[
-              "app/chat/page.tsx",
-              "components/message.tsx",
-              "lib/ai.ts",
-              "app/api/chat/route.ts",
-            ].map((file) => (
-              <Item key={file} variant="muted" size="sm">
-                <ItemMedia variant="icon">
-                  <FileIcon />
-                </ItemMedia>
-                <ItemContent>
-                  <ItemTitle>{file}</ItemTitle>
-                </ItemContent>
-              </Item>
-            ))}
-          </div>
-        </DrawerContent>
-      </Drawer>
     </Example>
   );
 }

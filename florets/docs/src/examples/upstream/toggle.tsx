@@ -3,7 +3,6 @@ import { BoldIcon, BookmarkIcon, ItalicIcon, UnderlineIcon } from "lucide-react"
 import { Button } from "@flora/florets/components/button";
 import { Toggle } from "@flora/florets/components/toggle";
 
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/toggle-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {
@@ -44,11 +43,11 @@ function ToggleOutline() {
     <Example title="Outline">
       <div className="flex flex-wrap items-center gap-2">
         <Toggle variant="outline" aria-label="Toggle italic">
-          <ItalicIcon data-icon="inline-start" />
+          <ItalicIcon />
           Italic
         </Toggle>
         <Toggle variant="outline" aria-label="Toggle bold">
-          <BoldIcon data-icon="inline-start" />
+          <BoldIcon />
           Bold
         </Toggle>
       </div>
@@ -150,7 +149,7 @@ function ToggleWithButtonIconText() {
             Button
           </Button>
           <Toggle variant="outline" aria-label="Toggle sm icon text" size="sm">
-            <BoldIcon data-icon="inline-start" />
+            <BoldIcon />
             Toggle
           </Toggle>
         </div>
@@ -160,7 +159,7 @@ function ToggleWithButtonIconText() {
             Button
           </Button>
           <Toggle variant="outline" aria-label="Toggle default icon text" size="default">
-            <ItalicIcon data-icon="inline-start" />
+            <ItalicIcon />
             Toggle
           </Toggle>
         </div>
@@ -170,7 +169,7 @@ function ToggleWithButtonIconText() {
             Button
           </Button>
           <Toggle variant="outline" aria-label="Toggle lg icon text" size="lg">
-            <UnderlineIcon data-icon="inline-start" />
+            <UnderlineIcon />
             Toggle
           </Toggle>
         </div>
@@ -202,10 +201,7 @@ function ToggleWithIcon() {
           <BookmarkIcon className="group-data-[state=on]/toggle:fill-accent-foreground" />
         </Toggle>
         <Toggle variant="outline" aria-label="Toggle bookmark outline">
-          <BookmarkIcon
-            className="group-data-[state=on]/toggle:fill-accent-foreground"
-            data-icon="inline-start"
-          />
+          <BookmarkIcon className="group-data-[state=on]/toggle:fill-accent-foreground" />
           Bookmark
         </Toggle>
       </div>

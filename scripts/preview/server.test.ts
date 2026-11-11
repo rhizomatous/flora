@@ -1,23 +1,17 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { createServer } from "vite";
+import { test } from "vitest";
 
-import { captured } from "./preview/captured.ts";
-import { projects as fixtureProjects, stories } from "./preview/scenarios.ts";
-import {
-  chatPreview,
-  messages,
-  previewFrameMs,
-  rebaseFrame,
-  type Frame,
-} from "./preview/server.ts";
+import { captured } from "./captured.ts";
+import { projects as fixtureProjects, stories } from "./scenarios.ts";
+import { chatPreview, messages, previewFrameMs, rebaseFrame, type Frame } from "./server.ts";
 
 test("captures match the pinned SDK and cover real OpenCode tool and question states", async () => {
-  const image = await readFile(new URL("../agent/image/Dockerfile", import.meta.url), "utf8");
-  const manifest = await readFile(new URL("../package.json", import.meta.url), "utf8");
+  const image = await readFile(new URL("../../agent/image/Dockerfile", import.meta.url), "utf8");
+  const manifest = await readFile(new URL("../../package.json", import.meta.url), "utf8");
   assert.match(image, /opencode:1\.2\.27@sha256:/);
   assert.match(manifest, /"@opencode-ai\/sdk": "1\.2\.27"/);
   const frames: Frame[] = captured.flatMap<Frame>((s) => s.frames);

@@ -1,5 +1,4 @@
 // oxlint-disable import/max-dependencies -- The upstream collection demonstrates compositions across several components.
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
 // oxlint-disable typescript/no-deprecated -- The upstream example demonstrates the dependency API it was authored against.
 // oxlint-disable typescript/no-unsafe-argument -- The formatter receives the payload supplied by Recharts.
 // oxlint-disable typescript/no-unsafe-assignment -- Recharts exposes formatter payloads through permissive types.
@@ -7,11 +6,10 @@
 // oxlint-disable typescript/no-unsafe-member-access -- Recharts exposes formatter payloads through permissive types.
 // oxlint-disable typescript/no-unsafe-type-assertion -- The upstream samples assert types for chart keys and error states.
 // oxlint-disable unicorn/consistent-function-scoping -- The helper remains beside the example that uses it.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/combobox-example.json
 "use client";
 
 import { ChevronDownIcon, GlobeIcon } from "lucide-react";
-import * as React from "react";
+import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@flora/florets/components/button";
@@ -73,6 +71,7 @@ export function Preview() {
     <ExampleWrapper>
       <ComboboxBasic />
       <ComboboxDisabled />
+      <ComboboxSides />
       <ComboboxInvalid />
       <ComboboxWithClear />
       <ComboboxAutoHighlight />
@@ -563,6 +562,33 @@ function ComboboxBasic() {
   );
 }
 
+function ComboboxSides() {
+  return (
+    <Example title="Sides" containerClassName="col-span-2">
+      <div className="flex flex-wrap justify-center gap-2">
+        {(["inline-start", "left", "top", "bottom", "right", "inline-end"] as const).map((side) => (
+          <Combobox key={side} items={frameworks}>
+            <ComboboxInput
+              placeholder={side.replace("-", " ")}
+              className="w-32 **:data-[slot=input-group-control]:capitalize"
+            />
+            <ComboboxContent side={side}>
+              <ComboboxEmpty>No items found.</ComboboxEmpty>
+              <ComboboxList>
+                {(item) => (
+                  <ComboboxItem key={item} value={item}>
+                    {item}
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
+        ))}
+      </div>
+    </Example>
+  );
+}
+
 function ComboboxDisabled() {
   return (
     <Example title="Disabled">
@@ -725,7 +751,7 @@ function ComboboxWithGroupsAndSeparator() {
 }
 
 function ComboboxWithForm() {
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.target as HTMLFormElement);
     const framework = formData.get("framework") as string;
@@ -1088,14 +1114,12 @@ function ComboboxWithCustomItems() {
 }
 
 function ComboboxInDialog() {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
 
   return (
     <Example title="Combobox in Dialog">
-      <Dialog open={open} onOpenChange={setOpen} modal={false}>
-        <DialogTrigger asChild>
-          <Button variant="outline">Open Dialog</Button>
-        </DialogTrigger>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger render={<Button variant="outline" />}>Open Dialog</DialogTrigger>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Select Framework</DialogTitle>
@@ -1147,6 +1171,41 @@ function ComboboxInDialog() {
   );
 }
 
+const items = [
+  {
+    label: "Select a framework",
+    value: null,
+  },
+  {
+    label: "React",
+    value: "react",
+  },
+  {
+    label: "Vue",
+    value: "vue",
+  },
+  {
+    label: "Angular",
+    value: "angular",
+  },
+  {
+    label: "Svelte",
+    value: "svelte",
+  },
+  {
+    label: "Solid",
+    value: "solid",
+  },
+  {
+    label: "Preact",
+    value: "preact",
+  },
+  {
+    label: "Next.js",
+    value: "next.js",
+  },
+];
+
 function ComboboxWithOtherInputs() {
   return (
     <Example title="With Other Inputs">
@@ -1163,24 +1222,21 @@ function ComboboxWithOtherInputs() {
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
-      <Select>
+      <Select items={items}>
         <SelectTrigger className="w-52">
-          <SelectValue placeholder="Select a framework" />
+          <SelectValue />
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            {frameworks.map((framework) => (
-              <SelectItem key={framework} value={framework}>
-                {framework}
+            {items.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
               </SelectItem>
             ))}
           </SelectGroup>
         </SelectContent>
       </Select>
-      <Button
-        variant="outline"
-        className="style-sera:hidden w-52 justify-between font-normal text-muted-foreground"
-      >
+      <Button variant="outline" className="w-52 justify-between font-normal text-muted-foreground">
         Select a framework
         <ChevronDownIcon />
       </Button>

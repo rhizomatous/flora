@@ -1,89 +1,31 @@
-import { useState, type SubmitEvent, type ReactNode } from "react";
+import { useState, type SubmitEvent } from "react";
 
 import {
   Button,
-  ChevronDownStrokeIcon,
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  FieldLabel,
-  InputGroup,
-  InputGroupTextarea,
-  InputGroupAddon,
+  DropdownButton,
   Popover,
   PopoverTrigger,
   PopoverContent,
-  ArrowUpIcon,
   CheckIcon,
   CloudIcon,
   DatabaseIcon,
   FolderIcon,
   GitBranchIcon,
-  GitPullRequestIcon,
   GlobeIcon,
   InboxIcon,
   KeyRoundIcon,
-  MicIcon,
-  PaperclipIcon,
   PinIcon,
   PlusIcon,
   PuzzleIcon,
   Settings2Icon,
   SlidersHorizontalIcon,
-  SparklesIcon,
   TagIcon,
-  FlowerIcon,
   TerminalIcon,
-  UsersIcon,
-  FilesIcon,
-  MessageSquareIcon,
 } from "@flora/florets";
 
-export type ComposerProject = { id: string; name: string };
+import { Composer, PlaceholderMenu } from "./composer";
 
-function PlaceholderMenu({
-  label,
-  children,
-  items,
-  iconOnly = false,
-}: {
-  label: string;
-  children: ReactNode;
-  items: { label: string; icon?: ReactNode; detail?: string; separator?: boolean }[];
-  iconOnly?: boolean;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          className={`composer-control ${iconOnly ? "composer-icon" : ""}`}
-          aria-label={label}
-        >
-          {children}
-          {!iconOnly && <ChevronDownStrokeIcon className="composer-chevron" />}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="composer-menu" align="start">
-        {items.map((item) => (
-          <div key={item.label}>
-            {item.separator === true && <DropdownMenuSeparator />}
-            <DropdownMenuItem disabled>
-              {item.icon}
-              <span className="composer-label">{item.label}</span>
-              {item.detail !== undefined && (
-                <span className="composer-label ml-auto text-muted-foreground">{item.detail}</span>
-              )}
-            </DropdownMenuItem>
-          </div>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+export type ComposerProject = { id: string; name: string };
 
 /** Selects the saved project and submits text; unfinished controls expose their availability in menus. */
 export function NewChatComposer({
@@ -106,7 +48,7 @@ export function NewChatComposer({
     project.name.toLowerCase().includes(search.toLowerCase()),
   );
   return (
-    <form onSubmit={onSend} className="new-chat-composer">
+    <form onSubmit={onSend} className="chat-composer new-chat-composer">
       <div className="composer-topbar">
         <input type="hidden" name="project" value={selectedProject?.id ?? ""} />
         <Popover
@@ -116,26 +58,28 @@ export function NewChatComposer({
             if (!open) setSearch("");
           }}
         >
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              className="composer-control composer-project"
-              disabled={busy}
-              aria-label={`Project: ${selectedProject?.name ?? ""}`}
-            >
-              <InboxIcon />
-              <span className="composer-label truncate">{selectedProject?.name}</span>
-              <ChevronDownStrokeIcon className="composer-chevron" />
-            </Button>
-          </PopoverTrigger>
+          <PopoverTrigger
+            render={
+              <DropdownButton
+                type="button"
+                variant="tertiary"
+                size="compact"
+                className="composer-project max-w-[180px] min-w-0 flex-[0_1_auto] justify-start!"
+                disabled={busy}
+                aria-label={`Project: ${selectedProject?.name ?? ""}`}
+              >
+                <InboxIcon />
+                <span className="florets-control-label truncate">{selectedProject?.name}</span>
+              </DropdownButton>
+            }
+          />
           <PopoverContent
             align="start"
-            className="composer-menu composer-project-menu"
+            className="composer-menu composer-project-menu w-[260px]! max-w-[calc(100vw-24px)] gap-0 overflow-hidden p-0!"
             aria-label="Choose project"
           >
             <input
-              className="composer-search"
+              className="composer-search w-full border-b border-(--menu-border) bg-transparent px-3 py-2.5 text-[13px] outline-none"
               aria-label="Search projects"
               placeholder="Search projects"
               value={search}
@@ -143,7 +87,7 @@ export function NewChatComposer({
                 setSearch(event.target.value);
               }}
             />
-            <div className="composer-project-list">
+            <div className="composer-project-list max-h-60 overflow-y-auto p-1.5">
               {filtered.map((project) => (
                 <button
                   type="button"
@@ -157,25 +101,30 @@ export function NewChatComposer({
                   }}
                 >
                   <InboxIcon />
-                  <span className="composer-label truncate">{project.name}</span>
+                  <span className="florets-control-label truncate">{project.name}</span>
                   {selectedProject?.id === project.id && <CheckIcon className="ml-auto" />}
                 </button>
               ))}
-              {filtered.length === 0 && <p className="composer-menu-note">No projects found.</p>}
+              {filtered.length === 0 && (
+                <p className="composer-menu-note px-2.5 py-1.5 text-xs leading-normal text-muted-foreground">
+                  No projects found.
+                </p>
+              )}
             </div>
-            <div className="composer-project-links">
+            <div className="composer-project-links border-t border-(--menu-border) p-1.5">
               <a href="#projects/new">
                 <PlusIcon />
-                <span className="composer-label">New project</span>
+                <span className="florets-control-label">New project</span>
               </a>
               <a href="#projects">
                 <Settings2Icon />
-                <span className="composer-label">Manage projects</span>
+                <span className="florets-control-label">Manage projects</span>
               </a>
             </div>
           </PopoverContent>
         </Popover>
         <PlaceholderMenu
+          variant="tertiary"
           label="Execution environment"
           items={[
             { label: "Cloud", icon: <CloudIcon /> },
@@ -183,66 +132,38 @@ export function NewChatComposer({
           ]}
         >
           <CloudIcon />
-          <span className="composer-label">Cloud</span>
+          <span className="florets-control-label">Cloud</span>
         </PlaceholderMenu>
         <Button
           type="button"
-          variant="ghost"
-          className="composer-control"
+          variant="tertiary"
+          size="compact"
           title="Setup assistance (coming soon)"
           aria-disabled="true"
         >
           <DatabaseIcon />
-          <span className="composer-label">Setup</span>
+          <span className="florets-control-label">Setup</span>
         </Button>
-        <div className="composer-branch">
+        <div className="composer-branch ml-auto shrink-0">
           <PlaceholderMenu
+            variant="tertiary"
             label="Base branch"
             items={[{ label: "Project default branch", icon: <GitBranchIcon /> }]}
           >
             <GitBranchIcon />
-            <span className="composer-label">Default</span>
+            <span className="florets-control-label">Default</span>
           </PlaceholderMenu>
         </div>
       </div>
-      <InputGroup className="composer-box">
-        <FieldLabel className="sr-only" htmlFor="new-chat-message">
-          Message
-        </FieldLabel>
-        <InputGroupTextarea
-          id="new-chat-message"
-          name="text"
-          className="composer-textarea"
-          placeholder="Ask anything, / for commands, @ for context"
-          value={message}
-          onChange={(event) => {
-            setMessage(event.target.value);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              if (!busy && message.trim()) event.currentTarget.form?.requestSubmit();
-            }
-          }}
-          required
-          disabled={busy}
-        />
-        <InputGroupAddon align="block-end" className="composer-bottom-bar">
-          <PlaceholderMenu
-            label="Add attachments and context"
-            iconOnly
-            items={[
-              { label: "Upload attachment", icon: <PaperclipIcon /> },
-              { label: "Environment variables", icon: <KeyRoundIcon /> },
-              { label: "People", icon: <UsersIcon />, separator: true },
-              { label: "Threads", icon: <MessageSquareIcon /> },
-              { label: "Pull requests", icon: <GitPullRequestIcon /> },
-              { label: "Skills", icon: <SparklesIcon /> },
-              { label: "Files", icon: <FilesIcon /> },
-            ]}
-          >
-            <PlusIcon />
-          </PlaceholderMenu>
+      <Composer
+        id="new-chat-message"
+        label="Message"
+        message={message}
+        onChange={setMessage}
+        disabled={busy}
+        canSend={!busy && message.trim() !== ""}
+        sendLabel={busy ? "Starting chat" : "Start chat"}
+        settings={
           <PlaceholderMenu
             label="Chat settings"
             iconOnly
@@ -259,42 +180,8 @@ export function NewChatComposer({
           >
             <SlidersHorizontalIcon />
           </PlaceholderMenu>
-          <PlaceholderMenu
-            label="Model"
-            items={[{ label: "Server default model", icon: <FlowerIcon /> }]}
-          >
-            <span className="composer-model-mark">
-              <FlowerIcon />
-            </span>
-            <span className="composer-label">Default model</span>
-          </PlaceholderMenu>
-          <PlaceholderMenu label="Reasoning effort" items={[{ label: "Default reasoning effort" }]}>
-            <span className="composer-label">Default</span>
-          </PlaceholderMenu>
-          {message.trim() ? (
-            <Button
-              className="composer-send"
-              type="submit"
-              disabled={busy}
-              aria-label={busy ? "Starting chat" : "Start chat"}
-              title="Start chat"
-            >
-              <ArrowUpIcon />
-            </Button>
-          ) : (
-            <Button
-              className="composer-send"
-              type="button"
-              disabled={busy}
-              aria-label="Voice input (coming soon)"
-              title="Voice input (coming soon)"
-              aria-disabled="true"
-            >
-              <MicIcon />
-            </Button>
-          )}
-        </InputGroupAddon>
-      </InputGroup>
+        }
+      />
     </form>
   );
 }

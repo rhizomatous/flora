@@ -1,9 +1,7 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/collapsible-example.json
 "use client";
 
 import { ChevronRightIcon, FileIcon, FolderIcon, MaximizeIcon, MinimizeIcon } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 
 import { Button } from "@flora/florets/components/button";
 import {
@@ -88,16 +86,18 @@ function CollapsibleFileTree() {
     if ("items" in fileItem) {
       return (
         <Collapsible key={fileItem.name}>
-          <CollapsibleTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="group w-full justify-start transition-none hover:bg-accent hover:text-accent-foreground"
-            >
-              <ChevronRightIcon className="transition-transform group-data-[state=open]:rotate-90" />
-              <FolderIcon />
-              {fileItem.name}
-            </Button>
+          <CollapsibleTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="sm"
+                className="group w-full justify-start transition-none hover:bg-accent hover:text-accent-foreground"
+              />
+            }
+          >
+            <ChevronRightIcon className="transition-transform group-data-[state=open]:rotate-90" />
+            <FolderIcon />
+            {fileItem.name}
           </CollapsibleTrigger>
           <CollapsibleContent className="style-lyra:ml-4 mt-1 ml-5">
             <div className="flex flex-col gap-1">
@@ -140,7 +140,7 @@ function CollapsibleFileTree() {
 }
 
 function CollapsibleSettings() {
-  const [isOpen, setIsOpen] = React.useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <Example title="Settings" className="items-center">
@@ -179,10 +179,8 @@ function CollapsibleSettings() {
                 </Field>
               </CollapsibleContent>
             </FieldGroup>
-            <CollapsibleTrigger asChild>
-              <Button variant="outline" size="icon">
-                {isOpen ? <MinimizeIcon /> : <MaximizeIcon />}
-              </Button>
+            <CollapsibleTrigger render={<Button variant="outline" size="icon" />}>
+              {isOpen ? <MinimizeIcon /> : <MaximizeIcon />}
             </CollapsibleTrigger>
           </Collapsible>
         </CardContent>

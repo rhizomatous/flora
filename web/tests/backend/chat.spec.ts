@@ -1,13 +1,12 @@
 import assert from "node:assert/strict";
 
-import { chromium, expect } from "@playwright/test";
+import { test, expect } from "../fixtures.ts";
 
-import { openWorkspaceMenu, assertFitsPhone, logIn, pageErrors } from "./browser.ts";
+import { openWorkspaceMenu, assertFitsPhone, logIn, pageErrors } from "../helpers.ts";
 
-const browser = await chromium.launch();
-try {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true });
-  const page = await context.newPage();
+test.use({ scenario: "chat" });
+
+test("chat creation, recovery, controls, and logout", async ({ page, context }) => {
   const errors = pageErrors(page);
   await logIn(page);
   const sidebar = page.locator('[data-slot="sidebar"]');
@@ -152,9 +151,4 @@ try {
   await page.goto(chatURL);
   await page.getByRole("heading", { name: "Log in", exact: true }).waitFor();
   assert.deepEqual(errors, []);
-  console.log(
-    "Chromium: login, create, reload during work, question/answer, full tool output, interrupt, stop, explicit resume, saved context, grouped list, reconnect, mobile width, logout protection passed.",
-  );
-} finally {
-  await browser.close();
-}
+});

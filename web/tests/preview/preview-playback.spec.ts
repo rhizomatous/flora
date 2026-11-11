@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
 
-import { chromium, expect } from "@playwright/test";
+import { test, expect } from "./fixtures.ts";
 
-const browser = await chromium.launch();
-try {
-  const page = await browser.newPage();
-  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5202";
+test("preview navigation and pauseable chat replay", async ({ page }) => {
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
   for (const [id, name] of [
     ["preview", "Flora"],
     ["garden", "Garden storefront"],
@@ -68,9 +66,4 @@ try {
   assert.equal(new URL(page.url()).hash, "#chats/waiting");
   await page.goto(`${base}/#chats/new`);
   await expect(page.getByRole("button", { name: "Replay chat", exact: true })).toBeDisabled();
-  console.log(
-    "Preview playback: recovery replays in place, pause/resume target the current chat, and waiting stays on its question.",
-  );
-} finally {
-  await browser.close();
-}
+});

@@ -5,24 +5,36 @@
   "namedInputs": {
     "shared": [
       "{workspaceRoot}/*.{json,lock,nix}",
+      "{workspaceRoot}/*.config.ts",
       "{workspaceRoot}/Makefile",
       "{workspaceRoot}/.*",
       "{workspaceRoot}/.github/**/*",
-      "{workspaceRoot}/**/project.json",
-      "{workspaceRoot}/scripts/**/*"
+      "{workspaceRoot}/**/project.json"
     ],
     "frontend": [
-      "shared",
+      "webBuild",
       "{workspaceRoot}/web/**/*",
-      "{workspaceRoot}/florets/src/**/*",
-      "{workspaceRoot}/florets/package.json",
-      "{workspaceRoot}/florets/tsconfig.json"
+      "{workspaceRoot}/scripts/preview/**/*",
+      "{workspaceRoot}/scripts/capture-chat-preview.ts",
+      "{workspaceRoot}/scripts/tsconfig.json"
     ],
     "go": [
       "shared",
       "{workspaceRoot}/backend/**/*",
       "!{workspaceRoot}/backend/internal/webassets/dist/**/*"
     ],
-    "image": ["shared", "{workspaceRoot}/agent/**/*"]
+    "image": ["shared", "{workspaceRoot}/agent/**/*"],
+    "webBuild": [
+      "shared",
+      "{workspaceRoot}/web/src/**/*",
+      "!{workspaceRoot}/web/src/**/*.test.{ts,tsx}",
+      "{workspaceRoot}/web/index.html",
+      "{workspaceRoot}/web/package.json",
+      "{workspaceRoot}/web/tsconfig.json",
+      "{workspaceRoot}/web/vite.config.ts",
+      "{workspaceRoot}/florets/src/**/*",
+      "{workspaceRoot}/florets/package.json",
+      "{workspaceRoot}/florets/tsconfig.json"
+    ]
   }
 }

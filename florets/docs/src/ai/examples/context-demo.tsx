@@ -35,12 +35,16 @@ const rows = [
 export function ContextDemo() {
   return (
     <div className="flex justify-center py-12">
-      <HoverCard openDelay={10} closeDelay={100}>
-        <HoverCardTrigger asChild>
-          <Button variant="outline" size="sm">
-            {percent}% context
-          </Button>
-        </HoverCardTrigger>
+      <HoverCard>
+        <HoverCardTrigger
+          delay={10}
+          closeDelay={100}
+          render={
+            <Button variant="outline" size="sm">
+              {percent}% context
+            </Button>
+          }
+        />
         <HoverCardContent className="flex w-64 flex-col gap-3">
           <div className="flex items-center justify-between gap-3 text-sm">
             <span className="font-medium">Context</span>
