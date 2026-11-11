@@ -594,25 +594,8 @@
 .flora-sidebar [data-slot="sidebar-content"] {
   gap: 0;
 }
-.sidebar-captains {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 16px 16px 0;
-  color: var(--muted-foreground);
-  font-size: 12px;
-}
-.sidebar-captains > span {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.sidebar-captains svg {
-  width: 13px;
-  height: 13px;
-}
 .sidebar-chats {
-  padding: 0 8px 16px;
+  padding: 16px 8px;
 }
 .sidebar-section-heading {
   display: flex;

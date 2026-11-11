@@ -66,7 +66,7 @@ Attachment/context, model, reasoning, slash-command, and voice placeholders list
 
 ### Disconnected placeholders
 
-- [ ] Add Issues, Pull requests, Automations, Explore, More, and Captains destinations.
+- [ ] Add Issues, Pull requests, Automations, Explore, and More destinations.
 - [ ] Implement pinned chats and a pinned section, archive actions, and custom folders.
 - [ ] Add grouping preferences, display controls, filters, and read/unread tracking. Persist sidebar preferences.
 - [ ] Populate hover summaries with model, PR/check details, and diff counts when backend metadata is available.

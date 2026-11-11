@@ -18,8 +18,6 @@ import {
   Repeat2Icon,
   CompassIcon,
   EllipsisIcon,
-  CrownIcon,
-  PlusIcon,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
@@ -203,15 +201,6 @@ export function Sidebar({
               </Button>
             </SidebarGroup>
           )}
-          <div className="sidebar-captains">
-            <span>
-              <CrownIcon />
-              Captains
-            </span>
-            <Button variant="ghost" size="icon-sm" disabled aria-label="Add captain (coming soon)">
-              <PlusIcon />
-            </Button>
-          </div>
           <SidebarChats
             projects={projects}
             chats={chats}
