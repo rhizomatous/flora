@@ -164,9 +164,11 @@ function Sidebar({
   className,
   children,
   dir,
+  mobileInitialFocus,
   mobileFinalFocus,
   ...props
 }: ComponentProps<"div"> & {
+  mobileInitialFocus?: ComponentProps<typeof SheetContent>["initialFocus"];
   mobileFinalFocus?: ComponentProps<typeof SheetContent>["finalFocus"];
   side?: "left" | "right";
   variant?: "sidebar" | "floating" | "inset";
@@ -194,6 +196,7 @@ function Sidebar({
       <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
         <SheetContent
           dir={dir}
+          initialFocus={mobileInitialFocus}
           finalFocus={mobileFinalFocus}
           data-sidebar="sidebar"
           data-slot="sidebar"

@@ -47,6 +47,7 @@ export function Sidebar({
   const [projects, setProjects] = useState<Project[]>([]);
   const [error, setError] = useState("");
   const { openMobile, setOpenMobile } = useSidebar();
+  const mobileToggle = useRef<HTMLButtonElement>(null);
   const openedPath = useRef<string | undefined>(undefined);
   const skipToContent = useRef(false);
   useEffect(() => {
@@ -84,6 +85,7 @@ export function Sidebar({
     <NavigationSidebar
       variant="inset"
       className="flora-navigation p-0"
+      mobileInitialFocus={() => mobileToggle.current}
       mobileFinalFocus={() => {
         // A destination heading may mount while the sheet still traps focus.
         const navigated = skipToContent.current || openedPath.current !== path;
@@ -131,7 +133,7 @@ export function Sidebar({
               >
                 <SearchIcon />
               </Button>
-              <SidebarTrigger aria-label="Toggle Sidebar" />
+              <SidebarTrigger ref={mobileToggle} aria-label="Toggle Sidebar" />
             </div>
           </div>
           <SidebarMenu>

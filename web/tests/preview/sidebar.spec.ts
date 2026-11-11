@@ -83,3 +83,28 @@ test("selected sidebar links retain the hover foreground", async ({ page }) => {
   await page.mouse.move(700, 100);
   await expect(other).toHaveCSS("color", resting);
 });
+
+test("mobile sidebar focuses its toggle and keeps the skip link keyboard accessible", async ({
+  page,
+}) => {
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${base}/#chats/pagination`);
+  await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  const nav = page.getByRole("navigation", { name: "Main", exact: true });
+  await expect(nav.getByRole("button", { name: "Toggle Sidebar", exact: true })).toBeFocused();
+  const skip = nav.getByRole("link", { name: "Skip to content", exact: true });
+  await expect(skip).not.toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Shift+Tab");
+  await expect(skip).toBeFocused();
+  await skip.press("Enter");
+  await expect(nav).not.toBeVisible();
+  await expect
+    .poll(() =>
+      page.locator("#main-content").evaluate((node) => node.contains(document.activeElement)),
+    )
+    .toBe(true);
+});
