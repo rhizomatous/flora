@@ -281,7 +281,7 @@ function SidebarTrigger({ className, onClick, ...props }: ComponentProps<typeof 
       }}
       {...props}
     >
-      <PanelLeftIcon className="cn-rtl-flip" />
+      <PanelLeftIcon className="florets-rtl-flip" />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );

@@ -62,9 +62,9 @@ export function PlaceholderMenu({
             {item.separator === true && <DropdownMenuSeparator />}
             <DropdownMenuItem disabled>
               {item.icon}
-              <span className="cn-control-label">{item.label}</span>
+              <span className="florets-control-label">{item.label}</span>
               {item.detail !== undefined && (
-                <span className="cn-control-label ml-auto text-muted-foreground">
+                <span className="florets-control-label ml-auto text-muted-foreground">
                   {item.detail}
                 </span>
               )}
@@ -191,10 +191,10 @@ export function Composer({
           <span className="composer-model-mark">
             <FlowerIcon />
           </span>
-          <span className="cn-control-label">Default model</span>
+          <span className="florets-control-label">Default model</span>
         </PlaceholderMenu>
         <PlaceholderMenu label="Reasoning effort" items={[{ label: "Default reasoning effort" }]}>
-          <span className="cn-control-label">Default</span>
+          <span className="florets-control-label">Default</span>
         </PlaceholderMenu>
         {action}
       </InputGroupAddon>

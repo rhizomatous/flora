@@ -164,7 +164,7 @@ function CodeBlockContent({
     >
       <code
         data-slot="code-block-code"
-        className="cn-code-block-code grid min-h-lh min-w-max content-start in-data-numbered:grid-cols-[auto_1fr] in-data-wrap:min-w-0"
+        className="florets-code-block-code grid min-h-lh min-w-max content-start in-data-numbered:grid-cols-[auto_1fr] in-data-wrap:min-w-0"
       >
         {lineNumbers && typeof children === "string"
           ? children
@@ -183,7 +183,7 @@ const codeBlockLineVariants = cva(
   {
     variants: {
       variant: {
-        default: "cn-code-block-line-variant-default",
+        default: "florets-code-block-line-variant-default",
         added: "bg-muted after:content-['+']",
         removed: "bg-destructive/10 after:text-destructive after:content-['−']",
         highlighted: "bg-muted",

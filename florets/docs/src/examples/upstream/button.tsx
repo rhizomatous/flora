@@ -11,11 +11,11 @@ export function Preview() {
       <Example title="Compact controls">
         <Button variant="ghost" size="compact" aria-expanded>
           <PlusIcon />
-          <span className="cn-control-label">Expanded panel</span>
+          <span className="florets-control-label">Expanded panel</span>
         </Button>
         <Button variant="tertiary" size="compact">
           <ArrowRightIcon />
-          <span className="cn-control-label">Open project</span>
+          <span className="florets-control-label">Open project</span>
         </Button>
       </Example>
       <ButtonVariantsAndSizes />

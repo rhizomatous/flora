@@ -67,15 +67,15 @@ function Calendar({
           defaultClassNames.dropdowns,
         ),
         dropdown_root: cn(
-          "cn-calendar-dropdown-root relative rounded-(--cell-radius)",
+          "florets-calendar-dropdown-root relative rounded-(--cell-radius)",
           defaultClassNames.dropdown_root,
         ),
         dropdown: cn("absolute inset-0 bg-popover opacity-0", defaultClassNames.dropdown),
         caption_label: cn(
           "font-medium select-none",
           captionLayout === "label"
-            ? "cn-calendar-caption text-sm"
-            : "cn-calendar-caption-label flex items-center gap-1 rounded-(--cell-radius) text-sm [&>svg]:size-3.5 [&>svg]:text-muted-foreground",
+            ? "florets-calendar-caption text-sm"
+            : "florets-calendar-caption-label flex items-center gap-1 rounded-(--cell-radius) text-sm [&>svg]:size-3.5 [&>svg]:text-muted-foreground",
           defaultClassNames.caption_label,
         ),
         month_grid: cn("w-full border-collapse", defaultClassNames.month_grid),
@@ -124,11 +124,15 @@ function Calendar({
         },
         Chevron: ({ className, orientation, ...props }) => {
           if (orientation === "left") {
-            return <ChevronLeftIcon className={cn("cn-rtl-flip size-4", className)} {...props} />;
+            return (
+              <ChevronLeftIcon className={cn("florets-rtl-flip size-4", className)} {...props} />
+            );
           }
 
           if (orientation === "right") {
-            return <ChevronRightIcon className={cn("cn-rtl-flip size-4", className)} {...props} />;
+            return (
+              <ChevronRightIcon className={cn("florets-rtl-flip size-4", className)} {...props} />
+            );
           }
 
           return <ChevronDownIcon className={cn("size-4", className)} {...props} />;

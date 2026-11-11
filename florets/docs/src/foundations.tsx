@@ -156,8 +156,13 @@ export function FoundationPage({ id }: { id: string }) {
           </Section>
           <Section id="compact-patterns" title="Compact navigation and controls">
             <p>
+              Shared CSS classes use the <code>florets-</code> prefix to identify styles owned by
+              this package. The <code>cn()</code> helper merges class names and is separate from
+              this naming convention.
+            </p>
+            <p>
               Use Button size <code>compact</code> or <code>icon-compact</code> for 28px controls.
-              Wrap labels in cn-control-label to center icons on the capital height at every
+              Wrap labels in florets-control-label to center icons on the capital height at every
               viewport size. DropdownButton supplies the shared caret spacing.
             </p>
             <p>
@@ -172,23 +177,23 @@ export function FoundationPage({ id }: { id: string }) {
               sidebar container for compact menu buttons.
             </p>
             <Demo>
-              <section className="cn-navigation-group w-64" data-expanded="true">
-                <div className="cn-navigation-group-heading">Project</div>
+              <section className="florets-navigation-group w-64" data-expanded="true">
+                <div className="florets-navigation-group-heading">Project</div>
                 <ul>
-                  <li className="cn-navigation-row" data-active="">
-                    <a href="#theming" className="cn-navigation-link">
-                      <FlowerMark className="cn-navigation-icon" />
+                  <li className="florets-navigation-row" data-active="">
+                    <a href="#theming" className="florets-navigation-link">
+                      <FlowerMark className="florets-navigation-icon" />
                       <span className="min-w-0 flex-1">
-                        <span className="cn-navigation-title">Selected conversation</span>
-                        <span className="cn-navigation-meta">Supporting information</span>
+                        <span className="florets-navigation-title">Selected conversation</span>
+                        <span className="florets-navigation-meta">Supporting information</span>
                       </span>
-                      <span className="cn-navigation-age">2h</span>
+                      <span className="florets-navigation-age">2h</span>
                     </a>
                   </li>
-                  <li className="cn-navigation-row">
-                    <a href="#theming" className="cn-navigation-link">
-                      <FlowerMark className="cn-navigation-icon" />
-                      <span className="cn-navigation-title">Another conversation</span>
+                  <li className="florets-navigation-row">
+                    <a href="#theming" className="florets-navigation-link">
+                      <FlowerMark className="florets-navigation-icon" />
+                      <span className="florets-navigation-title">Another conversation</span>
                     </a>
                   </li>
                 </ul>
@@ -196,12 +201,12 @@ export function FoundationPage({ id }: { id: string }) {
             </Demo>
             <CodeExample
               code={
-                '<li className="cn-navigation-row" data-active={selected || undefined}>\n  <a className="cn-navigation-link" href={href}>\n    <Icon className="cn-navigation-icon" />\n    <span className="min-w-0 flex-1">\n      <span className="cn-navigation-title">Title</span>\n      <span className="cn-navigation-meta">Details</span>\n    </span>\n  </a>\n</li>'
+                '<li className="florets-navigation-row" data-active={selected || undefined}>\n  <a className="florets-navigation-link" href={href}>\n    <Icon className="florets-navigation-icon" />\n    <span className="min-w-0 flex-1">\n      <span className="florets-navigation-title">Title</span>\n      <span className="florets-navigation-meta">Details</span>\n    </span>\n  </a>\n</li>'
               }
             />
             <p>
               HoverCardContent and PopoverContent accept <code>density=&quot;compact&quot;</code>{" "}
-              for shared preview typography, padding, and viewport limits. Use cn-topbar and
+              for shared preview typography, padding, and viewport limits. Use florets-topbar and
               --topbar-height to align page headers. Sidebar movement uses --sidebar-motion-duration
               and --sidebar-motion-easing and respects reduced motion.
             </p>

@@ -92,7 +92,7 @@ export function ChatTurnNavigation({ rows }: { rows: TranscriptRow[] }) {
             side="right"
             sideOffset={8}
             density="compact"
-            className="chat-turn-preview cn-menu-surface"
+            className="chat-turn-preview florets-menu-surface"
           >
             <p className="truncate">{turn.prompt}</p>
             {turn.reply && (

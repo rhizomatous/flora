@@ -107,7 +107,7 @@ export function ChatTitle({ title, chat }: { title: string; chat: Chat | undefin
             }}
           >
             <CloudIcon />
-            <span className="cn-control-label truncate">{title}</span>
+            <span className="florets-control-label truncate">{title}</span>
           </Button>
         }
       />
@@ -115,7 +115,7 @@ export function ChatTitle({ title, chat }: { title: string; chat: Chat | undefin
         align="start"
         alignOffset={0}
         density="compact"
-        className="chat-title-card cn-menu-surface"
+        className="chat-title-card florets-menu-surface"
         aria-label="Chat summary"
       >
         <div className="chat-summary-meta">
@@ -302,7 +302,7 @@ export function ChatComposerFooter({
               aria-label="Chat actions"
             >
               <CloudIcon />
-              <span className="cn-control-label">Cloud</span>
+              <span className="florets-control-label">Cloud</span>
               <span className="runtime-dot" />
             </DropdownButton>
           }
