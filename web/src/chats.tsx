@@ -534,7 +534,7 @@ function ChatDetail({
 
   return (
     <MessageScrollerProvider autoScroll>
-      <MessageScroller className="flex-1">
+      <MessageScroller className="-mx-4 w-auto flex-1 sm:-mx-8">
         <MessageScrollerViewport aria-label="Conversation" className="chat-transcript-viewport">
           <MessageScrollerContent className="mx-auto w-full max-w-[900px] gap-6 px-4 py-6">
             {disconnected && <Alert role="status">Disconnected. Reconnecting…</Alert>}

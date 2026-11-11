@@ -86,7 +86,7 @@ export function ChatTurnNavigation({ rows }: { rows: TranscriptRow[] }) {
             sideOffset={8}
             className="chat-turn-preview cn-menu-surface"
           >
-            <p className="line-clamp-2">{turn.prompt}</p>
+            <p className="truncate">{turn.prompt}</p>
             {turn.reply && (
               <div className="chat-turn-reply mt-1 line-clamp-3 text-muted-foreground">
                 <Suspense fallback={turn.reply}>
