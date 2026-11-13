@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import {
   GitMergeIcon,
   GitPullRequestClosedIcon,
@@ -111,5 +113,32 @@ export function PullList({ summary }: { summary: PullSummary | undefined }) {
         </p>
       )}
     </div>
+  );
+}
+
+export function InlinePullLink({
+  pull,
+  href,
+  children,
+}: {
+  pull: Pull;
+  href: string;
+  children: ReactNode;
+}) {
+  const { Icon, color, label } = appearance(pull);
+  const repository = pull.repository ?? pull.url.split("/").slice(3, 5).join("/");
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className={`inline-flex max-w-full cursor-pointer items-baseline gap-1 rounded-sm border border-current/25 bg-current/5 px-1 py-0.5 align-baseline text-[0.95em] font-medium no-underline! transition-colors hover:bg-current/15 hover:underline! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${color}`}
+      aria-label={`${repository} #${pull.number} ${label}`}
+      title={`${repository} #${pull.number} · ${label}${(pull.title ?? "") === "" ? "" : ` · ${pull.title}`}`}
+      data-inline-pr={label.toLowerCase()}
+    >
+      <Icon className="size-3.5 shrink-0 self-center" aria-hidden="true" />
+      <span className="min-w-0 break-words">{children}</span>
+    </a>
   );
 }

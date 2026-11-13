@@ -77,8 +77,42 @@ test("linked PRs refresh from the feed without reloading the chat", async ({ pag
   await page.getByRole("button", { name: "Linked pull requests (2)", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("link", { name: /example\/fieldnotes #19 Open/ })).toBeVisible();
+  const inline = page.getByRole("region", { name: "Conversation", exact: true });
+  await expect(
+    inline.getByRole("link", { name: "example/fieldnotes #19 Open", exact: true }),
+  ).toBeVisible();
   merged = true;
   await expect(dialog.getByRole("link", { name: /example\/fieldnotes #19 Merged/ })).toBeVisible();
+  await expect(
+    inline.getByRole("link", { name: "example/fieldnotes #19 Merged", exact: true }),
+  ).toBeVisible();
   const row = page.locator(".florets-navigation-link[href='#chats/pagination']");
   await expect(row.getByLabel("1 merged pull request", { exact: true })).toBeVisible();
+});
+
+test("transcript PR badges show status and react to hover and keyboard focus", async ({ page }) => {
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  await page.goto(`${base}/#chats/pagination`);
+  await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+  const transcript = page.getByRole("region", { name: "Conversation", exact: true });
+  const closed = transcript.getByRole("link", {
+    name: "example/fieldnotes #18 Closed",
+    exact: true,
+  });
+  const open = transcript.getByRole("link", { name: "example/fieldnotes #19 Open", exact: true });
+  await expect(closed).toHaveCount(2);
+  await expect(closed.last()).toHaveAttribute("data-inline-pr", "closed");
+  await expect(open).toHaveAttribute("href", "https://github.com/example/fieldnotes/pull/19");
+  await expect(open).toHaveAttribute("target", "_blank");
+  await expect(open).toHaveAttribute("title", /Open/);
+  await expect(open).toHaveCSS("cursor", "pointer");
+  await open.hover();
+  await expect(open).toHaveCSS("text-decoration-line", "underline");
+  await open.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(open).toBeFocused();
+  await expect(open).toHaveCSS("outline-style", "solid");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(open).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
