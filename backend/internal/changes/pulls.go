@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,6 +27,35 @@ type Pull struct {
 	State      string `json:"state"`
 	Draft      bool   `json:"draft"`
 }
+
+// PullSummary contains saved links and their last discovery result without scan bookkeeping.
+type PullSummary struct {
+	Items     []Pull `json:"items"`
+	CheckedAt string `json:"checkedAt"`
+	Error     string `json:"error"`
+}
+
+// ReadPulls reads saved PRs without loading diffs or contacting GitHub.
+func (s *Service) ReadPulls(ctx context.Context, id string) PullSummary {
+	result := PullSummary{Items: []Pull{}}
+	paths, err := s.Store.Paths(ctx, id)
+	if err == nil {
+		var root *os.Root
+		root, err = os.OpenRoot(paths.Artifacts)
+		if err == nil {
+			defer root.Close()
+			err = load(root, "pulls.json", &result)
+		}
+	}
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return PullSummary{Items: []Pull{}, Error: "Saved pull requests unavailable."}
+	}
+	if result.Items == nil {
+		result.Items = []Pull{}
+	}
+	return result
+}
+
 type pullBranch struct {
 	Repository     string `json:"repository"`
 	HeadRepository string `json:"headRepository"`

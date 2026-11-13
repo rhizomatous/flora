@@ -348,6 +348,7 @@ export function Chats({
     setBusy(false);
   }
 
+  const pulls = list?.find((chat) => chat.ID === id)?.pulls ?? detail?.chat.pulls;
   const existingChat = !isNew && id !== "";
   const headerLayout = existingChat
     ? "florets-topbar chat-header [&_h1]:flex-[0_1_auto] max-[560px]:gap-0.5 max-[560px]:[&_h1]:flex-1 max-[560px]:[&>[aria-disabled=true]]:hidden -mx-4 flex shrink-0 items-center gap-1 border-b px-3 sm:-mx-8"
@@ -376,7 +377,7 @@ export function Chats({
           tabIndex={-1}
           className="min-w-0 truncate text-base"
         >
-          {existingChat ? <ChatTitle title={title()} chat={detail?.chat} /> : title()}
+          {existingChat ? <ChatTitle title={title()} chat={detail?.chat} pulls={pulls} /> : title()}
         </Heading>
         {existingChat && <ChatHeaderActions />}
       </div>
@@ -419,6 +420,7 @@ export function Chats({
       )}
       {detail && (
         <ChatDetail
+          pulls={pulls}
           id={id}
           detail={detail}
           activity={activity}
@@ -506,6 +508,7 @@ function ChatList({ list, projects }: { list: Chat[]; projects: Project[] }) {
 
 /** Keeps pending questions above the composer while the transcript scrolls independently. */
 function ChatDetail({
+  pulls,
   id,
   detail,
   activity,
@@ -517,6 +520,7 @@ function ChatDetail({
 }: {
   id: string;
   detail: Detail;
+  pulls: Chat["pulls"];
   activity: Activity[];
   disconnected: boolean;
   busy: boolean;
@@ -573,7 +577,7 @@ function ChatDetail({
         <div className="chat-pending-questions max-h-[50dvh] overflow-y-auto empty:hidden [&_form]:mt-0 [&_form]:mb-3">
           {children}
         </div>
-        <ChatReviewStrip key={`review-${id}`}>
+        <ChatReviewStrip key={`review-${id}`} pulls={pulls}>
           <MessageScrollerButton
             aria-label="Jump to latest"
             size="sm"

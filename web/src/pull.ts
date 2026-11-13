@@ -7,3 +7,9 @@ export type Pull = {
   state: PullState;
   draft: boolean;
 };
+
+export type PullSummary = {
+  items: Pull[] | null;
+  checkedAt: string;
+  error: string;
+};

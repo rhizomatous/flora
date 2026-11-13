@@ -46,14 +46,23 @@ import {
   ListIcon,
   MonitorIcon,
   ClockIcon,
-  ChevronUpIcon,
 } from "@flora/florets";
 
 import { PlaceholderMenu } from "./composer";
 import type { Chat } from "./notifications";
+import type { PullSummary } from "./pull";
+import { PullCount, PullList } from "./pull-links";
 
-/** Summarizes saved chat metadata; unavailable model and PR data stay explicitly unknown. */
-export function ChatTitle({ title, chat }: { title: string; chat: Chat | undefined }) {
+/** Shows saved chat metadata and linked pull requests. */
+export function ChatTitle({
+  title,
+  chat,
+  pulls,
+}: {
+  title: string;
+  chat: Chat | undefined;
+  pulls: PullSummary | undefined;
+}) {
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -138,13 +147,10 @@ export function ChatTitle({ title, chat }: { title: string; chat: Chat | undefin
           <time dateTime={chat?.UpdatedAt} title={updated?.toLocaleString()}>
             {ageLabel}
           </time>
-          <span
-            className="chat-summary-pr flex items-center gap-1.5 text-muted-foreground [&_svg]:size-3.5"
-            aria-label="Pull request count unavailable"
-            title="Pull request count unavailable"
-          >
-            <GitPullRequestIcon />—
-          </span>
+          <PullCount pulls={pulls?.items ?? []} />
+        </div>
+        <div className="mt-2 border-t border-border pt-2">
+          <PullList summary={pulls} />
         </div>
       </HoverCardContent>
     </HoverCard>
@@ -420,48 +426,46 @@ export function ChatComposerFooter({
   );
 }
 
-export function ChatReviewStrip({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState(false);
+export function ChatReviewStrip({
+  children,
+  pulls,
+}: {
+  children: ReactNode;
+  pulls: PullSummary | undefined;
+}) {
+  const count = pulls?.items?.length ?? 0;
   return (
     <div className="composer-review flex flex-col items-center gap-1.5 pb-1.5">
       <div className="composer-accessories flex min-h-7 items-center justify-center gap-1.5">
         {children}
-        <Button
-          variant="secondary"
-          size="sm"
-          className="composer-accessory h-7 gap-1.5 border border-border px-2.5 text-xs [&_svg]:size-[13px]!"
-          aria-label="Pull requests and terminals"
-          aria-expanded={open}
-          aria-controls="chat-review-details"
-          onClick={() => {
-            setOpen(!open);
-          }}
-        >
-          <TerminalIcon />
-          <span className="sr-only">Terminals</span>
-          <GitPullRequestIcon />
-          <span>PRs</span>
-          <ChevronUpIcon className={open ? "rotate-180" : ""} />
-        </Button>
-      </div>
-      {open && (
-        <div
-          id="chat-review-details"
-          className="composer-review-details w-full rounded-[10px] bg-muted px-4 py-3 text-[13px] text-muted-foreground"
-        >
-          <div className="flex items-center gap-2">
-            <GitPullRequestIcon className="size-4" />
-            <span>Pull request details unavailable</span>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {["Review changes", "Checks", "Open pull request", "Terminals"].map((label) => (
-              <Button key={label} variant="secondary" size="sm" disabled>
-                {label}
+        <Popover>
+          <PopoverTrigger
+            render={
+              <Button
+                variant="secondary"
+                size="sm"
+                className="composer-accessory h-7 gap-1.5 border border-border px-2.5 text-xs [&_svg]:size-[13px]!"
+                aria-label={`Linked pull requests${pulls ? ` (${count})` : ""}`}
+              >
+                {count > 0 ? <PullCount pulls={pulls?.items ?? []} /> : <GitPullRequestIcon />}
+                <span>Linked PRs</span>
               </Button>
-            ))}
-          </div>
-        </div>
-      )}
+            }
+          />
+          <PopoverContent
+            side="top"
+            align="center"
+            density="compact"
+            className="max-h-[50dvh] w-96! max-w-[calc(100vw-24px)]! overflow-y-auto"
+          >
+            <PopoverTitle>Linked pull requests</PopoverTitle>
+            <PopoverDescription className="sr-only">
+              Saved GitHub pull requests for this chat.
+            </PopoverDescription>
+            <PullList summary={pulls} />
+          </PopoverContent>
+        </Popover>
+      </div>
     </div>
   );
 }

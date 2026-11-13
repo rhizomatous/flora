@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/rhizomatous/flora/backend/internal/changes"
@@ -71,5 +74,78 @@ func TestChangesAuthenticationAndFullDownload(t *testing.T) {
 	}
 	if w = call(download, token); w.Code != 401 {
 		t.Fatal("revoked download allowed")
+	}
+}
+
+// Chat summaries must remain available even when the much larger diff artifact is unreadable.
+func TestChatPullSummaries(t *testing.T) {
+	store, svc, auth, token, p, cleanup := chatAPI(t)
+	defer cleanup()
+	c := savedReview(t, store, p)
+	paths, err := store.Paths(context.Background(), c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(paths.Artifacts, "changes.json"), []byte("invalid"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	h := New(webassets.FS(), auth, settings.New(store), "https://flora.test", svc)
+	expected := changes.New(store, nil).ReadPulls(context.Background(), c.ID)
+	for _, endpoint := range []string{"/api/notifications", "/api/chats", "/api/chats/" + c.ID} {
+		r := httptest.NewRequest("GET", endpoint, nil)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != 401 {
+			t.Fatalf("%s exposed PRs without authentication", endpoint)
+		}
+		r = httptest.NewRequest("GET", endpoint, nil)
+		r.AddCookie(&http.Cookie{Name: cookieName, Value: token})
+		w = httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != 200 {
+			t.Fatalf("%s: %s", endpoint, w.Body.String())
+		}
+		var rows []chatView
+		switch endpoint {
+		case "/api/chats":
+			err = json.Unmarshal(w.Body.Bytes(), &rows)
+		case "/api/notifications":
+			var feed struct{ Chats []chatView }
+			err = json.Unmarshal(w.Body.Bytes(), &feed)
+			rows = feed.Chats
+		default:
+			var detail struct{ Chat chatView }
+			err = json.Unmarshal(w.Body.Bytes(), &detail)
+			rows = []chatView{detail.Chat}
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, row := range rows {
+			if row.ID == c.ID {
+				found = true
+				if !reflect.DeepEqual(row.Pulls, expected) {
+					t.Fatalf("%s: lost saved PR status: %+v", endpoint, row.Pulls)
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("%s: missing chat", endpoint)
+		}
+	}
+	if err := os.Remove(filepath.Join(paths.Artifacts, "pulls.json")); err != nil {
+		t.Fatal(err)
+	}
+	empty := changes.New(store, nil).ReadPulls(context.Background(), c.ID)
+	if empty.Items == nil || len(empty.Items) != 0 || empty.Error != "" {
+		t.Fatalf("missing artifact: %+v", empty)
+	}
+	if err := os.WriteFile(filepath.Join(paths.Artifacts, "pulls.json"), []byte("invalid"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	broken := changes.New(store, nil).ReadPulls(context.Background(), c.ID)
+	if broken.Items == nil || len(broken.Items) != 0 || broken.Error == "" {
+		t.Fatalf("corrupt artifact: %+v", broken)
 	}
 }

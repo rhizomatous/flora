@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/rhizomatous/flora/backend/internal/agentfiles"
+	"github.com/rhizomatous/flora/backend/internal/changes"
 	"github.com/rhizomatous/flora/backend/internal/chat"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
@@ -50,6 +52,23 @@ func decodeChat(w http.ResponseWriter, r *http.Request, v any) bool {
 	return decodeLimit(w, r, v, 6*storage.MaxAllowedMessageBytes+4096)
 }
 
+type chatView struct {
+	storage.Chat
+	Pulls changes.PullSummary `json:"pulls"`
+}
+
+func (a *api) chatView(ctx context.Context, c storage.Chat) chatView {
+	return chatView{Chat: c, Pulls: changes.New(a.settings.Store, nil).ReadPulls(ctx, c.ID)}
+}
+
+func (a *api) chatViews(ctx context.Context, chats []storage.Chat) []chatView {
+	result := make([]chatView, 0, len(chats))
+	for _, c := range chats {
+		result = append(result, a.chatView(ctx, c))
+	}
+	return result
+}
+
 func (a *api) chatRoutes(mux *http.ServeMux) {
 	store := a.settings.Store
 	mux.HandleFunc("GET /api/notifications", func(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +91,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			chatError(w, err)
 			return
 		}
-		jsonResponse(w, 200, map[string]any{"chats": chats, "completions": events, "cursor": cursor})
+		jsonResponse(w, 200, map[string]any{"chats": a.chatViews(r.Context(), chats), "completions": events, "cursor": cursor})
 	})
 	for _, action := range []string{"interrupt", "stop"} {
 		mux.HandleFunc("POST /api/chats/{id}/"+action, func(w http.ResponseWriter, r *http.Request) {
@@ -132,7 +151,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			chatError(w, err)
 			return
 		}
-		jsonResponse(w, 200, list)
+		jsonResponse(w, 200, a.chatViews(r.Context(), list))
 	})
 	mux.HandleFunc("POST /api/projects/{id}/chats", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {
@@ -173,7 +192,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 		if blocked != "" {
 			c.Status, c.StatusReason = storage.Failed, blocked
 		}
-		jsonResponse(w, 200, map[string]any{"chat": c, "messages": messages, "continuationBlockedReason": blocked})
+		jsonResponse(w, 200, map[string]any{"chat": a.chatView(r.Context(), c), "messages": messages, "continuationBlockedReason": blocked})
 	})
 	mux.HandleFunc("POST /api/chats/{id}/messages", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {

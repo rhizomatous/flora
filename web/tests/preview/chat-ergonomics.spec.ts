@@ -144,14 +144,11 @@ test("shared composer stays compact and exposes honest placeholders", async ({ p
     await page.getByRole("button", { name: "Context usage", exact: true }).click();
     await expect(page.getByText("Unavailable", { exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
-    const review = page.getByRole("button", { name: "Pull requests and terminals", exact: true });
+    const review = page.getByRole("button", { name: "Linked pull requests (0)", exact: true });
     await review.click();
-    await expect(page.getByText("Pull request details unavailable", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Review changes", exact: true })).toBeDisabled();
-    await review.click();
-    await expect(page.getByText("Pull request details unavailable", { exact: true })).toHaveCount(
-      0,
-    );
+    await expect(page.getByText("No linked pull requests yet.", { exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByText("No linked pull requests yet.", { exact: true })).toBeHidden();
     await expect(followUp).toHaveValue("Draft a follow-up");
   }
   assert.deepEqual(errors, []);

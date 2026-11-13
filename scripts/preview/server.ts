@@ -98,6 +98,11 @@ export function chatAt(id: string, frame: Frame, finished: boolean) {
     reason = "Waiting for your answer";
   }
   return {
+    pulls: {
+      items: finished ? (stories.find((s) => s.id === id)?.pulls ?? []) : [],
+      error: "",
+      checkedAt: epoch,
+    },
     ID: id,
     ProjectID: project.id,
     Title: scenario.title,
