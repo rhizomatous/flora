@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useState } from "react";
 
 import { Heading, Link, Text } from "@flora/florets";
 
+import type { Pull } from "./pull";
 import { isExpired, request } from "./request";
 
 type FileChange = {
@@ -15,7 +16,6 @@ type FileChange = {
   bytes: number;
   truncated: boolean;
 };
-type Pull = { repository?: string; url: string; number: number; state: string; draft: boolean };
 type Review = {
   snapshot: {
     id: string;

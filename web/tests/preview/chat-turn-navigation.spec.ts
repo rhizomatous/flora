@@ -5,7 +5,7 @@ test("turn navigation previews replies and jumps without losing the draft", asyn
   await page.goto(`${base}/#chats/pagination`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const nav = page.getByRole("navigation", { name: "Conversation turns" });
-  await expect(nav.getByRole("button")).toHaveCount(3);
+  await expect(nav.getByRole("button")).toHaveCount(4);
   const first = nav.getByRole("button", { name: /^Turn 1:/ });
   const second = nav.getByRole("button", { name: /^Turn 2:/ });
   const draft = page.getByLabel("Follow-up", { exact: true });
