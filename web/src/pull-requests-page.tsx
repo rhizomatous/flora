@@ -16,7 +16,7 @@ import { PullLineCounts, PullStatusIcon } from "./pull-links";
 import { collectPullRequests, type TrackedPull } from "./pull-requests";
 
 const filters = [
-  { id: "open", label: "Open" },
+  { id: "open", label: "Ready for review" },
   { id: "draft", label: "Draft" },
   { id: "merged", label: "Merged" },
   { id: "closed", label: "Closed" },
@@ -24,7 +24,7 @@ const filters = [
 ] as const;
 type Filter = (typeof filters)[number]["id"];
 const groups = [
-  { id: "open", label: "Open" },
+  { id: "open", label: "Ready for review" },
   { id: "draft", label: "Draft" },
   { id: "merged", label: "Merged" },
   { id: "closed", label: "Closed" },
@@ -33,7 +33,6 @@ const groups = [
 
 function matchesFilter(row: TrackedPull, filter: Filter) {
   if (filter === "all") return true;
-  if (filter === "open") return row.pull.state === "open";
   return pullStatus(row.pull) === filter;
 }
 

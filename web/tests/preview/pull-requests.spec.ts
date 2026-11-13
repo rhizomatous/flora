@@ -10,10 +10,16 @@ test("pull requests page filters, searches, and links back to chats", async ({ p
   const states = region.getByRole("group", { name: "Pull request state" });
   await expect(
     region
-      .getByRole("list", { name: "Open pull requests" })
+      .getByRole("list", { name: "Ready for review pull requests" })
       .getByRole("link", { name: /example\/fieldnotes #19:/ }),
   ).toBeVisible();
+  await expect(region.getByRole("list", { name: "Draft pull requests" })).toHaveCount(0);
+  await expect(
+    states.getByRole("button", { name: "Ready for review 1", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await states.getByRole("button", { name: /^Draft / }).click();
   await expect(region.getByRole("list", { name: "Draft pull requests" })).toBeVisible();
+  await states.getByRole("button", { name: /^Ready for review / }).click();
   await expect(region.getByLabel("35 additions, 36 deletions")).toBeVisible();
   await states.getByRole("button", { name: /^All / }).click();
   await expect(region.getByRole("list")).toHaveCount(4);
@@ -61,7 +67,7 @@ test("pull request groups update when saved statuses change", async ({ page }) =
   await page.goto(`${base}/#pulls`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const region = page.getByRole("region", { name: "Pull requests", exact: true });
-  await expect(region.getByRole("list", { name: "Open pull requests" })).toBeVisible();
+  await expect(region.getByRole("list", { name: "Ready for review pull requests" })).toBeVisible();
   merged = true;
   await expect(region.getByText("No pull requests match these filters.")).toBeVisible();
   await region.getByRole("button", { name: /^Merged / }).click();
