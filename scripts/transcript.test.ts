@@ -159,7 +159,7 @@ test("text-only saved messages, reasoning, unknown parts, and empty assistant me
     ["message", "message", "work"],
   );
   assert.ok(rows[1]?.kind === "message");
-  assert.equal(rows[1].message.Payload.parts?.[0]?.text, "Saved response");
+  assert.equal(rows[1].message.Payload.parts[0]?.text, "Saved response");
   assert.ok(rows[2]?.kind === "work");
   assert.equal(rows[2].steps.length, 2);
   assert.equal(workTiming(rows[2].steps, false), undefined);

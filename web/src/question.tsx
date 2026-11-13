@@ -17,17 +17,9 @@ import {
 } from "@flora/florets";
 
 import { request } from "./request";
+import { answeredSchema, type Question } from "./schemas";
 
-export type Question = {
-  id: string;
-  questions: {
-    question: string;
-    header: string;
-    multiple: boolean;
-    custom?: boolean;
-    options: { label: string; description: string }[];
-  }[];
-};
+export type { Question } from "./schemas";
 
 /** Answers one pending OpenCode question request. Each typed answer replaces selected options. */
 export function QuestionForm({
@@ -81,9 +73,9 @@ export function QuestionForm({
     setBusy(true);
     try {
       await request(
+        answeredSchema,
         `chats/${encodeURIComponent(chatID)}/questions/${encodeURIComponent(q.id)}/reply`,
-        "POST",
-        { answers: submitted },
+        { method: "POST", body: { answers: submitted } },
       );
       onAnswered();
     } catch (error) {
@@ -131,7 +123,7 @@ export function QuestionForm({
                 )}
               </QuestionnaireChoice>
             ))}
-            {question.custom !== false && (
+            {question.custom && (
               <QuestionnaireInput
                 aria-label={question.options.length === 0 ? "Answer" : "Other answer"}
                 placeholder={question.options.length === 0 ? "Answer…" : "Other answer…"}

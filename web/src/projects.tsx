@@ -15,14 +15,8 @@ import {
 } from "@flora/florets";
 
 import { errorMessage, isExpired, request } from "./request";
+import { projectSchema, type Project, type Repository } from "./schemas";
 import { text, texts } from "./ui";
-
-type Repository = { name: string; url: string; baseBranch: string; role: "core" | "extra" };
-type Project = {
-  id: string;
-  name: string;
-  configuration: { repositories: Repository[]; setupCommand: string };
-};
 
 const blankRepository: Repository = { name: "", url: "", baseBranch: "", role: "core" };
 
@@ -172,10 +166,10 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
     const load = async () => {
       try {
         if (id === "") {
-          const projects = await request<Project[]>("projects");
+          const projects = await request(projectSchema.array(), "projects");
           if (active) setList(projects);
         } else {
-          const loaded = await request<Project>(`projects/${encodeURIComponent(id)}`);
+          const loaded = await request(projectSchema, `projects/${encodeURIComponent(id)}`);
           if (active) setProject(loaded);
         }
       } catch (e) {
@@ -197,10 +191,10 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
     setError("");
     setNotice("");
     try {
-      const saved = await request<Project>(
+      const saved = await request(
+        projectSchema,
         creating ? "projects" : `projects/${encodeURIComponent(id)}`,
-        creating ? "POST" : "PUT",
-        payload,
+        { method: creating ? "POST" : "PUT", body: payload },
       );
       setProject(saved);
       setRevision((value) => value + 1);

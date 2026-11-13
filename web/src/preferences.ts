@@ -1,19 +1,7 @@
+import type { Preferences } from "./schemas";
 import { text } from "./ui";
 
-export type Preferences = {
-  cpus: number;
-  memoryBytes: number;
-  pidsLimit: number;
-  setupSeconds: number;
-  authorName: string;
-  authorEmail: string;
-  maxRunning: number;
-  activitySeconds: number;
-  inlineDiffBytes: number;
-  messageBytes: number;
-  sessionSeconds: number;
-  sound: boolean;
-};
+export type { Preferences } from "./schemas";
 
 type NumericPreference = Exclude<keyof Preferences, "authorName" | "authorEmail" | "sound">;
 

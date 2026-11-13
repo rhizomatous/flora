@@ -3,31 +3,7 @@ import { useEffect, useEffectEvent, useState } from "react";
 import { Heading, Link, Text } from "@flora/florets";
 
 import { isExpired, request } from "./request";
-
-type FileChange = {
-  repository?: string;
-  path: string;
-  previous?: string;
-  status: string;
-  binary: boolean;
-  undisplayable: boolean;
-  diff: string;
-  bytes: number;
-  truncated: boolean;
-};
-type Pull = { repository?: string; url: string; number: number; state: string; draft: boolean };
-type Review = {
-  snapshot: {
-    id: string;
-    capturedAt: string;
-    base: string;
-    bases?: Record<string, string>;
-    files: FileChange[];
-  } | null;
-  stale: boolean;
-  error: string;
-  pulls: { items: Pull[] | null; error: string; checkedAt: string };
-};
+import { reviewSchema, type Review, type FileChange, type Pull } from "./schemas";
 
 const pullStates = new Map([
   ["open", "Open"],
@@ -56,7 +32,7 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
       if (loading) return;
       loading = true;
       try {
-        const data = await request<Review>(`chats/${encodeURIComponent(chatID)}/changes`);
+        const data = await request(reviewSchema, `chats/${encodeURIComponent(chatID)}/changes`);
         if (active) {
           setReview(data);
           setError("");

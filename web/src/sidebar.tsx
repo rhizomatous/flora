@@ -19,8 +19,7 @@ import {
 
 import type { Chat } from "./notifications";
 import { errorMessage, isExpired, request } from "./request";
-
-type Project = { id: string; name: string };
+import { projectSummarySchema, type ProjectSummary as Project } from "./schemas";
 
 /** Keeps project navigation beside every workspace view, using the shared live chat feed. */
 export function Sidebar({
@@ -52,7 +51,7 @@ export function Sidebar({
     let active = true;
     async function load() {
       try {
-        const rows = await request<Project[]>("projects");
+        const rows = await request(projectSummarySchema.array(), "projects");
         if (active) {
           setProjects(rows);
           setError("");

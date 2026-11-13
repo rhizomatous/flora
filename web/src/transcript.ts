@@ -1,26 +1,7 @@
-export type Part = {
-  id?: string;
-  type: string;
-  text?: string;
-  tool?: string;
-  time?: { start: number; end?: number };
-  state?: {
-    time?: { start: number; end?: number };
-    status: string;
-    input?: unknown;
-    output?: string;
-    error?: string;
-    title?: string;
-  };
-};
-export type Message = {
-  ID: string;
-  Role: string;
-  Text: string;
-  Provider: string;
-  Model: string;
-  Payload: { parts?: Part[]; info?: { error?: unknown } };
-};
+import type { Part, Message } from "./schemas.ts";
+
+export type { Part, Message } from "./schemas.ts";
+
 export type WorkStep = { id: string; part: Part };
 export type TranscriptRow =
   | { kind: "message"; id: string; message: Message }
@@ -51,7 +32,7 @@ export function buildTranscript(messages: Message[], status: string): Transcript
       continue;
     }
     let prose: Extract<TranscriptRow, { kind: "message" }> | undefined;
-    const savedParts = message.Payload.parts ?? [];
+    const savedParts = message.Payload.parts;
     const parts = savedParts.length > 0 ? savedParts : [{ type: "text", text: message.Text }];
     for (const [index, part] of parts.entries()) {
       if (part.type === "step-start" || part.type === "step-finish") continue;
@@ -60,7 +41,7 @@ export function buildTranscript(messages: Message[], status: string): Transcript
         if ((part.text ?? "").trim() === "") continue;
         work = undefined;
         if (prose) {
-          prose.message.Payload.parts?.push(part);
+          prose.message.Payload.parts.push(part);
         } else {
           prose = {
             kind: "message",
@@ -83,7 +64,7 @@ export function buildTranscript(messages: Message[], status: string): Transcript
       rows.push({
         kind: "message",
         id: `error:${message.ID}`,
-        message: { ...message, Text: "", Payload: { info: message.Payload.info } },
+        message: { ...message, Text: "", Payload: { parts: [], info: message.Payload.info } },
       });
     }
   }

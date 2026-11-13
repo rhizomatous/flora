@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export class RequestError extends Error {
   readonly status: number;
 
@@ -15,20 +17,15 @@ export const isExpired = (error: unknown) => error instanceof RequestError && er
 export const errorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback;
 
-const diagnostic = (result: unknown) =>
-  typeof result === "object" &&
-  result !== null &&
-  "error" in result &&
-  typeof result.error === "string"
-    ? result.error
-    : undefined;
+const diagnosticSchema = z.object({ error: z.string() });
 
-/**
- * Sends a same-origin JSON request to the Flora API and returns the parsed body. The caller
- * chooses `T`; the body is not validated. Failures throw a RequestError carrying the server's
- * JSON diagnostic when there is one.
- */
-export async function request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
+/** Parses a same-origin API response before returning it to the caller. HTTP and malformed
+ * response failures carry the status, without exposing raw response data in the diagnostic. */
+export async function request<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  { method = "GET", body }: { method?: string; body?: unknown } = {},
+): Promise<T> {
   const init: RequestInit = {
     method,
     credentials: "same-origin",
@@ -46,7 +43,16 @@ export async function request<T>(path: string, method = "GET", body?: unknown): 
   } catch {
     throw new RequestError(fallback, response.status);
   }
-  if (!response.ok) throw new RequestError(diagnostic(result) ?? fallback, response.status);
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Callers own the response shape.
-  return result as T;
+  if (!response.ok) {
+    const diagnostic = diagnosticSchema.safeParse(result);
+    throw new RequestError(diagnostic.success ? diagnostic.data.error : fallback, response.status);
+  }
+  const parsed = schema.safeParse(result);
+  if (!parsed.success) {
+    throw new RequestError(
+      "Could not read the server response. Reload and try again.",
+      response.status,
+    );
+  }
+  return parsed.data;
 }
