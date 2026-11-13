@@ -35,6 +35,7 @@ import {
 
 import {
   ChatTurnNavigation,
+  ChatPullProvider,
   ChatTitle,
   ChatHeaderActions,
   ChatComposerFooter,
@@ -68,8 +69,8 @@ type Detail = { chat: Chat; messages: Message[]; continuationBlockedReason?: str
 type Project = { id: string; name: string };
 
 const Markdown = lazy(async () => {
-  const { Markdown: Component } = await import("@flora/florets/ai");
-  return { default: Component };
+  const { ReplyMarkdown } = await import("./reply-markdown");
+  return { default: ReplyMarkdown };
 });
 
 function ReplyText({ children }: { children: string }) {
@@ -348,6 +349,7 @@ export function Chats({
     setBusy(false);
   }
 
+  const pulls = list?.find((chat) => chat.ID === id)?.pulls ?? detail?.chat.pulls;
   const existingChat = !isNew && id !== "";
   const headerLayout = existingChat
     ? "florets-topbar chat-header [&_h1]:flex-[0_1_auto] max-[560px]:gap-0.5 max-[560px]:[&_h1]:flex-1 max-[560px]:[&>[aria-disabled=true]]:hidden -mx-4 flex shrink-0 items-center gap-1 border-b px-3 sm:-mx-8"
@@ -376,7 +378,7 @@ export function Chats({
           tabIndex={-1}
           className="min-w-0 truncate text-base"
         >
-          {existingChat ? <ChatTitle title={title()} chat={detail?.chat} /> : title()}
+          {existingChat ? <ChatTitle title={title()} chat={detail?.chat} pulls={pulls} /> : title()}
         </Heading>
         {existingChat && <ChatHeaderActions />}
       </div>
@@ -419,6 +421,7 @@ export function Chats({
       )}
       {detail && (
         <ChatDetail
+          pulls={pulls}
           id={id}
           detail={detail}
           activity={activity}
@@ -506,6 +509,7 @@ function ChatList({ list, projects }: { list: Chat[]; projects: Project[] }) {
 
 /** Keeps pending questions above the composer while the transcript scrolls independently. */
 function ChatDetail({
+  pulls,
   id,
   detail,
   activity,
@@ -517,6 +521,7 @@ function ChatDetail({
 }: {
   id: string;
   detail: Detail;
+  pulls: Chat["pulls"];
   activity: Activity[];
   disconnected: boolean;
   busy: boolean;
@@ -532,69 +537,71 @@ function ChatDetail({
   const visibleActivity = rows.some((row) => row.kind === "work" && row.active);
 
   return (
-    <MessageScrollerProvider autoScroll>
-      <MessageScroller className="-mx-4 w-auto flex-1 sm:-mx-8">
-        <MessageScrollerViewport aria-label="Conversation" className="chat-transcript-viewport">
-          <MessageScrollerContent className="mx-auto w-full max-w-[900px] gap-6 px-4 py-6">
-            {disconnected && <Alert role="status">Disconnected. Reconnecting…</Alert>}
-            {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
-              <Alert role="note">
-                Some live activity could not be captured. Recovered messages and tool snapshots are
-                shown; transient output may be missing.
-              </Alert>
-            )}
-            {rows.map((row) => (
-              <MessageScrollerItem
-                key={row.id}
-                messageId={row.id}
-                scrollAnchor={row.kind === "message" && row.message.Role === "user"}
-              >
-                {row.kind === "work" ? (
-                  <WorkSummary steps={row.steps} active={row.active} failed={row.failed} />
-                ) : (
-                  <ConversationMessage message={row.message} />
-                )}
-              </MessageScrollerItem>
-            ))}
-            {activeTurn && !visibleActivity && (
-              <div role="status" aria-label="Working">
-                <FlowerMark className="text-muted-foreground motion-safe:animate-pulse" />
-              </div>
-            )}
-            {(chat.Status === "failed" ||
-              chat.Status === "stopped" ||
-              chat.StatusReason.includes("interrupted")) &&
-              chat.StatusReason !== "" && <Text role="status">{chat.StatusReason}</Text>}
-          </MessageScrollerContent>
-        </MessageScrollerViewport>
-        <ChatTurnNavigation rows={rows} />
-      </MessageScroller>
-      <div className="chat-composer-dock mx-auto max-h-[70dvh] w-full max-w-[900px] shrink-0 overflow-y-auto pt-2 pb-[env(safe-area-inset-bottom)]">
-        <div className="chat-pending-questions max-h-[50dvh] overflow-y-auto empty:hidden [&_form]:mt-0 [&_form]:mb-3">
-          {children}
+    <ChatPullProvider value={pulls}>
+      <MessageScrollerProvider autoScroll>
+        <MessageScroller className="-mx-4 w-auto flex-1 sm:-mx-8">
+          <MessageScrollerViewport aria-label="Conversation" className="chat-transcript-viewport">
+            <MessageScrollerContent className="mx-auto w-full max-w-[900px] gap-6 px-4 py-6">
+              {disconnected && <Alert role="status">Disconnected. Reconnecting…</Alert>}
+              {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
+                <Alert role="note">
+                  Some live activity could not be captured. Recovered messages and tool snapshots
+                  are shown; transient output may be missing.
+                </Alert>
+              )}
+              {rows.map((row) => (
+                <MessageScrollerItem
+                  key={row.id}
+                  messageId={row.id}
+                  scrollAnchor={row.kind === "message" && row.message.Role === "user"}
+                >
+                  {row.kind === "work" ? (
+                    <WorkSummary steps={row.steps} active={row.active} failed={row.failed} />
+                  ) : (
+                    <ConversationMessage message={row.message} />
+                  )}
+                </MessageScrollerItem>
+              ))}
+              {activeTurn && !visibleActivity && (
+                <div role="status" aria-label="Working">
+                  <FlowerMark className="text-muted-foreground motion-safe:animate-pulse" />
+                </div>
+              )}
+              {(chat.Status === "failed" ||
+                chat.Status === "stopped" ||
+                chat.StatusReason.includes("interrupted")) &&
+                chat.StatusReason !== "" && <Text role="status">{chat.StatusReason}</Text>}
+            </MessageScrollerContent>
+          </MessageScrollerViewport>
+          <ChatTurnNavigation rows={rows} />
+        </MessageScroller>
+        <div className="chat-composer-dock mx-auto max-h-[70dvh] w-full max-w-[900px] shrink-0 overflow-y-auto pt-2 pb-[env(safe-area-inset-bottom)]">
+          <div className="chat-pending-questions max-h-[50dvh] overflow-y-auto empty:hidden [&_form]:mt-0 [&_form]:mb-3">
+            {children}
+          </div>
+          <ChatReviewStrip key={`review-${id}`} pulls={pulls}>
+            <MessageScrollerButton
+              aria-label="Jump to latest"
+              size="sm"
+              className="composer-accessory chat-scroll-latest h-7 gap-1.5 border border-border px-2.5 text-xs [&_svg]:size-[13px]!"
+            >
+              <ArrowDownIcon />
+              Scroll to end
+            </MessageScrollerButton>
+          </ChatReviewStrip>
+          <FollowUpComposer
+            key={id}
+            id={id}
+            busy={busy}
+            activeTurn={activeTurn}
+            blocked={blocked}
+            stopped={stopped}
+            onSend={onSend}
+            onControl={onControl}
+          />
         </div>
-        <ChatReviewStrip key={`review-${id}`}>
-          <MessageScrollerButton
-            aria-label="Jump to latest"
-            size="sm"
-            className="composer-accessory chat-scroll-latest h-7 gap-1.5 border border-border px-2.5 text-xs [&_svg]:size-[13px]!"
-          >
-            <ArrowDownIcon />
-            Scroll to end
-          </MessageScrollerButton>
-        </ChatReviewStrip>
-        <FollowUpComposer
-          key={id}
-          id={id}
-          busy={busy}
-          activeTurn={activeTurn}
-          blocked={blocked}
-          stopped={stopped}
-          onSend={onSend}
-          onControl={onControl}
-        />
-      </div>
-    </MessageScrollerProvider>
+      </MessageScrollerProvider>
+    </ChatPullProvider>
   );
 }
 

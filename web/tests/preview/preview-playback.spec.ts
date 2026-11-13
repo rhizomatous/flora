@@ -21,15 +21,21 @@ test("preview navigation and pauseable chat replay", async ({ page }) => {
     await expect(page.getByRole("alert")).toHaveCount(0);
   }
   for (const [id, title, pull] of [
-    ["checkout", "Keep the cart after signing in", "draft PR #42"],
-    ["pagination", "Fix duplicate notes between pages", "PR #19"],
-    ["focus", "Restore focus after removing a repository", "PR #73"],
+    ["checkout", "Keep the cart after signing in", "#42 Draft"],
+    ["pagination", "Fix duplicate notes between pages", "#19 Open"],
+    ["focus", "Restore focus after removing a repository", "#73 Merged"],
   ] as const) {
     await page.goto(`${base}/#chats/${id}`);
     await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: pull, exact: true })).toBeVisible();
+    await expect(
+      page
+        .getByRole("region", { name: "Conversation", exact: true })
+        .getByRole("link", { name: new RegExp(pull) }),
+    ).toBeVisible();
     if (id === "pagination") {
-      const originalPull = page.getByRole("button", { name: "PR #18", exact: true });
+      const originalPull = page
+        .getByRole("region", { name: "Conversation", exact: true })
+        .getByRole("link", { name: /#18 Closed/ });
       await expect(originalPull).toHaveCount(2);
       await expect(originalPull.last()).toBeVisible();
     }

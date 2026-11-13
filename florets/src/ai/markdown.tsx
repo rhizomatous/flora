@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentProps } from "react";
+import { useMemo, type ComponentProps } from "react";
 import { Streamdown, useIsCodeFenceIncomplete, type ExtraProps } from "streamdown";
 
 import {
@@ -69,14 +69,15 @@ const DEFAULT_COMPONENTS = { code: MarkdownCode };
 
 function Markdown({
   className,
-  components = DEFAULT_COMPONENTS,
+  components,
   controls = false,
   ...props
 }: ComponentProps<typeof Streamdown>) {
+  const renderers = useMemo(() => ({ ...DEFAULT_COMPONENTS, ...components }), [components]);
   return (
     <Streamdown
       data-slot="markdown"
-      components={components}
+      components={renderers}
       controls={controls}
       className={cn("florets-markdown w-full min-w-0 overflow-hidden", className)}
       {...props}

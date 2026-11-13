@@ -34,7 +34,7 @@ func TestVerifyPullLinksAndRetainOnFailure(t *testing.T) {
 			return &http.Response{StatusCode: 404, Body: io.NopCloser(strings.NewReader(`{}`)), Header: make(http.Header)}, nil
 		}
 		status := 200
-		body := `{"number":42,"state":"open","draft":true,"html_url":"https://github.com/example/core/pull/42"}`
+		body := `{"title":"Fix pagination","additions":35,"deletions":0,"number":42,"state":"open","draft":true,"html_url":"https://github.com/example/core/pull/42"}`
 		if fail {
 			status = 403
 			body = `{"message":"sensitive upstream failure"}`
@@ -46,6 +46,14 @@ func TestVerifyPullLinksAndRetainOnFailure(t *testing.T) {
 	if err != nil || len(r.Pulls.Items) != 1 || !r.Pulls.Items[0].Draft || r.Pulls.Error != "" {
 		t.Fatalf("unverified PR: %+v %v", r.Pulls, err)
 	}
+	assertDetails := func() {
+		t.Helper()
+		pull := r.Pulls.Items[0]
+		if pull.Title != "Fix pagination" || pull.Additions == nil || *pull.Additions != 35 || pull.Deletions == nil || *pull.Deletions != 0 {
+			t.Fatalf("PR details lost: %+v", pull)
+		}
+	}
+	assertDetails()
 	p, _ := s.Store.Paths(ctx, c.ID)
 	root, _ := os.OpenRoot(p.Artifacts)
 	defer root.Close()
@@ -59,6 +67,7 @@ func TestVerifyPullLinksAndRetainOnFailure(t *testing.T) {
 	if err != nil || len(r.Pulls.Items) != 1 || r.Pulls.Error == "" || requests != 3 || strings.Contains(r.Pulls.Error, "sensitive") {
 		t.Fatalf("PR retention failed: %+v %v", r.Pulls, err)
 	}
+	assertDetails()
 }
 
 func TestEmptyPullScanThrottlesAndDiscoversLaterLink(t *testing.T) {

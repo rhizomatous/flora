@@ -2,7 +2,8 @@ import { useEffect, useEffectEvent, useState } from "react";
 
 import { Heading, Link, Text } from "@flora/florets";
 
-import type { Pull } from "./pull";
+import type { PullSummary } from "./pull";
+import { PullList } from "./pull-links";
 import { isExpired, request } from "./request";
 
 type FileChange = {
@@ -26,17 +27,8 @@ type Review = {
   } | null;
   stale: boolean;
   error: string;
-  pulls: { items: Pull[] | null; error: string; checkedAt: string };
+  pulls: PullSummary;
 };
-
-const pullStates = new Map([
-  ["open", "Open"],
-  ["closed", "Closed"],
-  ["merged", "Merged"],
-]);
-
-const pullState = (pull: Pull) =>
-  pull.draft && pull.state === "open" ? "Draft" : (pullStates.get(pull.state) ?? "Unknown");
 
 function contentNote(file: FileChange) {
   if (file.binary) return " · Binary";
@@ -87,31 +79,10 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
       className="mt-8 min-w-0 rounded-md border border-foreground/20 p-4"
     >
       <Heading level={2}>Changes</Heading>
-      {pulls.length > 0 && (
-        <ul aria-label="Pull requests" className="mt-3 space-y-2 text-sm">
-          {pulls.map((p) => (
-            <li key={p.url} className="break-words">
-              <Link href={p.url} target="_blank" rel="noreferrer">
-                {p.repository ?? p.url.split("/").slice(3, 5).join("/")} PR #{p.number}
-              </Link>{" "}
-              · {pullState(p)}
-            </li>
-          ))}
-        </ul>
-      )}
-      {pulls.length > 0 && review !== undefined && review.pulls.checkedAt !== "" && (
-        <Text size="xs" tone="muted" className="mt-2">
-          PR discovery last attempted{" "}
-          <time dateTime={review.pulls.checkedAt}>
-            {new Date(review.pulls.checkedAt).toLocaleString()}
-          </time>
-          .
-        </Text>
-      )}
-      {review !== undefined && review.pulls.error !== "" && (
-        <Text role="status" className="mt-3">
-          {review.pulls.error}
-        </Text>
+      {review && (pulls.length > 0 || review.pulls.error !== "") && (
+        <div className="mt-3">
+          <PullList summary={review.pulls} />
+        </div>
       )}
       {error !== "" && (
         <Text role="alert" className="mt-3">

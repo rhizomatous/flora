@@ -23,6 +23,7 @@ import {
 } from "@flora/florets";
 
 import type { Chat } from "./notifications";
+import { PullCount, PullList } from "./pull-links";
 import { sidebarStatus, useSeenSidebarChats } from "./sidebar-status";
 
 type Project = { id: string; name: string };
@@ -73,7 +74,10 @@ function ChatRow({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="florets-navigation-title">{chat.Title || "Chat"}</span>
-                <span className="florets-navigation-meta">{status.label}</span>
+                <span className="florets-navigation-meta flex! flex-wrap items-center gap-x-2">
+                  <span>{status.label}</span>
+                  <PullCount pulls={chat.pulls?.items ?? []} />
+                </span>
               </span>
               <time
                 className="florets-navigation-age"
@@ -89,16 +93,18 @@ function ChatRow({
           side="right"
           align="start"
           density="compact"
-          className="sidebar-chat-preview florets-menu-surface w-80! max-w-[calc(100vw-32px)]! wrap-anywhere"
+          className="sidebar-chat-preview florets-menu-surface w-[420px]! max-w-[calc(100vw-32px)]! wrap-anywhere"
         >
           <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
             <span className="truncate">{chat.ID}</span>
-            <span>{status.label}</span>
           </div>
           <p className="mt-2">{chat.Title || "Chat"}</p>
-          <p className="mt-3 text-xs text-muted-foreground">
-            Updated {new Date(chat.UpdatedAt).toLocaleString()}
-          </p>
+          {((chat.pulls?.items?.length ?? 0) > 0 || (chat.pulls?.error ?? "") !== "") && (
+            <div className="mt-3 border-t border-border pt-2">
+              <p className="mb-1 text-xs text-muted-foreground">Pull requests</p>
+              <PullList summary={chat.pulls} />
+            </div>
+          )}
         </HoverCardContent>
       </HoverCard>
       <div className="florets-navigation-actions">

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,12 +21,44 @@ import (
 )
 
 type Pull struct {
+	Title      string `json:"title,omitempty"`
+	Additions  *int   `json:"additions,omitempty"`
+	Deletions  *int   `json:"deletions,omitempty"`
 	Repository string `json:"repository,omitempty"`
 	URL        string `json:"url"`
 	Number     int    `json:"number"`
 	State      string `json:"state"`
 	Draft      bool   `json:"draft"`
 }
+
+// PullSummary contains saved links and their last discovery result without scan bookkeeping.
+type PullSummary struct {
+	Items     []Pull `json:"items"`
+	CheckedAt string `json:"checkedAt"`
+	Error     string `json:"error"`
+}
+
+// ReadPulls reads saved PRs without loading diffs or contacting GitHub.
+func (s *Service) ReadPulls(ctx context.Context, id string) PullSummary {
+	result := PullSummary{Items: []Pull{}}
+	paths, err := s.Store.Paths(ctx, id)
+	if err == nil {
+		var root *os.Root
+		root, err = os.OpenRoot(paths.Artifacts)
+		if err == nil {
+			defer root.Close()
+			err = load(root, "pulls.json", &result)
+		}
+	}
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return PullSummary{Items: []Pull{}, Error: "Saved pull requests unavailable."}
+	}
+	if result.Items == nil {
+		result.Items = []Pull{}
+	}
+	return result
+}
+
 type pullBranch struct {
 	Repository     string `json:"repository"`
 	HeadRepository string `json:"headRepository"`
@@ -209,12 +242,15 @@ git for-each-ref --format='%(refname:short)%00%(objectname)%00%(upstream:remoten
 }
 
 type remotePull struct {
-	Number  int    `json:"number"`
-	State   string `json:"state"`
-	Draft   bool   `json:"draft"`
-	Merged  bool   `json:"merged"`
-	HTMLURL string `json:"html_url"`
-	Head    struct {
+	Title     string `json:"title"`
+	Additions *int   `json:"additions"`
+	Deletions *int   `json:"deletions"`
+	Number    int    `json:"number"`
+	State     string `json:"state"`
+	Draft     bool   `json:"draft"`
+	Merged    bool   `json:"merged"`
+	HTMLURL   string `json:"html_url"`
+	Head      struct {
 		Ref  string `json:"ref"`
 		SHA  string `json:"sha"`
 		Repo struct {
@@ -398,7 +434,7 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 		if remote.Merged {
 			remote.State = "merged"
 		}
-		known[link] = Pull{Repository: strings.ToLower(match[1]), URL: link, Number: number, State: remote.State, Draft: remote.Draft}
+		known[link] = Pull{Repository: strings.ToLower(match[1]), URL: link, Number: number, State: remote.State, Draft: remote.Draft, Title: remote.Title, Additions: remote.Additions, Deletions: remote.Deletions}
 		delete(state.Missing, link)
 	}
 	confirmed := map[string]bool{}
