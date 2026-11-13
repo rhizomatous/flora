@@ -19,6 +19,7 @@ import { Chats } from "./chats";
 import { Installation, type Settings } from "./installation";
 import { useNotifications } from "./notifications";
 import { Projects } from "./projects";
+import { PullRequests } from "./pull-requests-page";
 import { errorMessage, request } from "./request";
 import { Sidebar } from "./sidebar";
 import { CompletionToasts } from "./toasts";
@@ -199,12 +200,14 @@ function App() {
 
   const Layout = ready ? SidebarProvider : "div";
   const conversation = ready && path.startsWith("chats/") && !path.startsWith("chats/new");
-  const contentLayout = conversation
-    ? "flex min-h-0 flex-1 flex-col px-4 pb-2 sm:px-8"
-    : "mx-auto w-full max-w-6xl p-4 sm:p-8";
-  const frameLayout = conversation
-    ? "h-dvh min-h-0 min-w-0 overflow-hidden md:h-[calc(100dvh-1rem)]"
-    : "min-w-0";
+  const pullsPage = ready && path === "pulls";
+  let contentLayout = "mx-auto w-full max-w-6xl p-4 sm:p-8";
+  if (pullsPage) contentLayout = "flex min-h-0 flex-1 flex-col";
+  else if (conversation) contentLayout = "flex min-h-0 flex-1 flex-col px-4 pb-2 sm:px-8";
+  const frameLayout =
+    conversation || pullsPage
+      ? "h-dvh min-h-0 min-w-0 overflow-hidden md:h-[calc(100dvh-1rem)]"
+      : "min-w-0";
   const Content = ready ? SidebarInset : "main";
 
   return (
@@ -230,7 +233,7 @@ function App() {
         </header>
       )}
       <Content id="main-content" tabIndex={-1} className={ready ? frameLayout : undefined}>
-        {ready && !conversation && (
+        {ready && !conversation && !pullsPage && (
           <header className="florets-topbar flex shrink-0 items-center border-b px-3">
             <span className="sidebar-toggle-space" aria-hidden="true" />
           </header>
@@ -283,8 +286,12 @@ function App() {
           {ready && path === "settings" && (
             <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
           )}
+          {pullsPage && (
+            <PullRequests chats={notifications.chats} disconnected={notifications.error !== ""} />
+          )}
           {ready &&
             path !== "settings" &&
+            path !== "pulls" &&
             (path.startsWith("chats") ? (
               <Chats
                 key={path}

@@ -7,7 +7,7 @@ import {
   GitPullRequestIcon,
 } from "@flora/florets";
 
-import type { Pull, PullSummary } from "./pull";
+import { pullStatus, type Pull, type PullSummary } from "./pull";
 
 const appearances = {
   open: {
@@ -26,10 +26,34 @@ const appearances = {
 };
 
 function appearance(pull: { state: string; draft: boolean }) {
-  if (pull.state === "open") return pull.draft ? appearances.draft : appearances.open;
-  if (pull.state === "merged") return appearances.merged;
-  if (pull.state === "closed") return appearances.closed;
-  return appearances.unknown;
+  return appearances[pullStatus(pull)];
+}
+
+export function PullStatusIcon({ pull }: { pull: Pull }) {
+  const { Icon, label, color } = appearance(pull);
+  return (
+    <span role="img" aria-label={label} title={label} className={color}>
+      <Icon className="size-4 shrink-0" aria-hidden="true" />
+    </span>
+  );
+}
+
+export function PullLineCounts({ pull }: { pull: Pull }) {
+  if (pull.additions === undefined || pull.deletions === undefined) return null;
+  return (
+    <span
+      className="flex shrink-0 gap-1.5 text-xs tabular-nums"
+      role="img"
+      aria-label={`${pull.additions} additions, ${pull.deletions} deletions`}
+    >
+      <span className="text-emerald-700 dark:text-emerald-400" aria-hidden="true">
+        +{pull.additions}
+      </span>
+      <span className="text-red-700 dark:text-red-400" aria-hidden="true">
+        −{pull.deletions}
+      </span>
+    </span>
+  );
 }
 
 export function PullCount({ pulls }: { pulls: Pull[] }) {
@@ -83,22 +107,7 @@ export function PullList({ summary }: { summary: PullSummary | undefined }) {
                   <span className="min-w-0 flex-1 truncate text-muted-foreground">
                     {pull.title ?? repository}
                   </span>
-                  <span className="shrink-0 text-right">
-                    {pull.additions !== undefined && pull.deletions !== undefined && (
-                      <span
-                        className="flex justify-end gap-1.5 tabular-nums"
-                        role="img"
-                        aria-label={`${pull.additions} additions, ${pull.deletions} deletions`}
-                      >
-                        <span className="text-emerald-700 dark:text-emerald-400" aria-hidden="true">
-                          +{pull.additions}
-                        </span>
-                        <span className="text-red-700 dark:text-red-400" aria-hidden="true">
-                          −{pull.deletions}
-                        </span>
-                      </span>
-                    )}
-                  </span>
+                  <PullLineCounts pull={pull} />
                 </a>
               </li>
             );
