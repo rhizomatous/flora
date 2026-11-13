@@ -21,6 +21,9 @@ import (
 )
 
 type Pull struct {
+	Title      string `json:"title,omitempty"`
+	Additions  *int   `json:"additions,omitempty"`
+	Deletions  *int   `json:"deletions,omitempty"`
 	Repository string `json:"repository,omitempty"`
 	URL        string `json:"url"`
 	Number     int    `json:"number"`
@@ -239,12 +242,15 @@ git for-each-ref --format='%(refname:short)%00%(objectname)%00%(upstream:remoten
 }
 
 type remotePull struct {
-	Number  int    `json:"number"`
-	State   string `json:"state"`
-	Draft   bool   `json:"draft"`
-	Merged  bool   `json:"merged"`
-	HTMLURL string `json:"html_url"`
-	Head    struct {
+	Title     string `json:"title"`
+	Additions *int   `json:"additions"`
+	Deletions *int   `json:"deletions"`
+	Number    int    `json:"number"`
+	State     string `json:"state"`
+	Draft     bool   `json:"draft"`
+	Merged    bool   `json:"merged"`
+	HTMLURL   string `json:"html_url"`
+	Head      struct {
 		Ref  string `json:"ref"`
 		SHA  string `json:"sha"`
 		Repo struct {
@@ -428,7 +434,7 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 		if remote.Merged {
 			remote.State = "merged"
 		}
-		known[link] = Pull{Repository: strings.ToLower(match[1]), URL: link, Number: number, State: remote.State, Draft: remote.Draft}
+		known[link] = Pull{Repository: strings.ToLower(match[1]), URL: link, Number: number, State: remote.State, Draft: remote.Draft, Title: remote.Title, Additions: remote.Additions, Deletions: remote.Deletions}
 		delete(state.Missing, link)
 	}
 	confirmed := map[string]bool{}

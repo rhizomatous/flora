@@ -56,7 +56,6 @@ export function PullCount({ pulls }: { pulls: Pull[] }) {
 export function PullList({ summary }: { summary: PullSummary | undefined }) {
   const pulls = summary?.items ?? [];
   const error = summary?.error ?? "";
-  const checkedAt = summary?.checkedAt ?? "";
   let emptyMessage = "No linked pull requests yet.";
   if (summary === undefined) emptyMessage = "Loading pull requests…";
   else if (error !== "") emptyMessage = "Pull requests unavailable.";
@@ -78,9 +77,30 @@ export function PullList({ summary }: { summary: PullSummary | undefined }) {
                 >
                   <Icon className={`size-4 shrink-0 ${color}`} aria-hidden="true" />
                   <span className="min-w-0 flex-1 break-words">
-                    {repository} <span className="font-medium">#{pull.number}</span>
+                    {pull.title !== undefined && (
+                      <span className="block font-medium">{pull.title}</span>
+                    )}
+                    <span className="block text-muted-foreground">
+                      {repository} #{pull.number}
+                    </span>
                   </span>
-                  <span className={color}>{label}</span>
+                  <span className="shrink-0 text-right">
+                    <span className={color}>{label}</span>
+                    {pull.additions !== undefined && pull.deletions !== undefined && (
+                      <span
+                        className="mt-0.5 flex justify-end gap-1.5 tabular-nums"
+                        role="img"
+                        aria-label={`${pull.additions} additions, ${pull.deletions} deletions`}
+                      >
+                        <span className="text-emerald-700 dark:text-emerald-400" aria-hidden="true">
+                          +{pull.additions}
+                        </span>
+                        <span className="text-red-700 dark:text-red-400" aria-hidden="true">
+                          −{pull.deletions}
+                        </span>
+                      </span>
+                    )}
+                  </span>
                   <ExternalLinkIcon
                     className="size-3 shrink-0 text-muted-foreground"
                     aria-hidden="true"
@@ -96,11 +116,6 @@ export function PullList({ summary }: { summary: PullSummary | undefined }) {
       {error !== "" && (
         <p role="status" className="mt-2 text-muted-foreground">
           {error}
-        </p>
-      )}
-      {pulls.length > 0 && checkedAt !== "" && (
-        <p className="mt-2 text-muted-foreground">
-          Last checked <time dateTime={checkedAt}>{new Date(checkedAt).toLocaleString()}</time>
         </p>
       )}
     </div>

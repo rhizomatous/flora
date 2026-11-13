@@ -93,11 +93,10 @@ function ChatRow({
           side="right"
           align="start"
           density="compact"
-          className="sidebar-chat-preview florets-menu-surface w-80! max-w-[calc(100vw-32px)]! wrap-anywhere"
+          className="sidebar-chat-preview florets-menu-surface w-[420px]! max-w-[calc(100vw-32px)]! wrap-anywhere"
         >
           <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
             <span className="truncate">{chat.ID}</span>
-            <span>{status.label}</span>
           </div>
           <p className="mt-2">{chat.Title || "Chat"}</p>
           {((chat.pulls?.items?.length ?? 0) > 0 || (chat.pulls?.error ?? "") !== "") && (
@@ -106,9 +105,6 @@ function ChatRow({
               <PullList summary={chat.pulls} />
             </div>
           )}
-          <p className="mt-3 text-xs text-muted-foreground">
-            Updated {new Date(chat.UpdatedAt).toLocaleString()}
-          </p>
         </HoverCardContent>
       </HoverCard>
       <div className="florets-navigation-actions">

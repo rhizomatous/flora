@@ -10,11 +10,13 @@ test("linked PRs appear in the sidebar, hover cards, and composer", async ({ pag
   await row.hover();
   const preview = page.locator(".sidebar-chat-preview");
   await expect(
-    preview.getByRole("link", { name: "example/fieldnotes #18 Closed", exact: true }),
+    preview.getByRole("link", { name: /example\/fieldnotes #18 Closed/ }),
   ).toHaveAttribute("href", "https://github.com/example/fieldnotes/pull/18");
-  await expect(
-    preview.getByRole("link", { name: "example/fieldnotes #19 Open", exact: true }),
-  ).toBeVisible();
+  await expect(preview.getByRole("link", { name: /example\/fieldnotes #19 Open/ })).toBeVisible();
+  await expect(preview.getByText("Stabilize notes pagination", { exact: true })).toHaveCount(2);
+  await expect(preview.getByLabel("35 additions, 36 deletions", { exact: true })).toHaveCount(2);
+  await expect(preview.locator("time")).toHaveCount(0);
+  await expect(preview.getByText("Your turn", { exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
   const title = page.getByRole("button", {
     name: "Fix duplicate notes between pages",
@@ -39,9 +41,7 @@ test("linked PRs appear in the sidebar, hover cards, and composer", async ({ pag
   await expect(draft).toHaveValue("Keep this draft");
   await page.setViewportSize({ width: 390, height: 844 });
   await trigger.click();
-  await expect(
-    dialog.getByRole("link", { name: "example/fieldnotes #19 Open", exact: true }),
-  ).toBeVisible();
+  await expect(dialog.getByRole("link", { name: /example\/fieldnotes #19 Open/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   await page.keyboard.press("Escape");
 
@@ -52,7 +52,7 @@ test("linked PRs appear in the sidebar, hover cards, and composer", async ({ pag
     await page.goto(`${base}/#chats/${chat}`);
     await page.getByRole("button", { name: "Linked pull requests (1)", exact: true }).click();
     await expect(
-      page.getByRole("dialog").getByRole("link", { name: label, exact: true }),
+      page.getByRole("dialog").getByRole("link", { name: new RegExp(label) }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
   }
@@ -73,13 +73,9 @@ test("linked PRs refresh from the feed without reloading the chat", async ({ pag
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await page.getByRole("button", { name: "Linked pull requests (2)", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  await expect(
-    dialog.getByRole("link", { name: "example/fieldnotes #19 Open", exact: true }),
-  ).toBeVisible();
+  await expect(dialog.getByRole("link", { name: /example\/fieldnotes #19 Open/ })).toBeVisible();
   merged = true;
-  await expect(
-    dialog.getByRole("link", { name: "example/fieldnotes #19 Merged", exact: true }),
-  ).toBeVisible();
+  await expect(dialog.getByRole("link", { name: /example\/fieldnotes #19 Merged/ })).toBeVisible();
   const row = page.locator(".florets-navigation-link[href='#chats/pagination']");
   await expect(row.getByLabel("1 merged pull request", { exact: true })).toBeVisible();
 });
