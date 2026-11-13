@@ -1,5 +1,4 @@
 import {
-  ExternalLinkIcon,
   GitMergeIcon,
   GitPullRequestClosedIcon,
   GitPullRequestDraftIcon,
@@ -70,25 +69,22 @@ export function PullList({ summary }: { summary: PullSummary | undefined }) {
               <li key={pull.url}>
                 <a
                   href={pull.url}
+                  aria-label={`${repository} #${pull.number} ${label}${(pull.title ?? "") === "" ? "" : `: ${pull.title}`}${pull.additions !== undefined && pull.deletions !== undefined ? `, ${pull.additions} additions, ${pull.deletions} deletions` : ""}`}
+                  title={`${repository} #${pull.number} · ${label}${(pull.title ?? "") === "" ? "" : ` · ${pull.title}`}`}
                   target="_blank"
                   rel="noreferrer"
                   className="flex min-w-0 items-center gap-2 rounded-md p-2 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
                   data-pr-state={label.toLowerCase()}
                 >
                   <Icon className={`size-4 shrink-0 ${color}`} aria-hidden="true" />
-                  <span className="min-w-0 flex-1 break-words">
-                    {pull.title !== undefined && (
-                      <span className="block font-medium">{pull.title}</span>
-                    )}
-                    <span className="block text-muted-foreground">
-                      {repository} #{pull.number}
-                    </span>
+                  <span className="shrink-0 font-medium">#{pull.number}</span>
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                    {pull.title ?? repository}
                   </span>
                   <span className="shrink-0 text-right">
-                    <span className={color}>{label}</span>
                     {pull.additions !== undefined && pull.deletions !== undefined && (
                       <span
-                        className="mt-0.5 flex justify-end gap-1.5 tabular-nums"
+                        className="flex justify-end gap-1.5 tabular-nums"
                         role="img"
                         aria-label={`${pull.additions} additions, ${pull.deletions} deletions`}
                       >
@@ -101,10 +97,6 @@ export function PullList({ summary }: { summary: PullSummary | undefined }) {
                       </span>
                     )}
                   </span>
-                  <ExternalLinkIcon
-                    className="size-3 shrink-0 text-muted-foreground"
-                    aria-hidden="true"
-                  />
                 </a>
               </li>
             );

@@ -15,6 +15,9 @@ test("linked PRs appear in the sidebar, hover cards, and composer", async ({ pag
   await expect(preview.getByRole("link", { name: /example\/fieldnotes #19 Open/ })).toBeVisible();
   await expect(preview.getByText("Stabilize notes pagination", { exact: true })).toHaveCount(2);
   await expect(preview.getByLabel("35 additions, 36 deletions", { exact: true })).toHaveCount(2);
+  await expect(preview.getByRole("link").first()).toHaveAttribute("title", /Closed/);
+  await expect(preview.getByRole("link").first()).not.toContainText("Closed");
+  await expect(preview.getByRole("link").last()).not.toContainText("Open");
   await expect(preview.locator("time")).toHaveCount(0);
   await expect(preview.getByText("Your turn", { exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
