@@ -22,12 +22,17 @@ test("preview navigation and pauseable chat replay", async ({ page }) => {
   }
   for (const [id, title, pull] of [
     ["checkout", "Keep the cart after signing in", "draft PR #42"],
-    ["pagination", "Fix duplicate notes between pages", "PR #18"],
+    ["pagination", "Fix duplicate notes between pages", "PR #19"],
     ["focus", "Restore focus after removing a repository", "PR #73"],
   ] as const) {
     await page.goto(`${base}/#chats/${id}`);
     await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: pull, exact: true })).toBeVisible();
+    if (id === "pagination") {
+      const originalPull = page.getByRole("button", { name: "PR #18", exact: true });
+      await expect(originalPull).toHaveCount(2);
+      await expect(originalPull.last()).toBeVisible();
+    }
     await expect(page.getByRole("button", { name: "Replay chat", exact: true })).toBeEnabled();
   }
   await page.goto(`${base}/#chats/recovery`);
