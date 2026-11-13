@@ -187,9 +187,25 @@ export function Sidebar({
                   isActive={path === "chats"}
                 />
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  render={
+                    <a
+                      href="#pulls"
+                      aria-current={path === "pulls" ? "page" : undefined}
+                      onClick={() => {
+                        setOpenMobile(false);
+                      }}
+                    >
+                      <GitPullRequestIcon />
+                      Pull requests
+                    </a>
+                  }
+                  isActive={path === "pulls"}
+                />
+              </SidebarMenuItem>
               {[
                 { label: "Issues", icon: <CircleDotIcon /> },
-                { label: "Pull requests", icon: <GitPullRequestIcon /> },
                 { label: "Automations", icon: <Repeat2Icon /> },
                 { label: "Explore", icon: <CompassIcon /> },
                 { label: "More", icon: <EllipsisIcon /> },
