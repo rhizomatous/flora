@@ -90,7 +90,7 @@ test("linked PRs refresh from the feed without reloading the chat", async ({ pag
   await expect(row.getByLabel("1 merged pull request", { exact: true })).toBeVisible();
 });
 
-test("transcript PR badges show status and react to hover and keyboard focus", async ({ page }) => {
+test("transcript PR links show status and react to hover and keyboard focus", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
   await page.goto(`${base}/#chats/pagination`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
