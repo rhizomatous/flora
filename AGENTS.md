@@ -18,6 +18,7 @@ When doing _any_ UI work, refer to [specs/DESIGN.md](specs/DESIGN.md).
 
 ### Git
 
+- Before starting new work, fetch `origin/main` and create the worktree and branch from it.
 - Use a separate Git worktree for implementation work to support parallel work.
 - Commit verified changes as you go.
 - When the work is done, push your branch and open or update a PR. Complete this workflow end to end rather than leaving work uncommitted, unless the user explicitly requests otherwise.
