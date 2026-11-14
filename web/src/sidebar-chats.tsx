@@ -23,8 +23,9 @@ import {
 } from "@flora/florets";
 
 import type { Chat } from "./chat-schemas";
+import { chatStatus } from "./chat-status";
 import { PullCount, PullList } from "./pull-links";
-import { sidebarStatus, useSeenSidebarChats } from "./sidebar-status";
+import { useSeenSidebarChats } from "./sidebar-status";
 
 type Project = { id: string; name: string };
 
@@ -50,7 +51,7 @@ function ChatRow({
   now: number;
   seen: boolean;
 }) {
-  const status = sidebarStatus(chat, seen);
+  const status = chatStatus(chat, seen);
   return (
     <li className="florets-navigation-row" data-active={path === `chats/${chat.ID}` || undefined}>
       <HoverCard>

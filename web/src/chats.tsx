@@ -54,6 +54,7 @@ import {
   type Message,
   type Part,
 } from "./chat-schemas";
+import { chatStatus } from "./chat-status";
 import { Composer } from "./composer";
 import { NewChatComposer } from "./new-chat-composer";
 import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
@@ -497,8 +498,14 @@ function ChatDetail({
                 </MessageScrollerItem>
               ))}
               {activeTurn && !visibleActivity && (
-                <div role="status" aria-label="Working">
-                  <FlowerMark className="text-muted-foreground motion-safe:animate-pulse" />
+                <div role="status" aria-label={chatStatus(chat).label} title={chat.StatusReason}>
+                  <FlowerMark
+                    className={
+                      chatStatus(chat).pulse
+                        ? "text-muted-foreground motion-safe:animate-pulse"
+                        : "text-muted-foreground"
+                    }
+                  />
                 </div>
               )}
               {(chat.Status === "failed" ||

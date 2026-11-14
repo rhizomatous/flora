@@ -49,6 +49,7 @@ import {
 } from "@flora/florets";
 
 import type { Chat } from "./chat-schemas";
+import { chatStatus } from "./chat-status";
 import { PlaceholderMenu } from "./composer";
 import { PullCount, PullList } from "./pull-links";
 import type { PullSummary } from "./pull-schemas";
@@ -141,9 +142,7 @@ export function ChatTitle({
         </div>
         <p className="chat-summary-title mt-[3px] wrap-anywhere">{title}</p>
         <div className="chat-summary-footer mt-2.5 flex items-center gap-4 border-t border-border pt-2.5 text-muted-foreground">
-          <span>
-            {chat ? chat.Status.charAt(0).toUpperCase() + chat.Status.slice(1) : "Loading"}
-          </span>
+          <span title={chat?.StatusReason}>{chat ? chatStatus(chat).label : "Loading"}</span>
           <time dateTime={chat?.UpdatedAt} title={updated?.toLocaleString()}>
             {ageLabel}
           </time>

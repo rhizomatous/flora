@@ -1,3 +1,4 @@
+import { detailSchema, feedSchema } from "../../src/chat-schemas";
 import { test, expect } from "./fixtures.ts";
 
 const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
@@ -50,4 +51,47 @@ test("chats can be filtered, searched, collapsed, and opened on a narrow screen"
   await expect(
     page.getByRole("heading", { name: "Review the workspace changes", exact: true }),
   ).toBeVisible();
+});
+
+test("automatic retries appear as Working in the list, filters, sidebar, and summary", async ({
+  page,
+}) => {
+  const reason = "Waiting for the model provider to retry";
+  await page.route("**/api/notifications*", async (route) => {
+    const response = await route.fetch();
+    const feed = feedSchema.parse(await response.json());
+    const chat = feed.chats.find((item) => item.ID === "completed");
+    if (!chat) throw new Error("Missing completed chat");
+    chat.Status = "waiting";
+    chat.StatusReason = reason;
+    await route.fulfill({ response, json: feed });
+  });
+  await page.route("**/api/chats/completed", async (route) => {
+    const response = await route.fetch();
+    const detail = detailSchema.parse(await response.json());
+    detail.chat.Status = "waiting";
+    detail.chat.StatusReason = reason;
+    await route.fulfill({ response, json: detail });
+  });
+  await page.goto(`${base}/#chats`);
+  await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+  const region = page.locator("#main-content").getByRole("region", { name: "Chats", exact: true });
+  const row = region.getByRole("link", {
+    name: "Open chat: Review the workspace changes",
+    exact: true,
+  });
+  await expect(row).toContainText("Working");
+  await expect(
+    page
+      .getByRole("navigation", { name: "Main", exact: true })
+      .getByRole("link", { name: /Review the workspace changes/ }),
+  ).toContainText("Working");
+  await region.getByRole("button", { name: /^Needs you / }).click();
+  await expect(row).toHaveCount(0);
+  await region.getByRole("button", { name: /^Working / }).click();
+  await expect(row).toBeVisible();
+  await row.click();
+  await page.getByRole("button", { name: "Review the workspace changes", exact: true }).hover();
+  const summary = page.getByLabel("Chat summary", { exact: true });
+  await expect(summary.getByText("Working", { exact: true })).toHaveAttribute("title", reason);
 });

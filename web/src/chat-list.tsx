@@ -12,18 +12,12 @@ import {
 } from "@flora/florets";
 
 import type { Chat } from "./chat-schemas";
+import { chatStatus, chatStatuses } from "./chat-status";
 import type { ProjectSummary } from "./project-schemas";
 import { PullCount } from "./pull-links";
-import { sidebarStatus, useSeenSidebarChats } from "./sidebar-status";
+import { useSeenSidebarChats } from "./sidebar-status";
 
-const filters = [
-  { id: "all", label: "All chats" },
-  { id: "working", label: "Working" },
-  { id: "waiting", label: "Needs you" },
-  { id: "idle", label: "Idle" },
-  { id: "failed", label: "Failed" },
-  { id: "stopped", label: "Stopped" },
-] as const;
+const filters = [{ id: "all", label: "All chats" }, ...chatStatuses] as const;
 type Filter = (typeof filters)[number]["id"];
 
 function ageLabel(updated: string, now: number) {
@@ -79,7 +73,7 @@ export function ChatList({
   const visible = rows
     .filter(
       (chat) =>
-        (filter === "all" || chat.Status === filter) &&
+        (filter === "all" || chatStatus(chat).id === filter) &&
         (project === "" || chat.ProjectID === project) &&
         `${chat.Title} ${chat.ID} ${projectNames.get(chat.ProjectID) ?? ""}`
           .toLowerCase()
@@ -142,7 +136,7 @@ export function ChatList({
               >
                 {label}
                 <span className="text-xs text-muted-foreground">
-                  {rows.filter((chat) => id === "all" || chat.Status === id).length}
+                  {rows.filter((chat) => id === "all" || chatStatus(chat).id === id).length}
                 </span>
               </Button>
             ))}
@@ -235,8 +229,7 @@ export function ChatList({
                 </summary>
                 <ul aria-label={`${name} chats`} className="mt-1">
                   {chats.map((chat) => {
-                    const status = sidebarStatus(chat, isSeen(chat));
-                    const label = chat.Status === "idle" ? "Idle" : status.label;
+                    const status = chatStatus(chat, isSeen(chat));
                     return (
                       <li key={chat.ID}>
                         <a
@@ -261,10 +254,7 @@ export function ChatList({
                               className="mt-0.5 block truncate text-xs text-muted-foreground"
                               title={chat.StatusReason}
                             >
-                              {label}
-                              {chat.Status === "failed" && chat.StatusReason
-                                ? ` · ${chat.StatusReason}`
-                                : ""}
+                              {status.label}
                             </span>
                           </span>
                           <span className="hidden shrink-0 sm:block">

@@ -1,6 +1,6 @@
 import { test, expect } from "./fixtures.ts";
 
-test("sidebar markers distinguish attention, startup, work, and failures", async ({ page }) => {
+test("sidebar status labels stay stable when chats are read", async ({ page }) => {
   let updated = "2026-01-01T00:00:00Z";
   await page.route("**/api/notifications*", async (route) => {
     const response = await route.fetch();
@@ -43,20 +43,20 @@ test("sidebar markers distinguish attention, startup, work, and failures", async
   const nav = page.getByRole("navigation", { name: "Main", exact: true });
   const completed = nav.getByRole("link", { name: /Review the workspace changes/ });
   const starting = nav.getByRole("link", { name: /Check the project setup/ });
-  await expect(completed).toContainText("Needs you");
+  await expect(completed).toContainText("Idle");
   await expect(completed.locator(".sidebar-status")).toHaveAttribute("data-filled");
-  await expect(starting).toContainText("Starting");
+  await expect(starting).toContainText("Working");
   await expect(starting.locator(".sidebar-status")).not.toHaveAttribute("data-filled");
   await expect(nav.getByRole("link", { name: /Fix the workspace checks/ })).toContainText("Failed");
   await expect(nav.getByRole("link", { name: /Keep the cart/ })).toContainText("Stopped");
   await completed.click();
-  await expect(completed).toContainText("Your turn");
+  await expect(completed).toContainText("Idle");
   await expect(completed.locator(".sidebar-status")).not.toHaveAttribute("data-filled");
   await nav.getByRole("link", { name: "New chat", exact: true }).click();
   await page.reload();
-  await expect(completed).toContainText("Your turn");
+  await expect(completed).toContainText("Idle");
   updated = "2026-01-02T00:00:00Z";
-  await expect(completed).toContainText("Needs you");
+  await expect(completed.locator(".sidebar-status")).toHaveAttribute("data-filled");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(starting.locator(".sidebar-status > span")).toHaveCSS("animation-name", "none");
 });
