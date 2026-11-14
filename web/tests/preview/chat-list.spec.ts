@@ -41,10 +41,8 @@ test("chats can be filtered, searched, collapsed, and opened on a narrow screen"
   await region.locator("summary").click();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
-  await page.screenshot({ path: "/private/tmp/flora-chats-mobile.png" });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await projects.selectOption("");
-  await page.screenshot({ path: "/private/tmp/flora-chats-desktop.png" });
   await region
     .getByRole("link", { name: "Open chat: Review the workspace changes", exact: true })
     .click();
