@@ -1,5 +1,5 @@
-import type { Chat } from "./notifications";
-import type { Pull } from "./pull";
+import type { Chat } from "./chat-schemas";
+import type { Pull } from "./pull-schemas";
 
 export type TrackedPull = {
   pull: Pull;

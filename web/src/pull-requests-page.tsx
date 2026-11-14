@@ -10,7 +10,7 @@ import {
   MessageSquareIcon,
 } from "@flora/florets";
 
-import type { Chat } from "./notifications";
+import type { Chat } from "./chat-schemas";
 import { pullStatus } from "./pull";
 import { PullLineCounts, PullStatusIcon } from "./pull-links";
 import { collectPullRequests, type TrackedPull } from "./pull-requests";

@@ -24,11 +24,10 @@ import {
   useSidebar,
 } from "@flora/florets";
 
-import type { Chat } from "./notifications";
+import type { Chat } from "./chat-schemas";
+import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
 import { errorMessage, isExpired, request } from "./request";
 import { SidebarChats } from "./sidebar-chats";
-
-type Project = { id: string; name: string };
 
 /** Keeps project navigation beside every workspace view, using the shared live chat feed. */
 export function Sidebar({
@@ -43,7 +42,7 @@ export function Sidebar({
   children: ReactNode;
 }) {
   const [searching, setSearching] = useState(false);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [error, setError] = useState("");
   const { open, isMobile, openMobile, setOpenMobile } = useSidebar();
   const mobileToggle = useRef<HTMLButtonElement>(null);
@@ -62,7 +61,7 @@ export function Sidebar({
     let active = true;
     async function load() {
       try {
-        const rows = await request<Project[]>("projects");
+        const rows = await request(projectSummarySchema.array(), "projects");
         if (active) {
           setProjects(rows);
           setError("");

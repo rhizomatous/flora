@@ -1,6 +1,6 @@
 import type { Message, Part } from "@opencode-ai/sdk/v2";
 
-import type { Pull } from "../../web/src/pull.ts";
+import type { Pull } from "../../web/src/pull-schemas.ts";
 import type { Frame } from "./server.ts";
 
 export const projects = [

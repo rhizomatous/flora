@@ -12,20 +12,16 @@ import {
   Text,
 } from "@flora/florets";
 
-import { readPreferences, type Preferences } from "./preferences";
+import { readPreferences } from "./preferences";
 import { request } from "./request";
 import { PreferenceFields } from "./settings";
+import {
+  settingsSchema,
+  diagnosticSchema,
+  type Settings,
+  type Diagnostic,
+} from "./settings-schemas";
 import { text } from "./ui";
-
-export type Settings = {
-  provider: string;
-  model: string;
-  githubConfigured: boolean;
-  providerConfigured: boolean;
-  preferences: Preferences;
-  maxRunningOverride?: number;
-};
-type Diagnostic = { name: string; ok: boolean; message: string };
 
 /** Edits credentials, the fixed provider and model, and installation-wide preferences. */
 export function Installation({
@@ -52,12 +48,15 @@ export function Installation({
     void run(async () => {
       // Disabled provider and model fields are not submitted, and blank credentials keep the
       // saved ones; the server treats "" as "unchanged" for all four.
-      const next = await request<Settings>("settings", "PUT", {
-        provider: text(fields, "provider"),
-        model: text(fields, "model"),
-        githubToken: text(fields, "githubToken"),
-        providerKey: text(fields, "providerKey"),
-        preferences: readPreferences(fields),
+      const next = await request(settingsSchema, "settings", {
+        method: "PUT",
+        body: {
+          provider: text(fields, "provider"),
+          model: text(fields, "model"),
+          githubToken: text(fields, "githubToken"),
+          providerKey: text(fields, "providerKey"),
+          preferences: readPreferences(fields),
+        },
       });
       onSaved(next);
       form.reset();
@@ -66,7 +65,12 @@ export function Installation({
 
   function diagnose() {
     void run(async () => {
-      setDiagnostics(await request<Diagnostic[]>("settings/diagnostics", "POST", {}));
+      setDiagnostics(
+        await request(diagnosticSchema.array(), "settings/diagnostics", {
+          method: "POST",
+          body: {},
+        }),
+      );
     }, "Dependency check failed.");
   }
 

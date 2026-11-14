@@ -2,33 +2,9 @@ import { useEffect, useEffectEvent, useState } from "react";
 
 import { Heading, Link, Text } from "@flora/florets";
 
-import type { PullSummary } from "./pull";
+import { chatChangesSchema, type ChatChanges, type FileChange } from "./changes-schemas";
 import { PullList } from "./pull-links";
 import { isExpired, request } from "./request";
-
-type FileChange = {
-  repository?: string;
-  path: string;
-  previous?: string;
-  status: string;
-  binary: boolean;
-  undisplayable: boolean;
-  diff: string;
-  bytes: number;
-  truncated: boolean;
-};
-type Review = {
-  snapshot: {
-    id: string;
-    capturedAt: string;
-    base: string;
-    bases?: Record<string, string>;
-    files: FileChange[];
-  } | null;
-  stale: boolean;
-  error: string;
-  pulls: PullSummary;
-};
 
 function contentNote(file: FileChange) {
   if (file.binary) return " · Binary";
@@ -37,7 +13,7 @@ function contentNote(file: FileChange) {
 }
 
 export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () => void }) {
-  const [review, setReview] = useState<Review>();
+  const [review, setReview] = useState<ChatChanges>();
   const [error, setError] = useState("");
   const expire = useEffectEvent(onExpired);
   // The parent keys this component by chat, so state starts empty for each chat.
@@ -48,7 +24,10 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
       if (loading) return;
       loading = true;
       try {
-        const data = await request<Review>(`chats/${encodeURIComponent(chatID)}/changes`);
+        const data = await request(
+          chatChangesSchema,
+          `chats/${encodeURIComponent(chatID)}/changes`,
+        );
         if (active) {
           setReview(data);
           setError("");

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { Chat } from "./notifications";
-import type { Pull } from "./pull";
+import type { Chat } from "./chat-schemas";
 import { collectPullRequests } from "./pull-requests";
+import type { Pull } from "./pull-schemas";
 
 const pull: Pull = {
   url: "https://github.com/example/app/pull/1",
@@ -21,7 +21,7 @@ function chat(id: string, items: Pull[] | null, checkedAt = "2026-01-01"): Chat 
     ImageDigest: "",
     HarnessVersion: "",
     StartingCommits: {},
-    pulls: { items, checkedAt, error: "" },
+    pulls: { items: items ?? [], checkedAt, error: "" },
   };
 }
 

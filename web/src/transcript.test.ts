@@ -2,13 +2,8 @@ import assert from "node:assert/strict";
 
 import { test } from "vitest";
 
-import {
-  buildTranscript,
-  workTiming,
-  formatDuration,
-  type Message,
-  type Part,
-} from "./transcript.ts";
+import type { Message, Part } from "./chat-schemas.ts";
+import { buildTranscript, workTiming, formatDuration } from "./transcript.ts";
 
 function message(id: string, parts: Part[], role = "assistant"): Message {
   return { ID: id, Role: role, Text: "", Provider: "", Model: "", Payload: { parts } };
@@ -160,7 +155,7 @@ test("text-only saved messages, reasoning, unknown parts, and empty assistant me
     ["message", "message", "work"],
   );
   assert.ok(rows[1]?.kind === "message");
-  assert.equal(rows[1].message.Payload.parts?.[0]?.text, "Saved response");
+  assert.equal(rows[1].message.Payload.parts[0]?.text, "Saved response");
   assert.ok(rows[2]?.kind === "work");
   assert.equal(rows[2].steps.length, 2);
   assert.equal(workTiming(rows[2].steps, false), undefined);

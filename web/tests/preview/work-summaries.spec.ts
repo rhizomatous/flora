@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import type { Message, Part } from "../../src/transcript.ts";
+import type { Message, Part } from "../../src/chat-schemas.ts";
 import { test, expect } from "./fixtures.ts";
 
 function message(id: string, parts: Part[], role = "assistant"): Message {
@@ -70,6 +70,10 @@ test("live work grouping, disclosure state, and focus", async ({ page }) => {
           ProjectID: "preview",
           Status: phase >= 2 ? "idle" : "working",
           StatusReason: "",
+          UpdatedAt: "",
+          ImageDigest: "",
+          HarnessVersion: "",
+          StartingCommits: {},
         },
         messages,
       },

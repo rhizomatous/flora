@@ -7,7 +7,8 @@ import {
   GitPullRequestIcon,
 } from "@flora/florets";
 
-import { pullStatus, type Pull, type PullSummary } from "./pull";
+import { pullStatus } from "./pull";
+import type { Pull, PullSummary } from "./pull-schemas";
 
 const appearances = {
   open: {

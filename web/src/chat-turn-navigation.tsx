@@ -24,7 +24,7 @@ function exchanges(rows: TranscriptRow[]) {
       continue;
     }
     const text =
-      (row.message.Payload.parts ?? [])
+      row.message.Payload.parts
         .filter((part) => part.type === "text")
         .map((part) => part.text ?? "")
         .join("\n") || row.message.Text;

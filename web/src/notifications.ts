@@ -1,23 +1,9 @@
 import { useEffect, useEffectEvent, useState } from "react";
 
-import type { PullSummary } from "./pull";
+import { feedSchema, type Chat, type Completion } from "./chat-schemas";
 import { isExpired, request } from "./request";
 import { useCompletionSound } from "./sound";
 
-export type Chat = {
-  pulls?: PullSummary;
-  ID: string;
-  ProjectID: string;
-  Title: string;
-  Status: "working" | "waiting" | "failed" | "idle" | "stopped";
-  StatusReason: string;
-  UpdatedAt: string;
-  ImageDigest: string;
-  HarnessVersion: string;
-  StartingCommits: Record<string, string>;
-};
-type Completion = { ChatID: string; Sequence: number };
-type Feed = { chats: Chat[]; completions: Completion[]; cursor: number };
 export type Toast = Completion & { title: string };
 
 /**
@@ -41,7 +27,8 @@ export function useNotifications(authenticated: boolean, sound: boolean, onExpir
       if (loading) return;
       loading = true;
       try {
-        const feed = await request<Feed>(
+        const feed = await request(
+          feedSchema,
           cursor === undefined ? "notifications" : `notifications?after=${cursor}`,
         );
         if (!active) return;

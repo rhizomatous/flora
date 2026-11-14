@@ -48,10 +48,10 @@ import {
   ClockIcon,
 } from "@flora/florets";
 
+import type { Chat } from "./chat-schemas";
 import { PlaceholderMenu } from "./composer";
-import type { Chat } from "./notifications";
-import type { PullSummary } from "./pull";
 import { PullCount, PullList } from "./pull-links";
+import type { PullSummary } from "./pull-schemas";
 
 /** Shows saved chat metadata and linked pull requests. */
 export function ChatTitle({
@@ -433,7 +433,7 @@ export function ChatReviewStrip({
   children: ReactNode;
   pulls: PullSummary | undefined;
 }) {
-  const count = pulls?.items?.length ?? 0;
+  const count = pulls?.items.length ?? 0;
   return (
     <div className="composer-review flex flex-col items-center gap-1.5 pb-1.5">
       <div className="composer-accessories flex min-h-7 items-center justify-center gap-1.5">

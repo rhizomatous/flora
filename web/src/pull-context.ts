@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 
-import type { PullSummary } from "./pull";
+import type { PullSummary } from "./pull-schemas";
 
 export const ChatPullContext = createContext<PullSummary | undefined>(undefined);
 
@@ -12,5 +12,5 @@ export function useLinkedPull(href: string | undefined) {
     );
   if (!match) return;
   const canonical = `https://github.com/${match[1]}/pull/${match[2]}`.toLowerCase();
-  return summary?.items?.find((pull) => pull.url.toLowerCase() === canonical);
+  return summary?.items.find((pull) => pull.url.toLowerCase() === canonical);
 }

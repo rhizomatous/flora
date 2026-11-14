@@ -1,3 +1,4 @@
+// oxlint-disable import/max-dependencies -- The chat view imports its feature controls and boundary schemas directly.
 import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import {
@@ -33,6 +34,7 @@ import {
   ItemDescription,
 } from "@flora/florets";
 
+import { authenticatedSchema } from "./auth-schemas";
 import {
   ChatTurnNavigation,
   ChatPullProvider,
@@ -41,10 +43,25 @@ import {
   ChatComposerFooter,
   ChatReviewStrip,
 } from "./chat-controls";
+import {
+  type Chat,
+  type Question,
+  activitySchema,
+  toolDisplayInputSchema,
+  requestIdentitySchema,
+  detailSchema,
+  questionSchema,
+  chatSchema,
+  acceptanceSchema,
+  type Activity,
+  type Detail,
+  type Message,
+  type Part,
+} from "./chat-schemas";
 import { Composer } from "./composer";
 import { NewChatComposer } from "./new-chat-composer";
-import type { Chat } from "./notifications";
-import { QuestionForm, type Question } from "./question";
+import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
+import { QuestionForm } from "./question";
 import { errorMessage, isExpired, request } from "./request";
 import {
   buildTranscript,
@@ -52,21 +69,9 @@ import {
   isFailedPart,
   isLivePart,
   workTiming,
-  type Message,
-  type Part,
   type WorkStep,
 } from "./transcript";
 import { text } from "./ui";
-
-type Activity = {
-  ChatID: string;
-  Sequence: number;
-  Kind: string;
-  CreatedAt: string;
-  Payload: unknown;
-};
-type Detail = { chat: Chat; messages: Message[]; continuationBlockedReason?: string };
-type Project = { id: string; name: string };
 
 const Markdown = lazy(async () => {
   const { ReplyMarkdown } = await import("./reply-markdown");
@@ -83,15 +88,6 @@ function ReplyText({ children }: { children: string }) {
 
 const statusName = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-// Checks the fields the activity log depends on: Sequence deduplicates rows and Kind labels them.
-const isActivity = (value: unknown): value is Activity =>
-  typeof value === "object" &&
-  value !== null &&
-  "Sequence" in value &&
-  typeof value.Sequence === "number" &&
-  "Kind" in value &&
-  typeof value.Kind === "string";
-
 const requestKey = (scope: string) => `flora-request:${scope}`;
 
 // Keep the accepted identity across ambiguous responses and page reloads.
@@ -100,17 +96,10 @@ function identity(scope: string, input: unknown) {
   const key = requestKey(scope);
   const body = JSON.stringify(input);
   try {
-    const saved: unknown = JSON.parse(sessionStorage.getItem(key) ?? "null");
-    if (
-      typeof saved === "object" &&
-      saved !== null &&
-      "body" in saved &&
-      saved.body === body &&
-      "id" in saved &&
-      typeof saved.id === "string"
-    ) {
-      return saved.id;
-    }
+    const saved = requestIdentitySchema.safeParse(
+      JSON.parse(sessionStorage.getItem(key) ?? "null"),
+    );
+    if (saved.success && saved.data.body === body) return saved.data.id;
   } catch {
     /* Invalid or unavailable session storage does not prevent sending. */
   }
@@ -145,7 +134,7 @@ export function Chats({
   listError: string;
 }) {
   // Undefined until the project list loads.
-  const [projects, setProjects] = useState<Project[]>();
+  const [projects, setProjects] = useState<ProjectSummary[]>();
   const [detail, setDetail] = useState<Detail>();
   const [activity, setActivity] = useState<Activity[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -175,7 +164,7 @@ export function Chats({
     let active = true;
     const load = async () => {
       try {
-        const rows = await request<Project[]>("projects");
+        const rows = await request(projectSummarySchema.array(), "projects");
         if (active) setProjects(rows);
       } catch (e) {
         if (active) fail(e);
@@ -204,7 +193,7 @@ export function Chats({
         while (dirty) {
           dirty = false;
           // oxlint-disable-next-line no-await-in-loop -- Loads must run one after another so a stale response never overwrites a newer one.
-          const next = await request<Detail>(base);
+          const next = await request(detailSchema, base);
           if (!active) return;
           setDetail(next);
         }
@@ -221,7 +210,7 @@ export function Chats({
     // retrying is pointless.
     const checkSession = async () => {
       try {
-        const status = await request<{ authenticated: boolean }>("auth/status");
+        const status = await request(authenticatedSchema, "auth/status");
         if (active && !status.authenticated) {
           source.close();
           expire();
@@ -240,13 +229,10 @@ export function Chats({
       void checkSession();
     });
     source.addEventListener("activity", (event: MessageEvent<string>) => {
-      let row: unknown;
+      let row: Activity;
       try {
-        row = JSON.parse(event.data);
+        row = activitySchema.parse(JSON.parse(event.data));
       } catch {
-        /* Reported below. */
-      }
-      if (!isActivity(row)) {
         setError("Could not read saved activity. Reload to reconnect.");
         return;
       }
@@ -261,7 +247,7 @@ export function Chats({
 
     const pollQuestions = async () => {
       try {
-        const rows = await request<Question[]>(`${base}/questions`);
+        const rows = await request(questionSchema.array(), `${base}/questions`);
         if (!active) return;
         setQuestions(rows);
         setQuestionError("");
@@ -308,16 +294,25 @@ export function Chats({
     try {
       const requestID = identity(scope, input);
       if (isNew) {
-        const chat = await request<Chat>(`projects/${encodeURIComponent(project)}/chats`, "POST", {
-          ...input,
-          requestID,
+        const chat = await request(chatSchema, `projects/${encodeURIComponent(project)}/chats`, {
+          method: "POST",
+          body: {
+            ...input,
+            requestID,
+          },
         });
         window.location.hash = `chats/${chat.ID}`;
       } else {
-        await request(`${chatPath}/messages`, "POST", { text: message, requestID });
+        await request(acceptanceSchema, `${chatPath}/messages`, {
+          method: "POST",
+          body: {
+            text: message,
+            requestID,
+          },
+        });
         form.reset();
         saveDraft(id, "");
-        setDetail(await request<Detail>(chatPath));
+        setDetail(await request(detailSchema, chatPath));
       }
       forgetIdentity(scope);
     } catch (e) {
@@ -334,14 +329,14 @@ export function Chats({
     setBusy(true);
     setError("");
     try {
-      await request(`${chatPath}/${action}`, "POST", {});
+      await request(chatSchema, `${chatPath}/${action}`, { method: "POST", body: {} });
       setQuestions([]);
     } catch (e) {
       report(e);
     }
     // Show the outcome whether or not the action succeeded.
     try {
-      setDetail(await request<Detail>(chatPath));
+      setDetail(await request(detailSchema, chatPath));
     } catch (e) {
       report(e);
     }
@@ -457,7 +452,7 @@ export function Chats({
 }
 
 /** Lists chats grouped under their projects, in project order. */
-function ChatList({ list, projects }: { list: Chat[]; projects: Project[] }) {
+function ChatList({ list, projects }: { list: Chat[]; projects: ProjectSummary[] }) {
   if (list.length === 0) {
     return (
       <Text tone="muted" className="mt-8">
@@ -532,7 +527,7 @@ function ChatDetail({
   const { chat } = detail;
   const activeTurn = chat.Status === "working" || chat.Status === "waiting";
   const stopped = chat.Status === "stopped";
-  const blocked = (detail.continuationBlockedReason ?? "") !== "";
+  const blocked = detail.continuationBlockedReason !== "";
   const rows = buildTranscript(detail.messages, chat.Status);
   const visibleActivity = rows.some((row) => row.kind === "work" && row.active);
 
@@ -681,7 +676,7 @@ function FollowUpComposer({
 }
 
 function ConversationMessage({ message: m }: { message: Message }) {
-  const parts = (m.Payload.parts ?? []).filter(
+  const parts = m.Payload.parts.filter(
     (part) => part.type !== "step-start" && part.type !== "step-finish",
   );
   const failure = m.Payload.info?.error ?? null;
@@ -968,18 +963,10 @@ function toolTitle(part: Part) {
     question: "Waiting for your answer",
     webfetch: "Fetching page",
   };
-  const input = part.state?.input;
-  if (typeof input === "object" && input !== null) {
-    if (
-      "description" in input &&
-      typeof input.description === "string" &&
-      input.description !== ""
-    ) {
-      return input.description;
-    }
-    if ("filePath" in input && typeof input.filePath === "string") {
-      return `${names[part.tool ?? ""] ?? part.tool ?? "File"} ${input.filePath}`;
-    }
+  const input = toolDisplayInputSchema.parse(part.state?.input);
+  if (input.description !== undefined && input.description !== "") return input.description;
+  if (input.filePath !== undefined) {
+    return `${names[part.tool ?? ""] ?? part.tool ?? "File"} ${input.filePath}`;
   }
   return names[part.tool ?? ""] ?? part.tool ?? "Tool";
 }

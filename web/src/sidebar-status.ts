@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import type { Chat } from "./notifications";
+import type { Chat } from "./chat-schemas";
 
 export function sidebarStatus(chat: Chat, seen: boolean) {
   switch (chat.Status) {

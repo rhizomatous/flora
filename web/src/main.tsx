@@ -15,20 +15,21 @@ import {
   SidebarInset,
 } from "@flora/florets";
 
+import { statusSchema, authenticatedSchema, type Status } from "./auth-schemas";
 import { Chats } from "./chats";
-import { Installation, type Settings } from "./installation";
+import { Installation } from "./installation";
 import { useNotifications } from "./notifications";
 import { Projects } from "./projects";
 import { PullRequests } from "./pull-requests-page";
 import { errorMessage, request } from "./request";
+import { settingsSchema, type Settings } from "./settings-schemas";
 import { Sidebar } from "./sidebar";
 import { CompletionToasts } from "./toasts";
 import { text } from "./ui";
-import { WorkspaceMenu } from "./workspace-menu";
 
 import "./styles.css";
 
-type Status = { setupRequired: boolean; authenticated: boolean; enrollmentRequired?: boolean };
+import { WorkspaceMenu } from "./workspace-menu";
 
 const currentPath = () => window.location.hash.slice(1) || "chats/new";
 
@@ -58,9 +59,12 @@ function Account({
     const password = text(new FormData(form), "password");
     const enrollmentCode = text(new FormData(form), "enrollmentCode");
     void run(async () => {
-      await request(`auth/${setupRequired ? "bootstrap" : "login"}`, "POST", {
-        password,
-        enrollmentCode,
+      await request(authenticatedSchema, `auth/${setupRequired ? "bootstrap" : "login"}`, {
+        method: "POST",
+        body: {
+          password,
+          enrollmentCode,
+        },
       });
       form.reset();
       await onLogin();
@@ -129,7 +133,7 @@ function App() {
   // current view; the action that prompted the check has already reported its own error.
   async function recheckSession() {
     try {
-      setStatus(await request<Status>("auth/status"));
+      setStatus(await request(statusSchema, "auth/status"));
     } catch {
       // Keep the last known status.
     }
@@ -153,9 +157,9 @@ function App() {
   }, []);
 
   async function refresh() {
-    const next = await request<Status>("auth/status");
+    const next = await request(statusSchema, "auth/status");
     setStatus(next);
-    setSettings(next.authenticated ? await request<Settings>("settings") : undefined);
+    setSettings(next.authenticated ? await request(settingsSchema, "settings") : undefined);
   }
   async function load() {
     try {
@@ -188,7 +192,7 @@ function App() {
 
   function logout() {
     void run(async () => {
-      await request("auth/logout", "POST");
+      await request(authenticatedSchema, "auth/logout", { method: "POST" });
       await refresh();
     }, "Logout failed. Try again.");
   }
@@ -277,7 +281,7 @@ function App() {
             <Account
               key={String(status.setupRequired)}
               setupRequired={status.setupRequired}
-              enrollmentRequired={status.enrollmentRequired === true}
+              enrollmentRequired={status.enrollmentRequired}
               busy={busy}
               run={run}
               onLogin={refresh}

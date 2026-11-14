@@ -62,7 +62,21 @@ test("chat drafts, activity, and responsive layout", async ({ page }) => {
   await expect(page.getByRole("alert")).toContainText("Try again");
   await expect(draft).toHaveValue("Retain on failure");
   await page.unroute("**/api/chats/completed/messages");
-  await page.route("**/api/chats/completed/messages", (route) => route.fulfill({ json: {} }));
+  await page.route("**/api/chats/completed/messages", (route) =>
+    route.fulfill({
+      json: {
+        Message: {
+          ID: "accepted",
+          Role: "user",
+          Text: "Retain on failure",
+          Provider: "",
+          Model: "",
+          Payload: {},
+        },
+        Duplicate: false,
+      },
+    }),
+  );
   await draft.press("Enter");
   await expect(draft).toHaveValue("");
   await page.reload();

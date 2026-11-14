@@ -22,7 +22,7 @@ import {
   HoverCardContent,
 } from "@flora/florets";
 
-import type { Chat } from "./notifications";
+import type { Chat } from "./chat-schemas";
 import { PullCount, PullList } from "./pull-links";
 import { sidebarStatus, useSeenSidebarChats } from "./sidebar-status";
 
@@ -99,7 +99,7 @@ function ChatRow({
             <span className="truncate">{chat.ID}</span>
           </div>
           <p className="mt-2">{chat.Title || "Chat"}</p>
-          {((chat.pulls?.items?.length ?? 0) > 0 || (chat.pulls?.error ?? "") !== "") && (
+          {((chat.pulls?.items.length ?? 0) > 0 || (chat.pulls?.error ?? "") !== "") && (
             <div className="mt-3 border-t border-border pt-2">
               <p className="mb-1 text-xs text-muted-foreground">Pull requests</p>
               <PullList summary={chat.pulls} />
