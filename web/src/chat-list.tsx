@@ -262,8 +262,7 @@ export function ChatList({
                               title={chat.StatusReason}
                             >
                               {label}
-                              {(chat.Status === "failed" || chat.Status === "waiting") &&
-                              chat.StatusReason
+                              {chat.Status === "failed" && chat.StatusReason
                                 ? ` · ${chat.StatusReason}`
                                 : ""}
                             </span>
