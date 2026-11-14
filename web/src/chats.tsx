@@ -58,7 +58,7 @@ import {
   acceptanceSchema,
   type Activity,
   type Detail,
-  type ProjectSummary as Project,
+  type ProjectSummary,
 } from "./schemas";
 import {
   buildTranscript,
@@ -133,7 +133,7 @@ export function Chats({
   listError: string;
 }) {
   // Undefined until the project list loads.
-  const [projects, setProjects] = useState<Project[]>();
+  const [projects, setProjects] = useState<ProjectSummary[]>();
   const [detail, setDetail] = useState<Detail>();
   const [activity, setActivity] = useState<Activity[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -448,7 +448,7 @@ export function Chats({
 }
 
 /** Lists chats grouped under their projects, in project order. */
-function ChatList({ list, projects }: { list: Chat[]; projects: Project[] }) {
+function ChatList({ list, projects }: { list: Chat[]; projects: ProjectSummary[] }) {
   if (list.length === 0) {
     return (
       <Text tone="muted" className="mt-8">

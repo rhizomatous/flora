@@ -19,7 +19,7 @@ import {
 
 import type { Chat } from "./notifications";
 import { errorMessage, isExpired, request } from "./request";
-import { projectSummarySchema, type ProjectSummary as Project } from "./schemas";
+import { projectSummarySchema, type ProjectSummary } from "./schemas";
 
 /** Keeps project navigation beside every workspace view, using the shared live chat feed. */
 export function Sidebar({
@@ -33,7 +33,7 @@ export function Sidebar({
   onExpired: () => void;
   children: ReactNode;
 }) {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [error, setError] = useState("");
   const { openMobile, setOpenMobile } = useSidebar();
   const openedPath = useRef<string | undefined>(undefined);
