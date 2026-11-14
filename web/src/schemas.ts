@@ -172,7 +172,7 @@ const snapshotSchema = z.object({
   bases: z.record(z.string(), z.string()).optional(),
   files: z.array(fileChangeSchema),
 });
-export const reviewSchema = z.object({
+export const chatChangesSchema = z.object({
   snapshot: snapshotSchema.nullable(),
   stale: z.boolean(),
   error: z.string(),
@@ -186,4 +186,4 @@ export const reviewSchema = z.object({
     checkedAt: z.string(),
   }),
 });
-export type Review = z.infer<typeof reviewSchema>;
+export type ChatChanges = z.infer<typeof chatChangesSchema>;

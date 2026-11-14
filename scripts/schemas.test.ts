@@ -6,7 +6,7 @@ import {
   toolDisplayInputSchema,
   messageSchema,
   questionSchema,
-  reviewSchema,
+  chatChangesSchema,
   requestIdentitySchema,
 } from "../web/src/schemas.ts";
 import { captured } from "./preview/captured.ts";
@@ -66,9 +66,9 @@ test("Go's null pull list is normalized without hiding malformed lists", () => {
     error: "",
     pulls: { items: null, error: "", checkedAt: "" },
   };
-  assert.deepEqual(reviewSchema.parse(review).pulls.items, []);
+  assert.deepEqual(chatChangesSchema.parse(review).pulls.items, []);
   assert.equal(
-    reviewSchema.safeParse({ ...review, pulls: { ...review.pulls, items: {} } }).success,
+    chatChangesSchema.safeParse({ ...review, pulls: { ...review.pulls, items: {} } }).success,
     false,
   );
 });
