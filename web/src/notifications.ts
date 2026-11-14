@@ -1,10 +1,8 @@
 import { useEffect, useEffectEvent, useState } from "react";
 
+import { feedSchema, type Chat, type Completion } from "./chat-schemas";
 import { isExpired, request } from "./request";
-import { feedSchema, type Chat, type Completion } from "./schemas";
 import { useCompletionSound } from "./sound";
-
-export type { Chat } from "./schemas";
 
 export type Toast = Completion & { title: string };
 

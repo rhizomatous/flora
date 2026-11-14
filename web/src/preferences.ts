@@ -1,7 +1,5 @@
-import type { Preferences } from "./schemas";
+import type { Preferences } from "./settings-schemas";
 import { text } from "./ui";
-
-export type { Preferences } from "./schemas";
 
 type NumericPreference = Exclude<keyof Preferences, "authorName" | "authorEmail" | "sound">;
 

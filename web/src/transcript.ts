@@ -1,6 +1,4 @@
-import type { Part, Message } from "./schemas.ts";
-
-export type { Part, Message } from "./schemas.ts";
+import type { Part, Message } from "./chat-schemas.ts";
 
 export type WorkStep = { id: string; part: Part };
 export type TranscriptRow =

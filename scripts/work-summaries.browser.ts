@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 import { chromium, expect } from "@playwright/test";
 
-import type { Message, Part } from "../web/src/transcript.ts";
+import type { Message, Part } from "../web/src/chat-schemas.ts";
 
 function message(id: string, parts: Part[], role = "assistant"): Message {
   return { ID: id, Role: role, Text: "", Provider: "", Model: "", Payload: { parts } };

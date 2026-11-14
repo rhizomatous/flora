@@ -1,13 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import {
-  buildTranscript,
-  workTiming,
-  formatDuration,
-  type Message,
-  type Part,
-} from "../web/src/transcript.ts";
+import type { Message, Part } from "../web/src/chat-schemas.ts";
+import { buildTranscript, workTiming, formatDuration } from "../web/src/transcript.ts";
 
 function message(id: string, parts: Part[], role = "assistant"): Message {
   return { ID: id, Role: role, Text: "", Provider: "", Model: "", Payload: { parts } };

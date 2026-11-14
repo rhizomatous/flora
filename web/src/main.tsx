@@ -16,12 +16,13 @@ import {
   SidebarTrigger,
 } from "@flora/florets";
 
+import { statusSchema, authenticatedSchema, type Status } from "./auth-schemas";
 import { Chats } from "./chats";
-import { Installation, type Settings } from "./installation";
+import { Installation } from "./installation";
 import { useNotifications } from "./notifications";
 import { Projects } from "./projects";
 import { errorMessage, request } from "./request";
-import { statusSchema, settingsSchema, authenticatedSchema, type Status } from "./schemas";
+import { settingsSchema, type Settings } from "./settings-schemas";
 import { Sidebar } from "./sidebar";
 import { CompletionToasts } from "./toasts";
 import { text } from "./ui";

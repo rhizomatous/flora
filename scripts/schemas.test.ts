@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { chatChangesSchema } from "../web/src/changes-schemas.ts";
 import {
   activitySchema,
   toolDisplayInputSchema,
   messageSchema,
   questionSchema,
-  chatChangesSchema,
   requestIdentitySchema,
-} from "../web/src/schemas.ts";
+} from "../web/src/chat-schemas.ts";
 import { captured } from "./preview/captured.ts";
 import { messages } from "./preview/server.ts";
 

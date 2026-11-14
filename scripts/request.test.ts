@@ -3,8 +3,9 @@ import { test } from "node:test";
 
 import { z } from "zod";
 
+import { authenticatedSchema } from "../web/src/auth-schemas.ts";
+import { detailSchema } from "../web/src/chat-schemas.ts";
 import { request, RequestError } from "../web/src/request.ts";
-import { authenticatedSchema, detailSchema } from "../web/src/schemas.ts";
 
 test("API requests preserve method, credentials, and JSON body", async (t) => {
   t.mock.method(globalThis, "fetch", (url: RequestInfo | URL, init?: RequestInit) => {

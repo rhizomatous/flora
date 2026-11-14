@@ -17,9 +17,9 @@ import {
   useSidebar,
 } from "@flora/florets";
 
-import type { Chat } from "./notifications";
+import type { Chat } from "./chat-schemas";
+import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
 import { errorMessage, isExpired, request } from "./request";
-import { projectSummarySchema, type ProjectSummary } from "./schemas";
 
 /** Keeps project navigation beside every workspace view, using the shared live chat feed. */
 export function Sidebar({

@@ -14,11 +14,14 @@ import {
 
 import { readPreferences } from "./preferences";
 import { request } from "./request";
-import { settingsSchema, diagnosticSchema, type Settings, type Diagnostic } from "./schemas";
 import { PreferenceFields } from "./settings";
+import {
+  settingsSchema,
+  diagnosticSchema,
+  type Settings,
+  type Diagnostic,
+} from "./settings-schemas";
 import { text } from "./ui";
-
-export type { Settings } from "./schemas";
 
 /** Edits credentials, the fixed provider and model, and installation-wide preferences. */
 export function Installation({

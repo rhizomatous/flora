@@ -2,8 +2,8 @@ import { useEffect, useEffectEvent, useState } from "react";
 
 import { Heading, Link, Text } from "@flora/florets";
 
+import { chatChangesSchema, type ChatChanges, type FileChange, type Pull } from "./changes-schemas";
 import { isExpired, request } from "./request";
-import { chatChangesSchema, type ChatChanges, type FileChange, type Pull } from "./schemas";
 
 const pullStates = new Map([
   ["open", "Open"],

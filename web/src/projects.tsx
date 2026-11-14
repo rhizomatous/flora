@@ -14,8 +14,8 @@ import {
   Textarea,
 } from "@flora/florets";
 
+import { projectSchema, type Project, type Repository } from "./project-schemas";
 import { errorMessage, isExpired, request } from "./request";
-import { projectSchema, type Project, type Repository } from "./schemas";
 import { text, texts } from "./ui";
 
 const blankRepository: Repository = { name: "", url: "", baseBranch: "", role: "core" };

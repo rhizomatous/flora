@@ -16,10 +16,8 @@ import {
   QuestionnaireProgress,
 } from "@flora/florets";
 
+import { answeredSchema, type Question } from "./chat-schemas";
 import { request } from "./request";
-import { answeredSchema, type Question } from "./schemas";
-
-export type { Question } from "./schemas";
 
 /** Answers one pending OpenCode question request. Each typed answer replaces selected options. */
 export function QuestionForm({

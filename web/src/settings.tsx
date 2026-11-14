@@ -1,6 +1,7 @@
 import { FieldDescription, FieldLabel, FieldLegend, FieldSet, Input, Text } from "@flora/florets";
 
-import { preferenceFields, type Preferences } from "./preferences";
+import { preferenceFields } from "./preferences";
+import type { Preferences } from "./settings-schemas";
 
 export function PreferenceFields({
   value,

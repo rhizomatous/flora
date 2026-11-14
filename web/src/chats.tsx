@@ -42,32 +42,32 @@ import {
   ItemDescription,
 } from "@flora/florets";
 
-import { NewChatComposer } from "./new-chat-composer";
-import type { Chat } from "./notifications";
-import { QuestionForm, type Question } from "./question";
-import { errorMessage, isExpired, request } from "./request";
+import { authenticatedSchema } from "./auth-schemas";
 import {
+  type Chat,
+  type Question,
   activitySchema,
   toolDisplayInputSchema,
   requestIdentitySchema,
-  projectSummarySchema,
   detailSchema,
-  authenticatedSchema,
   questionSchema,
   chatSchema,
   acceptanceSchema,
   type Activity,
   type Detail,
-  type ProjectSummary,
-} from "./schemas";
+  type Message,
+  type Part,
+} from "./chat-schemas";
+import { NewChatComposer } from "./new-chat-composer";
+import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
+import { QuestionForm } from "./question";
+import { errorMessage, isExpired, request } from "./request";
 import {
   buildTranscript,
   formatDuration,
   isFailedPart,
   isLivePart,
   workTiming,
-  type Message,
-  type Part,
   type WorkStep,
 } from "./transcript";
 import { text } from "./ui";
