@@ -74,10 +74,10 @@ test("chat creation, recovery, controls, and logout", async ({ page, context }) 
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await page.getByText("Saved response 2", { exact: true }).waitFor();
   await page.getByRole("link", { name: "All chats", exact: true }).click();
-  await page.getByRole("heading", { name: "Browser project", exact: true }).waitFor();
-  await page
-    .getByRole("list")
-    .getByRole("link", { name: "First browser prompt 🌸", exact: true })
+  const chats = page.locator("#main-content").getByRole("list", { name: "Browser project chats", exact: true });
+  await expect(chats).toBeVisible();
+  await chats
+    .getByRole("link", { name: "Open chat: First browser prompt 🌸", exact: true })
     .click();
   await page.getByText("Saved response 2", { exact: true }).waitFor();
   // Exercise a genuine EventSource reconnect without replacing app API routes.
@@ -129,7 +129,7 @@ test("chat creation, recovery, controls, and logout", async ({ page, context }) 
   await expect(page.getByRole("dialog", { name: "Sidebar", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "All chats", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Sidebar", exact: true })).toHaveCount(0);
-  await page.getByRole("link", { name: "Missing container", exact: true }).click();
+  await page.getByRole("link", { name: "Open chat: Missing container", exact: true }).click();
   await page.getByRole("button", { name: "Continuation unavailable", exact: true }).waitFor();
   assert.equal(await page.getByLabel("Follow-up", { exact: true }).isDisabled(), true);
   assert.equal(

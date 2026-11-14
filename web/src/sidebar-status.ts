@@ -2,40 +2,6 @@ import { useEffect, useState } from "react";
 
 import type { Chat } from "./chat-schemas";
 
-export function sidebarStatus(chat: Chat, seen: boolean) {
-  switch (chat.Status) {
-    case "waiting":
-    case "idle": {
-      return {
-        label: seen ? "Your turn" : "Needs you",
-        tone: "attention",
-        filled: !seen,
-        pulse: false,
-      };
-    }
-    case "working": {
-      const starting = ["Message accepted", "Preparing checkout and setup"].includes(
-        chat.StatusReason,
-      );
-      return {
-        label: starting ? "Starting" : "Working",
-        tone: "working",
-        filled: !starting,
-        pulse: true,
-      };
-    }
-    case "failed": {
-      return { label: "Failed", tone: "failed", filled: true, pulse: false };
-    }
-    case "stopped": {
-      return { label: "Stopped", tone: "neutral", filled: false, pulse: false };
-    }
-    default: {
-      return { label: "Unknown", tone: "neutral", filled: false, pulse: false };
-    }
-  }
-}
-
 function revision(chat: Chat) {
   return JSON.stringify([chat.Status, chat.StatusReason, chat.UpdatedAt]);
 }
