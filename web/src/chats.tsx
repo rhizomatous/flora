@@ -8,7 +8,6 @@ import {
   ButtonLink,
   FlowerMark,
   Heading,
-  Link,
   CrossCircledIcon,
   Text,
   Message as ChatMessage,
@@ -28,10 +27,6 @@ import {
   TraceCollapsible,
   TraceCollapsibleTrigger,
   TraceCollapsibleContent,
-  Item,
-  ItemContent,
-  ItemTitle,
-  ItemDescription,
 } from "@flora/florets";
 
 import { authenticatedSchema } from "./auth-schemas";
@@ -43,6 +38,7 @@ import {
   ChatComposerFooter,
   ChatReviewStrip,
 } from "./chat-controls";
+import { ChatList } from "./chat-list";
 import {
   type Chat,
   type Question,
@@ -85,8 +81,6 @@ function ReplyText({ children }: { children: string }) {
     </Suspense>
   );
 }
-
-const statusName = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 const requestKey = (scope: string) => `flora-request:${scope}`;
 
@@ -344,6 +338,8 @@ export function Chats({
     setBusy(false);
   }
 
+  if (id === "") return <ChatList list={list} projects={projects} error={error || listError} />;
+
   const pulls = list?.find((chat) => chat.ID === id)?.pulls ?? detail?.chat.pulls;
   const existingChat = !isNew && id !== "";
   const headerLayout = existingChat
@@ -381,12 +377,6 @@ export function Chats({
         <Alert role="alert" className="mt-6">
           {error}
         </Alert>
-      )}
-      {id === "" && list !== undefined && <ChatList list={list} projects={projects ?? []} />}
-      {id === "" && list === undefined && error === "" && listError === "" && (
-        <Text size="md" role="status" className="mt-8">
-          Loading…
-        </Text>
       )}
       {isNew && projects === undefined && error === "" && (
         <Text role="status">Loading projects…</Text>
@@ -448,57 +438,6 @@ export function Chats({
         </ChatDetail>
       )}
     </section>
-  );
-}
-
-/** Lists chats grouped under their projects, in project order. */
-function ChatList({ list, projects }: { list: Chat[]; projects: ProjectSummary[] }) {
-  if (list.length === 0) {
-    return (
-      <Text tone="muted" className="mt-8">
-        No chats yet. Start a chat in a connected project.
-      </Text>
-    );
-  }
-  return (
-    <div className="mt-8 space-y-8">
-      {projects.map((p) => {
-        const chats = list.filter((c) => c.ProjectID === p.id);
-        return (
-          chats.length > 0 && (
-            <section key={p.id} aria-labelledby={`project-${p.id}`}>
-              <Heading level={2} id={`project-${p.id}`}>
-                <Link href={`#projects/${p.id}`}>{p.name}</Link>
-              </Heading>
-              <ul className="mt-3 space-y-2">
-                {chats.map((c) => (
-                  <li key={c.ID}>
-                    <Item variant="outline">
-                      <ItemContent>
-                        <ItemTitle>
-                          <Link href={`#chats/${c.ID}`} className="font-medium break-words">
-                            {c.Title}
-                          </Link>
-                        </ItemTitle>
-                        <ItemDescription>
-                          {statusName(c.Status)} ·{" "}
-                          <time dateTime={c.UpdatedAt}>
-                            {new Date(c.UpdatedAt).toLocaleString()}
-                          </time>
-                        </ItemDescription>
-                        {c.StatusReason !== "" && (
-                          <ItemDescription>{c.StatusReason}</ItemDescription>
-                        )}
-                      </ItemContent>
-                    </Item>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )
-        );
-      })}
-    </div>
   );
 }
 

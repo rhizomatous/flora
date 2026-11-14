@@ -205,11 +205,12 @@ function App() {
   const Layout = ready ? SidebarProvider : "div";
   const conversation = ready && path.startsWith("chats/") && !path.startsWith("chats/new");
   const pullsPage = ready && path === "pulls";
+  const chatsPage = ready && path === "chats";
   let contentLayout = "mx-auto w-full max-w-6xl p-4 sm:p-8";
-  if (pullsPage) contentLayout = "flex min-h-0 flex-1 flex-col";
+  if (pullsPage || chatsPage) contentLayout = "flex min-h-0 flex-1 flex-col";
   else if (conversation) contentLayout = "flex min-h-0 flex-1 flex-col px-4 pb-2 sm:px-8";
   const frameLayout =
-    conversation || pullsPage
+    conversation || pullsPage || chatsPage
       ? "h-dvh min-h-0 min-w-0 overflow-hidden md:h-[calc(100dvh-1rem)]"
       : "min-w-0";
   const Content = ready ? SidebarInset : "main";
@@ -237,7 +238,7 @@ function App() {
         </header>
       )}
       <Content id="main-content" tabIndex={-1} className={ready ? frameLayout : undefined}>
-        {ready && !conversation && !pullsPage && (
+        {ready && !conversation && !pullsPage && !chatsPage && (
           <header className="florets-topbar flex shrink-0 items-center border-b px-3">
             <span className="sidebar-toggle-space" aria-hidden="true" />
           </header>
