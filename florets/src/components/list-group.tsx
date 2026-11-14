@@ -15,7 +15,7 @@ export function ListGroup({
 }) {
   return (
     <details open className="group/list-group" data-slot="list-group">
-      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg bg-muted/60 px-3 py-2.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm font-medium sm:min-h-8 sm:py-1.5 [&::-webkit-details-marker]:hidden">
         <ChevronDownIcon
           className="size-3.5 text-muted-foreground group-not-open/list-group:-rotate-90"
           aria-hidden="true"

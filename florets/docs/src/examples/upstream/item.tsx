@@ -17,6 +17,7 @@ import {
   ItemSeparator,
   ItemTitle,
 } from "@flora/florets/components/item";
+import { ListGroup } from "@flora/florets/components/list-group";
 
 import { Example, ExampleWrapper } from "../example";
 import { PreviewImage as Image } from "../preview-image";
@@ -24,6 +25,7 @@ import { PreviewImage as Image } from "../preview-image";
 export function Preview() {
   return (
     <ExampleWrapper>
+      <CompactListItems />
       <DefaultVariantItems />
       <OutlineVariantItems />
       <MutedVariantItems />
@@ -1632,6 +1634,47 @@ function MutedVariantItemsWithImage() {
           <Button size="sm">Download</Button>
         </ItemActions>
       </Item>
+    </Example>
+  );
+}
+
+function CompactListItems() {
+  return (
+    <Example title="Compact grouped list">
+      <div className="w-full space-y-2">
+        <ListGroup label="Workspace" count={2} listLabel="Workspace items">
+          <li>
+            <Item size="list" render={<a href="#" />}>
+              <ItemMedia variant="icon">
+                <InboxIcon />
+              </ItemMedia>
+              <ItemContent>
+                <ItemTitle>Review the latest changes</ItemTitle>
+                <span className="text-xs text-muted-foreground">Working</span>
+              </ItemContent>
+              <ItemActions>
+                <span className="text-xs text-muted-foreground">2h</span>
+              </ItemActions>
+            </Item>
+          </li>
+          <Item size="list" render={<li />}>
+            <ItemMedia variant="icon">
+              <InboxIcon />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>
+                <a href="#">Update keyboard navigation</a>
+              </ItemTitle>
+              <span className="text-xs text-muted-foreground">Ready for review</span>
+            </ItemContent>
+            <ItemActions>
+              <Button variant="ghost" size="sm">
+                Review
+              </Button>
+            </ItemActions>
+          </Item>
+        </ListGroup>
+      </div>
     </Example>
   );
 }

@@ -1,6 +1,19 @@
 import { useEffect, useState } from "react";
 
-import { ListGroup, Button, ButtonLink, PlusIcon } from "@flora/florets";
+import {
+  NativeSelect,
+  Item,
+  ItemContent,
+  ItemTitle,
+  ItemActions,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  ListGroup,
+  Button,
+  ButtonLink,
+  PlusIcon,
+} from "@flora/florets";
 
 import type { Chat } from "./chat-schemas";
 import { chatStatus, chatStatuses } from "./chat-status";
@@ -94,13 +107,14 @@ export function ChatList({
           value={filter}
           onChange={setFilter}
         >
-          <select
+          <NativeSelect
+            size="sm"
             aria-label="Project"
             value={project}
             onChange={(event) => {
               setProject(event.target.value);
             }}
-            className="h-8 max-w-full rounded-md border border-border bg-background px-2 text-xs focus-visible:outline-2 focus-visible:outline-ring"
+            className="max-w-full"
           >
             <option value="">All projects</option>
             {groups.map(({ id, name }) => (
@@ -108,7 +122,7 @@ export function ChatList({
                 {name}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </ListFilters>
       }
     >
@@ -144,7 +158,7 @@ export function ChatList({
           )}
         </ListEmpty>
       )}
-      <div className="space-y-4">
+      <div className="space-y-2">
         {groups.map(({ id, name }) => {
           const chats = visible.filter((chat) => chat.ProjectID === id);
           if (chats.length === 0) return null;
@@ -154,42 +168,57 @@ export function ChatList({
                 const status = chatStatus(chat, isSeen(chat));
                 return (
                   <li key={chat.ID}>
-                    <a
-                      href={`#chats/${chat.ID}`}
-                      className="flex min-w-0 items-center gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-ring sm:px-4"
-                      aria-label={`Open chat: ${chat.Title || chat.ID}`}
-                    >
-                      <span
-                        className="sidebar-status flex size-4 shrink-0 items-center justify-center"
-                        data-tone={status.tone}
-                        data-filled={status.filled || undefined}
-                        data-pulse={status.pulse || undefined}
-                        aria-hidden="true"
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Item
+                            size="list"
+                            render={
+                              <a
+                                href={`#chats/${chat.ID}`}
+                                aria-label={`Open chat: ${chat.Title || chat.ID}`}
+                              />
+                            }
+                            aria-label={`Open chat: ${chat.Title || chat.ID}`}
+                            aria-description={chat.StatusReason || status.label}
+                          />
+                        }
                       >
-                        <span />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">
-                          {chat.Title || "Untitled chat"}
-                        </span>
                         <span
-                          className="mt-0.5 block truncate text-xs text-muted-foreground"
-                          title={chat.StatusReason}
+                          className="sidebar-status flex size-4 shrink-0 items-center justify-center"
+                          data-tone={status.tone}
+                          data-filled={status.filled || undefined}
+                          data-pulse={status.pulse || undefined}
+                          aria-hidden="true"
                         >
-                          {status.label}
+                          <span />
                         </span>
-                      </span>
-                      <span className="hidden shrink-0 sm:block">
-                        <PullCount pulls={chat.pulls?.items ?? []} />
-                      </span>
-                      <time
-                        dateTime={chat.UpdatedAt}
-                        title={new Date(chat.UpdatedAt).toLocaleString()}
-                        className="w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums"
-                      >
-                        {ageLabel(chat.UpdatedAt, now)}
-                      </time>
-                    </a>
+                        <ItemContent>
+                          <ItemTitle>{chat.Title || "Untitled chat"}</ItemTitle>
+                          <span className="shrink-0 text-xs text-muted-foreground sm:w-20">
+                            {status.label}
+                          </span>
+                        </ItemContent>
+                        <ItemActions className="shrink-0 gap-3">
+                          <span className="hidden w-16 sm:block">
+                            <PullCount pulls={chat.pulls?.items ?? []} />
+                          </span>
+                          <time
+                            dateTime={chat.UpdatedAt}
+                            title={new Date(chat.UpdatedAt).toLocaleString()}
+                            className="w-16 text-right text-xs text-muted-foreground tabular-nums"
+                          >
+                            {ageLabel(chat.UpdatedAt, now)}
+                          </time>
+                        </ItemActions>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <span className="min-w-0">
+                          <span className="block">{chat.Title || "Untitled chat"}</span>
+                          <span className="block">{chat.StatusReason || status.label}</span>
+                        </span>
+                      </TooltipContent>
+                    </Tooltip>
                   </li>
                 );
               })}

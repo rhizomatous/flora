@@ -44,6 +44,7 @@ const itemVariants = cva(
         default: "gap-2.5 px-3 py-2.5",
         sm: "gap-2.5 px-3 py-2.5",
         xs: "gap-2 px-2.5 py-2 in-data-[slot=dropdown-menu-content]:p-0",
+        list: "min-h-11 min-w-0 flex-nowrap gap-3 rounded-md border-0 px-3 py-2 hover:bg-muted/40 sm:min-h-10 sm:py-1.5",
       },
     },
     defaultVariants: {
@@ -115,7 +116,7 @@ function ItemContent({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="item-content"
       className={cn(
-        "flex flex-1 flex-col gap-1 group-data-[size=xs]/item:gap-0 [&+[data-slot=item-content]]:flex-none",
+        "flex min-w-0 flex-1 flex-col gap-1 group-data-[size=list]/item:gap-0.5 group-data-[size=list]/item:sm:flex-row group-data-[size=list]/item:sm:items-center group-data-[size=list]/item:sm:gap-3 group-data-[size=xs]/item:gap-0 [&+[data-slot=item-content]]:flex-none",
         className,
       )}
       {...props}
@@ -128,7 +129,7 @@ function ItemTitle({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="item-title"
       className={cn(
-        "line-clamp-1 flex w-fit items-center gap-2 text-sm leading-snug font-medium underline-offset-4",
+        "group-data-[size=list]/item:block group-data-[size=list]/item:min-w-0 group-data-[size=list]/item:flex-1 group-data-[size=list]/item:truncate line-clamp-1 flex w-fit items-center gap-2 text-sm leading-snug font-medium underline-offset-4",
         className,
       )}
       {...props}

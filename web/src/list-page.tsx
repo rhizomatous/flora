@@ -1,6 +1,15 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
-import { Button, Heading, Input, SearchIcon, XIcon } from "@flora/florets";
+import {
+  Button,
+  Empty,
+  Heading,
+  Input,
+  SearchIcon,
+  XIcon,
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@flora/florets";
 
 /** Owns page heading and search focus while callers own filtering and results. */
 export function ListPage({
@@ -115,22 +124,24 @@ export function ListFilters<T extends string>({
 }) {
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
+      <ToggleGroup
+        aria-label={label}
+        size="sm"
+        variant="outline"
+        value={[value]}
+        onValueChange={(values) => {
+          const selected = options.find((option) => option.id === values[0]);
+          if (selected) onChange(selected.id);
+        }}
+        className="max-w-full flex-wrap gap-1.5"
+      >
         {options.map((option) => (
-          <Button
-            key={option.id}
-            variant={value === option.id ? "secondary" : "outline"}
-            size="sm"
-            aria-pressed={value === option.id}
-            onClick={() => {
-              onChange(option.id);
-            }}
-          >
+          <ToggleGroupItem key={option.id} value={option.id}>
             {option.label}
             <span className="text-xs text-muted-foreground">{option.count}</span>
-          </Button>
+          </ToggleGroupItem>
         ))}
-      </div>
+      </ToggleGroup>
       {children}
     </div>
   );
@@ -138,8 +149,8 @@ export function ListFilters<T extends string>({
 
 export function ListEmpty({ children }: { children: ReactNode }) {
   return (
-    <div role="status" className="py-12 text-center text-sm text-muted-foreground">
+    <Empty role="status" className="gap-2 py-12 text-sm text-muted-foreground">
       {children}
-    </div>
+    </Empty>
   );
 }
