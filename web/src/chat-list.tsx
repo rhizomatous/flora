@@ -1,18 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
-import {
-  Button,
-  ButtonLink,
-  ChevronDownIcon,
-  Heading,
-  Input,
-  PlusIcon,
-  SearchIcon,
-  XIcon,
-} from "@flora/florets";
+import { ListGroup, Button, ButtonLink, PlusIcon } from "@flora/florets";
 
 import type { Chat } from "./chat-schemas";
 import { chatStatus, chatStatuses } from "./chat-status";
+import { ListPage, ListFilters, ListEmpty } from "./list-page";
 import type { ProjectSummary } from "./project-schemas";
 import { PullCount } from "./pull-links";
 import { useSeenSidebarChats } from "./sidebar-status";
@@ -46,14 +38,9 @@ export function ChatList({
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [project, setProject] = useState("");
-  const [searching, setSearching] = useState(false);
   const [now, setNow] = useState(Date.now);
-  const heading = useRef<HTMLHeadingElement>(null);
-  const search = useRef<HTMLInputElement>(null);
-  const searchButton = useRef<HTMLButtonElement>(null);
   const isSeen = useSeenSidebarChats(list, "chats");
   useEffect(() => {
-    heading.current?.focus();
     const timer = window.setInterval(() => {
       setNow(Date.now());
     }, 60_000);
@@ -61,9 +48,6 @@ export function ChatList({
       window.clearInterval(timer);
     };
   }, []);
-  useEffect(() => {
-    if (searching) search.current?.focus();
-  }, [searching]);
   const rows = list ?? [];
   const projectNames = new Map(projects?.map((item) => [item.id, item.name]));
   const groups = [...new Set(rows.map((chat) => chat.ProjectID))].map((id) => ({
@@ -80,37 +64,15 @@ export function ChatList({
           .includes(query.trim().toLowerCase()),
     )
     .toSorted((a, b) => Date.parse(b.UpdatedAt) - Date.parse(a.UpdatedAt));
-  function closeSearch() {
-    setQuery("");
-    setSearching(false);
-    searchButton.current?.focus();
-  }
   return (
-    <section aria-labelledby="chats-heading" className="flex min-h-0 flex-1 flex-col">
-      <header className="florets-topbar flex shrink-0 items-center gap-2 border-b px-3">
-        <span className="sidebar-toggle-space" aria-hidden="true" />
-        <Heading
-          level={1}
-          id="chats-heading"
-          ref={heading}
-          tabIndex={-1}
-          className="min-w-0 flex-1 text-base"
-        >
-          Chats
-        </Heading>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          ref={searchButton}
-          aria-label="Search chats"
-          aria-expanded={searching}
-          onClick={() => {
-            if (searching) closeSearch();
-            else setSearching(true);
-          }}
-        >
-          <SearchIcon />
-        </Button>
+    <ListPage
+      title="Chats"
+      searchLabel="Search chats"
+      searchPlaceholder="Search chats or projects"
+      closeSearchLabel="Close chat search"
+      query={query}
+      onQueryChange={setQuery}
+      actions={
         <Button
           variant="ghost"
           size="icon-sm"
@@ -120,27 +82,18 @@ export function ChatList({
         >
           <PlusIcon />
         </Button>
-      </header>
-      <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div role="group" aria-label="Chat state" className="flex flex-wrap gap-1.5">
-            {filters.map(({ id, label }) => (
-              <Button
-                key={id}
-                size="sm"
-                variant={filter === id ? "secondary" : "outline"}
-                aria-pressed={filter === id}
-                onClick={() => {
-                  setFilter(id);
-                }}
-              >
-                {label}
-                <span className="text-xs text-muted-foreground">
-                  {rows.filter((chat) => id === "all" || chatStatus(chat).id === id).length}
-                </span>
-              </Button>
-            ))}
-          </div>
+      }
+      filters={
+        <ListFilters
+          label="Chat state"
+          options={filters.map((option) => ({
+            ...option,
+            count: rows.filter((chat) => option.id === "all" || chatStatus(chat).id === option.id)
+              .length,
+          }))}
+          value={filter}
+          onChange={setFilter}
+        >
           <select
             aria-label="Project"
             value={project}
@@ -156,127 +109,94 @@ export function ChatList({
               </option>
             ))}
           </select>
-        </div>
-        {searching && (
-          <div className="mb-4 flex items-center gap-2">
-            <Input
-              ref={search}
-              aria-label="Search chats"
-              placeholder="Search chats or projects"
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") closeSearch();
-              }}
-            />
+        </ListFilters>
+      }
+    >
+      {error !== "" && (
+        <p role="alert" className="mb-4 text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      {list === undefined && (
+        <p role="status" className="py-12 text-center text-sm text-muted-foreground">
+          {error ? "Chats unavailable. Reconnecting…" : "Loading chats…"}
+        </p>
+      )}
+      {list !== undefined && visible.length === 0 && (
+        <ListEmpty>
+          <p>{rows.length === 0 ? "No chats yet." : "No chats match these filters."}</p>
+          {rows.length === 0 ? (
+            <ButtonLink href="#chats/new" className="mt-2">
+              Start a chat
+            </ButtonLink>
+          ) : (
             <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Close chat search"
-              onClick={closeSearch}
+              variant="link"
+              className="mt-2"
+              onClick={() => {
+                setFilter("all");
+                setProject("");
+                setQuery("");
+              }}
             >
-              <XIcon />
+              Show all chats
             </Button>
-          </div>
-        )}
-        {error !== "" && (
-          <p role="alert" className="mb-4 text-sm text-destructive">
-            {error}
-          </p>
-        )}
-        {list === undefined && (
-          <p role="status" className="py-12 text-center text-sm text-muted-foreground">
-            {error ? "Chats unavailable. Reconnecting…" : "Loading chats…"}
-          </p>
-        )}
-        {list !== undefined && visible.length === 0 && (
-          <div role="status" className="py-12 text-center text-sm text-muted-foreground">
-            <p>{rows.length === 0 ? "No chats yet." : "No chats match these filters."}</p>
-            {rows.length === 0 ? (
-              <ButtonLink href="#chats/new" className="mt-2">
-                Start a chat
-              </ButtonLink>
-            ) : (
-              <Button
-                variant="link"
-                className="mt-2"
-                onClick={() => {
-                  setFilter("all");
-                  setProject("");
-                  setQuery("");
-                }}
-              >
-                Show all chats
-              </Button>
-            )}
-          </div>
-        )}
-        <div className="space-y-4">
-          {groups.map(({ id, name }) => {
-            const chats = visible.filter((chat) => chat.ProjectID === id);
-            if (chats.length === 0) return null;
-            return (
-              <details key={id} open className="group">
-                <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg bg-muted/60 px-3 py-2.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
-                  <ChevronDownIcon
-                    className="size-3.5 text-muted-foreground group-not-open:-rotate-90"
-                    aria-hidden="true"
-                  />
-                  <span className="min-w-0 truncate">{name}</span>
-                  <span className="text-muted-foreground">{chats.length}</span>
-                </summary>
-                <ul aria-label={`${name} chats`} className="mt-1">
-                  {chats.map((chat) => {
-                    const status = chatStatus(chat, isSeen(chat));
-                    return (
-                      <li key={chat.ID}>
-                        <a
-                          href={`#chats/${chat.ID}`}
-                          className="flex min-w-0 items-center gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-ring sm:px-4"
-                          aria-label={`Open chat: ${chat.Title || chat.ID}`}
+          )}
+        </ListEmpty>
+      )}
+      <div className="space-y-4">
+        {groups.map(({ id, name }) => {
+          const chats = visible.filter((chat) => chat.ProjectID === id);
+          if (chats.length === 0) return null;
+          return (
+            <ListGroup key={id} label={name} count={chats.length} listLabel={`${name} chats`}>
+              {chats.map((chat) => {
+                const status = chatStatus(chat, isSeen(chat));
+                return (
+                  <li key={chat.ID}>
+                    <a
+                      href={`#chats/${chat.ID}`}
+                      className="flex min-w-0 items-center gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-ring sm:px-4"
+                      aria-label={`Open chat: ${chat.Title || chat.ID}`}
+                    >
+                      <span
+                        className="sidebar-status flex size-4 shrink-0 items-center justify-center"
+                        data-tone={status.tone}
+                        data-filled={status.filled || undefined}
+                        data-pulse={status.pulse || undefined}
+                        aria-hidden="true"
+                      >
+                        <span />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">
+                          {chat.Title || "Untitled chat"}
+                        </span>
+                        <span
+                          className="mt-0.5 block truncate text-xs text-muted-foreground"
+                          title={chat.StatusReason}
                         >
-                          <span
-                            className="sidebar-status flex size-4 shrink-0 items-center justify-center"
-                            data-tone={status.tone}
-                            data-filled={status.filled || undefined}
-                            data-pulse={status.pulse || undefined}
-                            aria-hidden="true"
-                          >
-                            <span />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium">
-                              {chat.Title || "Untitled chat"}
-                            </span>
-                            <span
-                              className="mt-0.5 block truncate text-xs text-muted-foreground"
-                              title={chat.StatusReason}
-                            >
-                              {status.label}
-                            </span>
-                          </span>
-                          <span className="hidden shrink-0 sm:block">
-                            <PullCount pulls={chat.pulls?.items ?? []} />
-                          </span>
-                          <time
-                            dateTime={chat.UpdatedAt}
-                            title={new Date(chat.UpdatedAt).toLocaleString()}
-                            className="w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums"
-                          >
-                            {ageLabel(chat.UpdatedAt, now)}
-                          </time>
-                        </a>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </details>
-            );
-          })}
-        </div>
+                          {status.label}
+                        </span>
+                      </span>
+                      <span className="hidden shrink-0 sm:block">
+                        <PullCount pulls={chat.pulls?.items ?? []} />
+                      </span>
+                      <time
+                        dateTime={chat.UpdatedAt}
+                        title={new Date(chat.UpdatedAt).toLocaleString()}
+                        className="w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums"
+                      >
+                        {ageLabel(chat.UpdatedAt, now)}
+                      </time>
+                    </a>
+                  </li>
+                );
+              })}
+            </ListGroup>
+          );
+        })}
       </div>
-    </section>
+    </ListPage>
   );
 }

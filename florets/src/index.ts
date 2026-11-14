@@ -38,6 +38,7 @@ export * from "./components/item";
 export * from "./components/kbd";
 export * from "./components/label";
 export * from "./components/link";
+export * from "./components/list-group";
 export * from "./components/marker";
 export * from "./components/menubar";
 export * from "./components/message-scroller";
