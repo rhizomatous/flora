@@ -26,6 +26,7 @@ export * from "./components/dialog";
 export * from "./components/direction";
 export * from "./components/drawer";
 export * from "./components/dropdown-menu";
+export * from "./components/dropdown-button";
 export * from "./components/empty";
 export * from "./components/feedback";
 export * from "./components/field";
@@ -77,14 +78,42 @@ export {
 } from "@radix-ui/react-icons";
 
 export {
-  ChevronDown as ChevronDownStrokeIcon,
+  SearchIcon,
+  SquarePenIcon,
+  CircleDotIcon,
+  CompassIcon,
+  Repeat2Icon,
+  ChevronRightIcon,
+  XIcon,
+  Share2Icon,
+  CrownIcon,
+  PencilIcon,
+  RefreshCwIcon,
+  GitForkIcon,
+  HashIcon,
+  MailIcon,
+  ArchiveIcon,
+  Trash2Icon,
   ArrowUpIcon,
+  ArrowDownIcon,
+  SquareIcon,
+  PlayIcon,
+  EllipsisIcon,
+  PanelRightIcon,
+  ExternalLinkIcon,
+  CopyIcon,
+  ListIcon,
+  MonitorIcon,
+  ClockIcon,
   CheckIcon,
   CloudIcon,
   DatabaseIcon,
   FolderIcon,
   GitBranchIcon,
   GitPullRequestIcon,
+  GitPullRequestDraftIcon,
+  GitPullRequestClosedIcon,
+  GitMergeIcon,
   GlobeIcon,
   InboxIcon,
   KeyRoundIcon,

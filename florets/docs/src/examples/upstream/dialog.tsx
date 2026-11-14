@@ -1,13 +1,11 @@
 // oxlint-disable import/max-dependencies -- The upstream collection demonstrates compositions across several components.
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 // oxlint-disable no-shadow -- Example callbacks use the prop names from their underlying primitives.
 // oxlint-disable react/no-array-index-key -- These fixed demo sequences use positions to distinguish repeated entries.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/dialog-example.json
 "use client";
 
 import { InfoIcon } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 
 import { Button } from "@flora/florets/components/button";
 import { Checkbox } from "@flora/florets/components/checkbox";
@@ -45,7 +43,6 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@flora/florets/components/select";
@@ -73,9 +70,7 @@ function DialogWithForm() {
     <Example title="With Form" className="items-center justify-center">
       <Dialog>
         <form>
-          <DialogTrigger asChild>
-            <Button variant="outline">Edit Profile</Button>
-          </DialogTrigger>
+          <DialogTrigger render={<Button variant="outline" />}>Edit Profile</DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Edit profile</DialogTitle>
@@ -95,9 +90,7 @@ function DialogWithForm() {
               </Field>
             </FieldGroup>
             <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="outline">Cancel</Button>
-              </DialogClose>
+              <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
               <Button type="submit">Save changes</Button>
             </DialogFooter>
           </DialogContent>
@@ -111,9 +104,7 @@ function DialogScrollableContent() {
   return (
     <Example title="Scrollable Content" className="items-center justify-center">
       <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline">Scrollable Content</Button>
-        </DialogTrigger>
+        <DialogTrigger render={<Button variant="outline" />}>Scrollable Content</DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Scrollable Content</DialogTitle>
@@ -144,9 +135,7 @@ function DialogWithStickyFooter() {
   return (
     <Example title="With Sticky Footer" className="items-center justify-center">
       <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline">Sticky Footer</Button>
-        </DialogTrigger>
+        <DialogTrigger render={<Button variant="outline" />}>Sticky Footer</DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Scrollable Content</DialogTitle>
@@ -168,9 +157,7 @@ function DialogWithStickyFooter() {
             ))}
           </div>
           <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Close</Button>
-            </DialogClose>
+            <DialogClose render={<Button variant="outline" />}>Close</DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -182,9 +169,7 @@ function DialogNoCloseButton() {
   return (
     <Example title="No Close Button" className="items-center justify-center">
       <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline">No Close Button</Button>
-        </DialogTrigger>
+        <DialogTrigger render={<Button variant="outline" />}>No Close Button</DialogTrigger>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>No Close Button</DialogTitle>
@@ -193,9 +178,7 @@ function DialogNoCloseButton() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Close</Button>
-            </DialogClose>
+            <DialogClose render={<Button variant="outline" />}>Close</DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -204,6 +187,7 @@ function DialogNoCloseButton() {
 }
 
 const spokenLanguages = [
+  { label: "Auto", value: "auto" },
   { label: "English", value: "en" },
   { label: "Spanish", value: "es" },
   { label: "French", value: "fr" },
@@ -234,19 +218,32 @@ const voices = [
   { label: "Daniel", value: "daniel" },
 ];
 
+const themes = [
+  { label: "Light", value: "light" },
+  { label: "Dark", value: "dark" },
+  { label: "System", value: "system" },
+];
+
+const accents = [
+  { label: "Default", value: "default" },
+  { label: "Red", value: "red" },
+  { label: "Blue", value: "blue" },
+  { label: "Green", value: "green" },
+  { label: "Purple", value: "purple" },
+  { label: "Pink", value: "pink" },
+];
+
 function DialogChatSettings() {
-  const [tab, setTab] = React.useState("general");
-  const [theme, setTheme] = React.useState("system");
-  const [accentColor, setAccentColor] = React.useState("default");
-  const [spokenLanguage, setSpokenLanguage] = React.useState("en");
-  const [voice, setVoice] = React.useState("samantha");
+  const [tab, setTab] = useState("general");
+  const [theme, setTheme] = useState("system");
+  const [accentColor, setAccentColor] = useState("default");
+  const [spokenLanguage, setSpokenLanguage] = useState("en");
+  const [voice, setVoice] = useState("samantha");
 
   return (
     <Example title="Chat Settings" className="items-center justify-center">
       <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline">Chat Settings</Button>
-        </DialogTrigger>
+        <DialogTrigger render={<Button variant="outline" />}>Chat Settings</DialogTrigger>
         <DialogContent className="min-w-md">
           <DialogHeader>
             <DialogTitle>Chat Settings</DialogTitle>
@@ -281,15 +278,23 @@ function DialogChatSettings() {
                     <FieldGroup>
                       <Field orientation="horizontal">
                         <FieldLabel htmlFor="theme">Theme</FieldLabel>
-                        <Select value={theme} onValueChange={setTheme}>
+                        <Select
+                          items={themes}
+                          value={theme}
+                          onValueChange={(value) => {
+                            setTheme(value ?? "");
+                          }}
+                        >
                           <SelectTrigger id="theme">
-                            <SelectValue placeholder="Select" />
+                            <SelectValue />
                           </SelectTrigger>
                           <SelectContent align="end">
                             <SelectGroup>
-                              <SelectItem value="light">Light</SelectItem>
-                              <SelectItem value="dark">Dark</SelectItem>
-                              <SelectItem value="system">System</SelectItem>
+                              {themes.map((theme) => (
+                                <SelectItem key={theme.value} value={theme.value}>
+                                  {theme.label}
+                                </SelectItem>
+                              ))}
                             </SelectGroup>
                           </SelectContent>
                         </Select>
@@ -297,36 +302,23 @@ function DialogChatSettings() {
                       <FieldSeparator />
                       <Field orientation="horizontal">
                         <FieldLabel htmlFor="accent-color">Accent Color</FieldLabel>
-                        <Select value={accentColor} onValueChange={setAccentColor}>
+                        <Select
+                          items={accents}
+                          value={accentColor}
+                          onValueChange={(value) => {
+                            setAccentColor(value ?? "");
+                          }}
+                        >
                           <SelectTrigger id="accent-color">
-                            <SelectValue placeholder="Select" />
+                            <SelectValue />
                           </SelectTrigger>
                           <SelectContent align="end">
                             <SelectGroup>
-                              <SelectItem value="default">
-                                <div className="size-3 rounded-full bg-neutral-500 dark:bg-neutral-400" />
-                                Default
-                              </SelectItem>
-                              <SelectItem value="red">
-                                <div className="size-3 rounded-full bg-red-500 dark:bg-red-400" />
-                                Red
-                              </SelectItem>
-                              <SelectItem value="blue">
-                                <div className="size-3 rounded-full bg-blue-500 dark:bg-blue-400" />
-                                Blue
-                              </SelectItem>
-                              <SelectItem value="green">
-                                <div className="size-3 rounded-full bg-green-500 dark:bg-green-400" />
-                                Green
-                              </SelectItem>
-                              <SelectItem value="purple">
-                                <div className="size-3 rounded-full bg-purple-500 dark:bg-purple-400" />
-                                Purple
-                              </SelectItem>
-                              <SelectItem value="pink">
-                                <div className="size-3 rounded-full bg-pink-500 dark:bg-pink-400" />
-                                Pink
-                              </SelectItem>
+                              {accents.map((accent) => (
+                                <SelectItem key={accent.value} value={accent.value}>
+                                  {accent.label}
+                                </SelectItem>
+                              ))}
                             </SelectGroup>
                           </SelectContent>
                         </Select>
@@ -340,15 +332,17 @@ function DialogChatSettings() {
                             listed, it may still be supported via auto-detection.
                           </FieldDescription>
                         </FieldContent>
-                        <Select value={spokenLanguage} onValueChange={setSpokenLanguage}>
+                        <Select
+                          items={spokenLanguages}
+                          value={spokenLanguage}
+                          onValueChange={(value) => {
+                            setSpokenLanguage(value ?? "");
+                          }}
+                        >
                           <SelectTrigger id="spoken-language">
-                            <SelectValue placeholder="Select" />
+                            <SelectValue />
                           </SelectTrigger>
-                          <SelectContent align="end" position="item-aligned">
-                            <SelectGroup>
-                              <SelectItem value="auto">Auto</SelectItem>
-                            </SelectGroup>
-                            <SelectSeparator />
+                          <SelectContent align="end">
                             <SelectGroup>
                               {spokenLanguages.map((language) => (
                                 <SelectItem key={language.value} value={language.value}>
@@ -362,11 +356,17 @@ function DialogChatSettings() {
                       <FieldSeparator />
                       <Field orientation="horizontal">
                         <FieldLabel htmlFor="voice">Voice</FieldLabel>
-                        <Select value={voice} onValueChange={setVoice}>
+                        <Select
+                          items={voices}
+                          value={voice}
+                          onValueChange={(value) => {
+                            setVoice(value ?? "");
+                          }}
+                        >
                           <SelectTrigger id="voice">
-                            <SelectValue placeholder="Select" />
+                            <SelectValue />
                           </SelectTrigger>
-                          <SelectContent align="end" position="item-aligned">
+                          <SelectContent align="end">
                             <SelectGroup>
                               {voices.map((voice) => (
                                 <SelectItem key={voice.value} value={voice.value}>
@@ -433,10 +433,8 @@ function DialogChatSettings() {
                         />
                         <InputGroupAddon align="inline-end">
                           <Tooltip>
-                            <TooltipTrigger asChild>
-                              <InputGroupButton size="icon-xs">
-                                <InfoIcon />
-                              </InputGroupButton>
+                            <TooltipTrigger render={<InputGroupButton size="icon-xs" />}>
+                              <InfoIcon />
                             </TooltipTrigger>
                             <TooltipContent className="flex items-center gap-2">
                               Used to identify you in the chat. <Kbd>N</Kbd>

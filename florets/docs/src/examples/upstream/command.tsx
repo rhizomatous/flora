@@ -1,5 +1,3 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/command-example.json
 "use client";
 
 import {
@@ -28,7 +26,7 @@ import {
   ZoomInIcon,
   ZoomOutIcon,
 } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 
 import { Button } from "@flora/florets/components/button";
 import { Card, CardContent } from "@flora/florets/components/card";
@@ -108,7 +106,7 @@ function CommandInline() {
 }
 
 function CommandBasic() {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
 
   return (
     <Example title="Basic">
@@ -141,7 +139,7 @@ function CommandBasic() {
 }
 
 function CommandWithShortcuts() {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
 
   return (
     <Example title="With Shortcuts">
@@ -186,7 +184,7 @@ function CommandWithShortcuts() {
 }
 
 function CommandWithGroups() {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
 
   return (
     <Example title="With Groups">
@@ -246,7 +244,7 @@ function CommandWithGroups() {
 }
 
 function CommandManyItems() {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
 
   return (
     <Example title="Many Groups & Items">

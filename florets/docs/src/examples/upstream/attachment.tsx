@@ -1,6 +1,4 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/attachment-example.json
 "use client";
 
 import {
@@ -18,7 +16,7 @@ import {
   TableIcon,
   XIcon,
 } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 
 import {
   Attachment,
@@ -218,14 +216,16 @@ function AttachmentContentOnly() {
             <AttachmentContent>
               <AttachmentTitle>shadcn/ui</AttachmentTitle>
             </AttachmentContent>
-            <AttachmentTrigger asChild>
-              <a
-                href="https://ui.shadcn.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Open shadcn/ui"
-              />
-            </AttachmentTrigger>
+            <AttachmentTrigger
+              render={
+                <a
+                  href="https://ui.shadcn.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Open shadcn/ui"
+                />
+              }
+            />
           </Attachment>
         </div>
       </div>
@@ -259,14 +259,16 @@ function AttachmentContentOnly() {
               <AttachmentTitle>Compound components in React</AttachmentTitle>
               <AttachmentDescription>ui.shadcn.com/docs</AttachmentDescription>
             </AttachmentContent>
-            <AttachmentTrigger asChild>
-              <a
-                href="https://ui.shadcn.com/docs"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Open Compound components in React"
-              />
-            </AttachmentTrigger>
+            <AttachmentTrigger
+              render={
+                <a
+                  href="https://ui.shadcn.com/docs"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Open Compound components in React"
+                />
+              }
+            />
           </Attachment>
         </div>
       </div>
@@ -459,14 +461,16 @@ function AttachmentImages() {
                 <XIcon />
               </AttachmentAction>
             </AttachmentActions>
-            <AttachmentTrigger asChild>
-              <a
-                href="https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=900&auto=format&fit=crop&q=80"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Open workspace.png"
-              />
-            </AttachmentTrigger>
+            <AttachmentTrigger
+              render={
+                <a
+                  href="https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=900&auto=format&fit=crop&q=80"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open workspace.png"
+                />
+              }
+            />
           </Attachment>
           <Attachment className="w-full">
             <AttachmentMedia variant="image">
@@ -484,14 +488,16 @@ function AttachmentImages() {
                 <XIcon />
               </AttachmentAction>
             </AttachmentActions>
-            <AttachmentTrigger asChild>
-              <a
-                href="https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=900&auto=format&fit=crop&q=80"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Open desk-reference.jpg"
-              />
-            </AttachmentTrigger>
+            <AttachmentTrigger
+              render={
+                <a
+                  href="https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=900&auto=format&fit=crop&q=80"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open desk-reference.jpg"
+                />
+              }
+            />
           </Attachment>
           <Attachment className="w-full">
             <AttachmentMedia variant="image">
@@ -509,14 +515,16 @@ function AttachmentImages() {
                 <XIcon />
               </AttachmentAction>
             </AttachmentActions>
-            <AttachmentTrigger asChild>
-              <a
-                href="https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=900&auto=format&fit=crop&q=80"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Open office-reference.jpg"
-              />
-            </AttachmentTrigger>
+            <AttachmentTrigger
+              render={
+                <a
+                  href="https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=900&auto=format&fit=crop&q=80"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open office-reference.jpg"
+                />
+              }
+            />
           </Attachment>
         </div>
       </div>
@@ -539,14 +547,16 @@ function AttachmentImages() {
                 <XIcon />
               </AttachmentAction>
             </AttachmentActions>
-            <AttachmentTrigger asChild>
-              <a
-                href="https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=900&auto=format&fit=crop&q=80"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Open workspace.png"
-              />
-            </AttachmentTrigger>
+            <AttachmentTrigger
+              render={
+                <a
+                  href="https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=900&auto=format&fit=crop&q=80"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open workspace.png"
+                />
+              }
+            />
           </Attachment>
           <Attachment orientation="vertical">
             <AttachmentMedia variant="image">
@@ -564,14 +574,16 @@ function AttachmentImages() {
                 <XIcon />
               </AttachmentAction>
             </AttachmentActions>
-            <AttachmentTrigger asChild>
-              <a
-                href="https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=900&auto=format&fit=crop&q=80"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Open desk-reference.jpg"
-              />
-            </AttachmentTrigger>
+            <AttachmentTrigger
+              render={
+                <a
+                  href="https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=900&auto=format&fit=crop&q=80"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open desk-reference.jpg"
+                />
+              }
+            />
           </Attachment>
           <Attachment orientation="vertical">
             <AttachmentMedia variant="image">
@@ -589,14 +601,16 @@ function AttachmentImages() {
                 <XIcon />
               </AttachmentAction>
             </AttachmentActions>
-            <AttachmentTrigger asChild>
-              <a
-                href="https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=900&auto=format&fit=crop&q=80"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Open office-reference.jpg"
-              />
-            </AttachmentTrigger>
+            <AttachmentTrigger
+              render={
+                <a
+                  href="https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=900&auto=format&fit=crop&q=80"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open office-reference.jpg"
+                />
+              }
+            />
           </Attachment>
           <Attachment orientation="vertical">
             <AttachmentMedia variant="image">
@@ -614,14 +628,16 @@ function AttachmentImages() {
                 <XIcon />
               </AttachmentAction>
             </AttachmentActions>
-            <AttachmentTrigger asChild>
-              <a
-                href="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=900&auto=format&fit=crop&q=80"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Open patio-reference.jpg"
-              />
-            </AttachmentTrigger>
+            <AttachmentTrigger
+              render={
+                <a
+                  href="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=900&auto=format&fit=crop&q=80"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open patio-reference.jpg"
+                />
+              }
+            />
           </Attachment>
           <Attachment orientation="vertical">
             <AttachmentMedia variant="image">
@@ -639,14 +655,16 @@ function AttachmentImages() {
                 <XIcon />
               </AttachmentAction>
             </AttachmentActions>
-            <AttachmentTrigger asChild>
-              <a
-                href="https://images.unsplash.com/photo-1494526585095-c41746248156?w=900&auto=format&fit=crop&q=80"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Open house-exterior.jpg"
-              />
-            </AttachmentTrigger>
+            <AttachmentTrigger
+              render={
+                <a
+                  href="https://images.unsplash.com/photo-1494526585095-c41746248156?w=900&auto=format&fit=crop&q=80"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open house-exterior.jpg"
+                />
+              }
+            />
           </Attachment>
         </AttachmentGroup>
       </div>
@@ -1027,7 +1045,7 @@ function AttachmentScrollableGroup() {
 }
 
 function AttachmentTriggers() {
-  const [isVisible, setIsVisible] = React.useState(true);
+  const [isVisible, setIsVisible] = useState(true);
 
   return (
     <Example title="Triggers" className="gap-3">
@@ -1053,9 +1071,11 @@ function AttachmentTriggers() {
               <XIcon />
             </AttachmentAction>
           </AttachmentActions>
-          <AttachmentTrigger asChild>
-            <a href="#" target="_blank" rel="noreferrer" aria-label="Open contract-review.pdf" />
-          </AttachmentTrigger>
+          <AttachmentTrigger
+            render={
+              <a href="#" target="_blank" rel="noreferrer" aria-label="Open contract-review.pdf" />
+            }
+          />
         </Attachment>
       ) : (
         <Button
@@ -1084,9 +1104,7 @@ function AttachmentTriggers() {
               <XIcon />
             </AttachmentAction>
           </AttachmentActions>
-          <DialogTrigger asChild>
-            <AttachmentTrigger aria-label="Preview research-summary.pdf" />
-          </DialogTrigger>
+          <DialogTrigger render={<AttachmentTrigger aria-label="Preview research-summary.pdf" />} />
         </Attachment>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

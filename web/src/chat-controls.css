@@ -1,0 +1,8 @@
+.composer-accessories .chat-scroll-latest {
+  position: static;
+  translate: none;
+  transform: none;
+}
+.composer-accessories .chat-scroll-latest[data-active="false"] {
+  display: none;
+}

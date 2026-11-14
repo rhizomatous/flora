@@ -128,11 +128,13 @@ function KbdInTooltip() {
   return (
     <Example title="Tooltip">
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button size="icon-sm" variant="outline">
-            <SaveIcon />
-          </Button>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <Button size="icon-sm" variant="outline">
+              <SaveIcon />
+            </Button>
+          }
+        />
         <TooltipContent className="pr-1.5">
           <div className="flex items-center gap-2">
             Save Changes <Kbd>S</Kbd>

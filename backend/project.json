@@ -47,7 +47,8 @@
     "smoke": {
       "inputs": [
         "go",
-        "frontend"
+        "frontend",
+        "{workspaceRoot}/scripts/smoke.test.ts"
       ],
       "dependsOn": [
         "binary"
@@ -57,7 +58,29 @@
     "browser": {
       "inputs": [
         "go",
-        "frontend"
+        "frontend",
+        "{workspaceRoot}/florets/docs/**/*",
+        "{workspaceRoot}/scripts/florets.browser.ts"
+      ],
+      "command": "npx playwright install --with-deps --only-shell chromium && FLORA_BROWSER_PREBUILT=1 npm run test:browser && npm run docs:test",
+      "dependsOn": [
+        "browser-build",
+        {
+          "projects": [
+            "@flora/florets"
+          ],
+          "target": "styleguide"
+        }
+      ]
+    },
+    "browser-build": {
+      "cache": true,
+      "inputs": [
+        "go",
+        "webBuild",
+        {
+          "runtime": "go env GOOS GOARCH GOVERSION"
+        }
       ],
       "dependsOn": [
         {
@@ -67,7 +90,10 @@
           "target": "build"
         }
       ],
-      "command": "npx playwright install --with-deps --only-shell chromium && make browser-test"
+      "outputs": [
+        "{workspaceRoot}/bin/browser-fixture"
+      ],
+      "command": "CGO_ENABLED=0 go -C backend build -mod=readonly -tags browserfixture -o ../bin/browser-fixture ./cmd/browser-fixture"
     }
   }
 }

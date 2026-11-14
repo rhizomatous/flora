@@ -1,3 +1,5 @@
+// oxlint-disable jsx-a11y/anchor-ambiguous-text -- The sample link text is preserved from the upstream examples.
+// oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 import { ArrowRightIcon } from "lucide-react";
 
 import { Badge } from "@flora/florets/components/badge";
@@ -18,8 +20,6 @@ import {
 } from "@flora/florets/components/input-group";
 import { Spinner } from "@flora/florets/components/spinner";
 
-// oxlint-disable jsx-a11y/anchor-ambiguous-text -- The sample link text is preserved from the upstream examples.
-// oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 // Adapted from https://ui.shadcn.com/r/styles/radix-nova/spinner-example.json
 import { Example, ExampleWrapper } from "../example";
 
@@ -124,16 +124,20 @@ function SpinnerInEmpty() {
         </EmptyHeader>
         <EmptyContent>
           <div className="flex gap-2">
-            <Button asChild>
-              <a href="#">Create project</a>
-            </Button>
+            <Button role="link" render={<a href="#">Create project</a>} nativeButton={false} />
             <Button variant="outline">Import project</Button>
           </div>
-          <Button variant="link" asChild className="text-muted-foreground">
-            <a href="#">
-              Learn more <ArrowRightIcon />
-            </a>
-          </Button>
+          <Button
+            role="link"
+            variant="link"
+            render={
+              <a href="#">
+                Learn more <ArrowRightIcon />
+              </a>
+            }
+            nativeButton={false}
+            className="text-muted-foreground"
+          />
         </EmptyContent>
       </Empty>
     </Example>

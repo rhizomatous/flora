@@ -1,5 +1,6 @@
 import type { Message, Part } from "@opencode-ai/sdk/v2";
 
+import type { Pull } from "../../web/src/pull-schemas.ts";
 import type { Frame } from "./server.ts";
 
 export const projects = [
@@ -147,7 +148,18 @@ export const stories = [
     id: "checkout",
     projectID: "garden",
     title: "Keep the cart after signing in",
-    pull: { number: 42, state: "open", draft: true },
+    pulls: [
+      {
+        repository: "example/storefront",
+        url: "https://github.com/example/storefront/pull/42",
+        number: 42,
+        title: "Keep the cart after signing in",
+        additions: 86,
+        deletions: 24,
+        state: "open",
+        draft: true,
+      },
+    ] satisfies Pull[],
     files: [
       {
         path: "src/cart.ts",
@@ -234,7 +246,28 @@ export const stories = [
     id: "pagination",
     projectID: "fieldnotes",
     title: "Fix duplicate notes between pages",
-    pull: { number: 18, state: "open", draft: false },
+    pulls: [
+      {
+        repository: "example/fieldnotes",
+        url: "https://github.com/example/fieldnotes/pull/18",
+        number: 18,
+        title: "Stabilize notes pagination",
+        additions: 35,
+        deletions: 36,
+        state: "closed",
+        draft: false,
+      },
+      {
+        repository: "example/fieldnotes",
+        url: "https://github.com/example/fieldnotes/pull/19",
+        number: 19,
+        title: "Stabilize notes pagination",
+        additions: 35,
+        deletions: 36,
+        state: "open",
+        draft: false,
+      },
+    ] satisfies Pull[],
     files: [
       {
         path: "internal/notes/list.go",
@@ -300,13 +333,37 @@ export const stories = [
           },
         ],
       },
+      {
+        user: "The release branch is ready. Close this PR and open a replacement against release.",
+        steps: [
+          check("gh pr close 18", "Closed pull request #18 (Stabilize notes pagination)"),
+          check(
+            "gh pr create --base release --title 'Stabilize notes pagination'",
+            "https://github.com/example/fieldnotes/pull/19",
+          ),
+          {
+            text: "Closed [PR #18](https://github.com/example/fieldnotes/pull/18) without merging and opened [PR #19](https://github.com/example/fieldnotes/pull/19) against release with the same pagination fix and cursor compatibility coverage.",
+          },
+        ],
+      },
     ],
   },
   {
     id: "focus",
     projectID: "preview",
     title: "Restore focus after removing a repository",
-    pull: { number: 73, state: "merged", draft: false },
+    pulls: [
+      {
+        repository: "example/flora",
+        url: "https://github.com/example/flora/pull/73",
+        number: 73,
+        title: "Restore repository form focus",
+        additions: 12,
+        deletions: 0,
+        state: "merged",
+        draft: false,
+      },
+    ] satisfies Pull[],
     files: [
       {
         path: "web/src/projects.tsx",

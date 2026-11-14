@@ -1,6 +1,9 @@
 import { z } from "zod";
 
+import { pullSummarySchema } from "./pull-schemas";
+
 export const chatSchema = z.object({
+  pulls: pullSummarySchema.optional(),
   ID: z.string(),
   ProjectID: z.string(),
   Title: z.string(),

@@ -197,7 +197,7 @@ function CarouselPrevious({
       onClick={scrollPrev}
       {...props}
     >
-      <ChevronLeftIcon className="cn-rtl-flip" />
+      <ChevronLeftIcon className="florets-rtl-flip" />
       <span className="sr-only">Previous slide</span>
     </Button>
   );
@@ -227,7 +227,7 @@ function CarouselNext({
       onClick={scrollNext}
       {...props}
     >
-      <ChevronRightIcon className="cn-rtl-flip" />
+      <ChevronRightIcon className="florets-rtl-flip" />
       <span className="sr-only">Next slide</span>
     </Button>
   );

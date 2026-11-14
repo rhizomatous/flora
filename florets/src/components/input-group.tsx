@@ -1,3 +1,4 @@
+// oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- Clicking the addon focuses the input; keyboard users focus the input directly.
 "use client";
 
 import { cva, type VariantProps } from "class-variance-authority";
@@ -27,12 +28,12 @@ const inputGroupAddonVariants = cva(
   {
     variants: {
       align: {
-        "inline-start": "pl-2 has-[>button]:ml-[-0.3rem] has-[>kbd]:ml-[-0.15rem] order-first",
-        "inline-end": "pr-2 has-[>button]:mr-[-0.3rem] has-[>kbd]:mr-[-0.15rem] order-last",
+        "inline-start": "order-first pl-2 has-[>button]:ml-[-0.3rem] has-[>kbd]:ml-[-0.15rem]",
+        "inline-end": "order-last pr-2 has-[>button]:mr-[-0.3rem] has-[>kbd]:mr-[-0.15rem]",
         "block-start":
-          "px-2.5 pt-2 group-has-[>input]/input-group:pt-2 [.border-b]:pb-2 order-first w-full justify-start",
+          "order-first w-full justify-start px-2.5 pt-2 group-has-[>input]/input-group:pt-2 [.border-b]:pb-2",
         "block-end":
-          "px-2.5 pb-2 group-has-[>input]/input-group:pb-2 [.border-t]:pt-2 order-last w-full justify-start",
+          "order-last w-full justify-start px-2.5 pb-2 group-has-[>input]/input-group:pb-2 [.border-t]:pt-2",
       },
     },
     defaultVariants: {
@@ -47,7 +48,6 @@ function InputGroupAddon({
   ...props
 }: ComponentProps<"div"> & VariantProps<typeof inputGroupAddonVariants>) {
   return (
-    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- Clicking addon space focuses the input, which already participates in keyboard navigation.
     <div
       role="group"
       data-slot="input-group-addon"
@@ -68,7 +68,7 @@ const inputGroupButtonVariants = cva("flex items-center gap-2 text-sm shadow-non
   variants: {
     size: {
       xs: "h-6 gap-1 rounded-[calc(var(--radius)-3px)] px-1.5 [&>svg:not([class*='size-'])]:size-3.5",
-      sm: "cn-input-group-button-size-sm",
+      sm: "",
       "icon-xs": "size-6 rounded-[calc(var(--radius)-3px)] p-0 has-[>svg]:p-0",
       "icon-sm": "size-8 p-0 has-[>svg]:p-0",
     },
@@ -84,7 +84,10 @@ function InputGroupButton({
   variant = "ghost",
   size = "xs",
   ...props
-}: Omit<ComponentProps<typeof Button>, "size"> & VariantProps<typeof inputGroupButtonVariants>) {
+}: Omit<ComponentProps<typeof Button>, "size" | "type"> &
+  VariantProps<typeof inputGroupButtonVariants> & {
+    type?: "button" | "submit" | "reset";
+  }) {
   return (
     <Button
       type={type}
@@ -100,7 +103,7 @@ function InputGroupText({ className, ...props }: ComponentProps<"span">) {
   return (
     <span
       className={cn(
-        "text-muted-foreground gap-2 text-sm [&_svg:not([class*='size-'])]:size-4 flex items-center [&_svg]:pointer-events-none",
+        "flex items-center gap-2 text-sm text-muted-foreground [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
       {...props}

@@ -1,3 +1,4 @@
+// oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 import { BluetoothIcon, Trash2Icon } from "lucide-react";
 
 import {
@@ -23,8 +24,6 @@ import {
   DialogTrigger,
 } from "@flora/florets/components/dialog";
 
-// oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/alert-dialog-example.json
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {
@@ -44,9 +43,7 @@ function AlertDialogBasic() {
   return (
     <Example title="Basic" className="items-center">
       <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button variant="outline">Default</Button>
-        </AlertDialogTrigger>
+        <AlertDialogTrigger render={<Button variant="outline">Default</Button>} />
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
@@ -69,9 +66,7 @@ function AlertDialogSmall() {
   return (
     <Example title="Small" className="items-center">
       <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button variant="outline">Small</Button>
-        </AlertDialogTrigger>
+        <AlertDialogTrigger render={<Button variant="outline">Small</Button>} />
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
             <AlertDialogTitle>Allow accessory to connect?</AlertDialogTitle>
@@ -93,9 +88,7 @@ function AlertDialogWithMedia() {
   return (
     <Example title="With Media" className="items-center">
       <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button variant="outline">Default (Media)</Button>
-        </AlertDialogTrigger>
+        <AlertDialogTrigger render={<Button variant="outline">Default (Media)</Button>} />
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogMedia>
@@ -120,9 +113,8 @@ function AlertDialogSmallWithMedia() {
   return (
     <Example title="Small With Media" className="items-center">
       <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button variant="outline">Small (Media)</Button>
-        </AlertDialogTrigger>
+        <AlertDialogTrigger render={<Button variant="outline">Small (Media)</Button>} />
+
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
             <AlertDialogMedia>
@@ -147,9 +139,7 @@ function AlertDialogDestructive() {
   return (
     <Example title="Destructive" className="items-center">
       <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button variant="destructive">Delete Chat</Button>
-        </AlertDialogTrigger>
+        <AlertDialogTrigger render={<Button variant="destructive">Delete Chat</Button>} />
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
             <AlertDialogMedia className="bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive">
@@ -175,9 +165,7 @@ function AlertDialogInDialog() {
   return (
     <Example title="In Dialog" className="items-center">
       <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline">Open Dialog</Button>
-        </DialogTrigger>
+        <DialogTrigger render={<Button variant="outline" />}>Open Dialog</DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Alert Dialog Example</DialogTitle>
@@ -185,9 +173,7 @@ function AlertDialogInDialog() {
           </DialogHeader>
           <DialogFooter>
             <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button>Open Alert Dialog</Button>
-              </AlertDialogTrigger>
+              <AlertDialogTrigger render={<Button />}>Open Alert Dialog</AlertDialogTrigger>
               <AlertDialogContent size="sm">
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>

@@ -1,24 +1,16 @@
+// oxlint-disable import/max-dependencies -- The chat view imports its feature controls and boundary schemas directly.
 import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import {
   Alert,
+  ArrowDownIcon,
   Button,
   ButtonLink,
-  FieldLabel,
   FlowerMark,
-  SidebarTrigger,
-  DropdownMenuItem,
   Heading,
   Link,
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
   CrossCircledIcon,
   Text,
-  InputGroup,
-  InputGroupTextarea,
-  InputGroupAddon,
-  InputGroupButton,
   Message as ChatMessage,
   MessageContent,
   MessageScrollerProvider,
@@ -44,6 +36,14 @@ import {
 
 import { authenticatedSchema } from "./auth-schemas";
 import {
+  ChatTurnNavigation,
+  ChatPullProvider,
+  ChatTitle,
+  ChatHeaderActions,
+  ChatComposerFooter,
+  ChatReviewStrip,
+} from "./chat-controls";
+import {
   type Chat,
   type Question,
   activitySchema,
@@ -58,6 +58,7 @@ import {
   type Message,
   type Part,
 } from "./chat-schemas";
+import { Composer } from "./composer";
 import { NewChatComposer } from "./new-chat-composer";
 import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
 import { QuestionForm } from "./question";
@@ -73,8 +74,8 @@ import {
 import { text } from "./ui";
 
 const Markdown = lazy(async () => {
-  const { Markdown: Component } = await import("@flora/florets/ai");
-  return { default: Component };
+  const { ReplyMarkdown } = await import("./reply-markdown");
+  return { default: ReplyMarkdown };
 });
 
 function ReplyText({ children }: { children: string }) {
@@ -121,14 +122,14 @@ function forgetIdentity(scope: string) {
 
 export function Chats({
   path,
-  onExpired,
   messageBytes,
+  onExpired,
   list,
   listError,
 }: {
   path: string;
-  onExpired: () => void;
   messageBytes: number;
+  onExpired: () => void;
   list: Chat[] | undefined;
   listError: string;
 }) {
@@ -343,9 +344,10 @@ export function Chats({
     setBusy(false);
   }
 
+  const pulls = list?.find((chat) => chat.ID === id)?.pulls ?? detail?.chat.pulls;
   const existingChat = !isNew && id !== "";
   const headerLayout = existingChat
-    ? "-mx-4 flex h-14 shrink-0 items-center gap-3 border-b px-4 sm:-mx-8"
+    ? "florets-topbar chat-header [&_h1]:flex-[0_1_auto] max-[560px]:gap-0.5 max-[560px]:[&_h1]:flex-1 max-[560px]:[&>[aria-disabled=true]]:hidden -mx-4 flex shrink-0 items-center gap-1 border-b px-3 sm:-mx-8"
     : "mx-auto flex w-full max-w-[880px] shrink-0 items-center justify-between gap-4 pb-3";
   const chatLayout = id === "" ? "mx-auto max-w-4xl min-w-0" : "flex min-h-0 flex-1 flex-col";
 
@@ -362,16 +364,18 @@ export function Chats({
       className={isNew ? "mx-auto my-12 w-full max-w-[720px] md:mt-[25svh]" : chatLayout}
     >
       <div className={isNew ? "sr-only" : headerLayout}>
-        {existingChat && <SidebarTrigger aria-label="Menu" />}
+        {existingChat && <span className="sidebar-toggle-space" aria-hidden="true" />}
         <Heading
           level={1}
           id="chats-heading"
+          aria-label={title()}
           ref={heading}
           tabIndex={-1}
           className="min-w-0 truncate text-base"
         >
-          {title()}
+          {existingChat ? <ChatTitle title={title()} chat={detail?.chat} pulls={pulls} /> : title()}
         </Heading>
+        {existingChat && <ChatHeaderActions />}
       </div>
       {error !== "" && (
         <Alert role="alert" className="mt-6">
@@ -412,12 +416,12 @@ export function Chats({
       )}
       {detail && (
         <ChatDetail
+          pulls={pulls}
           id={id}
           detail={detail}
           activity={activity}
           disconnected={disconnected}
           busy={busy}
-          messageBytes={messageBytes}
           onControl={(action) => {
             void controlWork(action);
           }}
@@ -500,22 +504,22 @@ function ChatList({ list, projects }: { list: Chat[]; projects: ProjectSummary[]
 
 /** Keeps pending questions above the composer while the transcript scrolls independently. */
 function ChatDetail({
+  pulls,
   id,
   detail,
   activity,
   disconnected,
   busy,
-  messageBytes,
   onControl,
   onSend,
   children,
 }: {
   id: string;
   detail: Detail;
+  pulls: Chat["pulls"];
   activity: Activity[];
   disconnected: boolean;
   busy: boolean;
-  messageBytes: number;
   onControl: (action: "interrupt" | "stop") => void;
   onSend: (event: React.SubmitEvent<HTMLFormElement>) => void;
   children: React.ReactNode;
@@ -528,60 +532,71 @@ function ChatDetail({
   const visibleActivity = rows.some((row) => row.kind === "work" && row.active);
 
   return (
-    <MessageScrollerProvider autoScroll>
-      <MessageScroller className="flex-1">
-        <MessageScrollerViewport aria-label="Conversation">
-          <MessageScrollerContent className="mx-auto w-full max-w-[880px] gap-8 px-1 py-6">
-            {disconnected && <Alert role="status">Disconnected. Reconnecting…</Alert>}
-            {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
-              <Alert role="note">
-                Some live activity could not be captured. Recovered messages and tool snapshots are
-                shown; transient output may be missing.
-              </Alert>
-            )}
-            {rows.map((row) => (
-              <MessageScrollerItem
-                key={row.id}
-                messageId={row.id}
-                scrollAnchor={row.kind === "message" && row.message.Role === "user"}
-              >
-                {row.kind === "work" ? (
-                  <WorkSummary steps={row.steps} active={row.active} failed={row.failed} />
-                ) : (
-                  <ConversationMessage message={row.message} />
-                )}
-              </MessageScrollerItem>
-            ))}
-            {activeTurn && !visibleActivity && (
-              <div role="status" aria-label="Working">
-                <FlowerMark className="text-muted-foreground motion-safe:animate-pulse" />
-              </div>
-            )}
-            {(chat.Status === "failed" ||
-              chat.Status === "stopped" ||
-              chat.StatusReason.includes("interrupted")) &&
-              chat.StatusReason !== "" && <Text role="status">{chat.StatusReason}</Text>}
-          </MessageScrollerContent>
-        </MessageScrollerViewport>
-        <MessageScrollerButton aria-label="Jump to latest" />
-      </MessageScroller>
-      <div className="mx-auto max-h-[70dvh] w-full max-w-[880px] shrink-0 overflow-y-auto bg-background pt-3 pb-[env(safe-area-inset-bottom)]">
-        <div className="max-h-[50dvh] overflow-y-auto empty:hidden [&_form]:mt-0 [&_form]:mb-3">
-          {children}
+    <ChatPullProvider value={pulls}>
+      <MessageScrollerProvider autoScroll>
+        <MessageScroller className="-mx-4 w-auto flex-1 sm:-mx-8">
+          <MessageScrollerViewport aria-label="Conversation" className="chat-transcript-viewport">
+            <MessageScrollerContent className="mx-auto w-full max-w-[900px] gap-6 px-4 py-6">
+              {disconnected && <Alert role="status">Disconnected. Reconnecting…</Alert>}
+              {activity.some((row) => row.ChatID === id && row.Kind === "capture.gap") && (
+                <Alert role="note">
+                  Some live activity could not be captured. Recovered messages and tool snapshots
+                  are shown; transient output may be missing.
+                </Alert>
+              )}
+              {rows.map((row) => (
+                <MessageScrollerItem
+                  key={row.id}
+                  messageId={row.id}
+                  scrollAnchor={row.kind === "message" && row.message.Role === "user"}
+                >
+                  {row.kind === "work" ? (
+                    <WorkSummary steps={row.steps} active={row.active} failed={row.failed} />
+                  ) : (
+                    <ConversationMessage message={row.message} />
+                  )}
+                </MessageScrollerItem>
+              ))}
+              {activeTurn && !visibleActivity && (
+                <div role="status" aria-label="Working">
+                  <FlowerMark className="text-muted-foreground motion-safe:animate-pulse" />
+                </div>
+              )}
+              {(chat.Status === "failed" ||
+                chat.Status === "stopped" ||
+                chat.StatusReason.includes("interrupted")) &&
+                chat.StatusReason !== "" && <Text role="status">{chat.StatusReason}</Text>}
+            </MessageScrollerContent>
+          </MessageScrollerViewport>
+          <ChatTurnNavigation rows={rows} />
+        </MessageScroller>
+        <div className="chat-composer-dock mx-auto max-h-[70dvh] w-full max-w-[900px] shrink-0 overflow-y-auto pt-2 pb-[env(safe-area-inset-bottom)]">
+          <div className="chat-pending-questions max-h-[50dvh] overflow-y-auto empty:hidden [&_form]:mt-0 [&_form]:mb-3">
+            {children}
+          </div>
+          <ChatReviewStrip key={`review-${id}`} pulls={pulls}>
+            <MessageScrollerButton
+              aria-label="Jump to latest"
+              size="sm"
+              className="composer-accessory chat-scroll-latest h-7 gap-1.5 border border-border px-2.5 text-xs [&_svg]:size-[13px]!"
+            >
+              <ArrowDownIcon />
+              Scroll to end
+            </MessageScrollerButton>
+          </ChatReviewStrip>
+          <FollowUpComposer
+            key={id}
+            id={id}
+            busy={busy}
+            activeTurn={activeTurn}
+            blocked={blocked}
+            stopped={stopped}
+            onSend={onSend}
+            onControl={onControl}
+          />
         </div>
-        <FollowUpComposer
-          key={id}
-          id={id}
-          busy={busy}
-          activeTurn={activeTurn}
-          blocked={blocked}
-          stopped={stopped}
-          messageBytes={messageBytes}
-          onSend={onSend}
-          onControl={onControl}
-        />
-      </div>
-    </MessageScrollerProvider>
+      </MessageScrollerProvider>
+    </ChatPullProvider>
   );
 }
 
@@ -607,7 +622,6 @@ function FollowUpComposer({
   activeTurn,
   blocked,
   stopped,
-  messageBytes,
   onSend,
   onControl,
 }: {
@@ -616,7 +630,6 @@ function FollowUpComposer({
   activeTurn: boolean;
   blocked: boolean;
   stopped: boolean;
-  messageBytes: number;
   onSend: (event: React.SubmitEvent<HTMLFormElement>) => void;
   onControl: (action: "interrupt" | "stop") => void;
 }) {
@@ -626,6 +639,7 @@ function FollowUpComposer({
 
   return (
     <form
+      className="chat-composer follow-up-composer"
       onSubmit={(event) => {
         if (!canSend) {
           event.preventDefault();
@@ -637,78 +651,26 @@ function FollowUpComposer({
         setDraft("");
       }}
     >
-      <FieldLabel htmlFor="follow-up-message" className="sr-only">
-        Follow-up
-      </FieldLabel>
-      <InputGroup className="rounded-xl">
-        <InputGroupTextarea
-          id="follow-up-message"
-          name="text"
-          className="max-h-[25dvh] min-h-12"
-          placeholder="Message…"
-          value={draft}
-          required
-          disabled={busy || blocked}
-          onChange={(event) => {
-            setDraft(event.target.value);
-            saveDraft(id, event.target.value);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              if (canSend) event.currentTarget.form?.requestSubmit();
-            }
-          }}
-        />
-        <InputGroupAddon align="block-end" className="justify-end">
-          {!blocked && !stopped && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <InputGroupButton
-                  type="button"
-                  variant="ghost"
-                  className="mr-auto"
-                  aria-label="Chat actions"
-                >
-                  ⋯
-                </InputGroupButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem
-                  disabled={busy}
-                  onSelect={() => {
-                    onControl("stop");
-                  }}
-                >
-                  Stop container
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          {activeTurn && !blocked ? (
-            <InputGroupButton
-              type="button"
-              variant="outline"
-              disabled={busy}
-              onClick={() => {
+      <Composer
+        id="follow-up-message"
+        label="Follow-up"
+        message={draft}
+        onChange={(value) => {
+          setDraft(value);
+          saveDraft(id, value);
+        }}
+        disabled={busy || blocked}
+        canSend={canSend}
+        sendLabel={blocked ? "Continuation unavailable" : sendLabel}
+        onInterrupt={
+          activeTurn && !blocked
+            ? () => {
                 onControl("interrupt");
-              }}
-              title="Interrupt work and keep the container running"
-            >
-              Interrupt
-            </InputGroupButton>
-          ) : (
-            <InputGroupButton
-              type="submit"
-              variant="default"
-              disabled={!canSend}
-              title={`Up to ${messageBytes.toLocaleString()} UTF-8 bytes`}
-            >
-              {blocked ? "Continuation unavailable" : sendLabel}
-            </InputGroupButton>
-          )}
-        </InputGroupAddon>
-      </InputGroup>
+              }
+            : undefined
+        }
+      />
+      <ChatComposerFooter busy={busy} blocked={blocked} stopped={stopped} onControl={onControl} />
     </form>
   );
 }
@@ -739,7 +701,7 @@ function ConversationMessage({ message: m }: { message: Message }) {
         <MessageContent>
           <span className="sr-only">{m.Role === "user" ? "You" : "Flora"}</span>
           <Bubble variant={m.Role === "user" ? "muted" : "ghost"}>
-            <BubbleContent className="space-y-4 text-[15px] leading-7">
+            <BubbleContent className="space-y-4 text-sm leading-6">
               {parts.length > 0 ? (
                 parts.map((part, index) => (
                   <MessagePart key={part.id ?? index} part={part} user={m.Role === "user"} />

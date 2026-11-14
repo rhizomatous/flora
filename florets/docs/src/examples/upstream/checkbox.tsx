@@ -1,8 +1,6 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/checkbox-example.json
 "use client";
 
-import * as React from "react";
+import { useState } from "react";
 
 import { Checkbox } from "@flora/florets/components/checkbox";
 import {
@@ -146,7 +144,7 @@ const tableData = [
 ];
 
 function CheckboxInTable() {
-  const [selectedRows, setSelectedRows] = React.useState<Set<string>>(new Set(["1"]));
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set(["1"]));
 
   const selectAll = selectedRows.size === tableData.length;
 
@@ -189,7 +187,7 @@ function CheckboxInTable() {
                   id={`row-${row.id}`}
                   checked={selectedRows.has(row.id)}
                   onCheckedChange={(checked) => {
-                    handleSelectRow(row.id, checked === true);
+                    handleSelectRow(row.id, checked);
                   }}
                 />
               </TableCell>

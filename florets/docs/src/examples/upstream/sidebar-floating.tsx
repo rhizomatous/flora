@@ -1,7 +1,6 @@
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 // oxlint-disable jsx-a11y/control-has-associated-label -- Nested title and code components provide the visible content.
 // oxlint-disable typescript/no-unnecessary-condition -- The upstream examples retain guards for incomplete runtime payloads.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/sidebar-floating-example.json
 "use client";
 
 import { MoreHorizontalIcon } from "lucide-react";
@@ -176,15 +175,13 @@ export function Preview() {
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" asChild>
-                <a href="#">
-                  <Item className="p-0" size="xs">
-                    <ItemContent>
-                      <ItemTitle className="text-sm">Documentation</ItemTitle>
-                      <ItemDescription>v1.0.0</ItemDescription>
-                    </ItemContent>
-                  </Item>
-                </a>
+              <SidebarMenuButton size="lg" render={<a href="#" />}>
+                <Item className="p-0" size="xs">
+                  <ItemContent>
+                    <ItemTitle className="text-sm">Documentation</ItemTitle>
+                    <ItemDescription>v1.0.0</ItemDescription>
+                  </ItemContent>
+                </Item>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -195,17 +192,19 @@ export function Preview() {
               {data.navMain.map((item) => (
                 <DropdownMenu key={item.title}>
                   <SidebarMenuItem>
-                    <DropdownMenuTrigger asChild>
-                      <SidebarMenuButton className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
-                        {item.title} <MoreHorizontalIcon className="ml-auto" />
-                      </SidebarMenuButton>
+                    <DropdownMenuTrigger
+                      render={
+                        <SidebarMenuButton className="data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground" />
+                      }
+                    >
+                      {item.title} <MoreHorizontalIcon className="ml-auto" />
                     </DropdownMenuTrigger>
                     {item.items?.length ? (
                       <DropdownMenuContent side="right" align="start">
                         <DropdownMenuGroup>
                           {item.items.map((subItem) => (
-                            <DropdownMenuItem asChild key={subItem.title}>
-                              <a href={subItem.url}>{subItem.title}</a>
+                            <DropdownMenuItem render={<a href={subItem.url} />} key={subItem.title}>
+                              {subItem.title}
                             </DropdownMenuItem>
                           ))}
                         </DropdownMenuGroup>
@@ -218,8 +217,8 @@ export function Preview() {
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
-          <SidebarGroup className="pb-1">
-            <Card size="sm" className="-mx-1">
+          <SidebarGroup>
+            <Card size="sm" className="-mx-2">
               <CardHeader>
                 <CardTitle className="text-sm">Subscribe to our newsletter</CardTitle>
                 <CardDescription>
@@ -245,16 +244,16 @@ export function Preview() {
         <SidebarRail />
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 px-4">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        <div className="flex flex-1 flex-col gap-4 p-4">
           <div className="grid auto-rows-min gap-4 md:grid-cols-3">
             <div className="aspect-video rounded-xl bg-muted/50" />
             <div className="aspect-video rounded-xl bg-muted/50" />
             <div className="aspect-video rounded-xl bg-muted/50" />
           </div>
-          <div className="min-h-screen flex-1 rounded-xl bg-muted/50 md:min-h-min" />
+          <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min" />
         </div>
       </SidebarInset>
     </SidebarProvider>

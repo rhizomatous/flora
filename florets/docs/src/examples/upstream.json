@@ -1,8 +1,8 @@
 [
   {
     "name": "accordion",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/accordion-example.json",
-    "sha256": "6cd38991fc0fc78f10762901fdaea705aa67dc0895c53474f2f991f264a00b53",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/accordion-example.json",
+    "sha256": "8bd475b5a2f47f6a224a03b6f534ace0021a7ad2e19d3282efe3153683f739c2",
     "examples": 5
   },
   {
@@ -13,56 +13,56 @@
   },
   {
     "name": "alert-dialog",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/alert-dialog-example.json",
-    "sha256": "56ce6e0256365b03d835424b76caa77400a6f72009f84b14ed4209dc9a10cfde",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/alert-dialog-example.json",
+    "sha256": "605224fa427153e9450d3a15946e058e0d989f7aa7e9a15422ad403aef723208",
     "examples": 6
   },
   {
     "name": "aspect-ratio",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/aspect-ratio-example.json",
-    "sha256": "466404fa46208df80fb5d7b235017f8c0c11296a4ab197306dd8a55046d137a5",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/aspect-ratio-example.json",
+    "sha256": "0e9ed4c736eeb8da0a3dca2e6cc0946299ee3cc8c4bcafb02eae037e47399e68",
     "examples": 4
   },
   {
     "name": "attachment",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/attachment-example.json",
-    "sha256": "4c5be67c5e20c95a316c81e18770d51944c9e9566c54bc25cc4396a0ec444dc4",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/attachment-example.json",
+    "sha256": "3d6ce7ff0f1d5ebc6a216daf22a69fcf2942a6b7943321c79fab4bf25294c898",
     "examples": 8
   },
   {
     "name": "avatar",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/avatar-example.json",
-    "sha256": "373264a5f9e7a543a5f6d3b19575d76b4a2f471384b5fda19c634d62192ef81e",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/avatar-example.json",
+    "sha256": "93a49cbcb0a05ec199d5482b5661d8a8383ae00dc0d84c1b9247629ce199cdb8",
     "examples": 7
   },
   {
     "name": "badge",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/badge-example.json",
-    "sha256": "24c1eac440a969ceeff120ff8a06cd58c03aebcdedc51856530afe67a25c2ebf",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/badge-example.json",
+    "sha256": "cf377136c424b9294e6ccb6305626389236d4bcf2632a2ede3c8244a07941ee1",
     "examples": 7
   },
   {
     "name": "breadcrumb",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/breadcrumb-example.json",
-    "sha256": "e3cdddaa08a00648935b19bac37195aa3347c890fad751b18ee094ef5ebcba51",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/breadcrumb-example.json",
+    "sha256": "255ab6ed4305b9b1b07da447cc468eed3f4f04c7bdc237ba24b23ee5e75bdc2b",
     "examples": 3
   },
   {
     "name": "bubble",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/bubble-example.json",
-    "sha256": "4c48855e956c6caeb199914aa2f7fefe9812189b3795d36230b47e16bdc300ff",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/bubble-example.json",
+    "sha256": "461ad5b779f041887998f9a9821b58d973e38654dadeb5500c9e788abbd1d327",
     "examples": 8
   },
   {
     "name": "button",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/button-example.json",
-    "sha256": "ec649e759cb9a2d4221cf419f2180d9a2c5f5c4075e841d591171b9701a8b4f7",
-    "examples": 6
+    "url": "https://ui.shadcn.com/r/styles/base-nova/button-example.json",
+    "sha256": "92e1b93e50cc820569f5b2aa62e6c141101743f8dc21d835b44f9305245ed045",
+    "examples": 7
   },
   {
     "name": "button-group",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/button-group-example.json",
-    "sha256": "1336ee7c3046cc4f9983bfe54eab7ace2a8ecb8661a59d33bee15949834298b3",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/button-group-example.json",
+    "sha256": "e32bf261112347d3593e2b9505254d90cb998d2ee319afba2c4613545514b060",
     "examples": 17
   },
   {
@@ -73,8 +73,8 @@
   },
   {
     "name": "card",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/card-example.json",
-    "sha256": "17e05624621b953e33bd4a66005c76fb9757e476cc22749389df3790618502e7",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/card-example.json",
+    "sha256": "a45cdaa263c7e8b70ed2f45051a35d40afef7415a0335e95e1236d5cd4f86299",
     "examples": 12
   },
   {
@@ -91,8 +91,8 @@
   },
   {
     "name": "checkbox",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/checkbox-example.json",
-    "sha256": "2dd1f7c76a4b4cfa0edfc6cdad861ee2ee65d69382abc565b1726261c2e5d80d",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/checkbox-example.json",
+    "sha256": "5d70bfff93b9041a0e055f89a54f45d0606a69d3b0e867cdc8c6ac9ded9e5e6c",
     "examples": 7
   },
   {
@@ -103,32 +103,32 @@
   },
   {
     "name": "collapsible",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/collapsible-example.json",
-    "sha256": "f0b461d6a9241a2f6126f5909e3829fdbf224c0fd235815dac977a06b19b3859",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/collapsible-example.json",
+    "sha256": "6a19175c65a35160792975698502e9524bf1f951f22e710d0e1667ce1153ee0a",
     "examples": 2
   },
   {
     "name": "combobox",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/combobox-example.json",
-    "sha256": "35b700f6268212a6353451a9b47db1e01c6b2a7439ef68d9a7b726d27098dd63",
-    "examples": 19
+    "url": "https://ui.shadcn.com/r/styles/base-nova/combobox-example.json",
+    "sha256": "74d69a978b95f7e5e4052f394478e50128aa1efdee52e5f13830b01e4bc25ef4",
+    "examples": 20
   },
   {
     "name": "command",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/command-example.json",
-    "sha256": "5e50b08fc8839c60399a7d13a3889003aa80612e63a29b6ca2eb225ffa13c58c",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/command-example.json",
+    "sha256": "3856fdec6ffb3b8b2c071e4077a882e5bce0a714af563e018466d2fde970fec3",
     "examples": 5
   },
   {
     "name": "context-menu",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/context-menu-example.json",
-    "sha256": "beca0b3bee051466534f9a2d28d829f1d53bd9f77d4ff29f7f4fe0b10e94f300",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/context-menu-example.json",
+    "sha256": "3455440a582d786b9f158e53052ef4bfb0cbf4bd38f4d48927d1ebfafb54ab19",
     "examples": 11
   },
   {
     "name": "dialog",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/dialog-example.json",
-    "sha256": "6346c70b5ef85f18c9bb80412ed3de20fcd8aecf8463121239b9b06c00728c7d",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/dialog-example.json",
+    "sha256": "71e074c6e7485435d3066efd916144820d232d340373eb1dbd6097d0c61379de",
     "examples": 5
   },
   {
@@ -139,15 +139,15 @@
   },
   {
     "name": "drawer",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/drawer-example.json",
-    "sha256": "0cd5f9ca6fbb44a7f5ccf82cc61cdd57dea8d7f0b631396f3e0e8c8ba294d962",
-    "examples": 2
+    "url": "https://ui.shadcn.com/r/styles/base-nova/drawer-example.json",
+    "sha256": "be98e3498ccb5e5a3df6eedcb52592e1845be956e3ec3eb19b834abfe1da9b36",
+    "examples": 8
   },
   {
     "name": "dropdown-menu",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/dropdown-menu-example.json",
-    "sha256": "172be298973aaed5bd6de6b50d930956998756d2324a3d120d1a88d4d66cc283",
-    "examples": 13
+    "url": "https://ui.shadcn.com/r/styles/base-nova/dropdown-menu-example.json",
+    "sha256": "c369f074a97420e5240f3fd9a0eab83d416e452c82e72d06a899de389eb76d0d",
+    "examples": 15
   },
   {
     "name": "empty",
@@ -157,39 +157,39 @@
   },
   {
     "name": "field",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/field-example.json",
-    "sha256": "e3dc0921a972fab76421f14204ae99beeeafccae7b9df73692f1ef9dc217aa9a",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/field-example.json",
+    "sha256": "0ec89793a62df029840715ea3f4673300ba7337b6b8e9b3ec0a8032e2ee50989",
     "examples": 10
   },
   {
     "name": "hover-card",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/hover-card-example.json",
-    "sha256": "98a07cabace99f32ff0cd0f02bc4aca5ab7e727ead95bf3da7ed01915fe06a57",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/hover-card-example.json",
+    "sha256": "e6afabb7eae2651e2844c5d21a2c6a78e0874b1631cf28591a10062a6b15da88",
     "examples": 2
   },
   {
     "name": "input",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/input-example.json",
-    "sha256": "4709660389452d6bcdcb90f884507f902fa2b2a30f612d35300be2faea64d300",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/input-example.json",
+    "sha256": "d02eaabf4a77e8a8dc7275968bf7d3a67bab90e5a1031dabac63895c6a5a2b1b",
     "examples": 10
   },
   {
     "name": "input-group",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/input-group-example.json",
-    "sha256": "39b3125573d22298f381728a85e95abe1a30dd9bbddb80ed6afe15f81c3b57a1",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/input-group-example.json",
+    "sha256": "a482acabbc69ee527d5fce726f10bec4d5c02785d1da800cec3cf4052b6729e9",
     "examples": 7
   },
   {
     "name": "input-otp",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/input-otp-example.json",
-    "sha256": "a3090edc4d4cf7eb0ad0bcde8e5dbe57db837d3351e6155570fb8acb1cd7f500",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/input-otp-example.json",
+    "sha256": "95712b85ddbde88d00440ea193b291233d03f0391bacd09acd3ceda5f9e1aa0a",
     "examples": 8
   },
   {
     "name": "item",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/item-example.json",
-    "sha256": "5e0a67c4fc01f1b5950196ac1a490ac52d46b55ac4eff722eba367362656126c",
-    "examples": 25
+    "url": "https://ui.shadcn.com/r/styles/base-nova/item-example.json",
+    "sha256": "363db2e9ba007787a1e846fcdd8d16abdc4edd83eaf6c611ee99fb1f5bdceeff",
+    "examples": 24
   },
   {
     "name": "kbd",
@@ -199,21 +199,21 @@
   },
   {
     "name": "label",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/label-example.json",
-    "sha256": "4969c4b1520caa7c5dfd87c30bbd86837ca427db2b3cec6aa3575f2cfcb43776",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/label-example.json",
+    "sha256": "c5fe22d135754758afad0c8e3a8b0bc5dc1ef2cc7bac4fda3cbfd35c0485573e",
     "examples": 4
   },
   {
     "name": "marker",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/marker-example.json",
-    "sha256": "f4969f403399dd2fb951281ba367010ed22e18c801e873b8b7689fa79773a83d",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/marker-example.json",
+    "sha256": "4db6efe8635e25ad7d926390ae8b5eccbf970eac17b0300fe8a138c32cdc879d",
     "examples": 5
   },
   {
     "name": "menubar",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/menubar-example.json",
-    "sha256": "b98775ae4e64f722d8aabe242d476bc246aaf86527be3148fdbde691bb15a491",
-    "examples": 11
+    "url": "https://ui.shadcn.com/r/styles/base-nova/menubar-example.json",
+    "sha256": "ca55d90b74d88f37e5cf7f102582d3c67795e44215a597c109602d0564647db6",
+    "examples": 12
   },
   {
     "name": "message",
@@ -229,44 +229,44 @@
   },
   {
     "name": "native-select",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/native-select-example.json",
-    "sha256": "a7cf0d67cf5653e6dc01f969cd2241ab1e89887437192a13baf92f5b074993e0",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/native-select-example.json",
+    "sha256": "ffdf114731e1c7ee4b8cc5d12c9cb0fd9a7956d44c2c752114a2cf33081ae911",
     "examples": 6
   },
   {
     "name": "navigation-menu",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/navigation-menu-example.json",
-    "sha256": "d0bf129fd682787c792d8d2cb688676f9ad38445718d0181b65a44a59b966030",
-    "examples": 2
+    "url": "https://ui.shadcn.com/r/styles/base-nova/navigation-menu-example.json",
+    "sha256": "2ca1fb540adaa5401ebfcf863df01edf09503abb21410cae389cf2b8d9b77c6a",
+    "examples": 1
   },
   {
     "name": "pagination",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/pagination-example.json",
-    "sha256": "174d825f234376a229c536cf6852156fa05e8656985aefcdbd69b9f5e067d940",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/pagination-example.json",
+    "sha256": "f1b2bd161504a044c3bf3fc2cc34f72f19bf92842a425a610a32daecdd25b2b1",
     "examples": 3
   },
   {
     "name": "popover",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/popover-example.json",
-    "sha256": "3ef5821a859af6b43c18aa8e94980581c457eea6407b621790e7a0a090f91956",
-    "examples": 4
+    "url": "https://ui.shadcn.com/r/styles/base-nova/popover-example.json",
+    "sha256": "72c5f96963f96e3fde33761d0b21ff56656007d8e1777ae151051632271204bf",
+    "examples": 5
   },
   {
     "name": "progress",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/progress-example.json",
-    "sha256": "5e54e4b13adb667bee8c672e2444e1c651c8bef4167ed3099fb47aa394cc84a0",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/progress-example.json",
+    "sha256": "607080f8409b4f8816500d27f467b9bf7694b3e5f9d5cfa3a4c68be01f6acd95",
     "examples": 4
   },
   {
     "name": "questionnaire",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/questionnaire-example.json",
-    "sha256": "80447ff7f8c994960bd0d97ac9634b5be71fdaa466056d4f1ebf92279fc8cf56",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/questionnaire-example.json",
+    "sha256": "576b62a339358954d7be546cc7b88070db454c275b6e2be368aa7e7973c76b6b",
     "examples": 5
   },
   {
     "name": "radio-group",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/radio-group-example.json",
-    "sha256": "28c914450dc2b4da80c406d5b625ed6b8c43578a20b21e8323a3e308f33f4f3c",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/radio-group-example.json",
+    "sha256": "ee52571acbddcbdbc976a89f5190002c39eb42e6bd48be407d2036cd07daee0b",
     "examples": 6
   },
   {
@@ -277,51 +277,51 @@
   },
   {
     "name": "scroll-area",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/scroll-area-example.json",
-    "sha256": "d3b4416bf6f8fb739a488cbdbfb465b3714cfa389c570c2c57ac4ad94500f134",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/scroll-area-example.json",
+    "sha256": "56947076d037789d51239c80762682ddbc422f4e36df57d2f0e49adfa9af4c00",
     "examples": 2
   },
   {
     "name": "select",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/select-example.json",
-    "sha256": "756b9f6697f22304d68f4686a8f7c5a5c26e900de06353daa9951003e9c71cf6",
-    "examples": 13
+    "url": "https://ui.shadcn.com/r/styles/base-nova/select-example.json",
+    "sha256": "d1bcd241bc16e93ed0554021157c4e851c935854cd2b263b59fa3c3534441359",
+    "examples": 15
   },
   {
     "name": "separator",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/separator-example.json",
-    "sha256": "6a21bfed186495648407c9fe53cdd5ce3959b70d89cc9c4eb9a8315f78880b60",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/separator-example.json",
+    "sha256": "cc21ab548288c4d07ff241b1bfd770ab893d97cbd6121c908edb5d2205f4424d",
     "examples": 4
   },
   {
     "name": "sheet",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/sheet-example.json",
-    "sha256": "922069494bbaf3efd7db2c84ee83b24a569fe8b955d4ef42ab9a5064c52bab8a",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/sheet-example.json",
+    "sha256": "1e6cf2bea20ef1c9b0b8adf86a8432602987bf300907b5d845d435417bf1969b",
     "examples": 3
   },
   {
     "name": "sidebar",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/sidebar-example.json",
-    "sha256": "bf0ee76ab3558f03ce293d0ce66a257609ccd1aaf782cbb5968c15b8cf96be4d",
-    "examples": 1
+    "url": "https://ui.shadcn.com/r/styles/base-nova/sidebar-example.json",
+    "sha256": "69bfff93aed44f7031544176a760cdfe1ca176e88900e81b8b02d1afc2f217cd",
+    "examples": 0
   },
   {
     "name": "sidebar-floating",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/sidebar-floating-example.json",
-    "sha256": "2fc9db15e457f8614cdddd933b914e4e2fc9a6d2c963817cc1612e94d515b54d",
-    "examples": 1
+    "url": "https://ui.shadcn.com/r/styles/base-nova/sidebar-floating-example.json",
+    "sha256": "64bb5e5747d403d18cbaaab0e6547b9987f9170529b33890206bb0ec61d3657e",
+    "examples": 0
   },
   {
     "name": "sidebar-icon",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/sidebar-icon-example.json",
-    "sha256": "73e8b4e3fd851a5da7e06c56d2fb68c2312411a46dd4e2add786255e55b8d7f1",
-    "examples": 1
+    "url": "https://ui.shadcn.com/r/styles/base-nova/sidebar-icon-example.json",
+    "sha256": "c51ecdc330cfe819fe8c309a598b311113272bc9eb878e3abc87e0bbb0243bea",
+    "examples": 0
   },
   {
     "name": "sidebar-inset",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/sidebar-inset-example.json",
-    "sha256": "9309354d1c23abc6a18520b84ae2f64b7e40131ff256e994add442c1cfcb8eed",
-    "examples": 1
+    "url": "https://ui.shadcn.com/r/styles/base-nova/sidebar-inset-example.json",
+    "sha256": "d564cd7cd39f03951040513b1457dfb71aca61a67be8e1f9f77aeadfd74e2eba",
+    "examples": 0
   },
   {
     "name": "skeleton",
@@ -331,14 +331,14 @@
   },
   {
     "name": "slider",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/slider-example.json",
-    "sha256": "b00c1bf4448233126729b523b06984a65377f3a8e9af5fbf88788b860fcd1a66",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/slider-example.json",
+    "sha256": "ca2d98db8c5808810518282f097fc7cf87c65f71efe8ad8dd7be4e6bc43d61e7",
     "examples": 6
   },
   {
     "name": "sonner",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/sonner-example.json",
-    "sha256": "2b1e09fb844aa4917748d9cdecf6c07bbf6b833a4e09692e294a64075866d054",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/sonner-example.json",
+    "sha256": "baa667e9fa769902b37e64c36b604bdaf16f213fb6617b1128af39766ca0d04f",
     "examples": 2
   },
   {
@@ -349,8 +349,8 @@
   },
   {
     "name": "switch",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/switch-example.json",
-    "sha256": "7f6c50e39fc3b3736683413a4f297285f10ee292cec953a4d233168018190de1",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/switch-example.json",
+    "sha256": "6098345cfe9f455d7e46a7f48920f2896f8e995131be3f0bed01699934fca36e",
     "examples": 5
   },
   {
@@ -361,8 +361,8 @@
   },
   {
     "name": "tabs",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/tabs-example.json",
-    "sha256": "12c635d6166c4db4d7255dff5aa68370b7d6b03881b64327c77a154785afe4ab",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/tabs-example.json",
+    "sha256": "0e189325a6f28f9fa0fec0086fd937c3e5e59a321ddc0d1f1df4c455dcd9441c",
     "examples": 13
   },
   {
@@ -373,20 +373,20 @@
   },
   {
     "name": "toggle",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/toggle-example.json",
-    "sha256": "612df74feda10da00f668aea7b0df0c8506c086b74729c0e3b0dbc4917a12ae7",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/toggle-example.json",
+    "sha256": "de6e77f8a0d4f8ed4b00c8ecb495a10a9aa30cfb924b36d10ec06dc760f0cee4",
     "examples": 8
   },
   {
     "name": "toggle-group",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/toggle-group-example.json",
-    "sha256": "320add84d46835e267519ef01ec7b8797c052a61807b5a1d33176d1fa006778f",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/toggle-group-example.json",
+    "sha256": "3c5574b6e214cd740ef18c689205bd1c9db89dedd2ba0252f61f5cbac6b35e66",
     "examples": 15
   },
   {
     "name": "tooltip",
-    "url": "https://ui.shadcn.com/r/styles/radix-nova/tooltip-example.json",
-    "sha256": "4be0818fa0156122f0209964e591317723a2cfe3633855a0c768366a51cad2b8",
+    "url": "https://ui.shadcn.com/r/styles/base-nova/tooltip-example.json",
+    "sha256": "c1bb7d02936176bfaca192db6b2425d358274139fb560f3ff85aba1e50e2598a",
     "examples": 8
   },
   {

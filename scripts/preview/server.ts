@@ -98,6 +98,11 @@ export function chatAt(id: string, frame: Frame, finished: boolean) {
     reason = "Waiting for your answer";
   }
   return {
+    pulls: {
+      items: finished ? (stories.find((s) => s.id === id)?.pulls ?? []) : [],
+      error: "",
+      checkedAt: epoch,
+    },
     ID: id,
     ProjectID: project.id,
     Title: scenario.title,
@@ -297,16 +302,7 @@ export function chatPreview(): Plugin {
         stale: false,
         error: "",
         pulls: {
-          items:
-            story && finished
-              ? [
-                  {
-                    ...story.pull,
-                    repository: repository.name,
-                    url: `${repository.url}/pull/${story.pull.number}`,
-                  },
-                ]
-              : [],
+          items: story && finished ? story.pulls : [],
           error: "",
           checkedAt: epoch,
         },

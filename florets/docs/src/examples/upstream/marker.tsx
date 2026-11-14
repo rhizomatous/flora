@@ -1,6 +1,6 @@
+// oxlint-disable jsx-a11y/control-has-associated-label -- Render elements receive their accessible content from the owning component.
 // oxlint-disable jsx-a11y/anchor-is-valid -- Placeholder links demonstrate component styling without navigating away.
 // oxlint-disable typescript/strict-void-return -- React ignores return values from these upstream event handlers.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/marker-example.json
 "use client";
 
 import {
@@ -75,30 +75,30 @@ function MarkerExample() {
       <Marker role="status">
         <MarkerContent className="shimmer">Thinking...</MarkerContent>
       </Marker>
-      <Marker asChild>
-        <a href="#">
-          <MarkerIcon>
-            <GitBranchIcon />
-          </MarkerIcon>
-          <MarkerContent>Marker as a link</MarkerContent>
-        </a>
+      <Marker render={<a href="#" />}>
+        <MarkerIcon>
+          <GitBranchIcon />
+        </MarkerIcon>
+        <MarkerContent>Marker as a link</MarkerContent>
       </Marker>
-      <Marker asChild>
-        <button
-          type="button"
-          onClick={() => toast("You clicked the button")}
-          className="transition-colors hover:text-foreground"
-        >
-          <MarkerIcon>
-            <ClockIcon />
-          </MarkerIcon>
-          <MarkerContent className="flex-1">
-            <div>Marker as a button</div>
-          </MarkerContent>
-          <MarkerIcon>
-            <ChevronRightIcon />
-          </MarkerIcon>
-        </button>
+      <Marker
+        render={
+          <button
+            type="button"
+            onClick={() => toast("You clicked the button")}
+            className="transition-colors hover:text-foreground"
+          />
+        }
+      >
+        <MarkerIcon>
+          <ClockIcon />
+        </MarkerIcon>
+        <MarkerContent className="flex-1">
+          <div>Marker as a button</div>
+        </MarkerContent>
+        <MarkerIcon>
+          <ChevronRightIcon />
+        </MarkerIcon>
       </Marker>
       <Marker>
         <MarkerIcon>
@@ -187,7 +187,7 @@ function MarkerSeparator() {
 function MarkerAccordion() {
   return (
     <Example title="Accordion" containerClassName="min-h-72">
-      <Accordion type="single" collapsible>
+      <Accordion>
         <AccordionItem value="1">
           <AccordionTrigger>
             <Marker>
@@ -212,13 +212,11 @@ function MarkerAccordion() {
 function MarkerDrawer() {
   return (
     <Example title="Drawer">
-      <Drawer direction="right">
+      <Drawer swipeDirection="right">
         <Marker variant="separator">
-          <DrawerTrigger asChild>
-            <Button variant="outline">
-              <SearchIcon data-icon="inline-start" />
-              Explored 4 files
-            </Button>
+          <DrawerTrigger render={<Button variant="outline" />}>
+            <SearchIcon data-icon="inline-start" />
+            Explored 4 files
           </DrawerTrigger>
         </Marker>
         <DrawerContent>
@@ -241,9 +239,7 @@ function MarkerDrawer() {
             </div>
           </div>
           <DrawerFooter>
-            <DrawerClose asChild>
-              <Button variant="outline">Close</Button>
-            </DrawerClose>
+            <DrawerClose render={<Button variant="outline" />}>Close</DrawerClose>
           </DrawerFooter>
         </DrawerContent>
       </Drawer>

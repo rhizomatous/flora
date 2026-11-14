@@ -1,14 +1,12 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/sidebar-example.json
+// oxlint-disable jsx-a11y/control-has-associated-label -- Render elements receive their accessible content from the owning component.
 "use client";
 
 import { CheckIcon, ChevronsUpDownIcon, SearchIcon } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@flora/florets/components/dropdown-menu";
@@ -169,7 +167,7 @@ export function Preview() {
     ],
   };
 
-  const [selectedVersion, setSelectedVersion] = React.useState(data.versions[0]);
+  const [selectedVersion, setSelectedVersion] = useState(data.versions[0]);
 
   return (
     <SidebarProvider>
@@ -178,36 +176,35 @@ export function Preview() {
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton
-                    size="lg"
-                    className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
-                  >
-                    <Item className="p-0" size="xs">
-                      <ItemContent>
-                        <ItemTitle className="text-sm">Documentation</ItemTitle>
-                        <ItemDescription>v{selectedVersion}</ItemDescription>
-                      </ItemContent>
-                      <ItemActions>
-                        <ChevronsUpDownIcon />
-                      </ItemActions>
-                    </Item>
-                  </SidebarMenuButton>
+                <DropdownMenuTrigger
+                  render={
+                    <SidebarMenuButton
+                      size="lg"
+                      className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
+                    />
+                  }
+                >
+                  <Item className="p-0" size="xs">
+                    <ItemContent>
+                      <ItemTitle className="text-sm">Documentation</ItemTitle>
+                      <ItemDescription>v{selectedVersion}</ItemDescription>
+                    </ItemContent>
+                    <ItemActions>
+                      <ChevronsUpDownIcon />
+                    </ItemActions>
+                  </Item>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  <DropdownMenuGroup>
-                    {data.versions.map((version) => (
-                      <DropdownMenuItem
-                        key={version}
-                        onSelect={() => {
-                          setSelectedVersion(version);
-                        }}
-                      >
-                        v{version}{" "}
-                        {version === selectedVersion && <CheckIcon className="ml-auto" />}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuGroup>
+                  {data.versions.map((version) => (
+                    <DropdownMenuItem
+                      key={version}
+                      onSelect={() => {
+                        setSelectedVersion(version);
+                      }}
+                    >
+                      v{version} {version === selectedVersion && <CheckIcon className="ml-auto" />}
+                    </DropdownMenuItem>
+                  ))}
                 </DropdownMenuContent>
               </DropdownMenu>
             </SidebarMenuItem>
@@ -232,8 +229,11 @@ export function Preview() {
                 <SidebarMenu>
                   {item.items.map((subItem) => (
                     <SidebarMenuItem key={subItem.title}>
-                      <SidebarMenuButton asChild isActive={subItem.isActive ?? false}>
-                        <a href={subItem.url}>{subItem.title}</a>
+                      <SidebarMenuButton
+                        render={<a href={subItem.url} />}
+                        isActive={subItem.isActive ?? false}
+                      >
+                        {subItem.title}
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
@@ -245,7 +245,7 @@ export function Preview() {
         <SidebarRail />
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <header className="flex h-16 shrink-0 items-center gap-2 px-4">
           <SidebarTrigger className="-ml-1" />
         </header>
         <div className="flex flex-1 flex-col gap-4 p-4">

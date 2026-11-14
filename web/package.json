@@ -19,7 +19,7 @@
       "build": {
         "cache": true,
         "inputs": [
-          "frontend"
+          "webBuild"
         ],
         "outputs": [
           "{workspaceRoot}/backend/internal/webassets/dist"

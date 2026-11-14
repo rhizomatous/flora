@@ -8,11 +8,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuLabel,
   GearIcon,
   SpeakerLoudIcon,
   ExitIcon,
   ChevronUpIcon,
+  ClockIcon,
+  MonitorIcon,
+  CompassIcon,
+  UsersIcon,
+  FolderIcon,
 } from "@flora/florets";
 
 /** Keeps installation actions in one menu; sound activation stays inside the user's gesture. */
@@ -35,52 +39,59 @@ export function WorkspaceMenu({
   }
   return (
     <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <SidebarMenuButton size="lg" aria-label="Workspace menu">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-            <FlowerMark className="text-2xl" />
-          </span>
-          <span className="min-w-0 flex-1 text-left">
-            <span className="block">Flora</span>
-          </span>
-          <ChevronUpIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-        </SidebarMenuButton>
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger
+        render={
+          <SidebarMenuButton size="lg" aria-label="Workspace menu">
+            <span className="flex size-7 shrink-0 items-center justify-center">
+              <FlowerMark className="text-2xl" />
+            </span>
+            <span className="min-w-0 flex-1 text-left">
+              <span className="block">Flora</span>
+              <span className="block text-xs text-muted-foreground">Workspace</span>
+            </span>
+            <ChevronUpIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+          </SidebarMenuButton>
+        }
+      />
       <DropdownMenuContent
         side="top"
         align="start"
-        className="w-[var(--radix-dropdown-menu-trigger-width)]"
-        onCloseAutoFocus={(event) => {
-          if (navigated.current) event.preventDefault();
+        className="w-[var(--anchor-width)]"
+        finalFocus={() => {
+          const restore = !navigated.current;
           navigated.current = false;
+          return restore;
         }}
       >
         <DropdownMenuItem
-          asChild
-          onSelect={() => {
+          render={
+            <a href="#settings">
+              <GearIcon aria-hidden="true" />
+              Settings
+            </a>
+          }
+          nativeButton={false}
+          onClick={() => {
             navigated.current = window.location.hash !== "#settings";
           }}
-        >
-          <a href="#settings">
-            <GearIcon aria-hidden="true" />
-            Settings
-          </a>
-        </DropdownMenuItem>
+        />
         <DropdownMenuItem
-          asChild
-          onSelect={() => {
+          render={
+            <a href="#projects">
+              <FolderIcon aria-hidden="true" />
+              Project settings
+            </a>
+          }
+          nativeButton={false}
+          onClick={() => {
             navigated.current = window.location.hash !== "#projects";
           }}
-        >
-          <a href="#projects">
-            <GearIcon aria-hidden="true" />
-            Project settings
-          </a>
-        </DropdownMenuItem>
+        />
         {sound && (
           <DropdownMenuItem
+            closeOnClick={false}
             disabled={audio.ready}
-            onSelect={(event) => {
+            onClick={(event) => {
               event.preventDefault();
               void enableSound();
             }}
@@ -90,13 +101,29 @@ export function WorkspaceMenu({
           </DropdownMenuItem>
         )}
         {sound && attemptedSound && !audio.ready && (
-          <DropdownMenuLabel role="status">
+          <p role="status" className="px-2 py-1 text-xs text-muted-foreground">
             Allow sound or autoplay in your browser, then try again. Completion toasts still appear.
             Missed sounds are not replayed.
-          </DropdownMenuLabel>
+          </p>
         )}
+        <DropdownMenuItem disabled>
+          <ClockIcon />
+          Usage
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled>
+          <MonitorIcon />
+          Open desktop app
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled>
+          <CompassIcon />
+          Appearance
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled>
+          <UsersIcon />
+          Switch workspace
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled={busy} onSelect={onLogout}>
+        <DropdownMenuItem variant="destructive" disabled={busy} onClick={onLogout}>
           <ExitIcon aria-hidden="true" />
           Log out
         </DropdownMenuItem>

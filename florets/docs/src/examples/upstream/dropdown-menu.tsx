@@ -1,8 +1,7 @@
-// oxlint-disable import/no-namespace -- The upstream examples group React and chart APIs in namespaces.
-// Adapted from https://ui.shadcn.com/r/styles/radix-nova/dropdown-menu-example.json
 "use client";
 
 import {
+  CloudIcon,
   ActivityIcon,
   ArchiveIcon,
   ArrowDownIcon,
@@ -31,7 +30,7 @@ import {
   UsersIcon,
   WalletIcon,
 } from "lucide-react";
-import * as React from "react";
+import { useState } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@flora/florets/components/avatar";
 import { Button } from "@flora/florets/components/button";
@@ -43,6 +42,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@flora/florets/components/dialog";
+import { DropdownButton } from "@flora/florets/components/dropdown-button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -66,8 +66,10 @@ import { Example, ExampleWrapper } from "../example";
 export function Preview() {
   return (
     <ExampleWrapper>
+      <DropdownTriggerStyles />
       <DropdownMenuBasic />
       <DropdownMenuComplex />
+      <DropdownMenuSides />
       <DropdownMenuWithIcons />
       <DropdownMenuWithShortcuts />
       <DropdownMenuWithSubmenu />
@@ -87,10 +89,8 @@ function DropdownMenuBasic() {
   return (
     <Example title="Basic">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="w-fit">
-            Open
-          </Button>
+        <DropdownMenuTrigger render={<Button variant="outline" className="w-fit" />}>
+          Open
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuGroup>
@@ -100,13 +100,34 @@ function DropdownMenuBasic() {
             <DropdownMenuItem>Settings</DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuItem>GitHub</DropdownMenuItem>
-            <DropdownMenuItem disabled>API</DropdownMenuItem>
-            <DropdownMenuItem>Support</DropdownMenuItem>
-          </DropdownMenuGroup>
+          <DropdownMenuItem>GitHub</DropdownMenuItem>
+          <DropdownMenuItem>Support</DropdownMenuItem>
+          <DropdownMenuItem disabled>API</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+    </Example>
+  );
+}
+
+function DropdownMenuSides() {
+  return (
+    <Example title="Sides" containerClassName="col-span-2">
+      <div className="flex flex-wrap justify-center gap-2">
+        {(["inline-start", "left", "top", "bottom", "right", "inline-end"] as const).map((side) => (
+          <DropdownMenu key={side}>
+            <DropdownMenuTrigger render={<Button variant="outline" className="w-fit capitalize" />}>
+              {side.replace("-", " ")}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side={side}>
+              <DropdownMenuGroup>
+                <DropdownMenuItem>Profile</DropdownMenuItem>
+                <DropdownMenuItem>Billing</DropdownMenuItem>
+                <DropdownMenuItem>Settings</DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ))}
+      </div>
     </Example>
   );
 }
@@ -115,33 +136,27 @@ function DropdownMenuWithIcons() {
   return (
     <Example title="With Icons">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="w-fit">
-            Open
-          </Button>
+        <DropdownMenuTrigger render={<Button variant="outline" className="w-fit" />}>
+          Open
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          <DropdownMenuGroup>
-            <DropdownMenuItem>
-              <UserIcon />
-              Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <CreditCardIcon />
-              Billing
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <SettingsIcon />
-              Settings
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
+          <DropdownMenuItem>
+            <UserIcon />
+            Profile
+          </DropdownMenuItem>
+          <DropdownMenuItem>
+            <CreditCardIcon />
+            Billing
+          </DropdownMenuItem>
+          <DropdownMenuItem>
+            <SettingsIcon />
+            Settings
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuItem variant="destructive">
-              <LogOutIcon />
-              Log out
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
+          <DropdownMenuItem variant="destructive">
+            <LogOutIcon />
+            Log out
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </Example>
@@ -152,10 +167,8 @@ function DropdownMenuWithShortcuts() {
   return (
     <Example title="With Shortcuts">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="w-fit">
-            Open
-          </Button>
+        <DropdownMenuTrigger render={<Button variant="outline" className="w-fit" />}>
+          Open
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuGroup>
@@ -173,17 +186,15 @@ function DropdownMenuWithShortcuts() {
               <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem>
-              Shortcuts
+              Keyboard shortcuts
               <DropdownMenuShortcut>⌘K</DropdownMenuShortcut>
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuItem>
-              Log out
-              <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
+          <DropdownMenuItem>
+            Log out
+            <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </Example>
@@ -194,10 +205,8 @@ function DropdownMenuWithSubmenu() {
   return (
     <Example title="With Submenu">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="w-fit">
-            Open
-          </Button>
+        <DropdownMenuTrigger render={<Button variant="outline" className="w-fit" />}>
+          Open
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuGroup>
@@ -206,14 +215,10 @@ function DropdownMenuWithSubmenu() {
               <DropdownMenuSubTrigger>Invite users</DropdownMenuSubTrigger>
               <DropdownMenuPortal>
                 <DropdownMenuSubContent>
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem>Email</DropdownMenuItem>
-                    <DropdownMenuItem>Message</DropdownMenuItem>
-                  </DropdownMenuGroup>
+                  <DropdownMenuItem>Email</DropdownMenuItem>
+                  <DropdownMenuItem>Message</DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem>More...</DropdownMenuItem>
-                  </DropdownMenuGroup>
+                  <DropdownMenuItem>More...</DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuPortal>
             </DropdownMenuSub>
@@ -229,17 +234,15 @@ function DropdownMenuWithSubmenu() {
 }
 
 function DropdownMenuWithCheckboxes() {
-  const [showStatusBar, setShowStatusBar] = React.useState(true);
-  const [showActivityBar, setShowActivityBar] = React.useState(false);
-  const [showPanel, setShowPanel] = React.useState(false);
+  const [showStatusBar, setShowStatusBar] = useState(true);
+  const [showActivityBar, setShowActivityBar] = useState(false);
+  const [showPanel, setShowPanel] = useState(false);
 
   return (
     <Example title="With Checkboxes">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="w-fit">
-            Checkboxes
-          </Button>
+        <DropdownMenuTrigger render={<Button variant="outline" className="w-fit" />}>
+          Checkboxes
         </DropdownMenuTrigger>
         <DropdownMenuContent className="min-w-40">
           <DropdownMenuGroup>
@@ -268,15 +271,13 @@ function DropdownMenuWithCheckboxes() {
 }
 
 function DropdownMenuWithRadio() {
-  const [position, setPosition] = React.useState("bottom");
+  const [position, setPosition] = useState("bottom");
 
   return (
     <Example title="With Radio Group">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="w-fit">
-            Radio Group
-          </Button>
+        <DropdownMenuTrigger render={<Button variant="outline" className="w-fit" />}>
+          Radio Group
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuGroup>
@@ -303,7 +304,7 @@ function DropdownMenuWithRadio() {
 }
 
 function DropdownMenuWithCheckboxesIcons() {
-  const [notifications, setNotifications] = React.useState({
+  const [notifications, setNotifications] = useState({
     email: true,
     sms: false,
     push: true,
@@ -312,10 +313,8 @@ function DropdownMenuWithCheckboxesIcons() {
   return (
     <Example title="Checkboxes with Icons">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="w-fit">
-            Notifications
-          </Button>
+        <DropdownMenuTrigger render={<Button variant="outline" className="w-fit" />}>
+          Notifications
         </DropdownMenuTrigger>
         <DropdownMenuContent className="min-w-56">
           <DropdownMenuGroup>
@@ -355,13 +354,13 @@ function DropdownMenuWithCheckboxesIcons() {
 }
 
 function DropdownMenuWithRadioIcons() {
-  const [paymentMethod, setPaymentMethod] = React.useState("card");
+  const [paymentMethod, setPaymentMethod] = useState("card");
 
   return (
     <Example title="Radio with Icons">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline">Payment Method</Button>
+        <DropdownMenuTrigger render={<Button variant="outline" className="w-fit" />}>
+          Payment Method
         </DropdownMenuTrigger>
         <DropdownMenuContent className="min-w-56">
           <DropdownMenuGroup>
@@ -391,33 +390,27 @@ function DropdownMenuWithDestructive() {
   return (
     <Example title="With Destructive Items">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="w-fit">
-            Actions
-          </Button>
+        <DropdownMenuTrigger render={<Button variant="outline" className="w-fit" />}>
+          Actions
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          <DropdownMenuGroup>
-            <DropdownMenuItem>
-              <PencilIcon />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <ShareIcon />
-              Share
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
+          <DropdownMenuItem>
+            <PencilIcon />
+            Edit
+          </DropdownMenuItem>
+          <DropdownMenuItem>
+            <ShareIcon />
+            Share
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuItem>
-              <ArchiveIcon />
-              Archive
-            </DropdownMenuItem>
-            <DropdownMenuItem variant="destructive">
-              <TrashIcon />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
+          <DropdownMenuItem>
+            <ArchiveIcon />
+            Archive
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="destructive">
+            <TrashIcon />
+            Delete
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </Example>
@@ -442,12 +435,10 @@ function DropdownMenuWithAvatar() {
         </DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
-      <DropdownMenuGroup>
-        <DropdownMenuItem>
-          <LogOutIcon />
-          Sign Out
-        </DropdownMenuItem>
-      </DropdownMenuGroup>
+      <DropdownMenuItem>
+        <LogOutIcon />
+        Sign Out
+      </DropdownMenuItem>
     </>
   );
 
@@ -455,34 +446,36 @@ function DropdownMenuWithAvatar() {
     <Example title="With Avatar">
       <div className="flex items-center justify-between gap-4">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              className="style-sera:font-normal style-sera:tracking-normal style-sera:normal-case h-12 justify-start px-2 md:max-w-[200px]"
-            >
-              <Avatar>
-                <AvatarImage src="https://github.com/shadcn.png" alt="Shadcn" />
-                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
-              </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">shadcn</span>
-                <span className="truncate text-xs text-muted-foreground">shadcn@example.com</span>
-              </div>
-              <ChevronsUpDownIcon className="ml-auto text-muted-foreground" />
-            </Button>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="outline"
+                className="style-sera:font-normal style-sera:tracking-normal style-sera:normal-case h-12 justify-start px-2 md:max-w-[200px]"
+              />
+            }
+          >
+            <Avatar>
+              <AvatarImage src="https://github.com/shadcn.png" alt="Shadcn" />
+              <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+            </Avatar>
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="truncate font-semibold">shadcn</span>
+              <span className="truncate text-xs text-muted-foreground">shadcn@example.com</span>
+            </div>
+            <ChevronsUpDownIcon className="ml-auto text-muted-foreground" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-(--radix-dropdown-menu-trigger-width) min-w-56">
+          <DropdownMenuContent className="w-(--anchor-width) min-w-56">
             {menuContent}
           </DropdownMenuContent>
         </DropdownMenu>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <Avatar>
-                <AvatarImage src="https://github.com/shadcn.png" alt="shadcn" />
-                <AvatarFallback>LR</AvatarFallback>
-              </Avatar>
-            </Button>
+          <DropdownMenuTrigger
+            render={<Button variant="ghost" size="icon" className="rounded-full" />}
+          >
+            <Avatar>
+              <AvatarImage src="https://github.com/shadcn.png" alt="shadcn" />
+              <AvatarFallback>LR</AvatarFallback>
+            </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="top">
             {menuContent}
@@ -497,59 +490,47 @@ function DropdownMenuInDialog() {
   return (
     <Example title="In Dialog">
       <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline">Open Dialog</Button>
-        </DialogTrigger>
+        <DialogTrigger render={<Button variant="outline" />}>Open Dialog</DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Dropdown Menu Example</DialogTitle>
             <DialogDescription>Click the button below to see the dropdown menu.</DialogDescription>
           </DialogHeader>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="w-fit">
-                Open Menu
-              </Button>
+            <DropdownMenuTrigger render={<Button variant="outline" className="w-fit" />}>
+              Open Menu
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuGroup>
-                <DropdownMenuItem>
-                  <CopyIcon />
-                  Copy
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <ScissorsIcon />
-                  Cut
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <ClipboardPasteIcon />
-                  Paste
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
+              <DropdownMenuItem>
+                <CopyIcon />
+                Copy
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <ScissorsIcon />
+                Cut
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <ClipboardPasteIcon />
+                Paste
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>More Options</DropdownMenuSubTrigger>
                 <DropdownMenuPortal>
                   <DropdownMenuSubContent>
-                    <DropdownMenuGroup>
-                      <DropdownMenuItem>Save Page...</DropdownMenuItem>
-                      <DropdownMenuItem>Create Shortcut...</DropdownMenuItem>
-                      <DropdownMenuItem>Name Window...</DropdownMenuItem>
-                    </DropdownMenuGroup>
+                    <DropdownMenuItem>Save Page...</DropdownMenuItem>
+                    <DropdownMenuItem>Create Shortcut...</DropdownMenuItem>
+                    <DropdownMenuItem>Name Window...</DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuGroup>
-                      <DropdownMenuItem>Developer Tools</DropdownMenuItem>
-                    </DropdownMenuGroup>
+                    <DropdownMenuItem>Developer Tools</DropdownMenuItem>
                   </DropdownMenuSubContent>
                 </DropdownMenuPortal>
               </DropdownMenuSub>
               <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem variant="destructive">
-                  <TrashIcon />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
+              <DropdownMenuItem variant="destructive">
+                <TrashIcon />
+                Delete
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </DialogContent>
@@ -559,17 +540,15 @@ function DropdownMenuInDialog() {
 }
 
 function DropdownMenuWithInset() {
-  const [showBookmarks, setShowBookmarks] = React.useState(true);
-  const [showUrls, setShowUrls] = React.useState(false);
-  const [theme, setTheme] = React.useState("system");
+  const [showBookmarks, setShowBookmarks] = useState(true);
+  const [showUrls, setShowUrls] = useState(false);
+  const [theme, setTheme] = useState("system");
 
   return (
     <Example title="With Inset">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="w-fit">
-            Open
-          </Button>
+        <DropdownMenuTrigger render={<Button variant="outline" className="w-fit" />}>
+          Open
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-44">
           <DropdownMenuGroup>
@@ -632,16 +611,14 @@ function DropdownMenuWithInset() {
 }
 
 function DropdownMenuComplex() {
-  const [showSidebar, setShowSidebar] = React.useState(true);
-  const [showStatusBar, setShowStatusBar] = React.useState(false);
+  const [showSidebar, setShowSidebar] = useState(true);
+  const [showStatusBar, setShowStatusBar] = useState(false);
 
   return (
     <Example title="Complex">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="w-fit">
-            Complex Menu
-          </Button>
+        <DropdownMenuTrigger render={<Button variant="outline" className="w-fit" />}>
+          Complex Menu
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56">
           <DropdownMenuGroup>
@@ -718,6 +695,42 @@ function DropdownMenuComplex() {
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
+    </Example>
+  );
+}
+
+function DropdownTriggerStyles() {
+  return (
+    <Example title="Trigger styles">
+      <div className="flex flex-wrap gap-3">
+        {(["primary", "secondary", "ghost", "tertiary"] as const).map((variant) => (
+          <DropdownMenu key={variant}>
+            <DropdownMenuTrigger
+              render={
+                <DropdownButton variant={variant}>
+                  <CloudIcon />
+                  {variant}
+                </DropdownButton>
+              }
+            />
+            <DropdownMenuContent className="w-60">
+              <DropdownMenuItem>
+                <CloudIcon />
+                Cloud
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <SettingsIcon />
+                Environment settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled>
+                <PlusCircleIcon />
+                Add environment
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ))}
+      </div>
     </Example>
   );
 }

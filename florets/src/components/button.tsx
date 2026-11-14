@@ -1,6 +1,6 @@
+// oxlint-disable react/only-export-components -- Styling variants are part of the component API.
+import { Button as ButtonPrimitive } from "@base-ui/react/button";
 import { cva, type VariantProps } from "class-variance-authority";
-import { Slot } from "radix-ui";
-import type { ComponentProps } from "react";
 
 import { cn } from "../lib/utils";
 
@@ -9,18 +9,21 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        primary: "florets-button-primary",
+        tertiary: "florets-button-tertiary",
         default: "bg-primary text-primary-foreground hover:bg-primary/80",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
-        ghost:
-          "hover:bg-muted hover:text-foreground dark:hover:bg-muted/50 aria-expanded:bg-muted aria-expanded:text-foreground",
+        ghost: "florets-button-ghost",
         destructive:
-          "bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/20 text-destructive focus-visible:border-destructive/40 dark:hover:bg-destructive/30",
+          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
+        compact: "florets-compact-control",
+        "icon-compact": "florets-compact-control florets-compact-icon",
         default:
           "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
         xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
@@ -45,16 +48,10 @@ function Button({
   className,
   variant = "default",
   size = "default",
-  asChild = false,
   ...props
-}: ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean;
-  }) {
-  const Comp = asChild ? Slot.Root : "button";
-
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
   return (
-    <Comp
+    <ButtonPrimitive
       data-slot="button"
       data-variant={variant}
       data-size={size}
@@ -64,5 +61,4 @@ function Button({
   );
 }
 
-// oxlint-disable-next-line react/only-export-components -- The public styling function is part of the upstream component API.
 export { Button, buttonVariants };

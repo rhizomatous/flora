@@ -1,6 +1,6 @@
+import { mergeProps } from "@base-ui/react/merge-props";
+import { useRender } from "@base-ui/react/use-render";
 import { ChevronRightIcon, MoreHorizontalIcon } from "lucide-react";
-import { Slot } from "radix-ui";
-// oxlint-disable typescript/strict-boolean-expressions -- The upstream component uses truthiness for optional props and React children.
 import type { ComponentProps } from "react";
 
 import { cn } from "../lib/utils";
@@ -34,22 +34,20 @@ function BreadcrumbItem({ className, ...props }: ComponentProps<"li">) {
   );
 }
 
-function BreadcrumbLink({
-  asChild,
-  className,
-  ...props
-}: ComponentProps<"a"> & {
-  asChild?: boolean;
-}) {
-  const Comp = asChild ? Slot.Root : "a";
-
-  return (
-    <Comp
-      data-slot="breadcrumb-link"
-      className={cn("transition-colors hover:text-foreground", className)}
-      {...props}
-    />
-  );
+function BreadcrumbLink({ className, render, ...props }: useRender.ComponentProps<"a">) {
+  return useRender({
+    defaultTagName: "a",
+    props: mergeProps<"a">(
+      {
+        className: cn("transition-colors hover:text-foreground", className),
+      },
+      props,
+    ),
+    render,
+    state: {
+      slot: "breadcrumb-link",
+    },
+  });
 }
 
 function BreadcrumbPage({ className, ...props }: ComponentProps<"span">) {
@@ -74,7 +72,7 @@ function BreadcrumbSeparator({ children, className, ...props }: ComponentProps<"
       className={cn("[&>svg]:size-3.5", className)}
       {...props}
     >
-      {children ?? <ChevronRightIcon className="cn-rtl-flip" />}
+      {children ?? <ChevronRightIcon className="florets-rtl-flip" />}
     </li>
   );
 }
