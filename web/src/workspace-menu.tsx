@@ -13,9 +13,6 @@ import {
   ExitIcon,
   ChevronUpIcon,
   ClockIcon,
-  MonitorIcon,
-  CompassIcon,
-  UsersIcon,
   FolderIcon,
 } from "@flora/florets";
 
@@ -109,18 +106,6 @@ export function WorkspaceMenu({
         <DropdownMenuItem disabled>
           <ClockIcon />
           Usage
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled>
-          <MonitorIcon />
-          Open desktop app
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled>
-          <CompassIcon />
-          Appearance
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled>
-          <UsersIcon />
-          Switch workspace
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" disabled={busy} onClick={onLogout}>
