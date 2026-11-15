@@ -100,7 +100,7 @@ func TestDurableRecordsAndImmutableSnapshot(t *testing.T) {
 	wantError(t, s.RecordStartingCommit(ctx, c.ID, "unknown", sha), ErrInvalid)
 	accepted, err := s.AcceptMessage(ctx, c.ID, "request-1", "Please fix this ✿")
 	must(t, err)
-	runtime := Message{ChatID: c.ID, RuntimeMessageID: "runtime-message-1", Role: "assistant", Text: "Done", Provider: "anthropic", Model: "claude-sonnet-4-6", Payload: json.RawMessage(`{"parts":[{"type":"tool","output":"full output"}]}`)}
+	runtime := Message{ChatID: c.ID, RuntimeMessageID: "runtime-message-1", Role: "assistant", Text: "Done", Provider: "anthropic", Model: "claude-sonnet-4-6", Payload: json.RawMessage(`{"info":{"cost":0.0123},"parts":[{"type":"tool","output":"full output"},{"id":"step-1","type":"step-finish","cost":0.0123,"tokens":{"input":123,"output":45,"reasoning":6,"cache":{"read":78,"write":9}}}]}`)}
 	must(t, s.SaveRuntimeMessage(ctx, "runtime-event-1", runtime))
 	must(t, s.AppendActivity(ctx, c.ID, "question-1", "question", json.RawMessage(`{"request_id":"question-local-only"}`)))
 	must(t, s.Transition(ctx, c.ID, accepted.Message.ID, Waiting, "Runtime requested input"))
@@ -371,7 +371,7 @@ func TestActivityPagingAndRuntimeUpdates(t *testing.T) {
 	wantError(t, s.SaveRuntimeMessage(ctx, "update-2", old), ErrConflict)
 	messages, err := s.Messages(ctx, c.ID)
 	must(t, err)
-	if len(messages) != 1 || messages[0].Text != "complete" {
+	if len(messages) != 1 || messages[0].Text != "complete" || string(messages[0].Payload) != string(m.Payload) {
 		t.Fatal("runtime update lost or duplicated")
 	}
 	payload := json.RawMessage(`{"output":"all command output"}`)
@@ -401,12 +401,14 @@ func TestActivityPagingAndRuntimeUpdates(t *testing.T) {
 	_, err = s.db.ExecContext(ctx, `CREATE TRIGGER fail_runtime BEFORE INSERT ON activity WHEN NEW.kind='message.runtime' BEGIN SELECT RAISE(ABORT,'injected'); END`)
 	must(t, err)
 	m.Text = "should roll back"
+	committedPayload := string(m.Payload)
+	m.Payload = json.RawMessage(`{"parts":[],"info":{"cost":99}}`)
 	if err := s.SaveRuntimeMessage(ctx, "update-3", m); err == nil {
 		t.Fatal("expected injected failure")
 	}
 	messages, err = s.Messages(ctx, c.ID)
 	must(t, err)
-	if messages[0].Text != "complete" {
+	if messages[0].Text != "complete" || string(messages[0].Payload) != committedPayload {
 		t.Fatal("runtime message survived failed activity write")
 	}
 }
