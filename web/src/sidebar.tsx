@@ -13,11 +13,8 @@ import {
   SearchIcon,
   SquarePenIcon,
   ListIcon,
-  CircleDotIcon,
   GitPullRequestIcon,
   Repeat2Icon,
-  CompassIcon,
-  EllipsisIcon,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
@@ -203,19 +200,12 @@ export function Sidebar({
                   isActive={path === "pulls"}
                 />
               </SidebarMenuItem>
-              {[
-                { label: "Issues", icon: <CircleDotIcon /> },
-                { label: "Automations", icon: <Repeat2Icon /> },
-                { label: "Explore", icon: <CompassIcon /> },
-                { label: "More", icon: <EllipsisIcon /> },
-              ].map(({ label, icon }) => (
-                <SidebarMenuItem key={label}>
-                  <SidebarMenuButton disabled title={`${label} (coming soon)`}>
-                    {icon}
-                    <span>{label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton disabled title="Automations (coming soon)">
+                  <Repeat2Icon />
+                  <span>Automations</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarHeader>
           <SidebarContent className="scroll-fade-y">

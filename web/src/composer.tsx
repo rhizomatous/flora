@@ -15,7 +15,6 @@ import {
   InputGroupAddon,
   ArrowUpIcon,
   GitPullRequestIcon,
-  KeyRoundIcon,
   MicIcon,
   PaperclipIcon,
   PlusIcon,
@@ -177,7 +176,6 @@ export function Composer({
           iconOnly
           items={[
             { label: "Upload attachment", icon: <PaperclipIcon /> },
-            { label: "Environment variables", icon: <KeyRoundIcon /> },
             { label: "People", icon: <UsersIcon />, separator: true },
             { label: "Threads", icon: <MessageSquareIcon /> },
             { label: "Pull requests", icon: <GitPullRequestIcon /> },

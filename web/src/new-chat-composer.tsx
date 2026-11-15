@@ -7,19 +7,15 @@ import {
   PopoverTrigger,
   PopoverContent,
   CheckIcon,
-  CloudIcon,
   DatabaseIcon,
-  FolderIcon,
   GitBranchIcon,
   GlobeIcon,
   InboxIcon,
   KeyRoundIcon,
-  PinIcon,
   PlusIcon,
   PuzzleIcon,
   Settings2Icon,
   SlidersHorizontalIcon,
-  TagIcon,
   TerminalIcon,
 } from "@flora/florets";
 
@@ -123,17 +119,6 @@ export function NewChatComposer({
             </div>
           </PopoverContent>
         </Popover>
-        <PlaceholderMenu
-          variant="tertiary"
-          label="Execution environment"
-          items={[
-            { label: "Cloud", icon: <CloudIcon /> },
-            { label: "Machine status unavailable", icon: <DatabaseIcon /> },
-          ]}
-        >
-          <CloudIcon />
-          <span className="florets-control-label">Cloud</span>
-        </PlaceholderMenu>
         <Button
           type="button"
           variant="tertiary"
@@ -169,13 +154,9 @@ export function NewChatComposer({
             iconOnly
             items={[
               { label: "Access", icon: <GlobeIcon /> },
-              { label: "Machine size", icon: <DatabaseIcon />, detail: "Default", separator: true },
               { label: "Setup and snapshots", icon: <TerminalIcon />, separator: true },
               { label: "Environment variables", icon: <KeyRoundIcon /> },
               { label: "MCP servers", icon: <PuzzleIcon /> },
-              { label: "Pin", icon: <PinIcon />, separator: true },
-              { label: "Folder", icon: <FolderIcon /> },
-              { label: "Tags", icon: <TagIcon /> },
             ]}
           >
             <SlidersHorizontalIcon />

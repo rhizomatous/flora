@@ -1,18 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import {
-  Share2Icon,
-  CrownIcon,
   PencilIcon,
-  RefreshCwIcon,
-  GitForkIcon,
-  HashIcon,
-  MailIcon,
   ArchiveIcon,
   Trash2Icon,
   PinIcon,
   FolderIcon,
-  TagIcon,
   HoverCard,
   HoverCardTrigger,
   HoverCardContent,
@@ -213,10 +206,6 @@ export function ChatHeaderActions() {
           align="end"
           className="composer-menu max-h-[70dvh] w-[260px]! max-w-[calc(100vw-24px)] overflow-y-auto [&_[role=menuitem]]:whitespace-nowrap"
         >
-          <DropdownMenuItem disabled>
-            <Share2Icon />
-            Share
-          </DropdownMenuItem>
           <DropdownMenuItem
             render={
               <a href={window.location.hash} target="_blank" rel="noreferrer">
@@ -229,10 +218,7 @@ export function ChatHeaderActions() {
           {[
             { label: "Pin", icon: <PinIcon /> },
             { label: "Move to", icon: <FolderIcon /> },
-            { label: "Tags", icon: <TagIcon /> },
-            { label: "Promote to Captain", icon: <CrownIcon /> },
             { label: "Rename", icon: <PencilIcon /> },
-            { label: "Regenerate title", icon: <RefreshCwIcon /> },
           ].map(({ label, icon }) => (
             <DropdownMenuItem key={label} disabled>
               {icon}
@@ -247,22 +233,7 @@ export function ChatHeaderActions() {
             <CopyIcon />
             {copyState}
           </DropdownMenuItem>
-          {[
-            { label: "Fork", icon: <GitForkIcon /> },
-            { label: "Device access", icon: <MonitorIcon /> },
-            { label: "Slack", icon: <HashIcon /> },
-            { label: "Make an automation", icon: <ClockIcon /> },
-          ].map(({ label, icon }) => (
-            <DropdownMenuItem key={label} disabled>
-              {icon}
-              {label}
-            </DropdownMenuItem>
-          ))}
           <DropdownMenuSeparator />
-          <DropdownMenuItem disabled>
-            <MailIcon />
-            Mark as unread
-          </DropdownMenuItem>
           <DropdownMenuItem disabled>
             <ArchiveIcon />
             Archive
