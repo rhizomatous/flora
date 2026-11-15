@@ -89,6 +89,9 @@
   place-items: center;
   color: var(--muted-foreground);
 }
+.florets-navigation-icon.sidebar-status > span {
+  translate: 0 1px;
+}
 .sidebar-status[data-tone="attention"] {
   color: #39745b;
 }
