@@ -40,7 +40,7 @@ The menus open, but their unfinished actions are disabled. Default model, reason
 
 ### Disconnected placeholders
 
-- [ ] PR review: expose in-app changes review and CI checks from the linked PR UI. The earlier disabled Review changes, Checks, and Open pull request buttons have been replaced by linked PR lists; opening a PR on GitHub is connected.
+- [ ] PR review: expose in-app changes review and CI checks from the linked PR UI.
 - [ ] Terminals: list active shells, open a terminal, and reflect their count in the summary strip.
 - [ ] Runtime: report actual machine size, CPU, memory, disk, awake/asleep state, and wake controls. The neutral dot does not report machine health.
 - [ ] Context: report usage, limits, system prompt, native tools, rules, codemode catalog, environment, and conversation breakdown; implement compaction thresholds. Unknown values are shown as dashes.
@@ -86,14 +86,3 @@ Attachment/context, model, reasoning, slash-command, and voice placeholders list
 - [ ] Workspace identity: replace the generic Flora/Workspace footer with saved identity and avatar data when available.
 
 Sidebar actions that are not connected are disabled; timestamps and statuses come from the saved chat feed.
-
-## Removed from the current UI
-
-These controls were removed rather than implemented and no longer need wiring in their former menus:
-
-- Main sidebar: Issues, Explore, and More.
-- Workspace menu: Open desktop app, Appearance, and Switch workspace.
-- New-chat top controls: Cloud selector. Existing chats still have a Cloud menu with Stop container; runtime telemetry and wake controls remain unfinished above.
-- Attachment menu: Environment variables. Environment variables remains planned in Chat settings.
-- Chat settings: Machine size, Pin, Folder, and Tags. Pinning and folders remain unfinished in the sidebar and chat action menu.
-- Chat action menu: Share, Tags, Promote to Captain, Regenerate title, Fork, Device access, Slack, Make an automation, and Mark as unread.
