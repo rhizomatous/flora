@@ -46,6 +46,8 @@ The menus open, but their unfinished actions are disabled. Default model, reason
 - [ ] Context: report usage, limits, system prompt, native tools, rules, codemode catalog, environment, and conversation breakdown; implement compaction thresholds. Unknown values are shown as dashes.
 - [ ] Title summary: connect actual model details. Model information is still unavailable.
 - [ ] Cost: report actual spend instead of the unavailable dash.
+- [ ] Subagent capture: discover child sessions, persist their messages and activity, recover after reconnects and restarts, and attribute their usage to the parent chat without double-counting.
+- [ ] Subagent UI: show spawned agents inline with their task and live status; open their conversation and tool activity in a side pane; expose completion, failures, and requests for input while keeping the parent conversation accessible.
 - [ ] Plus menu: search views; add diffs, machine files, setup, browser, side threads, new shell, desktop, and keep-awake controls. Overview is the current chat view.
 - [ ] Split review: open a resizable review pane next to the conversation.
 - [ ] Chat actions: implement pin, move to folder, rename, archive, and delete.
