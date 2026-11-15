@@ -14,12 +14,11 @@
 
 The menus open, but their unfinished actions are disabled. Default model, reasoning, and branch labels do not claim a particular backend configuration.
 
-- [ ] Cloud: show actual runtime status and machine details; implement machine selection and wake controls.
 - [ ] Setup: implement setup assistance and snapshots. The plain button is currently disabled.
 - [ ] Branch: load the project's actual branches and allow a per-chat base branch override. Currently the server uses the saved project configuration.
 - [ ] Attachments: upload, store, preview, remove, and send attachments with messages.
-- [ ] Context: add environment variables, people, threads, pull requests, skills, and files to a message.
-- [ ] Chat settings: implement access, machine size, setup/snapshots, environment variables, MCP servers, pinning, folders, and tags.
+- [ ] Context: add people, threads, pull requests, skills, and files to a message.
+- [ ] Chat settings: implement access, setup/snapshots, environment variables, and MCP servers.
 - [ ] Model: load supported models and pass the selected model to the backend. Currently uses the server default.
 - [ ] Reasoning effort: load supported options and pass the selection to the backend. Currently uses the server default.
 - [ ] Voice input: record and transcribe audio. The microphone button is currently disabled.
@@ -35,22 +34,33 @@ The menus open, but their unfinished actions are disabled. Default model, reason
 - [x] Scroll to end keeps the composer fixed while returning to the latest message.
 - [x] Cloud menu stops the container through the existing API.
 - [x] Open in new tab and Copy link use the current chat route.
-- [x] PR/terminal summary expands and collapses without inventing backend data.
+- [x] Linked PR summary shows saved PR counts, titles, status, additions/deletions, and links to GitHub.
+- [x] Title summary shows associated PR counts and details.
+- [x] Transcript PR links show saved PR status and include repository/title metadata.
 
 ### Disconnected placeholders
 
-- [ ] PR summary: fetch associated PRs, titles, status, additions/deletions, checks, and review/open actions. Connect the disabled Review changes, Checks, and Open pull request buttons. The strip shows “PRs”, not a fabricated count.
+- [ ] PR review: expose in-app changes review and CI checks from the linked PR UI. The earlier disabled Review changes, Checks, and Open pull request buttons have been replaced by linked PR lists; opening a PR on GitHub is connected.
 - [ ] Terminals: list active shells, open a terminal, and reflect their count in the summary strip.
 - [ ] Runtime: report actual machine size, CPU, memory, disk, awake/asleep state, and wake controls. The neutral dot does not report machine health.
 - [ ] Context: report usage, limits, system prompt, native tools, rules, codemode catalog, environment, and conversation breakdown; implement compaction thresholds. Unknown values are shown as dashes.
-- [ ] Title summary: connect actual model details and associated PR count. Both are currently shown as unavailable.
+- [ ] Title summary: connect actual model details. Model information is still unavailable.
 - [ ] Cost: report actual spend instead of the unavailable dash.
 - [ ] Plus menu: search views; add diffs, machine files, setup, browser, side threads, new shell, desktop, and keep-awake controls. Overview is the current chat view.
 - [ ] Split review: open a resizable review pane next to the conversation.
-- [ ] Chat actions: share, pin, move to folder, tags, promote to Captain, rename, regenerate title, fork, device access, Slack, automation, mark unread, archive, and delete.
-- [ ] Rich PR references: render linked PR cards and CI status in the transcript when structured metadata is available.
+- [ ] Chat actions: implement pin, move to folder, rename, archive, and delete.
+- [ ] Rich PR references: add expanded PR cards and CI/check status. Inline PR links already show saved open/draft/merged/closed status.
 
 Attachment/context, model, reasoning, slash-command, and voice placeholders listed above apply to both composers.
+
+## Chats and Pull requests pages
+
+### Connected
+
+- [x] Chats supports title/project/ID search, status filters and counts, project filtering, and collapsible project groups.
+- [x] Pull requests supports search, state filters and counts, repository filtering, collapsible state groups, GitHub links, and linked-chat navigation.
+- [x] Both pages share their page frame, search focus behavior, filter bar, empty-state layout, and compact Florets list components.
+- [x] Chat list, sidebar, and title summary share status labels; setup and automatic provider retries appear as Working.
 
 ## Sidebar
 
@@ -60,17 +70,30 @@ Attachment/context, model, reasoning, slash-command, and voice placeholders list
 - [x] Collapse individual projects or all projects and sort chats by update time or title for this session.
 - [x] Show saved status, relative update time, project counts, and a hover summary for each chat.
 - [x] Keep project settings, chat navigation, mobile dismissal, notification sound, and logout connected.
+- [x] Show linked PR counts in chat rows and saved PR titles, statuses, additions/deletions, and GitHub links in hover summaries.
+- [x] Mark a viewed chat revision as seen for this tab, surviving reloads through session storage; later updates become unread again.
 
 ### Disconnected placeholders
 
-- [ ] Navigation: implement the disabled Issues, Pull requests, Automations, Explore, and More destinations.
+- [ ] Navigation: implement the disabled Automations destination.
 - [ ] Chat row actions: implement Pin and Archive in both the hover toolbar and action menu; add the pinned section.
 - [ ] Folders: connect New folder and Move to folder, including folder creation and saved chat membership.
-- [ ] Chat list options: connect Display and filters and add grouping preferences.
-- [ ] Read state: implement Mark all as read and persist read/unread state.
+- [ ] Sidebar list options: connect Display and filters and add grouping preferences. The separate Chats page already has working status and project filters.
+- [ ] Read state: implement Mark all as read and durable read/unread persistence across tabs and browser sessions. Per-tab viewed revisions already use session storage.
 - [ ] Persist sorting and collapsed project preferences; currently these work only for the current sidebar session.
-- [ ] Populate hover summaries with model, PR/check details, and diff counts when backend metadata is available.
-- [ ] Workspace menu: connect Usage, Open desktop app, Appearance, and Switch workspace.
+- [ ] Populate hover summaries with model and CI/check details when backend metadata is available. Saved PR details and additions/deletions are already connected.
+- [ ] Workspace menu: connect Usage.
 - [ ] Workspace identity: replace the generic Flora/Workspace footer with saved identity and avatar data when available.
 
 Sidebar actions that are not connected are disabled; timestamps and statuses come from the saved chat feed.
+
+## Removed from the current UI
+
+These controls were removed rather than implemented and no longer need wiring in their former menus:
+
+- Main sidebar: Issues, Explore, and More.
+- Workspace menu: Open desktop app, Appearance, and Switch workspace.
+- New-chat top controls: Cloud selector. Existing chats still have a Cloud menu with Stop container; runtime telemetry and wake controls remain unfinished above.
+- Attachment menu: Environment variables. Environment variables remains planned in Chat settings.
+- Chat settings: Machine size, Pin, Folder, and Tags. Pinning and folders remain unfinished in the sidebar and chat action menu.
+- Chat action menu: Share, Tags, Promote to Captain, Regenerate title, Fork, Device access, Slack, Make an automation, and Mark as unread.
