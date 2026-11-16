@@ -5,6 +5,14 @@ import {
   Alert,
   Button,
   ButtonLink,
+  Combobox,
+  ComboboxTrigger,
+  ComboboxValue,
+  ComboboxContent,
+  ComboboxInput,
+  ComboboxEmpty,
+  ComboboxList,
+  ComboboxItem,
   FieldLabel,
   Heading,
   Input,
@@ -24,6 +32,17 @@ import {
 } from "./automation-schemas";
 import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
 import { errorMessage, isExpired, request } from "./request";
+
+const commonTimeZones = [
+  "UTC",
+  "America/New_York",
+  "America/Los_Angeles",
+  "America/Chicago",
+  "Europe/London",
+  "Europe/Berlin",
+  "Asia/Tokyo",
+];
+const timeZones = [...new Set([...commonTimeZones, ...Intl.supportedValuesOf("timeZone")])];
 
 const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 function stamp(value: string, timeZone: string) {
@@ -175,7 +194,7 @@ function AutomationForm({
           <FieldLabel className="w-full flex-col items-start">
             Instructions
             <Textarea
-              className="min-h-32"
+              className="min-h-32 resize-none"
               value={value.instructions}
               onChange={(e) => {
                 change("instructions", e.target.value);
@@ -228,8 +247,8 @@ function AutomationForm({
                 className="col-span-2 text-sm text-muted-foreground sm:col-span-1 sm:row-start-2"
               >
                 {value.mode === "same"
-                  ? "Keep the workspace and conversation."
-                  : "Each run starts with a fresh workspace and conversation."}
+                  ? "Continue in the same chat."
+                  : "Start a new chat each run."}
               </p>
               {initial.id && value.mode !== initial.mode && (
                 <p className="col-span-2 text-sm">
@@ -278,26 +297,45 @@ function AutomationForm({
                   <span className="text-sm text-muted-foreground" aria-hidden="true">
                     in
                   </span>
-                  <Input
-                    className="w-52 min-w-0"
-                    aria-label="Time zone"
+                  <Combobox
+                    items={timeZones.includes(timeZone) ? timeZones : [timeZone, ...timeZones]}
                     value={timeZone}
-                    onChange={(e) => {
-                      change("timeZone", e.target.value);
+                    onValueChange={(zone) => {
+                      if (zone !== null) change("timeZone", zone);
                     }}
-                    required
-                    list="automation-zones"
-                  />
+                  >
+                    <ComboboxTrigger
+                      aria-label="Time zone"
+                      render={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-52 min-w-0 justify-between font-normal"
+                        />
+                      }
+                    >
+                      <span className="truncate">
+                        <ComboboxValue />
+                      </span>
+                    </ComboboxTrigger>
+                    <ComboboxContent className="w-72">
+                      <ComboboxInput
+                        showTrigger={false}
+                        aria-label="Search time zones"
+                        placeholder="Search time zones"
+                      />
+                      <ComboboxEmpty>No time zones found.</ComboboxEmpty>
+                      <ComboboxList>
+                        {(zone: string) => (
+                          <ComboboxItem key={zone} value={zone}>
+                            {zone}
+                          </ComboboxItem>
+                        )}
+                      </ComboboxList>
+                    </ComboboxContent>
+                  </Combobox>
                 </div>
               </div>
-              <datalist id="automation-zones">
-                {Intl.supportedValuesOf("timeZone").map((zone) => (
-                  <option key={zone} value={zone}>
-                    {zone}
-                  </option>
-                ))}
-                <option value="UTC">UTC</option>
-              </datalist>
               {frequency === "weekly" && (
                 <fieldset>
                   <legend className="mb-2 text-sm font-medium">Days</legend>
@@ -338,10 +376,6 @@ function AutomationForm({
               </div>
             </div>
           </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Runs use your installation’s model, credentials, and limits. Missed runs and runs that
-            overlap active work are skipped.
-          </p>
         </fieldset>
       </form>
     </section>
@@ -478,7 +512,6 @@ export function Automations({
           <div className="mt-6 flex flex-wrap gap-2">
             <Button
               disabled={busy}
-              title="Starts real work using your saved instructions"
               onClick={() => {
                 void action(async () => {
                   manualID.current ??= crypto.randomUUID();
@@ -521,9 +554,6 @@ export function Automations({
               Edit
             </Button>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Run now starts real work. Pausing only prevents future scheduled runs.
-          </p>
           <div className="my-8 rounded-lg border p-4 text-sm whitespace-pre-wrap">
             {item.instructions}
           </div>
@@ -560,10 +590,18 @@ export function Automations({
       )}
       {list !== undefined && !isNew && !editing && id === "" && (
         <section>
-          <div className="flex items-center justify-between gap-4">
-            <Heading level={1}>Automations</Heading>
-            <ButtonLink href="#automations/new">New automation</ButtonLink>
-          </div>
+          {topbar &&
+            createPortal(
+              <>
+                <Heading level={1} className="min-w-0 flex-1 truncate text-base">
+                  Automations
+                </Heading>
+                <ButtonLink className="h-8 px-3 text-sm" href="#automations/new">
+                  New automation
+                </ButtonLink>
+              </>,
+              topbar,
+            )}
           {list.length === 0 ? (
             <div className="py-16 text-center">
               <p>Run a task on a schedule.</p>
@@ -577,7 +615,7 @@ export function Automations({
               )}
             </div>
           ) : (
-            <ul className="mt-8 divide-y rounded-lg border px-5">
+            <ul className="divide-y rounded-lg border px-5">
               {list.map((automation) => (
                 <li key={automation.id} className="py-5">
                   <div className="flex justify-between gap-4">
