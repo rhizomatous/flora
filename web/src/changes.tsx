@@ -134,7 +134,7 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
           </div>
           <div className="diff-scroll min-h-0 flex-1 overflow-auto px-3 pb-4">
             <div
-              className="flex w-fit items-center gap-3 py-3 text-xs text-muted-foreground"
+              className="flex w-fit items-center gap-3 px-3 py-3 text-xs text-muted-foreground"
               aria-label="Change summary"
             >
               <span>
