@@ -103,6 +103,8 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   const desktopBounds = await review.boundingBox();
   expect(desktopBounds?.width).toBeGreaterThan(900);
   await expect(review.getByText("const limit = 20;", { exact: true })).toBeVisible();
+  await expect(review.locator('[data-inline-change="add"]')).toHaveText(["20"]);
+  await expect(review.locator('[data-inline-change="remove"]')).toHaveText(["10"]);
   await expect(review.getByText(/Saved review, possibly out of date/)).toBeVisible();
   await expect(review.getByText(/logo.png.*Binary/)).toBeVisible();
   await expect(review.getByRole("link", { name: "Download full diff" })).toHaveAttribute(
@@ -145,4 +147,23 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   await expect(diffTab).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Conversation", exact: true })).toBeVisible();
   await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this draft");
+});
+
+test("live mock shows colored Go and CSS with within-line edits", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(`${process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199"}/#chats/pagination`);
+  await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+  await page.getByRole("button", { name: "Chat views", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Diffs", exact: true }).click();
+  const go = page.getByRole("region", { name: "Diff for internal/notes/list.go", exact: true });
+  await expect(go.locator('span[style*="--shiki-light"]').first()).toBeVisible();
+  await expect(go.locator('[data-inline-change="add"]').filter({ hasText: "50" })).toBeVisible();
+  await expect(go.locator('[data-inline-change="remove"]').filter({ hasText: "10" })).toBeVisible();
+  const css = page.getByRole("region", { name: "Diff for web/src/feed.css", exact: true });
+  await expect(
+    css.locator('[data-inline-change="add"]').filter({ hasText: "a3a3a3" }),
+  ).toBeVisible();
+  await expect(page.getByText("feed.css", { exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });

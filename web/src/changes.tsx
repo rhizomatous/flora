@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useState, useRef } from "react";
 
-import { Heading, Link, Text, Button, Diff } from "@flora/florets";
+import { Heading, Link, Text, Button, Diff, FileTypeIcon } from "@flora/florets";
 
 import { chatChangesSchema, type ChatChanges, type FileChange } from "./changes-schemas";
 import { PullList } from "./pull-links";
@@ -167,24 +167,34 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
                   className="overflow-hidden rounded-md border border-border"
                 >
                   <summary className="cursor-pointer bg-muted/30 p-3 text-sm break-all">
-                    <span className="mr-2 font-mono">{f.status}</span>
-                    {f.repository !== undefined && (
-                      <span className="mr-2 text-muted-foreground">{f.repository}</span>
-                    )}
-                    {f.previous !== undefined && <>{f.previous} → </>}
-                    {f.path}
-                    {contentNote(f)}
-                    {f.additions !== undefined && f.deletions !== undefined && (
-                      <span
-                        className="ml-3 inline-flex gap-2 tabular-nums"
-                        aria-label={`${f.additions} additions, ${f.deletions} deletions`}
-                      >
-                        <span className="text-emerald-700 dark:text-emerald-400">
-                          +{f.additions}
-                        </span>
-                        <span className="text-red-700 dark:text-red-400">−{f.deletions}</span>
+                    <span className="inline-flex w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 align-middle">
+                      <FileTypeIcon path={f.path} />
+                      <span className="font-medium">{f.path.split("/").at(-1)}</span>
+                      <span className="min-w-0 text-xs text-muted-foreground">
+                        {f.path.includes("/") ? f.path.slice(0, f.path.lastIndexOf("/") + 1) : ""}
                       </span>
-                    )}
+                      <span className="text-xs text-muted-foreground">
+                        {{ A: "Added", D: "Deleted", R: "Renamed", C: "Copied", T: "Type changed" }[
+                          f.status[0] ?? ""
+                        ] ?? "Modified"}
+                      </span>
+                      {f.repository !== undefined && (
+                        <span className="mr-2 text-muted-foreground">{f.repository}</span>
+                      )}
+                      {f.previous !== undefined && <>{f.previous} → </>}
+                      {contentNote(f)}
+                      {f.additions !== undefined && f.deletions !== undefined && (
+                        <span
+                          className="ml-auto inline-flex gap-2 tabular-nums"
+                          aria-label={`${f.additions} additions, ${f.deletions} deletions`}
+                        >
+                          <span className="text-emerald-700 dark:text-emerald-400">
+                            +{f.additions}
+                          </span>
+                          <span className="text-red-700 dark:text-red-400">−{f.deletions}</span>
+                        </span>
+                      )}
+                    </span>
                   </summary>
                   {f.truncated && (
                     <Text className="mt-3">

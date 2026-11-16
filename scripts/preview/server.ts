@@ -274,7 +274,17 @@ export function chatPreview(): Plugin {
       const project = present(projects.find((p) => p.id === scenario.projectID));
       const repository = present(project.configuration.repositories[0]);
       const files = story?.files.map((file) => {
-        const diff = `@@ -1,${file.before.split("\n").length} +1,${file.after.split("\n").length} @@\n-${file.before}\n+${file.after.split("\n").join("\n+")}\n`;
+        const before = file.before.split("\n");
+        const after = file.after.split("\n");
+        const lines: string[] = [];
+        for (let lineIndex = 0; lineIndex < Math.max(before.length, after.length); lineIndex++) {
+          if (before[lineIndex] === after[lineIndex]) lines.push(` ${before[lineIndex]}`);
+          else {
+            if (before[lineIndex] !== undefined) lines.push(`-${before[lineIndex]}`);
+            if (after[lineIndex] !== undefined) lines.push(`+${after[lineIndex]}`);
+          }
+        }
+        const diff = `@@ -1,${before.length} +1,${after.length} @@\n${lines.join("\n")}\n`;
         return {
           repository: repository.name,
           path: file.path,
@@ -282,6 +292,8 @@ export function chatPreview(): Plugin {
           binary: false,
           undisplayable: false,
           diff,
+          additions: lines.filter((line) => line.startsWith("+")).length,
+          deletions: lines.filter((line) => line.startsWith("-")).length,
           bytes: Buffer.byteLength(diff),
           truncated: false,
         };

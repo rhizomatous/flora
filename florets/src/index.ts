@@ -135,3 +135,5 @@ export {
 } from "lucide-react";
 
 export { Diff } from "./components/diff";
+
+export { FileTypeIcon } from "./components/file-type-icon";
