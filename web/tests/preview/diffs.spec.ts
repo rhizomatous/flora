@@ -105,12 +105,10 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   await expect(review.getByText("const limit = 20;", { exact: true })).toBeVisible();
   await expect(review.locator('[data-inline-change="add"]')).toHaveText(["20"]);
   await expect(review.locator('[data-inline-change="remove"]')).toHaveText(["10"]);
-  await expect(review.getByRole("button", { name: "Diff details", exact: true })).toContainText(
-    "Out of date",
-  );
-  await review.getByRole("button", { name: "Diff details", exact: true }).click();
-  await expect(page.getByText(/Saved review, possibly out of date/)).toBeVisible();
-  await page.keyboard.press("Escape");
+  await expect(
+    review.getByText("Saved changes may be out of date.", { exact: true }),
+  ).toBeVisible();
+  await expect(review.getByRole("button", { name: "Diff details", exact: true })).toHaveCount(0);
   await expect(review.getByRole("list", { name: "Linked pull requests" })).toHaveCount(0);
   await expect(review.getByText(/logo.png.*Binary/)).toBeVisible();
   await expect(review.getByRole("link", { name: "Download full diff" })).toHaveAttribute(
@@ -119,12 +117,18 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   );
   await review.getByRole("button", { name: "Collapse all", exact: true }).click();
   await expect(review.getByText("const limit = 20;", { exact: true })).not.toBeVisible();
+  await expect(review.getByRole("button", { name: "Expand all", exact: true })).toBeVisible();
+  await expect(review.getByRole("button", { name: "Collapse all", exact: true })).toHaveCount(0);
+  await review.getByRole("button", { name: "Expand all", exact: true }).click();
+  await expect(review.getByText("const limit = 20;", { exact: true })).toBeVisible();
+  await review.getByRole("button", { name: "Collapse all", exact: true }).click();
   await review.getByRole("button", { name: "Files", exact: true }).click();
   await page.getByRole("combobox", { name: "Search changed files" }).fill("no-such-file");
   await expect(page.getByText("No matching files.", { exact: true })).toBeVisible();
   await page.getByRole("combobox", { name: "Search changed files" }).fill("notes");
   await page.getByRole("combobox", { name: "Search changed files" }).press("Enter");
   await expect(review.locator("summary").first()).toBeFocused();
+  await expect(review.getByRole("button", { name: "Collapse all", exact: true })).toBeVisible();
   await expect(review.getByText("const limit = 20;", { exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Conversation", exact: true })).not.toBeVisible();
   await chatTab.click();
@@ -171,6 +175,10 @@ test("live mock shows colored Go and CSS with within-line edits", async ({ page 
     review.getByLabel("Change summary").getByLabel("5 additions, 5 deletions"),
   ).toBeVisible();
   await expect(review.getByRole("link")).toHaveCount(0);
+  const toolbarBounds = await review.locator(".diff-toolbar").boundingBox();
+  const headerBounds = await review.locator("summary").first().boundingBox();
+  expect(toolbarBounds?.height).toBeLessThanOrEqual(38);
+  expect(headerBounds?.height).toBeLessThanOrEqual(34);
   await expect(review.getByText("Modified", { exact: true })).toHaveCount(0);
   const go = page.getByRole("region", { name: "Diff for internal/notes/list.go", exact: true });
   await expect(go.locator('span[style*="--shiki-light"]').first()).toBeVisible();

@@ -35,7 +35,7 @@
   height: 100%;
   min-width: 0;
   overflow: auto;
-  padding: 1rem 0;
+  padding: 0 0 1rem;
 }
 
 .chat-view-panel[hidden] {
@@ -85,4 +85,14 @@
     opacity: 1;
     pointer-events: auto;
   }
+}
+
+.diff-file-heading {
+  list-style: none;
+}
+.diff-file-heading::-webkit-details-marker {
+  display: none;
+}
+details[open] > .diff-file-heading .diff-file-caret {
+  transform: rotate(90deg);
 }

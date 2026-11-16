@@ -1,17 +1,15 @@
 import { useEffect, useEffectEvent, useState, useRef } from "react";
 
 import {
-  ChevronDownIcon,
+  ChevronRightIcon,
+  ChevronsDownUpIcon,
+  ChevronsUpDownIcon,
   Heading,
   Link,
   Text,
   Button,
   Diff,
   FileTypeIcon,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  PopoverTitle,
 } from "@flora/florets";
 
 import {
@@ -31,6 +29,7 @@ function contentNote(file: FileChange) {
 
 export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () => void }) {
   const container = useRef<HTMLElement>(null);
+  const [anyExpanded, setAnyExpanded] = useState(true);
   const [review, setReview] = useState<ChatChanges>();
   const [error, setError] = useState("");
   const expire = useEffectEvent(onExpired);
@@ -101,47 +100,18 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
       {snapshot === null && <Text className="mt-3">No successful review saved yet.</Text>}
       {snapshot && (
         <>
-          <div className="diff-toolbar flex flex-wrap items-center gap-1 border-b border-border pb-2">
-            <Popover>
-              <PopoverTrigger
-                render={
-                  <Button variant="ghost" size="sm" aria-label="Diff details">
-                    Chat changes{review.stale || error !== "" ? " · Out of date" : ""}
-                    <ChevronDownIcon />
-                  </Button>
-                }
-              />
-              <PopoverContent
-                align="start"
-                className="max-w-[calc(100vw-24px)]"
-                aria-label="Diff details"
-              >
-                <PopoverTitle>Changes since this chat started</PopoverTitle>
-                <Text size="xs" tone="muted" role="status" className="mt-2 break-words">
-                  {review.stale || error !== ""
-                    ? "Saved review, possibly out of date"
-                    : "Latest saved review"}{" "}
-                  ·{" "}
-                  <time dateTime={snapshot.capturedAt}>
-                    {new Date(snapshot.capturedAt).toLocaleString()}
-                  </time>
-                </Text>
-                {snapshot.base !== "" && (
-                  <Text size="xs" tone="muted" className="mt-2 break-all">
-                    Base {snapshot.base}
-                  </Text>
-                )}
-                {snapshot.bases !== undefined && (
-                  <ul aria-label="Repository bases" className="mt-2 text-xs text-muted-foreground">
-                    {Object.entries(snapshot.bases).map(([name, sha]) => (
-                      <li key={name} className="break-all">
-                        {name} · {sha}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </PopoverContent>
-            </Popover>
+          <div className="diff-toolbar flex min-h-9 flex-wrap items-center gap-1 border-b border-border py-1">
+            <div
+              className="flex items-center gap-3 text-xs text-muted-foreground"
+              aria-label="Change summary"
+            >
+              <span>
+                {snapshot.files.length} {snapshot.files.length === 1 ? "file" : "files"}
+              </span>
+              {countsKnown && (
+                <ChangeCounts additions={totals.additions} deletions={totals.deletions} />
+              )}
+            </div>
             <span className="flex-1" />
             <DiffFiles
               files={snapshot.files}
@@ -158,42 +128,30 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
             />
             <Button
               variant="ghost"
-              size="sm"
+              size="icon-sm"
+              aria-label={anyExpanded ? "Collapse all" : "Expand all"}
+              title={anyExpanded ? "Collapse all" : "Expand all"}
+              disabled={snapshot.files.length === 0}
               onClick={() => {
-                for (const file of container.current?.querySelectorAll("details") ?? []) {
-                  file.open = false;
-                }
+                const files =
+                  container.current?.querySelectorAll<HTMLDetailsElement>("details") ?? [];
+                const expand = ![...files].some((file) => file.open);
+                for (const file of files) file.open = expand;
+                setAnyExpanded(expand);
               }}
             >
-              Collapse all
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                for (const file of container.current?.querySelectorAll("details") ?? []) {
-                  file.open = true;
-                }
-              }}
-            >
-              Expand all
+              {anyExpanded ? <ChevronsDownUpIcon /> : <ChevronsUpDownIcon />}
             </Button>
           </div>
-          <div
-            className="my-3 flex w-fit items-center gap-3 text-xs text-muted-foreground"
-            aria-label="Change summary"
-          >
-            <span>
-              {snapshot.files.length} {snapshot.files.length === 1 ? "file" : "files"}
-            </span>
-            {countsKnown && (
-              <ChangeCounts additions={totals.additions} deletions={totals.deletions} />
-            )}
-          </div>
+          {(review.stale || error !== "") && (
+            <Text role="status" size="xs" tone="muted" className="my-2">
+              Saved changes may be out of date.
+            </Text>
+          )}
           {snapshot.files.length === 0 && (
             <Text className="mt-3">No changes from the starting commit.</Text>
           )}
-          <ul className="space-y-3">
+          <ul className="mt-3 space-y-2">
             {snapshot.files.map((f, i) => (
               <li key={`${f.repository ?? ""}:${f.previous ?? ""}:${f.path}`} className="min-w-0">
                 {multipleRepositories &&
@@ -205,10 +163,22 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
                 <details
                   open
                   data-file-index={i}
+                  onToggle={() => {
+                    setAnyExpanded(
+                      [
+                        ...(container.current?.querySelectorAll<HTMLDetailsElement>("details") ??
+                          []),
+                      ].some((file) => file.open),
+                    );
+                  }}
                   className="overflow-hidden rounded-md border border-border"
                 >
-                  <summary className="cursor-pointer bg-muted/30 p-3 text-sm break-all">
-                    <span className="inline-flex w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 align-middle">
+                  <summary className="diff-file-heading flex cursor-pointer items-center gap-2 bg-muted/30 px-2.5 py-1.5 text-sm break-all">
+                    <ChevronRightIcon
+                      aria-hidden="true"
+                      className="diff-file-caret size-3 shrink-0 text-muted-foreground"
+                    />
+                    <span className="inline-flex min-w-0 flex-1 flex-wrap items-center gap-2 align-middle">
                       <FileTypeIcon path={f.path} />
                       <span className="font-medium">{f.path.split("/").at(-1)}</span>
                       <span className="min-w-0 text-xs text-muted-foreground">
