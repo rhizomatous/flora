@@ -5,7 +5,11 @@ import {
   Button,
   Heading,
   Input,
-  NativeSelect,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -115,16 +119,24 @@ function Breakdown({ report, metric }: { report: UsageReport; metric: Metric }) 
         <Heading level={2} id="breakdown-heading" className="text-base">
           Breakdown
         </Heading>
-        <NativeSelect
-          aria-label="Group usage by"
+        <Select
+          items={[
+            { value: "projects", label: "By project" },
+            { value: "models", label: "By model" },
+          ]}
           value={group}
-          onChange={(event) => {
-            setGroup(event.target.value);
+          onValueChange={(value) => {
+            if (value !== null) setGroup(value);
           }}
         >
-          <option value="projects">By project</option>
-          <option value="models">By model</option>
-        </NativeSelect>
+          <SelectTrigger aria-label="Group usage by">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end" alignItemWithTrigger={false}>
+            <SelectItem value="projects">By project</SelectItem>
+            <SelectItem value="models">By model</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <ul className="space-y-5">
         {rows.map((row) => (
@@ -164,17 +176,26 @@ function History({ rows }: { rows: UsageGroup[] }) {
         <Heading level={2} id="history-heading" className="text-base">
           Chats
         </Heading>
-        <NativeSelect
-          aria-label="Sort chats"
+        <Select
+          items={[
+            { value: "cost", label: "Highest cost" },
+            { value: "tokens", label: "Most tokens" },
+            { value: "activity", label: "Last usage" },
+          ]}
           value={sort}
-          onChange={(event) => {
-            setSort(event.target.value);
+          onValueChange={(value) => {
+            if (value !== null) setSort(value);
           }}
         >
-          <option value="cost">Highest cost</option>
-          <option value="tokens">Most tokens</option>
-          <option value="activity">Last usage</option>
-        </NativeSelect>
+          <SelectTrigger aria-label="Sort chats">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end" alignItemWithTrigger={false}>
+            <SelectItem value="cost">Highest cost</SelectItem>
+            <SelectItem value="tokens">Most tokens</SelectItem>
+            <SelectItem value="activity">Last usage</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">

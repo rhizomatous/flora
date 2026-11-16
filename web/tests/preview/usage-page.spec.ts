@@ -6,14 +6,16 @@ test("usage ranges, breakdowns, metrics and chat links", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Usage", exact: true })).toBeVisible();
   const rows = page.locator("tbody tr");
   await expect(rows).toHaveCount(4);
-  await page.getByLabel("Group usage by").selectOption("models");
+  await page.getByRole("combobox", { name: "Group usage by" }).click();
+  await page.getByRole("option", { name: "By model", exact: true }).click();
   await expect(page.getByText("anthropic/claude-sonnet-4-5", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Tokens", exact: true }).click();
   await expect(page.getByRole("button", { name: "Tokens", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await page.getByLabel("Sort chats").selectOption("tokens");
+  await page.getByRole("combobox", { name: "Sort chats" }).click();
+  await page.getByRole("option", { name: "Most tokens", exact: true }).click();
   await page.getByRole("button", { name: "24h", exact: true }).click();
   await expect(page.getByText("UTC · Hourly", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Custom", exact: true }).click();
