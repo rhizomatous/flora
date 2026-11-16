@@ -49,6 +49,14 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`${process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199"}/#chats/pagination`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+  const originalTitle = page.getByRole("button", {
+    name: "Fix duplicate notes between pages",
+    exact: true,
+  });
+  const originalBounds = await originalTitle.boundingBox();
+  const originalFont = await originalTitle.evaluate(
+    (element) => getComputedStyle(element).fontSize,
+  );
   await page.getByLabel("Follow-up", { exact: true }).fill("Keep this draft");
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
   await page.getByRole("menuitem", { name: "Diffs", exact: true }).click();
@@ -56,6 +64,22 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   const diffTab = page.getByRole("tab", { name: "Diffs", exact: true });
   const chatTab = page.getByRole("tab", { name: "Fix duplicate notes between pages", exact: true });
   await expect(diffTab).toHaveAttribute("aria-selected", "true");
+  const chatBounds = await chatTab.boundingBox();
+  const diffBounds = await diffTab.boundingBox();
+  expect(chatBounds?.height).toBe(originalBounds?.height);
+  expect(chatBounds?.width).toBe(originalBounds?.width);
+  expect(diffBounds?.height).toBe(originalBounds?.height);
+  expect(diffBounds?.width).toBeLessThan(100);
+  expect(await chatTab.evaluate((element) => getComputedStyle(element).fontSize)).toBe(
+    originalFont,
+  );
+  expect(await diffTab.evaluate((element) => getComputedStyle(element).fontSize)).toBe(
+    originalFont,
+  );
+  await chatTab.hover();
+  await expect(page.getByLabel("Chat summary", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+
   const desktopBounds = await review.boundingBox();
   expect(desktopBounds?.width).toBeGreaterThan(900);
   await expect(review.getByText("const limit = 20;", { exact: true })).toBeVisible();
@@ -76,13 +100,15 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   await chatTab.press("ArrowRight");
   await expect(diffTab).toBeFocused();
   await diffTab.press("Enter");
+  await page.keyboard.press("Escape");
+  await expect(page.getByLabel("Chat summary", { exact: true })).toBeHidden();
   await expect(review.getByText("const limit = 20;", { exact: true })).toBeVisible();
   await expect(review.getByRole("link", { name: "Download full diff" })).not.toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(review).toBeVisible();
   const reviewBounds = await review.boundingBox();
   expect(reviewBounds?.width).toBeGreaterThan(340);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   await chatTab.click();
   await expect(chatTab).toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this draft");

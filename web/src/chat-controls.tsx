@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import {
+  TabsTrigger,
   PencilIcon,
   ArchiveIcon,
   Trash2Icon,
@@ -51,7 +52,9 @@ export function ChatTitle({
   title,
   chat,
   pulls,
+  tabbed = false,
 }: {
+  tabbed?: boolean;
   title: string;
   chat: Chat | undefined;
   pulls: PullSummary | undefined;
@@ -83,6 +86,25 @@ export function ChatTitle({
             unit,
           );
   }
+  const titleButton = (
+    <Button
+      variant="secondary"
+      size="compact"
+      className="chat-title inline-flex max-w-full min-w-0 shrink items-center bg-secondary! tracking-tight text-secondary-foreground!"
+      aria-label={title}
+      onClick={() => {
+        setOpen(true);
+        setNow(Date.now());
+      }}
+      onFocus={() => {
+        setOpen(true);
+        setNow(Date.now());
+      }}
+    >
+      <CloudIcon />
+      <span className="florets-control-label truncate">{title}</span>
+    </Button>
+  );
   return (
     <HoverCard
       open={open}
@@ -94,23 +116,7 @@ export function ChatTitle({
       <HoverCardTrigger
         delay={200}
         render={
-          <Button
-            variant="secondary"
-            size="compact"
-            className="chat-title inline-flex max-w-full items-center bg-secondary! text-secondary-foreground!"
-            aria-label={title}
-            onClick={() => {
-              setOpen(true);
-              setNow(Date.now());
-            }}
-            onFocus={() => {
-              setOpen(true);
-              setNow(Date.now());
-            }}
-          >
-            <CloudIcon />
-            <span className="florets-control-label truncate">{title}</span>
-          </Button>
+          tabbed ? <TabsTrigger value="chat" variant="control" render={titleButton} /> : titleButton
         }
       />
       <HoverCardContent

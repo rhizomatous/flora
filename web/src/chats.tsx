@@ -6,7 +6,6 @@ import {
   TabsList,
   TabsTrigger,
   TabsContent,
-  CloudIcon,
   GitBranchIcon,
   Alert,
   ArrowDownIcon,
@@ -393,18 +392,24 @@ export function Chats({
             )}
           </Heading>
           {diffChat === id && (
-            <TabsList aria-label="Chat views" className="min-w-0 shrink bg-transparent p-0">
+            <TabsList
+              aria-label="Chat views"
+              className="h-auto! min-w-0 shrink justify-start gap-1 bg-transparent p-0"
+            >
+              <ChatTitle title={title()} chat={detail?.chat} pulls={pulls} tabbed />
               <TabsTrigger
-                value="chat"
-                className="max-w-64 min-w-0 data-active:bg-secondary!"
-                title={title()}
+                value="diffs"
+                variant="control"
+                render={
+                  <Button
+                    variant={activeDiff ? "secondary" : "ghost"}
+                    size="compact"
+                    className="tracking-tight"
+                  />
+                }
               >
-                <CloudIcon />
-                <span className="truncate">{title()}</span>
-              </TabsTrigger>
-              <TabsTrigger value="diffs" className="shrink-0 data-active:bg-secondary!">
                 <GitBranchIcon />
-                Diffs
+                <span className="florets-control-label">Diffs</span>
               </TabsTrigger>
             </TabsList>
           )}
