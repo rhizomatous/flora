@@ -90,6 +90,10 @@ func newFixture(t *testing.T) *runtimeFixture {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		switch {
+		case r.URL.Path == "/provider":
+			fmt.Fprint(w, `{"all":[]}`)
+		case strings.HasSuffix(r.URL.Path, "/children"):
+			fmt.Fprint(w, `[]`)
 		case r.URL.Path == "/config":
 			fmt.Fprint(w, `{"model":"anthropic/model","permission":"allow"}`)
 		case r.URL.Path == "/session":

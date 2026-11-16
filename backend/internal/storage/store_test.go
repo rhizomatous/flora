@@ -428,7 +428,7 @@ func TestMigrationSafety(t *testing.T) {
 	must(t, s.Close())
 	brokenRoot := t.TempDir()
 	broken := openTest(t, brokenRoot)
-	_, err = broken.db.Exec("DROP TABLE installation_settings")
+	_, err = broken.db.Exec("DROP TABLE usage_steps; DROP TABLE usage_messages; DROP TABLE usage_capture; DROP TABLE installation_settings")
 	must(t, err)
 	_, err = broken.db.Exec("DROP TABLE chat_requests; DROP TABLE github_capabilities; DROP TABLE browser_sessions; DROP TABLE administrator; DROP TABLE installation_credentials; DROP TRIGGER immutable_chat_config; DROP TABLE starting_commits; DROP TABLE activity; DROP TABLE chats; DROP TABLE messages; DROP TABLE projects; CREATE TABLE chats (conflict TEXT); PRAGMA user_version=0")
 	must(t, err)

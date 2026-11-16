@@ -30,6 +30,8 @@ type Service struct {
 	Store                   *storage.Store
 	provisioner             Provisioner
 	ctx                     context.Context
+	usageMu                 sync.Mutex
+	usageRetryInterval      time.Duration
 	turnMu                  sync.Mutex
 	turns                   map[string]*turnActivity
 	promptAdmissionTimeout  time.Duration
@@ -41,7 +43,7 @@ type Service struct {
 }
 
 func New(ctx context.Context, store *storage.Store, p Provisioner) *Service {
-	return &Service{Store: store, provisioner: p, ctx: ctx, turns: map[string]*turnActivity{}, jobs: map[string]*turnJob{}, promptAdmissionTimeout: 30 * time.Second, promptCompletionTimeout: 30 * time.Second, questionPollInterval: time.Second, questionPollTimeout: 3 * time.Second}
+	return &Service{usageRetryInterval: time.Minute, Store: store, provisioner: p, ctx: ctx, turns: map[string]*turnActivity{}, jobs: map[string]*turnJob{}, promptAdmissionTimeout: 30 * time.Second, promptCompletionTimeout: 30 * time.Second, questionPollInterval: time.Second, questionPollTimeout: 3 * time.Second}
 }
 
 func (s *Service) Create(ctx context.Context, project, title, requestID, text string) (storage.Chat, error) {

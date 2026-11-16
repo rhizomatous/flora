@@ -32,7 +32,7 @@ func (e *responseError) Error() string {
 }
 
 func newRuntime(e provisioning.Endpoint) *runtime {
-	return &runtime{e, &http.Client{Transport: &http.Transport{}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+	return &runtime{endpoint: e, client: &http.Client{Transport: &http.Transport{}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
 }
 
 func (c *runtime) request(ctx context.Context, method, path string, in any) (*http.Response, error) {

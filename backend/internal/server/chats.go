@@ -192,7 +192,12 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 		if blocked != "" {
 			c.Status, c.StatusReason = storage.Failed, blocked
 		}
-		jsonResponse(w, 200, map[string]any{"chat": a.chatView(r.Context(), c), "messages": messages, "continuationBlockedReason": blocked})
+		usage, err := store.ChatUsage(r.Context(), c.ID)
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		jsonResponse(w, 200, map[string]any{"chat": a.chatView(r.Context(), c), "messages": messages, "continuationBlockedReason": blocked, "usage": usage})
 	})
 	mux.HandleFunc("POST /api/chats/{id}/messages", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {

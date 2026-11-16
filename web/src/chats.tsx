@@ -372,7 +372,7 @@ export function Chats({
         >
           {existingChat ? <ChatTitle title={title()} chat={detail?.chat} pulls={pulls} /> : title()}
         </Heading>
-        {existingChat && <ChatHeaderActions />}
+        {existingChat && <ChatHeaderActions usage={detail?.usage} />}
       </div>
       {error !== "" && (
         <Alert role="alert" className="mt-6">

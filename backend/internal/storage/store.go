@@ -133,6 +133,11 @@ func (s *Store) migrate(ctx context.Context) error {
 				return err
 			}
 		}
+		if version < 6 {
+			if err := backfillUsage(ctx, tx); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 }
