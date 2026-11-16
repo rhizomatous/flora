@@ -397,10 +397,14 @@ export function Chats({
               aria-label="Chat views"
               className="h-auto! min-w-0 shrink justify-start gap-1 bg-transparent p-0"
             >
-              <ChatTitle title={title()} chat={detail?.chat} pulls={pulls} tabbed />
-              <div
-                className={`flex shrink-0 items-center rounded-lg ${activeDiff ? "bg-secondary" : ""}`}
-              >
+              <ChatTitle
+                title={title()}
+                chat={detail?.chat}
+                pulls={pulls}
+                tabbed
+                active={!activeDiff}
+              />
+              <div className="chat-diff-tab" data-active={activeDiff || undefined}>
                 <TabsTrigger
                   value="diffs"
                   variant="control"
@@ -408,7 +412,7 @@ export function Chats({
                     <Button
                       variant={activeDiff ? "secondary" : "ghost"}
                       size="compact"
-                      className="rounded-r-none tracking-tight"
+                      className="chat-diff-tab-trigger tracking-tight"
                     />
                   }
                 >
@@ -418,7 +422,7 @@ export function Chats({
                 <Button
                   variant="ghost"
                   size="icon-compact"
-                  className="rounded-l-none"
+                  className="chat-diff-tab-close"
                   aria-label="Close Diffs"
                   title="Close Diffs"
                   onClick={() => {

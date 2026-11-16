@@ -41,3 +41,40 @@
 .chat-view-panel[hidden] {
   display: none;
 }
+
+.chat-diff-tab {
+  position: relative;
+  flex-shrink: 0;
+  border-radius: 8px;
+}
+.chat-diff-tab[data-active],
+.chat-diff-tab:hover,
+.chat-diff-tab:focus-within {
+  background: var(--secondary);
+}
+.chat-diff-tab .chat-diff-tab-trigger {
+  background: transparent;
+}
+.chat-diff-tab .chat-diff-tab-close {
+  position: absolute;
+  inset-inline-end: 0;
+  top: 0;
+  width: 24px;
+  padding-inline: 5px;
+  border-radius: 0 8px 8px 0;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  opacity: 0;
+  pointer-events: none;
+}
+.chat-diff-tab:hover .chat-diff-tab-close,
+.chat-diff-tab:focus-within .chat-diff-tab-close {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (hover: none), (pointer: coarse) {
+  .chat-diff-tab .chat-diff-tab-close {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}

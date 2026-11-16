@@ -80,6 +80,19 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   await expect(page.getByLabel("Chat summary", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
 
+  const closeDiffs = page.getByRole("button", { name: "Close Diffs", exact: true });
+  await review.getByRole("heading", { name: "Chat changes" }).hover();
+  await expect(closeDiffs).toHaveCSS("opacity", "0");
+  await diffTab.hover();
+  await expect(closeDiffs).toHaveCSS("opacity", "1");
+  const hoveredBounds = await diffTab.boundingBox();
+  expect(hoveredBounds?.width).toBe(diffBounds?.width);
+  await review.getByRole("heading", { name: "Chat changes" }).hover();
+  await diffTab.focus();
+  await expect(closeDiffs).toHaveCSS("opacity", "1");
+  await diffTab.press("Tab");
+  await expect(closeDiffs).toBeFocused();
+  await expect(chatTab).toHaveAttribute("data-variant", "ghost");
   const desktopBounds = await review.boundingBox();
   expect(desktopBounds?.width).toBeGreaterThan(900);
   await expect(review.getByText("const limit = 20;", { exact: true })).toBeVisible();
@@ -112,6 +125,7 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   await chatTab.click();
   await expect(chatTab).toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this draft");
+  await diffTab.hover();
   await page.getByRole("button", { name: "Close Diffs", exact: true }).click();
   await expect(diffTab).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Chat views", exact: true })).toBeFocused();
@@ -119,6 +133,7 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
   await page.getByRole("menuitem", { name: "Diffs", exact: true }).click();
   await expect(diffTab).toHaveAttribute("aria-selected", "true");
+  await diffTab.hover();
   await page.getByRole("button", { name: "Close Diffs", exact: true }).click();
   await expect(diffTab).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Conversation", exact: true })).toBeVisible();

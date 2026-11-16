@@ -53,8 +53,10 @@ export function ChatTitle({
   chat,
   pulls,
   tabbed = false,
+  active = true,
 }: {
   tabbed?: boolean;
+  active?: boolean;
   title: string;
   chat: Chat | undefined;
   pulls: PullSummary | undefined;
@@ -88,9 +90,9 @@ export function ChatTitle({
   }
   const titleButton = (
     <Button
-      variant="secondary"
+      variant={active ? "secondary" : "ghost"}
       size="compact"
-      className="chat-title inline-flex max-w-full min-w-0 shrink items-center bg-secondary! tracking-tight text-secondary-foreground!"
+      className={`chat-title inline-flex max-w-full min-w-0 shrink items-center tracking-tight ${active ? "bg-secondary! text-secondary-foreground!" : ""}`}
       aria-label={title}
       onClick={() => {
         setOpen(true);
