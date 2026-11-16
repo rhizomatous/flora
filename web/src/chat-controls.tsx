@@ -164,7 +164,7 @@ function ChatViewMenu({
           </Button>
         }
       />
-      <DropdownMenuContent align="start">
+      <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-24px)]">
         <DropdownMenuItem
           onClick={() => {
             onDiffsChange(false);
@@ -172,7 +172,11 @@ function ChatViewMenu({
         >
           <ListIcon />
           Overview
-          {!diffsOpen && <span className="ml-auto text-muted-foreground">Current view</span>}
+          {!diffsOpen && (
+            <span className="ml-auto shrink-0 whitespace-nowrap text-muted-foreground">
+              Current view
+            </span>
+          )}
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => {
@@ -180,7 +184,10 @@ function ChatViewMenu({
           }}
         >
           <GitBranchIcon />
-          Diffs{diffsOpen && <span className="ml-auto text-muted-foreground">Open</span>}
+          Diffs
+          {diffsOpen && (
+            <span className="ml-auto shrink-0 whitespace-nowrap text-muted-foreground">Open</span>
+          )}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled>
