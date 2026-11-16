@@ -156,7 +156,7 @@ test("shared composer stays compact and exposes honest placeholders", async ({ p
     await page.keyboard.press("Escape");
     await expect(followUp).toHaveValue("Draft a follow-up");
     await page.getByRole("button", { name: "Context usage", exact: true }).click();
-    await expect(page.getByText("Latest model call", { exact: false })).toBeVisible();
+    await expect(page.getByRole("progressbar", { name: "Context window used" })).toBeVisible();
     await page.keyboard.press("Escape");
     const review = page.getByRole("button", { name: "Linked pull requests (0)", exact: true });
     await review.click();

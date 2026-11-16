@@ -45,7 +45,7 @@ The menus open, but their unfinished actions are disabled. Default model, reason
 - [ ] Terminals: list active shells, open a terminal, and reflect their count in the summary strip.
 - [ ] Runtime: report actual machine size, CPU, memory, disk, awake/asleep state, and wake controls. The neutral dot does not report machine health.
 - [x] Context: show latest main-session model-call usage against its runtime model limit.
-- [ ] Context: report system prompt, native tools, rules, codemode catalog, environment, and conversation breakdown; implement compaction thresholds.
+- [ ] Context: implement compaction thresholds.
 - [ ] Title summary: connect actual model details. Model information is still unavailable.
 - [ ] Subagent capture: discover child sessions, persist their messages and activity, recover after reconnects and restarts, and attribute their usage to the parent chat without double-counting.
 - [ ] Subagent UI: show spawned agents inline with their task and live status; open their conversation and tool activity in a side pane; expose completion, failures, and requests for input while keeping the parent conversation accessible.

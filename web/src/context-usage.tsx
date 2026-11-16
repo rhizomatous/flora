@@ -78,12 +78,9 @@ export function ContextUsagePopover({ usage }: { usage: ContextUsage | undefined
             className="my-1 [&_[data-slot=progress-indicator]]:bg-foreground"
           />
         )}
-        <PopoverDescription className="text-xs">
-          {used === null ? "No context usage yet." : "Latest model call"}
-          {used !== null && usage?.model !== "" && (
-            <span className="mt-1 block break-words">{usage?.model}</span>
-          )}
-        </PopoverDescription>
+        {used === null && (
+          <PopoverDescription className="text-xs">No context usage yet.</PopoverDescription>
+        )}
       </PopoverContent>
     </Popover>
   );
