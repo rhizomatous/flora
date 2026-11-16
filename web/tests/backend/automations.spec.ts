@@ -17,8 +17,15 @@ test("create, edit, pause, and run an automation in a dedicated chat", async ({ 
   await page.getByLabel("Time zone", { exact: true }).fill("America/New_York");
   await expect(page.getByText(/^Next run:/)).toBeVisible();
   await assertFitsPhone(page);
-  await page.screenshot({ path: testInfo.outputPath("form-phone.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 375, height: 600 });
+  await page.getByText(/^Next run:/).scrollIntoViewIfNeeded();
+  await expect(page.getByRole("button", { name: "Create automation", exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("button", { name: "Cancel", exact: true })).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: testInfo.outputPath("form-phone.png"), fullPage: false, animations: "disabled" });
   await page.setViewportSize({ width: 1280, height: 1000 });
+  const scheduleBox = await page.getByLabel("Schedule", { exact: true }).boundingBox();
+  const zoneBox = await page.getByLabel("Time zone", { exact: true }).boundingBox();
+  expect(Math.abs((scheduleBox?.y ?? -100) - (zoneBox?.y ?? 100))).toBeLessThan(4);
   await page.screenshot({ path: testInfo.outputPath("form.png"), fullPage: true, animations: "disabled" });
   await page.getByRole("button", { name: "Create automation", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Weekly dependency check", exact: true })).toBeVisible();

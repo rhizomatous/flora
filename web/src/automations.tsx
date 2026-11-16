@@ -120,22 +120,32 @@ function AutomationForm({
     }
   }
   return (
-    <section className="mx-auto max-w-2xl">
-      <Heading level={1} ref={heading} tabIndex={-1}>
-        {initial.id ? "Edit automation" : "New automation"}
-      </Heading>
+    <section className="mx-auto max-w-3xl [&_input]:scroll-mt-40 [&_textarea]:scroll-mt-40">
+      <header className="sticky top-0 z-20 -mx-4 grid gap-3 border-b bg-background/95 px-4 py-4 backdrop-blur-sm sm:flex sm:items-center sm:justify-between">
+        <Heading level={1} ref={heading} tabIndex={-1}>
+          {initial.id ? "Edit automation" : "New automation"}
+        </Heading>
+        <div className="flex items-center justify-end gap-2">
+          <Button type="button" variant="ghost" disabled={busy} onClick={cancel}>
+            Cancel
+          </Button>
+          <Button type="submit" form="automation-form" disabled={busy || !preview}>
+            {busy ? "Saving…" : saveLabel}
+          </Button>
+        </div>
+      </header>
       <form
-        className="mt-8 space-y-6"
+        id="automation-form"
+        className="mt-6"
         onSubmit={(event) => {
           event.preventDefault();
           save(value);
         }}
       >
-        <fieldset disabled={busy} className="space-y-6">
+        <fieldset disabled={busy} className="space-y-5">
           <FieldLabel className="w-full flex-col items-start">
             Name
             <Input
-              className="mt-2"
               value={value.name}
               onChange={(e) => {
                 change("name", e.target.value);
@@ -146,31 +156,9 @@ function AutomationForm({
             />
           </FieldLabel>
           <FieldLabel className="w-full flex-col items-start">
-            Project
-            <NativeSelect
-              className="mt-2 w-full"
-              aria-label="Project"
-              value={value.projectID}
-              disabled={initial.id !== ""}
-              onChange={(e) => {
-                change("projectID", e.target.value);
-              }}
-              required
-            >
-              <option value="" disabled>
-                Choose a project
-              </option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </NativeSelect>
-          </FieldLabel>
-          <FieldLabel className="w-full flex-col items-start">
             Instructions
             <Textarea
-              className="mt-2 min-h-40"
+              className="min-h-32"
               value={value.instructions}
               onChange={(e) => {
                 change("instructions", e.target.value);
@@ -179,11 +167,35 @@ function AutomationForm({
               placeholder="Check for outdated dependencies. Update safe minor versions, run tests, and open a draft PR if anything changes."
             />
           </FieldLabel>
-          <div className="space-y-4 rounded-lg border p-4">
-            <FieldLabel className="w-full flex-col items-start">
-              Runs in
+          <div className="divide-y rounded-lg border">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <FieldLabel htmlFor="automation-project">Project</FieldLabel>
               <NativeSelect
-                className="mt-2 w-full"
+                id="automation-project"
+                className="w-[min(14rem,52vw)]"
+                aria-label="Project"
+                value={value.projectID}
+                disabled={initial.id !== ""}
+                onChange={(e) => {
+                  change("projectID", e.target.value);
+                }}
+                required
+              >
+                <option value="" disabled>
+                  Choose a project
+                </option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3">
+              <FieldLabel htmlFor="automation-mode">Runs in</FieldLabel>
+              <NativeSelect
+                id="automation-mode"
+                className="col-start-2 row-start-1 w-[min(14rem,52vw)] sm:row-span-2"
                 aria-label="Runs in"
                 value={value.mode}
                 onChange={(e) => {
@@ -194,122 +206,126 @@ function AutomationForm({
                 <option value="new">A new chat each run</option>
                 <option value="same">The same chat each run</option>
               </NativeSelect>
-            </FieldLabel>
-            <p id="run-mode-help" className="text-sm text-muted-foreground">
-              {value.mode === "same"
-                ? "Runs continue in one dedicated chat, keeping its workspace and conversation."
-                : "Each run starts with a fresh workspace and conversation."}
-            </p>
-            {initial.id && value.mode !== initial.mode && (
-              <p className="text-sm">
-                The next run will start a new chat. Previous chats stay available.
-              </p>
-            )}
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FieldLabel className="w-full flex-col items-start">
-              Schedule
-              <NativeSelect
-                className="mt-2 w-full"
-                aria-label="Schedule"
-                value={frequency}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  if (next === "daily" || next === "weekdays" || next === "weekly") {
-                    change("frequency", next);
-                  }
-                }}
+              <p
+                id="run-mode-help"
+                className="col-span-2 text-sm text-muted-foreground sm:col-span-1 sm:row-start-2"
               >
-                <option value="daily">Daily</option>
-                <option value="weekdays">Weekdays</option>
-                <option value="weekly">Weekly</option>
-              </NativeSelect>
-            </FieldLabel>
-            <FieldLabel className="w-full flex-col items-start">
-              Time
-              <Input
-                className="mt-2"
-                type="time"
-                value={time}
-                onChange={(e) => {
-                  change("time", e.target.value);
-                }}
-                required
-              />
-            </FieldLabel>
-          </div>
-          {frequency === "weekly" && (
-            <fieldset>
-              <legend className="mb-2 text-sm font-medium">Days</legend>
-              <div className="flex flex-wrap gap-2">
-                {weekdays.map((day, index) => (
-                  <Button
-                    type="button"
-                    key={day}
-                    size="sm"
-                    variant={(days ?? []).includes(index) ? "default" : "outline"}
-                    aria-label={day}
-                    aria-pressed={(days ?? []).includes(index)}
-                    onClick={() => {
-                      change(
-                        "days",
-                        (days ?? []).includes(index)
-                          ? (days ?? []).filter((d) => d !== index)
-                          : [...(days ?? []), index].toSorted((a, b) => a - b),
-                      );
-                    }}
-                  >
-                    {day.slice(0, 3)}
-                  </Button>
-                ))}
-              </div>
-            </fieldset>
-          )}
-          <FieldLabel className="w-full flex-col items-start">
-            Time zone
-            <Input
-              className="mt-2"
-              aria-label="Time zone"
-              value={timeZone}
-              onChange={(e) => {
-                change("timeZone", e.target.value);
-              }}
-              required
-              list="automation-zones"
-            />
-            <datalist id="automation-zones">
-              {Intl.supportedValuesOf("timeZone").map((zone) => (
-                <option key={zone} value={zone}>
-                  {zone}
-                </option>
-              ))}
-              <option value="UTC">UTC</option>
-            </datalist>
-          </FieldLabel>
-          <div className="text-sm text-muted-foreground" aria-live="polite">
-            {previewError ? (
-              <p>{previewError}</p>
-            ) : (
-              <p>
-                {preview
-                  ? `Next run: ${stamp(preview, timeZone)} · ${timeZone}`
-                  : "Checking schedule…"}
+                {value.mode === "same"
+                  ? "Runs continue in one dedicated chat, keeping its workspace and conversation."
+                  : "Each run starts with a fresh workspace and conversation."}
               </p>
-            )}
-            <p className="mt-2">
-              Runs use your installation’s model, credentials, and limits. Missed runs and runs that
-              overlap active work are skipped.
-            </p>
+              {initial.id && value.mode !== initial.mode && (
+                <p className="col-span-2 text-sm">
+                  The next run will start a new chat. Previous chats stay available.
+                </p>
+              )}
+            </div>
+            <div className="space-y-3 px-4 py-4">
+              <p className="text-sm font-medium">Schedule</p>
+              <div
+                role="group"
+                aria-label="Run schedule"
+                className="flex flex-wrap items-center gap-x-3 gap-y-2"
+              >
+                <NativeSelect
+                  className="w-auto"
+                  aria-label="Schedule"
+                  value={frequency}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    if (next === "daily" || next === "weekdays" || next === "weekly") {
+                      change("frequency", next);
+                    }
+                  }}
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekdays">Weekdays</option>
+                  <option value="weekly">Weekly</option>
+                </NativeSelect>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground" aria-hidden="true">
+                    at
+                  </span>
+                  <Input
+                    className="w-34"
+                    aria-label="Time"
+                    type="time"
+                    value={time}
+                    onChange={(e) => {
+                      change("time", e.target.value);
+                    }}
+                    required
+                  />
+                </div>
+                <div className="flex max-w-full min-w-0 items-center gap-2">
+                  <span className="text-sm text-muted-foreground" aria-hidden="true">
+                    in
+                  </span>
+                  <Input
+                    className="w-52 min-w-0"
+                    aria-label="Time zone"
+                    value={timeZone}
+                    onChange={(e) => {
+                      change("timeZone", e.target.value);
+                    }}
+                    required
+                    list="automation-zones"
+                  />
+                </div>
+              </div>
+              <datalist id="automation-zones">
+                {Intl.supportedValuesOf("timeZone").map((zone) => (
+                  <option key={zone} value={zone}>
+                    {zone}
+                  </option>
+                ))}
+                <option value="UTC">UTC</option>
+              </datalist>
+              {frequency === "weekly" && (
+                <fieldset>
+                  <legend className="mb-2 text-sm font-medium">Days</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {weekdays.map((day, index) => (
+                      <Button
+                        type="button"
+                        key={day}
+                        size="sm"
+                        variant={(days ?? []).includes(index) ? "default" : "outline"}
+                        aria-label={day}
+                        aria-pressed={(days ?? []).includes(index)}
+                        onClick={() => {
+                          change(
+                            "days",
+                            (days ?? []).includes(index)
+                              ? (days ?? []).filter((d) => d !== index)
+                              : [...(days ?? []), index].toSorted((a, b) => a - b),
+                          );
+                        }}
+                      >
+                        {day.slice(0, 3)}
+                      </Button>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+              <div className="text-xs text-muted-foreground" aria-live="polite">
+                {previewError ? (
+                  <p>{previewError}</p>
+                ) : (
+                  <p>
+                    {preview
+                      ? `Next run: ${stamp(preview, timeZone)} · ${timeZone}`
+                      : "Checking schedule…"}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Runs use your installation’s model, credentials, and limits. Missed runs and runs that
+            overlap active work are skipped.
+          </p>
         </fieldset>
-        <div className="flex gap-2">
-          <Button type="submit" disabled={busy || !preview}>
-            {busy ? "Saving…" : saveLabel}
-          </Button>
-          <Button type="button" variant="ghost" disabled={busy} onClick={cancel}>
-            Cancel
-          </Button>
-        </div>
       </form>
     </section>
   );
