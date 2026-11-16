@@ -7,6 +7,7 @@ import {
   TabsTrigger,
   TabsContent,
   GitBranchIcon,
+  XIcon,
   Alert,
   ArrowDownIcon,
   Button,
@@ -397,20 +398,40 @@ export function Chats({
               className="h-auto! min-w-0 shrink justify-start gap-1 bg-transparent p-0"
             >
               <ChatTitle title={title()} chat={detail?.chat} pulls={pulls} tabbed />
-              <TabsTrigger
-                value="diffs"
-                variant="control"
-                render={
-                  <Button
-                    variant={activeDiff ? "secondary" : "ghost"}
-                    size="compact"
-                    className="tracking-tight"
-                  />
-                }
+              <div
+                className={`flex shrink-0 items-center rounded-lg ${activeDiff ? "bg-secondary" : ""}`}
               >
-                <GitBranchIcon />
-                <span className="florets-control-label">Diffs</span>
-              </TabsTrigger>
+                <TabsTrigger
+                  value="diffs"
+                  variant="control"
+                  render={
+                    <Button
+                      variant={activeDiff ? "secondary" : "ghost"}
+                      size="compact"
+                      className="rounded-r-none tracking-tight"
+                    />
+                  }
+                >
+                  <GitBranchIcon />
+                  <span className="florets-control-label">Diffs</span>
+                </TabsTrigger>
+                <Button
+                  variant="ghost"
+                  size="icon-compact"
+                  className="rounded-l-none"
+                  aria-label="Close Diffs"
+                  title="Close Diffs"
+                  onClick={() => {
+                    setDiffChat(null);
+                    setActiveDiff(false);
+                    document
+                      .querySelector<HTMLButtonElement>('button[aria-label="Chat views"]')
+                      ?.focus();
+                  }}
+                >
+                  <XIcon />
+                </Button>
+              </div>
             </TabsList>
           )}
           {existingChat && (

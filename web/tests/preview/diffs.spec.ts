@@ -112,4 +112,15 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   await chatTab.click();
   await expect(chatTab).toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this draft");
+  await page.getByRole("button", { name: "Close Diffs", exact: true }).click();
+  await expect(diffTab).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Chat views", exact: true })).toBeFocused();
+  await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this draft");
+  await page.getByRole("button", { name: "Chat views", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Diffs", exact: true }).click();
+  await expect(diffTab).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("button", { name: "Close Diffs", exact: true }).click();
+  await expect(diffTab).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Conversation", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this draft");
 });
