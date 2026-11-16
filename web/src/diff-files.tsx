@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import {
   Button,
@@ -9,12 +9,14 @@ import {
   CommandItem,
   CommandList,
   FileTypeIcon,
+  FolderIcon,
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@flora/florets";
 
 import { changeStatus, type FileChange } from "./changes-schemas";
+import { diffTree, type DiffTreeNode } from "./diff-tree";
 
 export function ChangeCounts({
   additions,
@@ -43,57 +45,96 @@ export function DiffFiles({
   onSelect: (index: number) => HTMLElement | undefined;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const nodes = useMemo(() => diffTree(files, query), [files, query]);
   const destination = useRef<HTMLElement | undefined>(undefined);
-  const multipleRepositories = new Set(files.map((file) => file.repository)).size > 1;
+
   return (
     <Popover
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) destination.current = undefined;
+        if (next) {
+          destination.current = undefined;
+          setQuery("");
+        }
       }}
     >
       <PopoverTrigger
         render={
           <Button variant="ghost" size="sm" aria-label="Files">
-            Files {files.length}
+            Files <span className="text-muted-foreground">{files.length}</span>
             <ChevronDownIcon />
           </Button>
         }
       />
       <PopoverContent
-        align="start"
+        align="end"
         className="w-96! max-w-[calc(100vw-24px)]! p-0"
         aria-label="Changed files"
         finalFocus={() => destination.current ?? true}
       >
-        <Command>
-          <CommandInput aria-label="Search changed files" placeholder="Search files…" />
-          <CommandList aria-label="Changed files">
+        <Command shouldFilter={false} className="rounded-lg! p-0">
+          <CommandInput
+            variant="plain"
+            value={query}
+            onValueChange={setQuery}
+            aria-label="Search changed files"
+            placeholder="Search"
+          />
+          <CommandList aria-label="Changed files" className="p-1.5">
             <CommandEmpty>No matching files.</CommandEmpty>
-            {files.map((file, index) => (
-              <CommandItem
-                key={`${file.repository ?? ""}:${file.path}`}
-                value={`${file.repository ?? ""}/${file.path}`}
-                onSelect={() => {
-                  destination.current = onSelect(index);
-                  setOpen(false);
-                }}
-              >
-                <FileTypeIcon path={file.path} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate">{file.path}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {multipleRepositories ? `${file.repository ?? "Repository"} · ` : ""}
-                    {changeStatus(file.status)}
-                  </span>
-                </span>
-                <ChangeCounts additions={file.additions} deletions={file.deletions} />
-              </CommandItem>
-            ))}
+            <FileTree
+              nodes={nodes}
+              onSelect={(index) => {
+                destination.current = onSelect(index);
+                setOpen(false);
+              }}
+            />
           </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function FileTree({
+  nodes,
+  onSelect,
+}: {
+  nodes: DiffTreeNode[];
+  onSelect: (index: number) => void;
+}) {
+  return nodes.map((node) =>
+    node.kind === "folder" ? (
+      <div key={node.path} role="group" aria-label={node.name}>
+        <div className="flex h-7 items-center gap-2 px-2 text-sm text-muted-foreground">
+          <FolderIcon aria-hidden="true" className="size-4 shrink-0" />
+          <span className="truncate" title={node.name}>
+            {node.name}
+          </span>
+        </div>
+        <div className="ml-3 border-l border-border pl-2">
+          <FileTree nodes={node.children} onSelect={onSelect} />
+        </div>
+      </div>
+    ) : (
+      <CommandItem
+        key={node.path}
+        value={node.path}
+        title={node.path}
+        className="min-h-7 gap-2 rounded-sm py-1 [&>svg:last-child]:hidden"
+        onSelect={() => {
+          onSelect(node.index);
+        }}
+      >
+        <FileTypeIcon path={node.file.path} />
+        <span className="min-w-0 flex-1 truncate">{node.name}</span>
+        {node.file.status !== "M" && (
+          <span className="text-xs text-muted-foreground">{changeStatus(node.file.status)}</span>
+        )}
+        <ChangeCounts additions={node.file.additions} deletions={node.file.deletions} />
+      </CommandItem>
+    ),
   );
 }

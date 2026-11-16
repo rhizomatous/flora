@@ -189,6 +189,18 @@ test("live mock shows colored Go and CSS with within-line edits", async ({ page 
     css.locator('[data-inline-change="add"]').filter({ hasText: "a3a3a3" }),
   ).toBeVisible();
   await expect(page.getByText("feed.css", { exact: true })).toBeVisible();
+  await review.getByRole("button", { name: "Files", exact: true }).click();
+  await expect(page.getByText("internal / notes", { exact: true })).toBeVisible();
+  await expect(page.getByRole("option")).toHaveCount(3);
+  const search = page.getByRole("combobox", { name: "Search changed files" });
+  await search.fill("internal cursor");
+  await expect(page.getByRole("option")).toHaveCount(1);
+  await expect(page.getByText("web / src", { exact: true })).toHaveCount(0);
+  await search.press("Enter");
+  await expect(review.locator("summary").filter({ hasText: "cursor.go" })).toBeFocused();
   await page.setViewportSize({ width: 390, height: 844 });
+  await review.getByRole("button", { name: "Files", exact: true }).click();
+  await expect(search).toHaveValue("");
+  await expect(page.getByRole("option")).toHaveCount(3);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
