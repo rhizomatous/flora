@@ -105,17 +105,20 @@ follow-ups prevent automatic cleanup from taking over that chat. Failed or waiti
 runs remain available for inspection and explicit recovery. Schedules and run
 records persist in SQLite; restarting Flora never resends a claimed run.
 
-### Chat UI preview
+### Shared UI preview
 
 Run `npm ci`, then `npm run preview:chat` and open the loopback URL printed by Vite.
+Projects, chats, pull requests, and automations share one demo dataset.
 The sidebar includes working, completed, waiting-for-an-answer, recovered-failure,
 and long-response chats. The preview uses the real app components, API requests,
 and EventSource connection. Its toolbar can replay, pause, or resume the working
 chat. Reload restores hidden controls. Playback is shared by tabs on that dev server.
 
 This mode needs no backend, Docker, credentials, or model access. All API routes
-are intercepted locally; mutations return a read-only error and unknown routes
-never reach an installation. Changed-file review data is illustrative. The preview
+are intercepted locally and unknown routes never reach an installation. Automation
+forms, pause/resume, and Run now work in memory. Simulated runs appear in the same
+chat list and run history, and reset when the preview server restarts. Schedules
+do not execute automatically. Other mutations return a read-only error. Changed-file review data is illustrative. The preview
 plugin and fixtures are not included in production builds.
 
 Message and question fixtures were captured from Flora's pinned OpenCode 1.2.27

@@ -1,6 +1,7 @@
 import type { Message, Part } from "@opencode-ai/sdk/v2";
 
 import type { Pull } from "../../web/src/pull-schemas.ts";
+import { captured } from "./captured.ts";
 import type { Frame } from "./server.ts";
 
 export const projects = [
@@ -61,7 +62,7 @@ type Step = { text: string } | { tool: string; input: Record<string, unknown>; o
 type Turn = { user: string; steps: Step[] };
 
 // Authored conversations use SDK message shapes; each tool has a running and completed frame.
-function conversation(id: string, turns: Turn[]): Frame[] {
+export function conversation(id: string, turns: Turn[]): Frame[] {
   const frames: Frame[] = [];
   const history: Frame["history"] = [];
   const sessionID = `session-${id}`;
@@ -406,3 +407,28 @@ export const stories = [
     ],
   },
 ].map(({ turns, ...story }) => ({ ...story, frames: conversation(story.id, turns) }));
+
+export const scenarios: { id: string; projectID: string; title: string; frames: Frame[] }[] = [
+  {
+    id: "working",
+    projectID: "preview",
+    title: "Check the project setup",
+    frames: captured.flatMap<Frame>((s) => (s.name === "completed" ? s.frames : [])),
+  },
+  ...captured.map((s) => ({
+    id: s.name,
+    projectID:
+      ({ recovery: "fieldnotes", long: "garden" } as Record<string, string>)[s.name] ?? "preview",
+    title:
+      (
+        {
+          completed: "Review the workspace changes",
+          waiting: "Move project settings into the menu",
+          recovery: "Fix the workspace checks",
+          long: "Improve keyboard navigation",
+        } as Record<string, string>
+      )[s.name] ?? s.name,
+    frames: s.frames,
+  })),
+  ...stories,
+];

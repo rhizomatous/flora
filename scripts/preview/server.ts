@@ -4,8 +4,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Message, Part, QuestionRequest } from "@opencode-ai/sdk/v2";
 import type { Plugin } from "vite";
 
-import { captured } from "./captured.ts";
-import { projects, stories } from "./scenarios.ts";
+import { PreviewAutomations } from "./automations.ts";
+import { projects, stories, scenarios as demoScenarios, conversation } from "./scenarios.ts";
 import { previewUsage } from "./usage.ts";
 
 export type Frame = { history: { info: Message; parts: Part[] }[]; questions: QuestionRequest[] };
@@ -13,30 +13,6 @@ function present<T>(value: T | undefined): T {
   assert.ok(value !== undefined);
   return value;
 }
-const scenarios: { id: string; projectID: string; title: string; frames: Frame[] }[] = [
-  {
-    id: "working",
-    projectID: "preview",
-    title: "Check the project setup",
-    frames: present(captured.find((s) => s.name === "completed")).frames,
-  },
-  ...captured.map((s) => ({
-    id: s.name,
-    projectID:
-      ({ recovery: "fieldnotes", long: "garden" } as Record<string, string>)[s.name] ?? "preview",
-    title:
-      (
-        {
-          completed: "Review the workspace changes",
-          waiting: "Move project settings into the menu",
-          recovery: "Fix the workspace checks",
-          long: "Improve keyboard navigation",
-        } as Record<string, string>
-      )[s.name] ?? s.name,
-    frames: s.frames,
-  })),
-  ...stories,
-];
 export const previewFrameMs = 2500;
 
 // Shift only runtime timestamps; file ranges and tool inputs retain their recorded values.
@@ -89,8 +65,8 @@ export function messages(frame: Frame, chatID: string) {
   });
 }
 
-export function chatAt(id: string, frame: Frame, finished: boolean) {
-  const scenario = present(scenarios.find((s) => s.id === id));
+export function chatAt(scenario: (typeof demoScenarios)[number], frame: Frame, finished: boolean) {
+  const { id } = scenario;
   const project = present(projects.find((p) => p.id === scenario.projectID));
   let status = finished ? "idle" : "working";
   let reason = finished ? "Turn completed; ready for a follow-up" : "Running";
@@ -125,6 +101,7 @@ export function chatAt(id: string, frame: Frame, finished: boolean) {
 
 /** The dev server owns only in-memory playback. Every API request is handled here, never proxied to a real installation. */
 export function chatPreview(): Plugin {
+  const scenarios = structuredClone(demoScenarios);
   const playback = new Map(
     scenarios.map((scenario) => [
       scenario.id,
@@ -154,6 +131,53 @@ export function chatPreview(): Plugin {
     res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" });
     res.end(JSON.stringify(value));
   }
+  const automations = new PreviewAutomations((automation, runID) => {
+    const existing =
+      automation.mode === "same" ? scenarios.find((s) => s.id === automation.chatID) : undefined;
+    if (existing) {
+      const state = present(playback.get(existing.id));
+      const frame = present(state.frames[index(existing.id)]);
+      if (frame.questions.length > 0 || index(existing.id) < existing.frames.length - 1) {
+        return null;
+      }
+    }
+    const id = existing?.id ?? `automation-${runID}`;
+    const frames = replayFrames(
+      conversation(runID, [
+        {
+          user: automation.instructions,
+          steps: [
+            {
+              text: "Simulated automation run completed. This preview does not execute tools, change repository files, or open pull requests.",
+            },
+          ],
+        },
+      ]),
+    );
+    const newFrame = present(frames.at(-1));
+    const messageID = `saved-${present(newFrame.history[0]).info.id}`;
+    if (existing) {
+      const previous = present(playback.get(id));
+      const previousFrame = present(previous.frames.at(-1));
+      const { sessionID } = present(previousFrame.history[0]).info;
+      for (const message of newFrame.history) {
+        message.info.sessionID = sessionID;
+        for (const part of message.parts) part.sessionID = sessionID;
+      }
+      newFrame.history.unshift(...previousFrame.history);
+      existing.frames = [newFrame];
+    } else {
+      scenarios.push({
+        id,
+        projectID: automation.projectID,
+        title: automation.name,
+        frames: [newFrame],
+      });
+    }
+    playback.set(id, { frames: [newFrame], frameIndex: 0, playing: false, lastTick: Date.now() });
+    for (const [stream, chatID] of streams) if (chatID === id) stream.end();
+    return { chatID: id, messageID };
+  });
   const handler = (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     if (url.pathname === "/__preview/control" && req.method === "POST") {
@@ -180,6 +204,13 @@ export function chatPreview(): Plugin {
     }
     if (!url.pathname.startsWith("/api/")) {
       next();
+      return;
+    }
+    if (url.pathname === "/api/automations" || url.pathname.startsWith("/api/automations/")) {
+      // oxlint-disable-next-line promise/prefer-await-to-then -- Connect middleware does not await handlers.
+      void automations.handle(req, res, url).catch(() => {
+        json(res, { error: "Invalid preview automation request." }, 400);
+      });
       return;
     }
     if (req.method !== "GET") {
@@ -238,7 +269,7 @@ export function chatPreview(): Plugin {
         chats: scenarios.map((s) => {
           const i = index(s.id);
           const state = present(playback.get(s.id));
-          return chatAt(s.id, present(state.frames[i]), i === s.frames.length - 1);
+          return chatAt(s, present(state.frames[i]), i === s.frames.length - 1);
         }),
         completions: [],
         cursor: 0,
@@ -258,9 +289,10 @@ export function chatPreview(): Plugin {
     const endpoint = match?.[2];
     if (endpoint === undefined) {
       json(res, {
-        chat: chatAt(id, frame, i === scenario.frames.length - 1),
+        chat: chatAt(scenario, frame, i === scenario.frames.length - 1),
         messages: messages(frame, id),
         continuationBlockedReason: "",
+        automationRuns: automations.forChat(id),
         contextUsage: frame.history.some(
           ({ info }) => info.role === "assistant" && info.time.completed !== undefined,
         )
@@ -278,19 +310,21 @@ export function chatPreview(): Plugin {
       const finished = i === scenario.frames.length - 1;
       const project = present(projects.find((p) => p.id === scenario.projectID));
       const repository = present(project.configuration.repositories[0]);
-      const files = story?.files.map((file) => {
-        const diff = `@@ -1,${file.before.split("\n").length} +1,${file.after.split("\n").length} @@\n-${file.before}\n+${file.after.split("\n").join("\n+")}\n`;
-        return {
-          repository: repository.name,
-          path: file.path,
-          status: "M",
-          binary: false,
-          undisplayable: false,
-          diff,
-          bytes: Buffer.byteLength(diff),
-          truncated: false,
-        };
-      });
+      const files = (story?.files ?? (id.startsWith("automation-") ? [] : undefined))?.map(
+        (file) => {
+          const diff = `@@ -1,${file.before.split("\n").length} +1,${file.after.split("\n").length} @@\n-${file.before}\n+${file.after.split("\n").join("\n+")}\n`;
+          return {
+            repository: repository.name,
+            path: file.path,
+            status: "M",
+            binary: false,
+            undisplayable: false,
+            diff,
+            bytes: Buffer.byteLength(diff),
+            truncated: false,
+          };
+        },
+      );
       json(res, {
         snapshot:
           i === scenario.frames.length - 1 && id !== "waiting"
