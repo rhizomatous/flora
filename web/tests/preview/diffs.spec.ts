@@ -81,7 +81,7 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   await page.keyboard.press("Escape");
 
   const closeDiffs = page.getByRole("button", { name: "Close Diffs", exact: true });
-  await review.getByRole("heading", { name: "Chat changes" }).hover();
+  await review.getByLabel("Change summary").hover();
   await expect(closeDiffs).toHaveCSS("opacity", "0");
   await diffTab.hover();
   await expect(closeDiffs).toHaveCSS("opacity", "1");
@@ -94,7 +94,7 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
     .not.toBe(revealedBackground);
   const hoveredBounds = await diffTab.boundingBox();
   expect(hoveredBounds?.width).toBe(diffBounds?.width);
-  await review.getByRole("heading", { name: "Chat changes" }).hover();
+  await review.getByLabel("Change summary").hover();
   await diffTab.focus();
   await expect(closeDiffs).toHaveCSS("opacity", "1");
   await diffTab.press("Tab");
@@ -105,7 +105,13 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   await expect(review.getByText("const limit = 20;", { exact: true })).toBeVisible();
   await expect(review.locator('[data-inline-change="add"]')).toHaveText(["20"]);
   await expect(review.locator('[data-inline-change="remove"]')).toHaveText(["10"]);
-  await expect(review.getByText(/Saved review, possibly out of date/)).toBeVisible();
+  await expect(review.getByRole("button", { name: "Diff details", exact: true })).toContainText(
+    "Out of date",
+  );
+  await review.getByRole("button", { name: "Diff details", exact: true }).click();
+  await expect(page.getByText(/Saved review, possibly out of date/)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(review.getByRole("list", { name: "Linked pull requests" })).toHaveCount(0);
   await expect(review.getByText(/logo.png.*Binary/)).toBeVisible();
   await expect(review.getByRole("link", { name: "Download full diff" })).toHaveAttribute(
     "href",
@@ -113,7 +119,12 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   );
   await review.getByRole("button", { name: "Collapse all", exact: true }).click();
   await expect(review.getByText("const limit = 20;", { exact: true })).not.toBeVisible();
-  await review.getByLabel("Jump to file").selectOption("0");
+  await review.getByRole("button", { name: "Files", exact: true }).click();
+  await page.getByRole("combobox", { name: "Search changed files" }).fill("no-such-file");
+  await expect(page.getByText("No matching files.", { exact: true })).toBeVisible();
+  await page.getByRole("combobox", { name: "Search changed files" }).fill("notes");
+  await page.getByRole("combobox", { name: "Search changed files" }).press("Enter");
+  await expect(review.locator("summary").first()).toBeFocused();
   await expect(review.getByText("const limit = 20;", { exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Conversation", exact: true })).not.toBeVisible();
   await chatTab.click();
@@ -155,6 +166,12 @@ test("live mock shows colored Go and CSS with within-line edits", async ({ page 
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
   await page.getByRole("menuitem", { name: "Diffs", exact: true }).click();
+  const review = page.getByRole("region", { name: "Chat changes", exact: true });
+  await expect(
+    review.getByLabel("Change summary").getByLabel("5 additions, 5 deletions"),
+  ).toBeVisible();
+  await expect(review.getByRole("link")).toHaveCount(0);
+  await expect(review.getByText("Modified", { exact: true })).toHaveCount(0);
   const go = page.getByRole("region", { name: "Diff for internal/notes/list.go", exact: true });
   await expect(go.locator('span[style*="--shiki-light"]').first()).toBeVisible();
   await expect(go.locator('[data-inline-change="add"]').filter({ hasText: "50" })).toBeVisible();

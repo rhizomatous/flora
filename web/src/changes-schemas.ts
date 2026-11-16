@@ -30,3 +30,18 @@ export const chatChangesSchema = z.object({
   pulls: pullSummarySchema,
 });
 export type ChatChanges = z.infer<typeof chatChangesSchema>;
+
+export function changeStatus(status: string) {
+  return (
+    (
+      {
+        A: "Added",
+        D: "Deleted",
+        R: "Renamed",
+        C: "Copied",
+        T: "Type changed",
+        M: "Modified",
+      } as Record<string, string>
+    )[status[0] ?? ""] ?? status
+  );
+}

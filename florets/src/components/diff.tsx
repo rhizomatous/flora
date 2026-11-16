@@ -101,17 +101,17 @@ function Hunk({ rows, language }: { rows: DiffLine[]; language: string }) {
           <tr key={index} className={colors[row.kind]}>
             <td
               aria-hidden="true"
-              className={`w-10 border-l-2 px-2 text-right select-none ${gutter[row.kind]}`}
+              className={`w-8 border-l-2 px-1 text-right select-none ${gutter[row.kind]}`}
             >
               {row.oldLine}
             </td>
             <td
               aria-hidden="true"
-              className="w-10 border-r border-border px-2 text-right text-muted-foreground select-none"
+              className="w-8 border-r border-border px-1 text-right text-muted-foreground select-none"
             >
               {row.newLine}
             </td>
-            <td className="w-5 px-1 select-none">
+            <td className="w-4 px-1 select-none">
               {{ add: "+", remove: "−", context: "" }[row.kind]}
             </td>
             <td className="pr-4">

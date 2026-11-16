@@ -1,9 +1,26 @@
 import { useEffect, useEffectEvent, useState, useRef } from "react";
 
-import { Heading, Link, Text, Button, Diff, FileTypeIcon } from "@flora/florets";
+import {
+  ChevronDownIcon,
+  Heading,
+  Link,
+  Text,
+  Button,
+  Diff,
+  FileTypeIcon,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  PopoverTitle,
+} from "@flora/florets";
 
-import { chatChangesSchema, type ChatChanges, type FileChange } from "./changes-schemas";
-import { PullList } from "./pull-links";
+import {
+  chatChangesSchema,
+  changeStatus,
+  type ChatChanges,
+  type FileChange,
+} from "./changes-schemas";
+import { ChangeCounts, DiffFiles } from "./diff-files";
 import { isExpired, request } from "./request";
 
 function contentNote(file: FileChange) {
@@ -52,20 +69,20 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
     };
   }, [chatID]);
   const snapshot = review?.snapshot;
-  const pulls = review?.pulls.items ?? [];
+  const multipleRepositories = new Set(snapshot?.files.map((file) => file.repository)).size > 1;
+  const countsKnown =
+    snapshot?.files.every((file) => file.additions !== undefined && file.deletions !== undefined) ??
+    false;
+  const totals = { additions: 0, deletions: 0 };
+  for (const file of snapshot?.files ?? []) {
+    totals.additions += file.additions ?? 0;
+    totals.deletions += file.deletions ?? 0;
+  }
   return (
     <section aria-label="Chat changes" ref={container} className="chat-diffs">
-      <Heading level={2} className="text-base">
+      <Heading level={2} className="sr-only">
         Chat changes
       </Heading>
-      <Text size="xs" tone="muted" className="mt-2">
-        Changes since this chat started.
-      </Text>
-      {review && (pulls.length > 0 || review.pulls.error !== "") && (
-        <div className="mt-3">
-          <PullList summary={review.pulls} />
-        </div>
-      )}
       {error !== "" && (
         <Text role="alert" className="mt-3">
           {error}
@@ -84,57 +101,61 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
       {snapshot === null && <Text className="mt-3">No successful review saved yet.</Text>}
       {snapshot && (
         <>
-          <Text size="xs" tone="muted" role="status" className="mt-3 break-words">
-            {review.stale || error !== ""
-              ? "Saved review, possibly out of date"
-              : "Latest saved review"}{" "}
-            ·{" "}
-            <time dateTime={snapshot.capturedAt}>
-              {new Date(snapshot.capturedAt).toLocaleString()}
-            </time>
-            {snapshot.base !== "" && <> · Base {snapshot.base.slice(0, 12)}</>}
-          </Text>
-          {snapshot.bases !== undefined && (
-            <ul aria-label="Repository bases" className="mt-2 text-xs text-muted-foreground">
-              {Object.entries(snapshot.bases).map(([name, sha]) => (
-                <li key={name} className="break-all">
-                  {name} · Base {sha.slice(0, 12)}
-                </li>
-              ))}
-            </ul>
-          )}
-          {snapshot.files.length === 0 && (
-            <Text className="mt-3">No changes from the starting commit.</Text>
-          )}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <label className="text-xs">
-              Files {snapshot.files.length}
-              <select
-                aria-label="Jump to file"
-                className="ml-2 max-w-48 rounded border border-border bg-background p-1"
-                defaultValue=""
-                onChange={(event) => {
-                  const file = container.current?.querySelector<HTMLDetailsElement>(
-                    `[data-file-index="${event.target.value}"]`,
-                  );
-                  if (file) {
-                    file.open = true;
-                    file.scrollIntoView({ block: "start" });
-                    file.querySelector("summary")?.focus();
-                  }
-                }}
+          <div className="diff-toolbar flex flex-wrap items-center gap-1 border-b border-border pb-2">
+            <Popover>
+              <PopoverTrigger
+                render={
+                  <Button variant="ghost" size="sm" aria-label="Diff details">
+                    Chat changes{review.stale || error !== "" ? " · Out of date" : ""}
+                    <ChevronDownIcon />
+                  </Button>
+                }
+              />
+              <PopoverContent
+                align="start"
+                className="max-w-[calc(100vw-24px)]"
+                aria-label="Diff details"
               >
-                <option value="" disabled>
-                  Jump to file
-                </option>
-                {snapshot.files.map((file, i) => (
-                  <option key={`${file.repository ?? ""}:${file.path}`} value={i}>
-                    {file.repository === undefined ? "" : `${file.repository}/`}
-                    {file.path}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <PopoverTitle>Changes since this chat started</PopoverTitle>
+                <Text size="xs" tone="muted" role="status" className="mt-2 break-words">
+                  {review.stale || error !== ""
+                    ? "Saved review, possibly out of date"
+                    : "Latest saved review"}{" "}
+                  ·{" "}
+                  <time dateTime={snapshot.capturedAt}>
+                    {new Date(snapshot.capturedAt).toLocaleString()}
+                  </time>
+                </Text>
+                {snapshot.base !== "" && (
+                  <Text size="xs" tone="muted" className="mt-2 break-all">
+                    Base {snapshot.base}
+                  </Text>
+                )}
+                {snapshot.bases !== undefined && (
+                  <ul aria-label="Repository bases" className="mt-2 text-xs text-muted-foreground">
+                    {Object.entries(snapshot.bases).map(([name, sha]) => (
+                      <li key={name} className="break-all">
+                        {name} · {sha}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </PopoverContent>
+            </Popover>
+            <span className="flex-1" />
+            <DiffFiles
+              files={snapshot.files}
+              onSelect={(index) => {
+                const file = container.current?.querySelector<HTMLDetailsElement>(
+                  `[data-file-index="${index}"]`,
+                );
+                if (file) {
+                  file.open = true;
+                  file.scrollIntoView({ block: "start" });
+                }
+                return file?.querySelector("summary") ?? undefined;
+              }}
+            />
             <Button
               variant="ghost"
               size="sm"
@@ -158,9 +179,29 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
               Expand all
             </Button>
           </div>
-          <ul className="mt-4 space-y-3">
+          <div
+            className="my-3 flex w-fit items-center gap-3 text-xs text-muted-foreground"
+            aria-label="Change summary"
+          >
+            <span>
+              {snapshot.files.length} {snapshot.files.length === 1 ? "file" : "files"}
+            </span>
+            {countsKnown && (
+              <ChangeCounts additions={totals.additions} deletions={totals.deletions} />
+            )}
+          </div>
+          {snapshot.files.length === 0 && (
+            <Text className="mt-3">No changes from the starting commit.</Text>
+          )}
+          <ul className="space-y-3">
             {snapshot.files.map((f, i) => (
               <li key={`${f.repository ?? ""}:${f.previous ?? ""}:${f.path}`} className="min-w-0">
+                {multipleRepositories &&
+                  (i === 0 || snapshot.files[i - 1]?.repository !== f.repository) && (
+                    <Heading level={3} className="py-2 text-sm">
+                      {f.repository ?? "Repository"}
+                    </Heading>
+                  )}
                 <details
                   open
                   data-file-index={i}
@@ -173,27 +214,14 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
                       <span className="min-w-0 text-xs text-muted-foreground">
                         {f.path.includes("/") ? f.path.slice(0, f.path.lastIndexOf("/") + 1) : ""}
                       </span>
-                      <span className="text-xs text-muted-foreground">
-                        {{ A: "Added", D: "Deleted", R: "Renamed", C: "Copied", T: "Type changed" }[
-                          f.status[0] ?? ""
-                        ] ?? "Modified"}
-                      </span>
-                      {f.repository !== undefined && (
-                        <span className="mr-2 text-muted-foreground">{f.repository}</span>
+                      {f.status !== "M" && (
+                        <span className="text-xs text-muted-foreground">
+                          {changeStatus(f.status)}
+                        </span>
                       )}
                       {f.previous !== undefined && <>{f.previous} → </>}
                       {contentNote(f)}
-                      {f.additions !== undefined && f.deletions !== undefined && (
-                        <span
-                          className="ml-auto inline-flex gap-2 tabular-nums"
-                          aria-label={`${f.additions} additions, ${f.deletions} deletions`}
-                        >
-                          <span className="text-emerald-700 dark:text-emerald-400">
-                            +{f.additions}
-                          </span>
-                          <span className="text-red-700 dark:text-red-400">−{f.deletions}</span>
-                        </span>
-                      )}
+                      <ChangeCounts additions={f.additions} deletions={f.deletions} />
                     </span>
                   </summary>
                   {f.truncated && (
