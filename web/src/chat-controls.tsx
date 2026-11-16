@@ -198,7 +198,7 @@ export function ChatHeaderActions({ usage }: { usage: Usage | undefined }) {
             : `Est. ${usage.costUSD > 0 && usage.costUSD < 0.01 ? "<$0.01" : `$${usage.costUSD.toFixed(2)}`}`}
         </PopoverTrigger>
         <PopoverContent align="end" className="w-72">
-          <PopoverTitle>Model usage</PopoverTitle>
+          <PopoverTitle className="text-base font-semibold">Model usage</PopoverTitle>
           {refreshFailed && (
             <PopoverDescription>
               {usage.steps > 0
