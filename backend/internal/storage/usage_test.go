@@ -168,6 +168,7 @@ func TestUsageMigrationRestoresReportedZero(t *testing.T) {
 	_, err := s.db.Exec(`ALTER TABLE usage_messages ADD COLUMN incomplete INTEGER NOT NULL DEFAULT 0;
  ALTER TABLE usage_messages ADD COLUMN pricing_known INTEGER NOT NULL DEFAULT 0;
  UPDATE usage_steps SET cost_nanos=NULL;
+ DROP INDEX usage_messages_created;
  PRAGMA user_version=7;`)
 	must(t, err)
 	must(t, s.Close())

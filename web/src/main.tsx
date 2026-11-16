@@ -29,6 +29,7 @@ import { text } from "./ui";
 
 import "./styles.css";
 
+import { UsagePage } from "./usage-page";
 import { WorkspaceMenu } from "./workspace-menu";
 
 const currentPath = () => window.location.hash.slice(1) || "chats/new";
@@ -291,12 +292,14 @@ function App() {
           {ready && path === "settings" && (
             <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
           )}
+          {ready && path === "usage" && <UsagePage onExpired={onExpired} />}
           {pullsPage && (
             <PullRequests chats={notifications.chats} disconnected={notifications.error !== ""} />
           )}
           {ready &&
             path !== "settings" &&
             path !== "pulls" &&
+            path !== "usage" &&
             (path.startsWith("chats") ? (
               <Chats
                 key={path}

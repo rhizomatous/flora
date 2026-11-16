@@ -84,7 +84,7 @@ Attachment/context, model, reasoning, slash-command, and voice placeholders list
 - [ ] Read state: implement Mark all as read and durable read/unread persistence across tabs and browser sessions. Per-tab viewed revisions already use session storage.
 - [ ] Persist sorting and collapsed project preferences; currently these work only for the current sidebar session.
 - [ ] Populate hover summaries with model and CI/check details when backend metadata is available. Saved PR details and additions/deletions are already connected.
-- [ ] Workspace menu: connect Usage.
+- [x] Workspace menu: connect Usage with date ranges, cost and token charts, project/model breakdowns, and linked chat history.
 - [ ] Workspace identity: replace the generic Flora/Workspace footer with saved identity and avatar data when available.
 
 Sidebar actions that are not connected are disabled; timestamps and statuses come from the saved chat feed.

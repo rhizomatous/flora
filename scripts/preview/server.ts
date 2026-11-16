@@ -6,6 +6,7 @@ import type { Plugin } from "vite";
 
 import { captured } from "./captured.ts";
 import { projects, stories } from "./scenarios.ts";
+import { previewUsage } from "./usage.ts";
 
 export type Frame = { history: { info: Message; parts: Part[] }[]; questions: QuestionRequest[] };
 function present<T>(value: T | undefined): T {
@@ -214,6 +215,12 @@ export function chatPreview(): Plugin {
           sound: false,
         },
       });
+      return;
+    }
+    if (url.pathname === "/api/usage") {
+      const from = url.searchParams.get("from") ?? "";
+      const to = url.searchParams.get("to") ?? "";
+      json(res, previewUsage(from, to));
       return;
     }
     if (url.pathname === "/api/projects") {
