@@ -133,3 +133,5 @@ export {
   FilesIcon,
   MessageSquareIcon,
 } from "lucide-react";
+
+export { Diff } from "./components/diff";

@@ -1,6 +1,6 @@
-import { useEffect, useEffectEvent, useState } from "react";
+import { useEffect, useEffectEvent, useState, useRef } from "react";
 
-import { Heading, Link, Text } from "@flora/florets";
+import { Heading, Link, Text, Button, Diff } from "@flora/florets";
 
 import { chatChangesSchema, type ChatChanges, type FileChange } from "./changes-schemas";
 import { PullList } from "./pull-links";
@@ -12,7 +12,24 @@ function contentNote(file: FileChange) {
   return "";
 }
 
-export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () => void }) {
+export function Changes({
+  chatID,
+  onExpired,
+  expanded,
+  onExpand,
+  onClose,
+}: {
+  chatID: string;
+  onExpired: () => void;
+  expanded: boolean;
+  onExpand: () => void;
+  onClose: () => void;
+}) {
+  const container = useRef<HTMLElement>(null);
+  const title = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    title.current?.focus();
+  }, []);
   const [review, setReview] = useState<ChatChanges>();
   const [error, setError] = useState("");
   const expire = useEffectEvent(onExpired);
@@ -53,11 +70,21 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
   const snapshot = review?.snapshot;
   const pulls = review?.pulls.items ?? [];
   return (
-    <section
-      aria-label="Changes"
-      className="mt-8 min-w-0 rounded-md border border-foreground/20 p-4"
-    >
-      <Heading level={2}>Changes</Heading>
+    <section aria-label="Chat changes" ref={container} className="chat-diffs">
+      <div className="flex flex-wrap items-center gap-2">
+        <Heading level={2} ref={title} tabIndex={-1} className="mr-auto text-base">
+          Chat changes
+        </Heading>
+        <Button variant="ghost" size="sm" className="chat-diff-expand" onClick={onExpand}>
+          {expanded ? "Show chat" : "Expand"}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          Back to chat
+        </Button>
+      </div>
+      <Text size="xs" tone="muted" className="mt-2">
+        Changes since this chat started.
+      </Text>
       {review && (pulls.length > 0 || review.pulls.error !== "") && (
         <div className="mt-3">
           <PullList summary={review.pulls} />
@@ -103,11 +130,67 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
           {snapshot.files.length === 0 && (
             <Text className="mt-3">No changes from the starting commit.</Text>
           )}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <label className="text-xs">
+              Files {snapshot.files.length}
+              <select
+                aria-label="Jump to file"
+                className="ml-2 max-w-48 rounded border border-border bg-background p-1"
+                defaultValue=""
+                onChange={(event) => {
+                  const file = container.current?.querySelector<HTMLDetailsElement>(
+                    `[data-file-index="${event.target.value}"]`,
+                  );
+                  if (file) {
+                    file.open = true;
+                    file.scrollIntoView({ block: "start" });
+                    file.querySelector("summary")?.focus();
+                  }
+                }}
+              >
+                <option value="" disabled>
+                  Jump to file
+                </option>
+                {snapshot.files.map((file, i) => (
+                  <option key={`${file.repository ?? ""}:${file.path}`} value={i}>
+                    {file.repository === undefined ? "" : `${file.repository}/`}
+                    {file.path}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                for (const file of container.current?.querySelectorAll("details") ?? []) {
+                  file.open = false;
+                }
+              }}
+            >
+              Collapse all
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                for (const file of container.current?.querySelectorAll("details") ?? []) {
+                  file.open = true;
+                }
+              }}
+            >
+              Expand all
+            </Button>
+          </div>
           <ul className="mt-4 space-y-3">
             {snapshot.files.map((f, i) => (
               <li key={`${f.repository ?? ""}:${f.previous ?? ""}:${f.path}`} className="min-w-0">
-                <details className="rounded-md border border-foreground/20 p-3">
-                  <summary className="cursor-pointer text-sm break-all">
+                <details
+                  open
+                  data-file-index={i}
+                  className="overflow-hidden rounded-md border border-border"
+                >
+                  <summary className="cursor-pointer bg-muted/30 p-3 text-sm break-all">
                     <span className="mr-2 font-mono">{f.status}</span>
                     {f.repository !== undefined && (
                       <span className="mr-2 text-muted-foreground">{f.repository}</span>
@@ -115,6 +198,17 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
                     {f.previous !== undefined && <>{f.previous} → </>}
                     {f.path}
                     {contentNote(f)}
+                    {f.additions !== undefined && f.deletions !== undefined && (
+                      <span
+                        className="ml-3 inline-flex gap-2 tabular-nums"
+                        aria-label={`${f.additions} additions, ${f.deletions} deletions`}
+                      >
+                        <span className="text-emerald-700 dark:text-emerald-400">
+                          +{f.additions}
+                        </span>
+                        <span className="text-red-700 dark:text-red-400">−{f.deletions}</span>
+                      </span>
+                    )}
                   </summary>
                   {f.truncated && (
                     <Text className="mt-3">
@@ -126,15 +220,7 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
                       </Link>
                     </Text>
                   )}
-                  {f.diff !== "" && (
-                    <pre
-                      tabIndex={0}
-                      aria-label={`Diff for ${f.path}`}
-                      className="mt-3 max-h-[32rem] overflow-auto font-mono text-xs leading-5 whitespace-pre"
-                    >
-                      {f.diff}
-                    </pre>
-                  )}
+                  {f.diff !== "" && <Diff patch={f.diff} path={f.path} />}
                 </details>
               </li>
             ))}

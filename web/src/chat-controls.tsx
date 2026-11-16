@@ -28,8 +28,10 @@ import {
   DatabaseIcon,
   GitBranchIcon,
   GitPullRequestIcon,
-  TerminalIcon,
   PlusIcon,
+  TerminalIcon,
+  MonitorIcon,
+  ClockIcon,
   EllipsisIcon,
   PanelRightIcon,
   ExternalLinkIcon,
@@ -37,13 +39,10 @@ import {
   FilesIcon,
   GlobeIcon,
   ListIcon,
-  MonitorIcon,
-  ClockIcon,
 } from "@flora/florets";
 
 import type { Chat, Usage } from "./chat-schemas";
 import { chatStatus } from "./chat-status";
-import { PlaceholderMenu } from "./composer";
 import { PullCount, PullList } from "./pull-links";
 import type { PullSummary } from "./pull-schemas";
 
@@ -149,30 +148,83 @@ export function ChatTitle({
   );
 }
 
-function ChatViewMenu() {
+function ChatViewMenu({
+  diffsOpen,
+  onDiffsChange,
+}: {
+  diffsOpen: boolean;
+  onDiffsChange: (open: boolean) => void;
+}) {
   return (
-    <PlaceholderMenu
-      label="Chat views"
-      iconOnly
-      variant="ghost"
-      items={[
-        { label: "Overview", icon: <ListIcon />, detail: "Current view" },
-        { label: "Diffs", icon: <GitBranchIcon /> },
-        { label: "Machine files", icon: <FilesIcon /> },
-        { label: "Setup", icon: <DatabaseIcon /> },
-        { label: "Browser", icon: <GlobeIcon /> },
-        { label: "Side threads", separator: true },
-        { label: "New shell", icon: <TerminalIcon />, separator: true },
-        { label: "Desktop", icon: <MonitorIcon /> },
-        { label: "Keep awake 4h", icon: <ClockIcon />, separator: true },
-      ]}
-    >
-      <PlusIcon />
-    </PlaceholderMenu>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" aria-label="Chat views">
+            <PlusIcon />
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="start">
+        <DropdownMenuItem
+          onClick={() => {
+            onDiffsChange(false);
+          }}
+        >
+          <ListIcon />
+          Overview
+          {!diffsOpen && <span className="ml-auto text-muted-foreground">Current view</span>}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            onDiffsChange(true);
+          }}
+        >
+          <GitBranchIcon />
+          Diffs{diffsOpen && <span className="ml-auto text-muted-foreground">Open</span>}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled>
+          <FilesIcon />
+          Machine files
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled>
+          <DatabaseIcon />
+          Setup
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled>
+          <GlobeIcon />
+          Browser
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled>Side threads</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled>
+          <TerminalIcon />
+          New shell
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled>
+          <MonitorIcon />
+          Desktop
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled>
+          <ClockIcon />
+          Keep awake 4h
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
-export function ChatHeaderActions({ usage }: { usage: Usage | undefined }) {
+export function ChatHeaderActions({
+  usage,
+  diffsOpen,
+  onDiffsChange,
+}: {
+  usage: Usage | undefined;
+  diffsOpen: boolean;
+  onDiffsChange: (open: boolean) => void;
+}) {
   const [copyState, setCopyState] = useState("Copy link");
   const costUnavailable = usage?.costUSD === undefined || usage.costUSD === null;
   const refreshFailed =
@@ -187,7 +239,7 @@ export function ChatHeaderActions({ usage }: { usage: Usage | undefined }) {
   }
   return (
     <>
-      <ChatViewMenu />
+      <ChatViewMenu diffsOpen={diffsOpen} onDiffsChange={onDiffsChange} />
       <span className="ml-auto" />
       <Popover>
         <PopoverTrigger

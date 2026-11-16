@@ -11,6 +11,8 @@ export const fileChangeSchema = z.object({
   undisplayable: z.boolean(),
   diff: z.string(),
   bytes: z.number(),
+  additions: z.number().optional(),
+  deletions: z.number().optional(),
   truncated: z.boolean(),
 });
 export type FileChange = z.infer<typeof fileChangeSchema>;

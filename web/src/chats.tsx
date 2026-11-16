@@ -2,6 +2,9 @@
 import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
   Alert,
   ArrowDownIcon,
   Button,
@@ -30,6 +33,7 @@ import {
 } from "@flora/florets";
 
 import { authenticatedSchema } from "./auth-schemas";
+import { Changes } from "./changes";
 import {
   ChatTurnNavigation,
   ChatPullProvider,
@@ -128,6 +132,8 @@ export function Chats({
   list: Chat[] | undefined;
   listError: string;
 }) {
+  const [diffChat, setDiffChat] = useState<string | null>(null);
+  const [expandedDiff, setExpandedDiff] = useState(false);
   // Undefined until the project list loads.
   const [projects, setProjects] = useState<ProjectSummary[]>();
   const [detail, setDetail] = useState<Detail>();
@@ -372,7 +378,16 @@ export function Chats({
         >
           {existingChat ? <ChatTitle title={title()} chat={detail?.chat} pulls={pulls} /> : title()}
         </Heading>
-        {existingChat && <ChatHeaderActions usage={detail?.usage} />}
+        {existingChat && (
+          <ChatHeaderActions
+            usage={detail?.usage}
+            diffsOpen={diffChat === id}
+            onDiffsChange={(open) => {
+              setDiffChat(open ? id : null);
+              setExpandedDiff(false);
+            }}
+          />
+        )}
       </div>
       {error !== "" && (
         <Alert role="alert" className="mt-6">
@@ -406,37 +421,70 @@ export function Chats({
         </Text>
       )}
       {detail && (
-        <ChatDetail
-          pulls={pulls}
-          id={id}
-          detail={detail}
-          activity={activity}
-          disconnected={disconnected}
-          busy={busy}
-          onControl={(action) => {
-            void controlWork(action);
-          }}
-          onSend={(event) => {
-            void send(event);
-          }}
+        <ResizablePanelGroup
+          className={`chat-review-layout ${diffChat === id ? "has-diffs" : ""} ${expandedDiff ? "diff-expanded" : ""}`}
         >
-          {questionError !== "" && (
-            <Text className="mt-6" role="status">
-              {questionError}
-            </Text>
+          <ResizablePanel id="conversation" minSize="30%" className="chat-conversation">
+            <div className="flex h-full min-h-0 min-w-0 flex-col px-1">
+              <ChatDetail
+                pulls={pulls}
+                id={id}
+                detail={detail}
+                activity={activity}
+                disconnected={disconnected}
+                busy={busy}
+                onControl={(action) => {
+                  void controlWork(action);
+                }}
+                onSend={(event) => {
+                  void send(event);
+                }}
+              >
+                {questionError !== "" && (
+                  <Text className="mt-6" role="status">
+                    {questionError}
+                  </Text>
+                )}
+                {questions.map((q) => (
+                  <QuestionForm
+                    key={q.id}
+                    question={q}
+                    chatID={id}
+                    onError={report}
+                    onAnswered={() => {
+                      setQuestions((rows) => rows.filter((row) => row.id !== q.id));
+                    }}
+                  />
+                ))}
+              </ChatDetail>
+            </div>
+          </ResizablePanel>
+          {diffChat === id && (
+            <>
+              <ResizableHandle className="chat-diff-handle mx-3" withHandle />
+              <ResizablePanel
+                id="diffs"
+                defaultSize="55%"
+                minSize="30%"
+                className="chat-diff-panel"
+              >
+                <Changes
+                  key={id}
+                  chatID={id}
+                  onExpired={onExpired}
+                  expanded={expandedDiff}
+                  onExpand={() => {
+                    setExpandedDiff(!expandedDiff);
+                  }}
+                  onClose={() => {
+                    setDiffChat(null);
+                    document.querySelector<HTMLButtonElement>('[aria-label="Chat views"]')?.focus();
+                  }}
+                />
+              </ResizablePanel>
+            </>
           )}
-          {questions.map((q) => (
-            <QuestionForm
-              key={q.id}
-              question={q}
-              chatID={id}
-              onError={report}
-              onAnswered={() => {
-                setQuestions((rows) => rows.filter((row) => row.id !== q.id));
-              }}
-            />
-          ))}
-        </ChatDetail>
+        </ResizablePanelGroup>
       )}
     </section>
   );
