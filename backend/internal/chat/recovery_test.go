@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -66,7 +67,17 @@ func TestRecoveryReconnectsWithoutSubmitting(t *testing.T) {
 				time.Sleep(time.Millisecond)
 			}
 			f.mu.Lock()
-			f.history = append(f.history, json.RawMessage(`{"info":{"id":"assistant_original","role":"assistant","parentID":"msg_original","finish":"stop","time":{"completed":1}},"parts":[{"type":"text","text":"recovered provider_SECRET"}]}`))
+			usage := map[string]any{"input": float64(120), "output": float64(35), "reasoning": float64(8), "cache": map[string]any{"read": float64(90), "write": float64(15)}}
+			part := map[string]any{"id": "usage-step", "type": "step-finish", "cost": 0.0123, "tokens": usage}
+			assistant, err := json.Marshal(map[string]any{
+				"info":  map[string]any{"id": "assistant_original", "role": "assistant", "parentID": "msg_original", "finish": "stop", "time": map[string]int{"completed": 1}},
+				"parts": []any{map[string]string{"type": "text", "text": "recovered provider_SECRET"}, part},
+			})
+			if err != nil {
+				f.mu.Unlock()
+				t.Fatal(err)
+			}
+			f.history = append(f.history, assistant)
 			f.busy = false
 			f.mu.Unlock()
 			waitStatus(t, recovered, c.ID, storage.Idle)
@@ -81,6 +92,15 @@ func TestRecoveryReconnectsWithoutSubmitting(t *testing.T) {
 			messages, _ := original.Store.Messages(ctx, c.ID)
 			if len(messages) != 2 || messages[0].RuntimeMessageID != "msg_original" || strings.Contains(messages[1].Text, "provider_SECRET") {
 				t.Fatalf("incorrect recovered messages: %+v", messages)
+			}
+			var payload struct {
+				Parts []map[string]any `json:"parts"`
+			}
+			if err := json.Unmarshal(messages[1].Payload, &payload); err != nil {
+				t.Fatal(err)
+			}
+			if len(payload.Parts) != 2 || !reflect.DeepEqual(payload.Parts[1], part) {
+				t.Fatalf("recovery lost reported usage: %s", messages[1].Payload)
 			}
 			rows, _ := original.Store.Activities(ctx, c.ID, 0, 1000)
 			gaps := 0
