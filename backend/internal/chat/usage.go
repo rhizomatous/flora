@@ -217,7 +217,12 @@ func (s *Service) reconcileChatUsage(ctx context.Context, c storage.Chat) {
 	if err != nil {
 		return
 	}
-	if c.ActiveMessageID == "" && usage.Collection == "complete" && usage.ReconciledRevision == c.UpdatedAt {
+	contextUsage, err := s.Store.ChatContext(ctx, c.ID)
+	if err != nil {
+		return
+	}
+	needsLimit := contextUsage.Tokens != nil && contextUsage.Limit == nil
+	if !needsLimit && c.ActiveMessageID == "" && usage.Collection == "complete" && usage.ReconciledRevision == c.UpdatedAt {
 		return
 	}
 	// Failed endpoints are retried without inspecting every stopped container on
@@ -250,4 +255,5 @@ func (s *Service) reconcileChatUsage(ctx context.Context, c storage.Chat) {
 		return
 	}
 	s.captureUsage(ctx, rt, c, history, redaction.Values(ctx, s.Store, c.ID, endpoint.Password, endpoint.ProviderKey))
+	s.captureContextLimit(ctx, rt, c)
 }

@@ -41,9 +41,10 @@ import {
   ClockIcon,
 } from "@flora/florets";
 
-import type { Chat, Usage } from "./chat-schemas";
+import type { Chat, Usage, ContextUsage } from "./chat-schemas";
 import { chatStatus } from "./chat-status";
 import { PlaceholderMenu } from "./composer";
+import { ContextUsagePopover } from "./context-usage";
 import { PullCount, PullList } from "./pull-links";
 import type { PullSummary } from "./pull-schemas";
 
@@ -292,13 +293,15 @@ export function ChatHeaderActions({ usage }: { usage: Usage | undefined }) {
   );
 }
 
-/** Runtime actions use the saved chat state; machine telemetry and context usage are unavailable. */
+/** Runtime actions use saved chat state; context uses the latest reported model call. */
 export function ChatComposerFooter({
+  contextUsage,
   busy,
   blocked,
   stopped,
   onControl,
 }: {
+  contextUsage: ContextUsage | undefined;
   busy: boolean;
   blocked: boolean;
   stopped: boolean;
@@ -361,72 +364,7 @@ export function ChatComposerFooter({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      <Popover>
-        <PopoverTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="composer-context ml-auto size-7!"
-              aria-label="Context usage"
-              title="Context usage"
-            >
-              <span className="context-ring size-3.5 rounded-full border-2 border-border border-t-muted-foreground" />
-            </Button>
-          }
-        />
-        <PopoverContent side="top" align="end" density="compact" className="context-popover gap-0">
-          <div className="context-header flex items-center justify-between gap-3">
-            <PopoverTitle>Context</PopoverTitle>
-            <span className="context-value text-muted-foreground tabular-nums">Unavailable</span>
-          </div>
-          <PopoverDescription className="sr-only">
-            Token usage and compaction controls are not connected yet.
-          </PopoverDescription>
-          <div
-            className="context-meter mt-3 mb-2.5 h-1.5 rounded-full bg-border"
-            aria-hidden="true"
-          />
-          <dl className="context-breakdown">
-            {[
-              { label: "System prompt", color: "#808080" },
-              { label: "Native tools", color: "#8b5cf6" },
-              { label: "Rules", color: "#10b981" },
-              { label: "Codemode catalog", color: "#ec4899" },
-              { label: "Environment", color: "#0099ff" },
-              { label: "Conversation", color: "var(--action)" },
-            ].map(({ label, color }) => (
-              <div
-                key={label}
-                className="context-row flex min-h-[22px] items-center justify-between gap-3 [&_dt]:flex [&_dt]:items-center [&_dt]:gap-2"
-              >
-                <dt>
-                  <span
-                    className="context-swatch size-2 shrink-0 rounded-[3px]"
-                    style={{ backgroundColor: color }}
-                    aria-hidden="true"
-                  />
-                  {label}
-                </dt>
-                <dd
-                  className="context-value text-muted-foreground tabular-nums"
-                  aria-label="Unavailable"
-                >
-                  —
-                </dd>
-              </div>
-            ))}
-          </dl>
-          <Button
-            variant="outline"
-            className="context-compaction mt-3 h-7 w-full justify-between px-2 text-[length:inherit] font-normal disabled:opacity-100"
-            disabled
-          >
-            <span>Compact at</span>
-            <span className="context-value text-muted-foreground tabular-nums">— / —</span>
-          </Button>
-        </PopoverContent>
-      </Popover>
+      <ContextUsagePopover usage={contextUsage} />
     </div>
   );
 }

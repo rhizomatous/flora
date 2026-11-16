@@ -83,8 +83,16 @@ export const usageSchema = z.object({
     .default("pending"),
 });
 export type Usage = z.infer<typeof usageSchema>;
+export const contextUsageSchema = z.object({
+  tokens: z.number().int().nonnegative().nullable(),
+  limit: z.number().int().positive().nullable(),
+  provider: z.string(),
+  model: z.string(),
+});
+export type ContextUsage = z.infer<typeof contextUsageSchema>;
 export const detailSchema = z.object({
   usage: usageSchema.optional(),
+  contextUsage: contextUsageSchema.optional(),
   chat: chatSchema,
   messages: z.array(messageSchema),
   continuationBlockedReason: z.string().default(""),

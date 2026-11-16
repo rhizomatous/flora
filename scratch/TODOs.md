@@ -38,15 +38,17 @@ The menus open, but their unfinished actions are disabled. Default model, reason
 - [x] Title summary shows associated PR counts and details.
 - [x] Transcript PR links show saved PR status and include repository/title metadata.
 - [x] Cost: show estimated model cost and token counts from persisted usage, including captured subagent work; show reported totals and collection failures.
+- [x] Context: show latest main-session model-call usage against its runtime model limit.
+- [x] Subagent accounting: discover descendant sessions, persist their usage, reconcile after reconnects and restarts, and include it in parent-chat totals without double-counting.
 
 ### Disconnected placeholders
 
 - [ ] PR review: expose in-app changes review and CI checks from the linked PR UI.
 - [ ] Terminals: list active shells, open a terminal, and reflect their count in the summary strip.
 - [ ] Runtime: report actual machine size, CPU, memory, disk, awake/asleep state, and wake controls. The neutral dot does not report machine health.
-- [ ] Context: report usage, limits, system prompt, native tools, rules, codemode catalog, environment, and conversation breakdown; implement compaction thresholds. Unknown values are shown as dashes.
-- [ ] Title summary: connect actual model details. Model information is still unavailable.
-- [ ] Subagent capture: discover child sessions, persist their messages and activity, recover after reconnects and restarts, and attribute their usage to the parent chat without double-counting.
+- [ ] Context: expose configurable compaction thresholds.
+- [ ] Title summary: display model identity from saved reported calls. Model selection remains a separate composer follow-up.
+- [ ] Subagent conversation capture: persist full child-session conversations and tool activity for display, including recovery after reconnects and restarts. Usage accounting is already connected.
 - [ ] Subagent UI: show spawned agents inline with their task and live status; open their conversation and tool activity in a side pane; expose completion, failures, and requests for input while keeping the parent conversation accessible.
 - [ ] Plus menu: search views; add diffs, machine files, setup, browser, side threads, new shell, desktop, and keep-awake controls. Overview is the current chat view.
 - [ ] Split review: open a resizable review pane next to the conversation.
@@ -74,6 +76,7 @@ Attachment/context, model, reasoning, slash-command, and voice placeholders list
 - [x] Keep project settings, chat navigation, mobile dismissal, notification sound, and logout connected.
 - [x] Show linked PR counts in chat rows and saved PR titles, statuses, additions/deletions, and GitHub links in hover summaries.
 - [x] Mark a viewed chat revision as seen for this tab, surviving reloads through session storage; later updates become unread again.
+- [x] Workspace menu: connect Usage with date ranges, cost and token charts, project/model breakdowns, and linked chat history.
 
 ### Disconnected placeholders
 
@@ -83,8 +86,7 @@ Attachment/context, model, reasoning, slash-command, and voice placeholders list
 - [ ] Sidebar list options: connect Display and filters and add grouping preferences. The separate Chats page already has working status and project filters.
 - [ ] Read state: implement Mark all as read and durable read/unread persistence across tabs and browser sessions. Per-tab viewed revisions already use session storage.
 - [ ] Persist sorting and collapsed project preferences; currently these work only for the current sidebar session.
-- [ ] Populate hover summaries with model and CI/check details when backend metadata is available. Saved PR details and additions/deletions are already connected.
-- [x] Workspace menu: connect Usage with date ranges, cost and token charts, project/model breakdowns, and linked chat history.
+- [ ] Populate hover summaries with model identity from saved reported calls and connect CI/check details. Saved PR details and additions/deletions are already connected.
 - [ ] Workspace identity: replace the generic Flora/Workspace footer with saved identity and avatar data when available.
 
 Sidebar actions that are not connected are disabled; timestamps and statuses come from the saved chat feed.
