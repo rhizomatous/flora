@@ -3,6 +3,19 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
   Alert,
   Button,
+  ToggleGroup,
+  ToggleGroupItem,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+  Card,
+  CardContent,
+  FieldLabel,
+  LoadingStatus,
+  Empty,
   Heading,
   Input,
   Select,
@@ -46,21 +59,21 @@ const amount = (row: UsageGroup, metric: Metric) =>
 
 function MetricButtons({ value, onChange }: { value: Metric; onChange: (metric: Metric) => void }) {
   return (
-    <div className="flex gap-1" role="group" aria-label="Usage metric">
+    <ToggleGroup
+      aria-label="Usage metric"
+      size="sm"
+      value={[value]}
+      onValueChange={(values) => {
+        const selected = values[0];
+        if (selected === "cost" || selected === "tokens") onChange(selected);
+      }}
+    >
       {(["cost", "tokens"] as const).map((metric) => (
-        <Button
-          key={metric}
-          size="sm"
-          variant={metric === value ? "secondary" : "ghost"}
-          aria-pressed={metric === value}
-          onClick={() => {
-            onChange(metric);
-          }}
-        >
+        <ToggleGroupItem key={metric} value={metric}>
           {metric === "cost" ? "Cost" : "Tokens"}
-        </Button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }
 
@@ -197,39 +210,37 @@ function History({ rows }: { rows: UsageGroup[] }) {
           </SelectContent>
         </Select>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b text-xs text-muted-foreground">
-            <tr>
-              <th className="py-3 font-medium">Chat</th>
-              <th className="px-4 font-medium">Project</th>
-              <th className="px-4 text-right font-medium">Est. cost</th>
-              <th className="px-4 text-right font-medium">Tokens</th>
-              <th className="text-right font-medium">Last usage</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((row) => (
-              <tr key={row.id} className="border-b border-border/60">
-                <td className="min-w-48 py-4">
-                  <a
-                    href={`#chats/${encodeURIComponent(row.id)}`}
-                    className="rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-                  >
-                    {row.label}
-                  </a>
-                </td>
-                <td className="px-4 text-muted-foreground">{row.project}</td>
-                <td className="px-4 text-right tabular-nums">{money(row.costUSD)}</td>
-                <td className="px-4 text-right tabular-nums">{count(row.tokens)}</td>
-                <td className="text-right whitespace-nowrap text-muted-foreground">
-                  {dateLabel(row.lastActivity)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table>
+        <TableHeader className="border-b text-xs text-muted-foreground">
+          <TableRow>
+            <TableHead className="py-3 font-medium">Chat</TableHead>
+            <TableHead className="px-4 font-medium">Project</TableHead>
+            <TableHead className="px-4 text-right font-medium">Est. cost</TableHead>
+            <TableHead className="px-4 text-right font-medium">Tokens</TableHead>
+            <TableHead className="text-right font-medium">Last usage</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sorted.map((row) => (
+            <TableRow key={row.id} className="border-b border-border/60">
+              <TableCell className="min-w-48 py-4">
+                <a
+                  href={`#chats/${encodeURIComponent(row.id)}`}
+                  className="rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  {row.label}
+                </a>
+              </TableCell>
+              <TableCell className="px-4 text-muted-foreground">{row.project}</TableCell>
+              <TableCell className="px-4 text-right tabular-nums">{money(row.costUSD)}</TableCell>
+              <TableCell className="px-4 text-right tabular-nums">{count(row.tokens)}</TableCell>
+              <TableCell className="text-right whitespace-nowrap text-muted-foreground">
+                {dateLabel(row.lastActivity)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </section>
   );
 }
@@ -287,39 +298,39 @@ function UsageResults({
     );
   }
   if (report === undefined) {
-    return (
-      <p role="status" className="py-12 text-sm text-muted-foreground">
-        Loading usage…
-      </p>
-    );
+    return <LoadingStatus className="py-12">Loading usage…</LoadingStatus>;
   }
   if (report.total.steps === 0) {
     return (
-      <p role="status" className="py-16 text-center text-sm text-muted-foreground">
+      <Empty role="status" className="py-16 text-sm text-muted-foreground">
         No usage in this period.
-      </p>
+      </Empty>
     );
   }
   return (
     <>
       <div className="mt-8 grid gap-8 lg:grid-cols-[2fr_1fr]">
-        <section aria-label="Usage over time" className="min-w-0 rounded-xl border bg-card p-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="text-3xl font-semibold tabular-nums">
-                {metric === "cost" ? money(report.total.costUSD) : count(report.total.tokens)}
+        <Card role="region" aria-label="Usage over time" className="min-w-0">
+          <CardContent>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="text-3xl font-semibold tabular-nums">
+                  {metric === "cost" ? money(report.total.costUSD) : count(report.total.tokens)}
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {metric === "cost" ? "Estimated model cost" : "Tokens"}
+                </p>
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {metric === "cost" ? "Estimated model cost" : "Tokens"}
-              </p>
+              <MetricButtons value={metric} onChange={setMetric} />
             </div>
-            <MetricButtons value={metric} onChange={setMetric} />
-          </div>
-          <UsageChart report={report} metric={metric} />
-        </section>
-        <div className="rounded-xl border p-5">
-          <Breakdown report={report} metric={metric} />
-        </div>
+            <UsageChart report={report} metric={metric} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <Breakdown report={report} metric={metric} />
+          </CardContent>
+        </Card>
       </div>
       <details className="mt-4 text-sm text-muted-foreground">
         <summary className="cursor-pointer">
@@ -388,26 +399,31 @@ export function UsagePage({ onExpired }: { onExpired: () => void }) {
           Refresh
         </Button>
       </div>
-      <div className="mt-6 flex flex-wrap items-center gap-2" role="group" aria-label="Date range">
-        {[...presets.map((option) => option.id), "custom"].map((id) => (
-          <Button
-            key={id}
-            size="sm"
-            variant={preset === id ? "secondary" : "ghost"}
-            aria-pressed={preset === id}
-            onClick={() => {
-              setPreset(id);
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <ToggleGroup
+          aria-label="Date range"
+          size="sm"
+          value={[preset]}
+          className="flex-wrap"
+          onValueChange={(values) => {
+            const selected = values[0];
+            if (typeof selected === "string") {
+              setPreset(selected);
               setNow(new Date());
-            }}
-          >
-            {id === "custom" ? "Custom" : id}
-          </Button>
-        ))}
+            }
+          }}
+        >
+          {[...presets.map((option) => option.id), "custom"].map((id) => (
+            <ToggleGroupItem key={id} value={id}>
+              {id === "custom" ? "Custom" : id}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
         <span className="ml-auto text-xs text-muted-foreground">UTC</span>
       </div>
       {preset === "custom" && (
         <div className="mt-4 flex flex-wrap gap-4">
-          <label htmlFor="usage-from" className="text-sm">
+          <FieldLabel htmlFor="usage-from" className="flex-col items-start">
             From
             <Input
               id="usage-from"
@@ -417,8 +433,8 @@ export function UsagePage({ onExpired }: { onExpired: () => void }) {
                 setStart(event.target.value);
               }}
             />
-          </label>
-          <label htmlFor="usage-to" className="text-sm">
+          </FieldLabel>
+          <FieldLabel htmlFor="usage-to" className="flex-col items-start">
             Through
             <Input
               id="usage-to"
@@ -428,7 +444,7 @@ export function UsagePage({ onExpired }: { onExpired: () => void }) {
                 setEnd(event.target.value);
               }}
             />
-          </label>
+          </FieldLabel>
         </div>
       )}
       {valid ? (
