@@ -62,8 +62,8 @@ export function DiffFiles({
     >
       <PopoverTrigger
         render={
-          <Button variant="ghost" size="sm" aria-label="Files">
-            Files <span className="text-muted-foreground">{files.length}</span>
+          <Button variant="ghost" size="sm" aria-label="Files" className="text-muted-foreground">
+            Files <span className="opacity-60">{files.length}</span>
             <ChevronDownIcon />
           </Button>
         }

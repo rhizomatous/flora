@@ -91,7 +91,11 @@ function Hunk({ rows, language }: { rows: DiffLine[]; language: string }) {
         if (row.kind === "meta") {
           return (
             <tr key={index}>
-              <td colSpan={4} aria-label={row.text} className="p-0 font-sans text-muted-foreground">
+              <td
+                colSpan={3}
+                aria-label={row.text}
+                className="cursor-default p-0 font-sans text-muted-foreground"
+              >
                 <div className="sticky left-0 flex w-[100cqw] items-center gap-3 px-3 py-1">
                   <span aria-hidden="true" className="h-px min-w-3 flex-1 bg-border" />
                   <span>{row.text}</span>
@@ -107,13 +111,7 @@ function Hunk({ rows, language }: { rows: DiffLine[]; language: string }) {
               aria-hidden="true"
               className={`w-8 border-l-2 px-1 text-right select-none ${gutter[row.kind]}`}
             >
-              {row.oldLine}
-            </td>
-            <td
-              aria-hidden="true"
-              className="w-8 border-r border-border px-1 text-right text-muted-foreground select-none"
-            >
-              {row.newLine}
+              {row.kind === "remove" ? row.oldLine : row.newLine}
             </td>
             <td className="w-4 px-1 select-none">
               {{ add: "+", remove: "−", context: "" }[row.kind]}

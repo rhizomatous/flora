@@ -100,7 +100,7 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
       {snapshot === null && <Text className="mt-3">No successful review saved yet.</Text>}
       {snapshot && (
         <>
-          <div className="diff-toolbar flex min-h-9 shrink-0 items-center gap-1 border-b border-border px-3 py-1">
+          <div className="diff-toolbar relative z-10 flex min-h-9 shrink-0 items-center gap-1 border-b border-border bg-background px-3 py-1 shadow-md">
             <span className="flex-1" />
             <DiffFiles
               files={snapshot.files}
