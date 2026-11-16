@@ -531,6 +531,7 @@ function ChatDetail({
             </MessageScrollerButton>
           </ChatReviewStrip>
           <FollowUpComposer
+            contextUsage={detail.contextUsage}
             key={id}
             id={id}
             busy={busy}
@@ -563,6 +564,7 @@ function readDraft(id: string) {
 }
 
 function FollowUpComposer({
+  contextUsage,
   id,
   busy,
   activeTurn,
@@ -571,6 +573,7 @@ function FollowUpComposer({
   onSend,
   onControl,
 }: {
+  contextUsage: Detail["contextUsage"];
   id: string;
   busy: boolean;
   activeTurn: boolean;
@@ -616,7 +619,13 @@ function FollowUpComposer({
             : undefined
         }
       />
-      <ChatComposerFooter busy={busy} blocked={blocked} stopped={stopped} onControl={onControl} />
+      <ChatComposerFooter
+        contextUsage={contextUsage}
+        busy={busy}
+        blocked={blocked}
+        stopped={stopped}
+        onControl={onControl}
+      />
     </form>
   );
 }

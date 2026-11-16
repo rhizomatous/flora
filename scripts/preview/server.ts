@@ -261,6 +261,11 @@ export function chatPreview(): Plugin {
         chat: chatAt(id, frame, i === scenario.frames.length - 1),
         messages: messages(frame, id),
         continuationBlockedReason: "",
+        contextUsage: frame.history.some(
+          ({ info }) => info.role === "assistant" && info.time.completed !== undefined,
+        )
+          ? { tokens: 79_600, limit: 200_000, provider: "anthropic", model: "claude-sonnet-4-6" }
+          : { tokens: null, limit: null, provider: "", model: "" },
       });
       return;
     }
