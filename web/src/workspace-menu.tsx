@@ -103,10 +103,18 @@ export function WorkspaceMenu({
             Missed sounds are not replayed.
           </p>
         )}
-        <DropdownMenuItem disabled>
-          <ClockIcon />
-          Usage
-        </DropdownMenuItem>
+        <DropdownMenuItem
+          render={
+            <a href="#usage">
+              <ClockIcon />
+              Usage
+            </a>
+          }
+          nativeButton={false}
+          onClick={() => {
+            navigated.current = window.location.hash !== "#usage";
+          }}
+        />
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" disabled={busy} onClick={onLogout}>
           <ExitIcon aria-hidden="true" />
