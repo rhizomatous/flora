@@ -201,3 +201,41 @@ func TestChatAPIAuthenticationValidationAndReplay(t *testing.T) {
 	}
 	call("GET", "/api/chats/"+c.ID+"/events", "", token, "", 401)
 }
+
+func TestChatDetailIncludesUsageWithoutLeakingChildTranscript(t *testing.T) {
+	store, svc, authentication, token, project, cleanup := chatAPI(t)
+	defer cleanup()
+	ctx := context.Background()
+	c, err := store.CreateChat(ctx, project.ID, "Usage", "flora@sha256:"+strings.Repeat("a", 64), "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := json.RawMessage(`{"info":{"id":"child-message","role":"assistant","time":{"completed":1}},"parts":[{"id":"step","type":"step-finish","cost":0.025,"tokens":{"input":12,"output":34,"reasoning":0,"cache":{"read":0,"write":0}}},{"type":"text","text":"child-only-transcript"}]}`)
+	if err := store.SaveUsageMessage(ctx, c.ID, "child", "", raw, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetUsageCapture(ctx, c.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewUnstartedServer(nil)
+	server.Config.Handler = New(webassets.FS(), authentication, settings.New(store), "http://"+server.Listener.Addr().String(), svc)
+	server.Start()
+	defer server.Close()
+	req, _ := http.NewRequest("GET", server.URL+"/api/chats/"+c.ID, nil)
+	req.AddCookie(&http.Cookie{Name: cookieName, Value: token})
+	response, err := server.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	var detail struct {
+		Usage    storage.UsageSummary `json:"usage"`
+		Messages []storage.Message    `json:"messages"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&detail); err != nil {
+		t.Fatal(err)
+	}
+	if response.StatusCode != 200 || detail.Usage.CostUSD == nil || *detail.Usage.CostUSD != 0.025 || detail.Usage.Input != 12 || detail.Usage.Partial || len(detail.Messages) != 0 {
+		t.Fatalf("incorrect usage detail: %+v", detail)
+	}
+}

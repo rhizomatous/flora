@@ -41,7 +41,7 @@ import {
   ClockIcon,
 } from "@flora/florets";
 
-import type { Chat } from "./chat-schemas";
+import type { Chat, Usage } from "./chat-schemas";
 import { chatStatus } from "./chat-status";
 import { PlaceholderMenu } from "./composer";
 import { PullCount, PullList } from "./pull-links";
@@ -172,7 +172,7 @@ function ChatViewMenu() {
   );
 }
 
-export function ChatHeaderActions() {
+export function ChatHeaderActions({ usage }: { usage: Usage | undefined }) {
   const [copyState, setCopyState] = useState("Copy link");
   async function copyLink() {
     try {
@@ -186,14 +186,52 @@ export function ChatHeaderActions() {
     <>
       <ChatViewMenu />
       <span className="ml-auto" />
-      <Button
-        variant="ghost"
-        size="compact"
-        aria-disabled="true"
-        title="Cost tracking is not available yet"
-      >
-        Cost —
-      </Button>
+      <Popover>
+        <PopoverTrigger
+          render={<Button variant="ghost" size="compact" aria-label="Estimated chat cost" />}
+        >
+          {usage?.costUSD === undefined || usage.costUSD === null
+            ? "Cost —"
+            : `Est. ${usage.costUSD > 0 && usage.costUSD < 0.01 ? "<$0.01" : `$${usage.costUSD.toFixed(2)}`}${usage.partial ? " · Partial" : ""}`}
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-72">
+          <PopoverTitle>Estimated model cost</PopoverTitle>
+          <PopoverDescription>
+            {usage?.costUSD === undefined || usage.costUSD === null
+              ? "Cost is unavailable until usage and pricing are reported."
+              : "USD estimate from reported model usage, including captured subagent work. Provider bills may differ."}
+          </PopoverDescription>
+          {usage?.partial === true && (
+            <p className="text-xs text-muted-foreground">
+              Some usage or pricing is unavailable. Reported totals may increase.
+            </p>
+          )}
+          {usage && usage.steps > 0 && (
+            <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
+              {(
+                [
+                  ["Input tokens", usage.input],
+                  ["Output tokens", usage.output],
+                  ["Reasoning tokens", usage.reasoning],
+                  ["Cache read", usage.cacheRead],
+                  ["Cache write", usage.cacheWrite],
+                  ["Calls without pricing", usage.unpricedSteps],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label} className="contents">
+                  <dt>{label}</dt>
+                  <dd className="text-right tabular-nums">{value.toLocaleString()}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          {usage && usage.steps > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Reasoning may already be included in output tokens.
+            </p>
+          )}
+        </PopoverContent>
+      </Popover>
       <DropdownMenu>
         <DropdownMenuTrigger
           render={

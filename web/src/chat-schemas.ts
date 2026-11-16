@@ -69,7 +69,21 @@ export const messageSchema = z.object({
   Payload: payloadSchema,
 });
 export type Message = z.infer<typeof messageSchema>;
+export const usageSchema = z.object({
+  costUSD: z.number().nonnegative().nullable(),
+  steps: z.number().int().nonnegative(),
+  unpricedSteps: z.number().int().nonnegative(),
+  input: z.number().int().nonnegative(),
+  output: z.number().int().nonnegative(),
+  reasoning: z.number().int().nonnegative(),
+  cacheRead: z.number().int().nonnegative(),
+  cacheWrite: z.number().int().nonnegative(),
+  partial: z.boolean(),
+  checkedAt: z.string(),
+});
+export type Usage = z.infer<typeof usageSchema>;
 export const detailSchema = z.object({
+  usage: usageSchema.optional(),
   chat: chatSchema,
   messages: z.array(messageSchema),
   continuationBlockedReason: z.string().default(""),
