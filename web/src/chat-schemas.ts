@@ -80,6 +80,11 @@ export const usageSchema = z.object({
   cacheWrite: z.number().int().nonnegative(),
   partial: z.boolean(),
   checkedAt: z.string(),
+  collection: z
+    .enum(["pending", "complete", "history_unavailable", "runtime_stopped"])
+    .default("pending"),
+  tokensMissing: z.boolean().default(false),
+  costMissing: z.boolean().default(false),
 });
 export type Usage = z.infer<typeof usageSchema>;
 export const detailSchema = z.object({

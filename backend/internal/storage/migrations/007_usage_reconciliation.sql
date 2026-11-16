@@ -1,0 +1,2 @@
+ALTER TABLE usage_capture ADD COLUMN reason TEXT NOT NULL DEFAULT '';
+ALTER TABLE usage_capture ADD COLUMN chat_revision TEXT NOT NULL DEFAULT '';

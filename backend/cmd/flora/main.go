@@ -183,6 +183,7 @@ func main() {
 			os.Exit(1)
 		}
 		chats = chat.New(ctx, store, manager)
+		go chats.RunUsage(ctx)
 		if err := chats.Reconcile(ctx); err != nil {
 			slog.Error("Saved chat reconciliation unavailable; check storage and Docker")
 		}

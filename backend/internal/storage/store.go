@@ -134,7 +134,12 @@ func (s *Store) migrate(ctx context.Context) error {
 			}
 		}
 		if version < 6 {
-			return backfillUsage(ctx, tx)
+			if err := backfillUsage(ctx, tx); err != nil {
+				return err
+			}
+		}
+		if version < 7 {
+			return rebuildUsageMarkers(ctx, tx)
 		}
 		return nil
 	})

@@ -193,13 +193,24 @@ export function ChatHeaderActions({ usage }: { usage: Usage | undefined }) {
         >
           {usage?.costUSD === undefined || usage.costUSD === null
             ? "Cost —"
-            : `Est. ${usage.costUSD > 0 && usage.costUSD < 0.01 ? "<$0.01" : `$${usage.costUSD.toFixed(2)}`}${usage.partial ? " · Partial" : ""}`}
+            : `Est. ${usage.costUSD > 0 && usage.costUSD < 0.01 ? "<$0.01" : `$${usage.costUSD.toFixed(2)}`}`}
         </PopoverTrigger>
         <PopoverContent align="end" className="w-72">
           <PopoverTitle>Model usage</PopoverTitle>
           {costUnavailable && <PopoverDescription>Cost unavailable.</PopoverDescription>}
-          {!costUnavailable && usage.partial && (
-            <PopoverDescription>Some usage or pricing is missing.</PopoverDescription>
+          {usage?.collection === "history_unavailable" && (
+            <PopoverDescription>
+              Usage history could not be fetched. Retrying automatically.
+            </PopoverDescription>
+          )}
+          {usage?.collection === "runtime_stopped" && (
+            <PopoverDescription>Runtime stopped. Showing saved usage.</PopoverDescription>
+          )}
+          {usage?.costMissing === true && usage.unpricedSteps === 0 && (
+            <PopoverDescription>Some completed calls have no reported cost.</PopoverDescription>
+          )}
+          {usage?.tokensMissing === true && (
+            <PopoverDescription>Some token counts were not reported.</PopoverDescription>
           )}
           {usage && usage.steps > 0 && (
             <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">

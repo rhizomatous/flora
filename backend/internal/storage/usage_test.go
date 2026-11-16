@@ -21,12 +21,12 @@ func TestUsageReconciliationIsolationAndReopen(t *testing.T) {
 	other, err := s.CreateChat(ctx, p.ID, "Other", image, "1")
 	must(t, err)
 	for range 3 {
-		must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", usageFixture("same", "user", "0.01", 100), true))
-		must(t, s.SaveUsageMessage(ctx, c.ID, "child", accepted.Message.ID, usageFixture("same", "child-user", "0.02", 200), true))
-		must(t, s.SaveUsageMessage(ctx, other.ID, "root", "", usageFixture("same", "user", "9", 900), true))
+		must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("same", "user", "0.01", 100), true))
+		must(t, s.SaveUsageMessage(ctx, c.ID, "child", accepted.Message.ID, "", usageFixture("same", "child-user", "0.02", 200), true))
+		must(t, s.SaveUsageMessage(ctx, other.ID, "root", "", "", usageFixture("same", "user", "9", 900), true))
 	}
-	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", usageFixture("same", "user", "0.015", 150), true))
-	must(t, s.SetUsageCapture(ctx, c.ID, true))
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("same", "user", "0.015", 150), true))
+	must(t, s.SetUsageCapture(ctx, c.ID, UsageCapture{Complete: true, Revision: c.UpdatedAt}))
 	must(t, s.Close())
 	s = openTest(t, root)
 	u, err := s.ChatUsage(ctx, c.ID)
@@ -39,7 +39,7 @@ func TestUsageReconciliationIsolationAndReopen(t *testing.T) {
 	if turns != 2 {
 		t.Fatal("lost turn attribution")
 	}
-	must(t, s.SetUsageCapture(ctx, c.ID, false))
+	must(t, s.SetUsageCapture(ctx, c.ID, UsageCapture{Revision: c.UpdatedAt}))
 	u, err = s.ChatUsage(ctx, c.ID)
 	must(t, err)
 	if !u.Partial || *u.CostUSD != 0.035 {
@@ -56,15 +56,15 @@ func TestUsageUnknownPricingAndMissingTokens(t *testing.T) {
 		known  bool
 	}{{"null", false, false}, {"0", false, false}, {"0", true, true}, {"0.002", false, true}} {
 		id := fmt.Sprint(test.cost, test.priced)
-		must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", usageFixture(id, "user", test.cost, 10), test.priced))
+		must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture(id, "user", test.cost, 10), test.priced))
 		var cost any
 		must(t, s.db.QueryRow(`SELECT cost_nanos FROM usage_steps WHERE chat_id=? AND message_id=?`, c.ID, id).Scan(&cost))
 		if (cost != nil) != test.known {
 			t.Fatalf("cost=%s priced=%v saved=%v", test.cost, test.priced, cost)
 		}
 	}
-	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", json.RawMessage(`{"info":{"id":"missing","role":"assistant","time":{"completed":1}},"parts":[{"type":"step-finish","id":"step","cost":0.1,"tokens":{"input":-1,"output":2.5}}]}`), true))
-	must(t, s.SetUsageCapture(ctx, c.ID, true))
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", json.RawMessage(`{"info":{"id":"missing","role":"assistant","time":{"completed":1}},"parts":[{"type":"step-finish","id":"step","cost":0.1,"tokens":{"input":-1,"output":2.5}}]}`), true))
+	must(t, s.SetUsageCapture(ctx, c.ID, UsageCapture{Complete: true, Revision: c.UpdatedAt}))
 	u, err := s.ChatUsage(ctx, c.ID)
 	must(t, err)
 	if !u.Partial || u.UnpricedSteps != 2 || u.Input != 40 || u.Output != 80 {
@@ -85,7 +85,7 @@ func TestUsageBackfillAndAtomicTranscriptSave(t *testing.T) {
 	s = openTest(t, root)
 	u, err := s.ChatUsage(ctx, c.ID)
 	must(t, err)
-	if u.Steps != 1 || u.CostUSD == nil || *u.CostUSD != 0.01 || !u.Partial {
+	if u.Steps != 1 || u.CostUSD == nil || *u.CostUSD != 0.01 || u.Collection != "pending" {
 		t.Fatalf("incorrect historical backfill: %+v", u)
 	}
 	_, err = s.db.Exec(`CREATE TRIGGER fail_usage_activity BEFORE INSERT ON activity WHEN NEW.kind='message.runtime' BEGIN SELECT RAISE(ABORT,'injected'); END`)
@@ -111,12 +111,52 @@ func TestUsageBackfillAndAtomicTranscriptSave(t *testing.T) {
 func TestUsageRetainsReportedCostButMarksAnIncompleteRevision(t *testing.T) {
 	s := openTest(t, t.TempDir())
 	_, c := fixture(t, s)
-	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", usageFixture("message", "user", "0.01", 100), false))
-	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", usageFixture("message", "user", "null", 200), false))
-	must(t, s.SetUsageCapture(ctx, c.ID, true))
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("message", "user", "0.01", 100), false))
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("message", "user", "null", 200), false))
+	must(t, s.SetUsageCapture(ctx, c.ID, UsageCapture{Complete: true, Revision: c.UpdatedAt}))
 	u, err := s.ChatUsage(ctx, c.ID)
 	must(t, err)
 	if u.CostUSD == nil || *u.CostUSD != 0.01 || !u.Partial || u.Input != 200 {
 		t.Fatalf("missing latest cost was hidden: %+v", u)
+	}
+}
+
+func TestUsageBackgroundSnapshotCannotOverwriteNewerTranscript(t *testing.T) {
+	s := openTest(t, t.TempDir())
+	_, c := fixture(t, s)
+	must(t, s.BindRuntime(ctx, c.ID, "container", "root"))
+	latest := usageFixture("message", "user", "0.02", 200)
+	must(t, s.SaveRuntimeMessage(ctx, "latest", Message{ChatID: c.ID, RuntimeMessageID: "message", Role: "assistant", Payload: latest}))
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("message", "user", "0.01", 100), true))
+	u, err := s.ChatUsage(ctx, c.ID)
+	must(t, err)
+	if u.CostUSD == nil || *u.CostUSD != 0.02 || u.Input != 200 {
+		t.Fatalf("stale background read overwrote latest usage: %+v", u)
+	}
+	current, err := s.Chat(ctx, c.ID)
+	must(t, err)
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", current.UpdatedAt, usageFixture("message", "user", "0.03", 300), true))
+	u, err = s.ChatUsage(ctx, c.ID)
+	must(t, err)
+	if u.CostUSD == nil || *u.CostUSD != 0.03 || u.Input != 300 {
+		t.Fatalf("fresh history could not repair a saved snapshot: %+v", u)
+	}
+}
+
+func TestRunningResponsesAndMissingTokenCountsDoNotMarkCostPartial(t *testing.T) {
+	s := openTest(t, t.TempDir())
+	_, c := fixture(t, s)
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", json.RawMessage(`{"info":{"id":"running","role":"assistant"},"parts":[]}`), false))
+	must(t, s.SetUsageCapture(ctx, c.ID, UsageCapture{Complete: true}))
+	u, err := s.ChatUsage(ctx, c.ID)
+	must(t, err)
+	if u.Partial || u.CostMissing {
+		t.Fatal("unfinished response treated as a missing cost")
+	}
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", json.RawMessage(`{"info":{"id":"reported","role":"assistant","time":{"completed":1}},"parts":[{"type":"step-finish","id":"step","cost":0.01,"tokens":{"input":1}}]}`), true))
+	u, err = s.ChatUsage(ctx, c.ID)
+	must(t, err)
+	if u.Partial || !u.TokensMissing || u.CostUSD == nil || *u.CostUSD != 0.01 {
+		t.Fatalf("missing token fields changed cost completeness: %+v", u)
 	}
 }

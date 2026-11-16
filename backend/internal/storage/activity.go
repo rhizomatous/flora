@@ -77,7 +77,7 @@ func (s *Store) AcceptMessage(ctx context.Context, chatID, requestID, text strin
 		if err := addActivity(ctx, tx, chatID, id(), "status", payload); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, "UPDATE usage_capture SET complete=0 WHERE chat_id=?", chatID); err != nil {
+		if _, err := tx.ExecContext(ctx, "UPDATE usage_capture SET complete=0,reason='' WHERE chat_id=?", chatID); err != nil {
 			return err
 		}
 		a.Message = m

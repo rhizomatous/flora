@@ -1,6 +1,6 @@
 import { test, expect } from "./fixtures.ts";
 
-test("chat cost distinguishes estimates, partial totals, and unavailable pricing", async ({
+test("chat cost shows reported totals and specific collection or pricing gaps", async ({
   page,
 }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
@@ -14,6 +14,9 @@ test("chat cost distinguishes estimates, partial totals, and unavailable pricing
     cacheRead: 78,
     cacheWrite: 9,
     partial: false,
+    collection: "complete",
+    tokensMissing: false,
+    costMissing: false,
     checkedAt: "2026-01-01T00:00:00Z",
   };
   await page.route("**/api/chats/completed", async (route) => {
@@ -33,12 +36,15 @@ test("chat cost distinguishes estimates, partial totals, and unavailable pricing
   await page.keyboard.press("Escape");
 
   usage.partial = true;
+  usage.collection = "history_unavailable";
   usage.unpricedSteps = 1;
   await page.reload();
-  await expect(cost).toHaveText("Est. $0.04 · Partial");
+  await expect(cost).toHaveText("Est. $0.04");
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await cost.click();
-  await expect(page.getByText("Some usage or pricing is missing.", { exact: false })).toBeVisible();
+  await expect(
+    page.getByText("Usage history could not be fetched. Retrying automatically.", { exact: false }),
+  ).toBeVisible();
   await page.keyboard.press("Escape");
 
   usage.costUSD = null;
@@ -49,6 +55,7 @@ test("chat cost distinguishes estimates, partial totals, and unavailable pricing
   await expect(page.getByText("Cost unavailable.")).toBeVisible();
   await page.keyboard.press("Escape");
 
+  usage.collection = "complete";
   usage.costUSD = 0;
   usage.partial = false;
   usage.unpricedSteps = 0;

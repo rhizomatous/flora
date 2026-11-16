@@ -7,9 +7,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/provisioning"
+	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
 func TestUsageCollectsDescendantsOnceWithoutMixingTranscripts(t *testing.T) {
@@ -60,7 +63,7 @@ func TestUsageCollectsDescendantsOnceWithoutMixingTranscripts(t *testing.T) {
 	rt := newRuntime(provisioning.Endpoint{URL: server.URL})
 	history := []json.RawMessage{usageMessage("ses_one", "user-root", 0.01, `{"type":"tool","state":{"time":{"start":100,"end":200},"metadata":{"sessionId":"child"}}}`)}
 	for range 3 {
-		s.captureUsage(ctx, rt, c, history, nil, true)
+		s.captureUsage(ctx, rt, c, history, nil)
 	}
 	check := func(partial bool) {
 		t.Helper()
@@ -75,16 +78,16 @@ func TestUsageCollectsDescendantsOnceWithoutMixingTranscripts(t *testing.T) {
 		t.Fatal("usage collection inserted child messages into the main transcript")
 	}
 	unavailable = true
-	s.captureUsage(ctx, rt, c, history, nil, true)
+	s.captureUsage(ctx, rt, c, history, nil)
 	check(true)
 	unavailable = false
 	// A fresh runtime client models lost in-memory collection state after recovery.
 	rt = newRuntime(provisioning.Endpoint{URL: server.URL})
-	s.captureUsage(ctx, rt, c, history, nil, true)
+	s.captureUsage(ctx, rt, c, history, nil)
 	check(false)
 	foreign = true
 	before := childCalls
-	s.captureUsage(ctx, rt, c, history, nil, true)
+	s.captureUsage(ctx, rt, c, history, nil)
 	check(true)
 	if childCalls != before {
 		t.Fatal("traversed a child belonging to another parent")
@@ -128,6 +131,7 @@ func TestUsageFailureDoesNotFailCompletedTurn(t *testing.T) {
 	if err != nil || failed || !complete {
 		t.Fatalf("usage failure changed execution outcome: failed=%v complete=%v err=%v", failed, complete, err)
 	}
+	s.captureUsage(context.Background(), rt, c, f.history, nil)
 	u, err := s.Store.ChatUsage(context.Background(), c.ID)
 	if err != nil || !u.Partial || u.CostUSD == nil || *u.CostUSD != 0.01 {
 		t.Fatalf("lost partial usage: %+v %v", u, err)
@@ -146,5 +150,138 @@ func TestResumedSubagentKeepsUsageWithItsOriginalTurn(t *testing.T) {
 	}
 	if got := invocationTurn(150, append(calls, usageInvocation{140, 180, "another-turn"})); got != "" {
 		t.Fatal("ambiguous invocation was assigned to a turn")
+	}
+}
+
+func TestFinishedChatUsageReconcilesAndRetriesWithoutSubmitting(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	s, p, project := testService(t, f)
+	s.usageRetryInterval = 0
+	c, accepted := savedRecoveryTurn(t, s, project)
+	if err := s.Store.Transition(ctx, c.ID, accepted.ID, storage.Idle, "Finished"); err != nil {
+		t.Fatal(err)
+	}
+	var fail atomic.Bool
+	fail.Store(true)
+	var reads atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reads.Add(1)
+		if r.Method != "GET" {
+			t.Error("accounting sent a mutation")
+			w.WriteHeader(405)
+			return
+		}
+		switch r.URL.Path {
+		case "/provider":
+			fmt.Fprint(w, `{"all":[]}`)
+		case "/session/ses_one/message":
+			fmt.Fprintf(w, "[%s]", usageMessage("ses_one", "user", 0.01, ""))
+		case "/session/ses_one/children":
+			fmt.Fprint(w, `[{"id":"child","parentID":"ses_one"}]`)
+		case "/session/child/message":
+			if fail.Load() {
+				w.WriteHeader(503)
+				return
+			}
+			fmt.Fprintf(w, "[%s]", usageMessage("child", "child-user", 0.02, ""))
+		case "/session/child/children":
+			fmt.Fprint(w, `[]`)
+		default:
+			t.Errorf("unexpected request %s", r.URL.Path)
+			w.WriteHeader(404)
+		}
+	}))
+	defer server.Close()
+	p.url = server.URL
+	if err := s.ReconcileUsage(ctx); err != nil {
+		t.Fatal(err)
+	}
+	u, err := s.Store.ChatUsage(ctx, c.ID)
+	if err != nil || u.Collection != "history_unavailable" || u.CostUSD == nil || *u.CostUSD != 0.01 {
+		t.Fatalf("missing capture failure: %+v %v", u, err)
+	}
+	fail.Store(false)
+	if err := s.ReconcileUsage(ctx); err != nil {
+		t.Fatal(err)
+	}
+	u, err = s.Store.ChatUsage(ctx, c.ID)
+	if err != nil || u.Collection != "complete" || u.Partial || u.Steps != 2 || *u.CostUSD != 0.03 {
+		t.Fatalf("idle history was not reconciled: %+v %v", u, err)
+	}
+	before := reads.Load()
+	if err := s.ReconcileUsage(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if reads.Load() != before {
+		t.Fatal("unchanged settled chat was fetched again")
+	}
+	saved, err := s.Store.Chat(ctx, c.ID)
+	if err != nil || saved.Status != storage.Idle || saved.ActiveMessageID != "" || p.starts.Load() != 0 || f.prompts.Load() != 0 {
+		t.Fatal("usage reconciliation changed execution state")
+	}
+}
+
+func TestUsageTraversalHasNoSharedTwoSecondDeadlineOrSessionLimit(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	f := newFixture(t)
+	s, _, project := testService(t, f)
+	c, _ := savedRecoveryTurn(t, s, project)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/provider" {
+			fmt.Fprint(w, `{"all":[]}`)
+			return
+		}
+		if r.URL.Path == "/session/ses_one/children" {
+			children := []map[string]string{}
+			for i := range 130 {
+				children = append(children, map[string]string{"id": fmt.Sprintf("child-%d", i), "parentID": "ses_one"})
+			}
+			_ = json.NewEncoder(w).Encode(children)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/children") {
+			fmt.Fprint(w, `[]`)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/message") {
+			session := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/session/"), "/message")
+			if session == "child-0" || session == "child-1" {
+				select {
+				case <-time.After(1100 * time.Millisecond):
+				case <-r.Context().Done():
+					return
+				}
+			}
+			fmt.Fprintf(w, "[%s]", usageMessage(session, "user", 0.01, ""))
+			return
+		}
+		t.Errorf("unexpected request %s", r.URL.Path)
+	}))
+	defer server.Close()
+	rt := newRuntime(provisioning.Endpoint{URL: server.URL})
+	s.captureUsage(ctx, rt, c, []json.RawMessage{usageMessage("ses_one", "user", 0.01, "")}, nil)
+	u, err := s.Store.ChatUsage(ctx, c.ID)
+	if err != nil || u.Collection != "complete" || u.Steps != 131 || u.CostUSD == nil || *u.CostUSD != 1.31 {
+		t.Fatalf("large healthy tree was truncated: %+v %v", u, err)
+	}
+}
+
+func TestUsageReconciliationDoesNotStartStoppedRuntime(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	s, base, project := testService(t, f)
+	c, accepted := savedRecoveryTurn(t, s, project)
+	if err := s.Store.Transition(ctx, c.ID, accepted.ID, storage.Idle, "Finished"); err != nil {
+		t.Fatal(err)
+	}
+	s.provisioner = &recoveryProvisioner{testProvisioner: base, err: &provisioning.ExecutionEndedError{Reason: "container stopped"}}
+	if err := s.ReconcileUsage(ctx); err != nil {
+		t.Fatal(err)
+	}
+	u, err := s.Store.ChatUsage(ctx, c.ID)
+	if err != nil || u.Collection != "runtime_stopped" || base.starts.Load() != 0 || f.prompts.Load() != 0 {
+		t.Fatalf("stopped runtime was not left alone: %+v %v", u, err)
 	}
 }

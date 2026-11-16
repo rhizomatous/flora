@@ -211,10 +211,10 @@ func TestChatDetailIncludesUsageWithoutLeakingChildTranscript(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw := json.RawMessage(`{"info":{"id":"child-message","role":"assistant","time":{"completed":1}},"parts":[{"id":"step","type":"step-finish","cost":0.025,"tokens":{"input":12,"output":34,"reasoning":0,"cache":{"read":0,"write":0}}},{"type":"text","text":"child-only-transcript"}]}`)
-	if err := store.SaveUsageMessage(ctx, c.ID, "child", "", raw, true); err != nil {
+	if err := store.SaveUsageMessage(ctx, c.ID, "child", "", "", raw, true); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.SetUsageCapture(ctx, c.ID, true); err != nil {
+	if err := store.SetUsageCapture(ctx, c.ID, storage.UsageCapture{Complete: true, Revision: c.UpdatedAt}); err != nil {
 		t.Fatal(err)
 	}
 	server := httptest.NewUnstartedServer(nil)
