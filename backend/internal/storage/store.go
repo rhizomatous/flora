@@ -138,9 +138,6 @@ func (s *Store) migrate(ctx context.Context) error {
 				return err
 			}
 		}
-		if version < 7 {
-			return rebuildUsageMarkers(ctx, tx)
-		}
 		return nil
 	})
 }

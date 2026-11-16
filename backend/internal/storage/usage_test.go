@@ -21,17 +21,17 @@ func TestUsageReconciliationIsolationAndReopen(t *testing.T) {
 	other, err := s.CreateChat(ctx, p.ID, "Other", image, "1")
 	must(t, err)
 	for range 3 {
-		must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("same", "user", "0.01", 100), true))
-		must(t, s.SaveUsageMessage(ctx, c.ID, "child", accepted.Message.ID, "", usageFixture("same", "child-user", "0.02", 200), true))
-		must(t, s.SaveUsageMessage(ctx, other.ID, "root", "", "", usageFixture("same", "user", "9", 900), true))
+		must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("same", "user", "0.01", 100)))
+		must(t, s.SaveUsageMessage(ctx, c.ID, "child", accepted.Message.ID, "", usageFixture("same", "child-user", "0.02", 200)))
+		must(t, s.SaveUsageMessage(ctx, other.ID, "root", "", "", usageFixture("same", "user", "9", 900)))
 	}
-	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("same", "user", "0.015", 150), true))
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("same", "user", "0.015", 150)))
 	must(t, s.SetUsageCapture(ctx, c.ID, UsageCapture{Complete: true, Revision: c.UpdatedAt}))
 	must(t, s.Close())
 	s = openTest(t, root)
 	u, err := s.ChatUsage(ctx, c.ID)
 	must(t, err)
-	if u.Steps != 2 || u.CostUSD == nil || *u.CostUSD != 0.035 || u.Input != 350 || u.Output != 40 || u.Reasoning != 10 || u.CacheRead != 60 || u.CacheWrite != 80 || u.Partial {
+	if u.Steps != 2 || u.CostUSD == nil || *u.CostUSD != 0.035 || u.Input != 350 || u.Output != 40 || u.Reasoning != 10 || u.CacheRead != 60 || u.CacheWrite != 80 {
 		t.Fatalf("wrong reconciled usage: %+v", u)
 	}
 	var turns int
@@ -42,32 +42,31 @@ func TestUsageReconciliationIsolationAndReopen(t *testing.T) {
 	must(t, s.SetUsageCapture(ctx, c.ID, UsageCapture{Revision: c.UpdatedAt}))
 	u, err = s.ChatUsage(ctx, c.ID)
 	must(t, err)
-	if !u.Partial || *u.CostUSD != 0.035 {
+	if u.Collection != "history_unavailable" || *u.CostUSD != 0.035 {
 		t.Fatal("capture failure erased known spending")
 	}
 }
 
-func TestUsageUnknownPricingAndMissingTokens(t *testing.T) {
+func TestUsageReportedZeroAndInvalidCounters(t *testing.T) {
 	s := openTest(t, t.TempDir())
 	_, c := fixture(t, s)
 	for _, test := range []struct {
-		cost   string
-		priced bool
-		known  bool
-	}{{"null", false, false}, {"0", false, false}, {"0", true, true}, {"0.002", false, true}} {
-		id := fmt.Sprint(test.cost, test.priced)
-		must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture(id, "user", test.cost, 10), test.priced))
+		cost  string
+		known bool
+	}{{"null", false}, {"0", true}, {"0.002", true}} {
+		id := test.cost
+		must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture(id, "user", test.cost, 10)))
 		var cost any
 		must(t, s.db.QueryRow(`SELECT cost_nanos FROM usage_steps WHERE chat_id=? AND message_id=?`, c.ID, id).Scan(&cost))
 		if (cost != nil) != test.known {
-			t.Fatalf("cost=%s priced=%v saved=%v", test.cost, test.priced, cost)
+			t.Fatalf("cost=%s saved=%v", test.cost, cost)
 		}
 	}
-	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", json.RawMessage(`{"info":{"id":"missing","role":"assistant","time":{"completed":1}},"parts":[{"type":"step-finish","id":"step","cost":0.1,"tokens":{"input":-1,"output":2.5}}]}`), true))
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", json.RawMessage(`{"info":{"id":"missing","role":"assistant","time":{"completed":1}},"parts":[{"type":"step-finish","id":"step","cost":0.1,"tokens":{"input":-1,"output":2.5}}]}`)))
 	must(t, s.SetUsageCapture(ctx, c.ID, UsageCapture{Complete: true, Revision: c.UpdatedAt}))
 	u, err := s.ChatUsage(ctx, c.ID)
 	must(t, err)
-	if !u.Partial || u.UnpricedSteps != 2 || u.Input != 40 || u.Output != 80 {
+	if u.Input != 30 || u.Output != 60 {
 		t.Fatalf("missing data was reported as known: %+v", u)
 	}
 }
@@ -108,15 +107,15 @@ func TestUsageBackfillAndAtomicTranscriptSave(t *testing.T) {
 	}
 }
 
-func TestUsageRetainsReportedCostButMarksAnIncompleteRevision(t *testing.T) {
+func TestUsageRetainsReportedCostWhenLaterSnapshotOmitsIt(t *testing.T) {
 	s := openTest(t, t.TempDir())
 	_, c := fixture(t, s)
-	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("message", "user", "0.01", 100), false))
-	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("message", "user", "null", 200), false))
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("message", "user", "0.01", 100)))
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("message", "user", "null", 200)))
 	must(t, s.SetUsageCapture(ctx, c.ID, UsageCapture{Complete: true, Revision: c.UpdatedAt}))
 	u, err := s.ChatUsage(ctx, c.ID)
 	must(t, err)
-	if u.CostUSD == nil || *u.CostUSD != 0.01 || !u.Partial || u.Input != 200 {
+	if u.CostUSD == nil || *u.CostUSD != 0.01 || u.Input != 200 {
 		t.Fatalf("missing latest cost was hidden: %+v", u)
 	}
 }
@@ -127,7 +126,7 @@ func TestUsageBackgroundSnapshotCannotOverwriteNewerTranscript(t *testing.T) {
 	must(t, s.BindRuntime(ctx, c.ID, "container", "root"))
 	latest := usageFixture("message", "user", "0.02", 200)
 	must(t, s.SaveRuntimeMessage(ctx, "latest", Message{ChatID: c.ID, RuntimeMessageID: "message", Role: "assistant", Payload: latest}))
-	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("message", "user", "0.01", 100), true))
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("message", "user", "0.01", 100)))
 	u, err := s.ChatUsage(ctx, c.ID)
 	must(t, err)
 	if u.CostUSD == nil || *u.CostUSD != 0.02 || u.Input != 200 {
@@ -135,7 +134,7 @@ func TestUsageBackgroundSnapshotCannotOverwriteNewerTranscript(t *testing.T) {
 	}
 	current, err := s.Chat(ctx, c.ID)
 	must(t, err)
-	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", current.UpdatedAt, usageFixture("message", "user", "0.03", 300), true))
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", current.UpdatedAt, usageFixture("message", "user", "0.03", 300)))
 	u, err = s.ChatUsage(ctx, c.ID)
 	must(t, err)
 	if u.CostUSD == nil || *u.CostUSD != 0.03 || u.Input != 300 {
@@ -143,20 +142,39 @@ func TestUsageBackgroundSnapshotCannotOverwriteNewerTranscript(t *testing.T) {
 	}
 }
 
-func TestRunningResponsesAndMissingTokenCountsDoNotMarkCostPartial(t *testing.T) {
+func TestUnreportedUsageStaysUnknownAndMissingTokensDoNotEraseCost(t *testing.T) {
 	s := openTest(t, t.TempDir())
 	_, c := fixture(t, s)
-	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", json.RawMessage(`{"info":{"id":"running","role":"assistant"},"parts":[]}`), false))
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", json.RawMessage(`{"info":{"id":"running","role":"assistant"},"parts":[]}`)))
 	must(t, s.SetUsageCapture(ctx, c.ID, UsageCapture{Complete: true}))
 	u, err := s.ChatUsage(ctx, c.ID)
 	must(t, err)
-	if u.Partial || u.CostMissing {
+	if u.CostUSD != nil {
 		t.Fatal("unfinished response treated as a missing cost")
 	}
-	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", json.RawMessage(`{"info":{"id":"reported","role":"assistant","time":{"completed":1}},"parts":[{"type":"step-finish","id":"step","cost":0.01,"tokens":{"input":1}}]}`), true))
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", json.RawMessage(`{"info":{"id":"reported","role":"assistant","time":{"completed":1}},"parts":[{"type":"step-finish","id":"step","cost":0.01,"tokens":{"input":1}}]}`)))
 	u, err = s.ChatUsage(ctx, c.ID)
 	must(t, err)
-	if u.Partial || !u.TokensMissing || u.CostUSD == nil || *u.CostUSD != 0.01 {
+	if u.CostUSD == nil || *u.CostUSD != 0.01 {
 		t.Fatalf("missing token fields changed cost completeness: %+v", u)
+	}
+}
+
+func TestUsageMigrationRestoresReportedZero(t *testing.T) {
+	root := t.TempDir()
+	s := openTest(t, root)
+	_, c := fixture(t, s)
+	must(t, s.SaveUsageMessage(ctx, c.ID, "root", "", "", usageFixture("zero", "user", "0", 100)))
+	_, err := s.db.Exec(`ALTER TABLE usage_messages ADD COLUMN incomplete INTEGER NOT NULL DEFAULT 0;
+ ALTER TABLE usage_messages ADD COLUMN pricing_known INTEGER NOT NULL DEFAULT 0;
+ UPDATE usage_steps SET cost_nanos=NULL;
+ PRAGMA user_version=7;`)
+	must(t, err)
+	must(t, s.Close())
+	s = openTest(t, root)
+	u, err := s.ChatUsage(ctx, c.ID)
+	must(t, err)
+	if u.CostUSD == nil || *u.CostUSD != 0 || u.Input != 100 || u.Steps != 1 {
+		t.Fatalf("reported zero lost during migration: %+v", u)
 	}
 }

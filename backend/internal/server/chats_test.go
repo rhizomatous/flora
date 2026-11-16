@@ -211,7 +211,7 @@ func TestChatDetailIncludesUsageWithoutLeakingChildTranscript(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw := json.RawMessage(`{"info":{"id":"child-message","role":"assistant","time":{"completed":1}},"parts":[{"id":"step","type":"step-finish","cost":0.025,"tokens":{"input":12,"output":34,"reasoning":0,"cache":{"read":0,"write":0}}},{"type":"text","text":"child-only-transcript"}]}`)
-	if err := store.SaveUsageMessage(ctx, c.ID, "child", "", "", raw, true); err != nil {
+	if err := store.SaveUsageMessage(ctx, c.ID, "child", "", "", raw); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.SetUsageCapture(ctx, c.ID, storage.UsageCapture{Complete: true, Revision: c.UpdatedAt}); err != nil {
@@ -235,7 +235,7 @@ func TestChatDetailIncludesUsageWithoutLeakingChildTranscript(t *testing.T) {
 	if err := json.NewDecoder(response.Body).Decode(&detail); err != nil {
 		t.Fatal(err)
 	}
-	if response.StatusCode != 200 || detail.Usage.CostUSD == nil || *detail.Usage.CostUSD != 0.025 || detail.Usage.Input != 12 || detail.Usage.Partial || len(detail.Messages) != 0 {
+	if response.StatusCode != 200 || detail.Usage.CostUSD == nil || *detail.Usage.CostUSD != 0.025 || detail.Usage.Input != 12 || len(detail.Messages) != 0 {
 		t.Fatalf("incorrect usage detail: %+v", detail)
 	}
 }

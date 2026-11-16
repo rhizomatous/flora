@@ -1,22 +1,16 @@
 import { test, expect } from "./fixtures.ts";
 
-test("chat cost shows reported totals and specific collection or pricing gaps", async ({
-  page,
-}) => {
+test("chat cost distinguishes no usage, reported zero, and refresh failures", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
   const usage = {
     costUSD: 0.035 as number | null,
     steps: 3,
-    unpricedSteps: 0,
     input: 123,
     output: 45,
     reasoning: 6,
     cacheRead: 78,
     cacheWrite: 9,
-    partial: false,
     collection: "complete",
-    tokensMissing: false,
-    costMissing: false,
     checkedAt: "2026-01-01T00:00:00Z",
   };
   await page.route("**/api/chats/completed", async (route) => {
@@ -35,30 +29,28 @@ test("chat cost shows reported totals and specific collection or pricing gaps", 
   await expect(page.getByText("Calls without pricing", { exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
 
-  usage.partial = true;
   usage.collection = "history_unavailable";
-  usage.unpricedSteps = 1;
   await page.reload();
   await expect(cost).toHaveText("Est. $0.04");
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await cost.click();
   await expect(
-    page.getByText("Usage history could not be fetched. Retrying automatically.", { exact: false }),
+    page.getByText("Showing saved usage. Couldn’t refresh.", { exact: false }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
 
   usage.costUSD = null;
+  usage.steps = 0;
+  usage.collection = "pending";
   await page.reload();
   await expect(cost).toHaveText("Cost —");
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await cost.click();
-  await expect(page.getByText("Cost unavailable.")).toBeVisible();
+  await expect(page.getByText("No usage yet.")).toBeVisible();
   await page.keyboard.press("Escape");
 
   usage.collection = "complete";
   usage.costUSD = 0;
-  usage.partial = false;
-  usage.unpricedSteps = 0;
   await page.reload();
   await expect(cost).toHaveText("Est. $0.00");
   usage.costUSD = 0.001;

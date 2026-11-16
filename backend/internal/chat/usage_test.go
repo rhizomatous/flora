@@ -68,7 +68,7 @@ func TestUsageCollectsDescendantsOnceWithoutMixingTranscripts(t *testing.T) {
 	check := func(partial bool) {
 		t.Helper()
 		u, err := s.Store.ChatUsage(ctx, c.ID)
-		if err != nil || u.Steps != 3 || u.CostUSD == nil || *u.CostUSD != 0.06 || u.Partial != partial {
+		if err != nil || u.Steps != 3 || u.CostUSD == nil || *u.CostUSD != 0.06 || (u.Collection != "complete") != partial {
 			t.Fatalf("incorrect tree total: %+v err=%v", u, err)
 		}
 	}
@@ -133,7 +133,7 @@ func TestUsageFailureDoesNotFailCompletedTurn(t *testing.T) {
 	}
 	s.captureUsage(context.Background(), rt, c, f.history, nil)
 	u, err := s.Store.ChatUsage(context.Background(), c.ID)
-	if err != nil || !u.Partial || u.CostUSD == nil || *u.CostUSD != 0.01 {
+	if err != nil || u.Collection != "history_unavailable" || u.CostUSD == nil || *u.CostUSD != 0.01 {
 		t.Fatalf("lost partial usage: %+v %v", u, err)
 	}
 }
@@ -206,7 +206,7 @@ func TestFinishedChatUsageReconcilesAndRetriesWithoutSubmitting(t *testing.T) {
 		t.Fatal(err)
 	}
 	u, err = s.Store.ChatUsage(ctx, c.ID)
-	if err != nil || u.Collection != "complete" || u.Partial || u.Steps != 2 || *u.CostUSD != 0.03 {
+	if err != nil || u.Collection != "complete" || u.Steps != 2 || *u.CostUSD != 0.03 {
 		t.Fatalf("idle history was not reconciled: %+v %v", u, err)
 	}
 	before := reads.Load()

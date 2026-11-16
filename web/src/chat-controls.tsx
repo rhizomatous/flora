@@ -175,6 +175,8 @@ function ChatViewMenu() {
 export function ChatHeaderActions({ usage }: { usage: Usage | undefined }) {
   const [copyState, setCopyState] = useState("Copy link");
   const costUnavailable = usage?.costUSD === undefined || usage.costUSD === null;
+  const refreshFailed =
+    usage?.collection === "history_unavailable" || usage?.collection === "runtime_stopped";
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -197,20 +199,15 @@ export function ChatHeaderActions({ usage }: { usage: Usage | undefined }) {
         </PopoverTrigger>
         <PopoverContent align="end" className="w-72">
           <PopoverTitle>Model usage</PopoverTitle>
-          {costUnavailable && <PopoverDescription>Cost unavailable.</PopoverDescription>}
-          {usage?.collection === "history_unavailable" && (
+          {refreshFailed && (
             <PopoverDescription>
-              Usage history could not be fetched. Retrying automatically.
+              {usage.steps > 0
+                ? "Showing saved usage. Couldn’t refresh."
+                : "Couldn’t refresh usage."}
             </PopoverDescription>
           )}
-          {usage?.collection === "runtime_stopped" && (
-            <PopoverDescription>Runtime stopped. Showing saved usage.</PopoverDescription>
-          )}
-          {usage?.costMissing === true && usage.unpricedSteps === 0 && (
-            <PopoverDescription>Some completed calls have no reported cost.</PopoverDescription>
-          )}
-          {usage?.tokensMissing === true && (
-            <PopoverDescription>Some token counts were not reported.</PopoverDescription>
+          {!refreshFailed && costUnavailable && (
+            <PopoverDescription>No usage yet.</PopoverDescription>
           )}
           {usage && usage.steps > 0 && (
             <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
@@ -221,16 +218,13 @@ export function ChatHeaderActions({ usage }: { usage: Usage | undefined }) {
                   ["Reasoning tokens", usage.reasoning],
                   ["Cache read", usage.cacheRead],
                   ["Cache write", usage.cacheWrite],
-                  ["Calls without pricing", usage.unpricedSteps],
                 ] as const
-              )
-                .filter(([label, value]) => label !== "Calls without pricing" || value > 0)
-                .map(([label, value]) => (
-                  <div key={label} className="contents">
-                    <dt>{label}</dt>
-                    <dd className="text-right tabular-nums">{value.toLocaleString()}</dd>
-                  </div>
-                ))}
+              ).map(([label, value]) => (
+                <div key={label} className="contents">
+                  <dt>{label}</dt>
+                  <dd className="text-right tabular-nums">{value.toLocaleString()}</dd>
+                </div>
+              ))}
             </dl>
           )}
         </PopoverContent>

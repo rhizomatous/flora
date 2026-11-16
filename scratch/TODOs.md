@@ -37,7 +37,7 @@ The menus open, but their unfinished actions are disabled. Default model, reason
 - [x] Linked PR summary shows saved PR counts, titles, status, additions/deletions, and links to GitHub.
 - [x] Title summary shows associated PR counts and details.
 - [x] Transcript PR links show saved PR status and include repository/title metadata.
-- [x] Cost: show estimated model cost and token counts from persisted usage, including captured subagent work; identify missing history, token counts, and pricing.
+- [x] Cost: show estimated model cost and token counts from persisted usage, including captured subagent work; show reported totals and collection failures.
 
 ### Disconnected placeholders
 

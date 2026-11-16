@@ -55,27 +55,6 @@ func (s *Service) captureUsage(ctx context.Context, rt *runtime, c storage.Chat,
 		defer done()
 		_ = s.Store.SetUsageCapture(saveCtx, c.ID, storage.UsageCapture{Complete: complete, Revision: c.UpdatedAt})
 	}()
-	if rt.prices == nil {
-		var providers struct {
-			All []struct {
-				ID     string `json:"id"`
-				Models map[string]struct {
-					Cost *struct {
-						Input  *float64 `json:"input"`
-						Output *float64 `json:"output"`
-					} `json:"cost"`
-				} `json:"models"`
-			} `json:"all"`
-		}
-		if err := usageCall(captureCtx, rt, "GET", "/provider", nil, &providers); err == nil {
-			rt.prices = map[string]bool{}
-			for _, p := range providers.All {
-				for model, m := range p.Models {
-					rt.prices[p.ID+"/"+model] = m.Cost != nil && m.Cost.Input != nil && m.Cost.Output != nil && (*m.Cost.Input > 0 || *m.Cost.Output > 0)
-				}
-			}
-		}
-	}
 	messages, err := s.Store.Messages(captureCtx, c.ID)
 	if err != nil {
 		complete = false
@@ -119,7 +98,7 @@ func (s *Service) captureUsage(ctx context.Context, rt *runtime, c storage.Chat,
 			} else {
 				turn = invocationTurn(userTimes[m.Info.ParentID], invocations)
 			}
-			if err := s.Store.SaveUsageMessage(captureCtx, c.ID, session, turn, c.UpdatedAt, redaction.JSON(raws[i], secrets...), rt.prices[m.Info.Provider+"/"+m.Info.Model]); err != nil {
+			if err := s.Store.SaveUsageMessage(captureCtx, c.ID, session, turn, c.UpdatedAt, redaction.JSON(raws[i], secrets...)); err != nil {
 				return false
 			}
 			for _, p := range m.Parts {
@@ -238,7 +217,7 @@ func (s *Service) reconcileChatUsage(ctx context.Context, c storage.Chat) {
 	if err != nil {
 		return
 	}
-	if c.ActiveMessageID == "" && usage.Collection == "complete" && !usage.Partial && !usage.TokensMissing && usage.ReconciledRevision == c.UpdatedAt {
+	if c.ActiveMessageID == "" && usage.Collection == "complete" && usage.ReconciledRevision == c.UpdatedAt {
 		return
 	}
 	// Failed endpoints are retried without inspecting every stopped container on

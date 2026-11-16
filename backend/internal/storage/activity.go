@@ -161,7 +161,7 @@ func (s *Store) SaveRuntimeMessage(ctx context.Context, eventID string, m Messag
 		if err := tx.QueryRowContext(ctx, "SELECT coalesce(session_id,'') FROM chats WHERE id=?", m.ChatID).Scan(&sessionID); err != nil {
 			return err
 		}
-		if err := saveUsageMessage(ctx, tx, m.ChatID, sessionID, "", m.Payload, false); err != nil {
+		if err := saveUsageMessage(ctx, tx, m.ChatID, sessionID, "", m.Payload); err != nil {
 			return err
 		}
 		return addActivity(ctx, tx, m.ChatID, eventID, "message.runtime", payload)

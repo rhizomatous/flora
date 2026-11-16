@@ -23,7 +23,6 @@ const SystemPrompt = `You are Flora, a helpful autonomous coding agent. Use simp
 type runtime struct {
 	endpoint provisioning.Endpoint
 	client   *http.Client
-	prices   map[string]bool
 }
 
 type responseError struct{ status int }
