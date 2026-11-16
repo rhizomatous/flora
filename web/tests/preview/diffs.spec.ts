@@ -85,6 +85,13 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   await expect(closeDiffs).toHaveCSS("opacity", "0");
   await diffTab.hover();
   await expect(closeDiffs).toHaveCSS("opacity", "1");
+  const revealedBackground = await closeDiffs.evaluate(
+    (element) => getComputedStyle(element).backgroundColor,
+  );
+  await closeDiffs.hover();
+  await expect
+    .poll(() => closeDiffs.evaluate((element) => getComputedStyle(element).backgroundColor))
+    .not.toBe(revealedBackground);
   const hoveredBounds = await diffTab.boundingBox();
   expect(hoveredBounds?.width).toBe(diffBounds?.width);
   await review.getByRole("heading", { name: "Chat changes" }).hover();

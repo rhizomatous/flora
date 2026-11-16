@@ -67,6 +67,14 @@
   opacity: 0;
   pointer-events: none;
 }
+.chat-diff-tab .chat-diff-tab-close:hover,
+.chat-diff-tab .chat-diff-tab-close:focus-visible {
+  background: color-mix(in oklch, var(--secondary), var(--foreground) 12%);
+}
+.chat-diff-tab .chat-diff-tab-close:focus-visible {
+  outline: 1px solid var(--ring);
+  outline-offset: -2px;
+}
 .chat-diff-tab:hover .chat-diff-tab-close,
 .chat-diff-tab:focus-within .chat-diff-tab-close {
   opacity: 1;
