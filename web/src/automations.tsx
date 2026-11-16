@@ -5,14 +5,15 @@ import {
   Alert,
   Button,
   ButtonLink,
-  Combobox,
-  ComboboxTrigger,
-  ComboboxValue,
-  ComboboxContent,
-  ComboboxInput,
-  ComboboxEmpty,
-  ComboboxList,
-  ComboboxItem,
+  Command,
+  CommandInput,
+  CommandEmpty,
+  CommandList,
+  CommandItem,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  ChevronDownIcon,
   FieldLabel,
   Heading,
   Input,
@@ -74,6 +75,68 @@ function blank(projectID: string): Automation {
     chatID: "",
     revision: 0,
   };
+}
+
+function TimeZonePicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (zone: string) => void;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const zones = timeZones.includes(value) ? timeZones : [value, ...timeZones];
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            disabled={disabled}
+            aria-label="Time zone"
+            className="w-52 min-w-0 justify-between font-normal"
+          >
+            <span className="truncate">{value}</span>
+            <ChevronDownIcon />
+          </Button>
+        }
+      />
+      <PopoverContent
+        align="start"
+        className="w-72! max-w-[calc(100vw-24px)]! p-0"
+        aria-label="Time zones"
+      >
+        <Command className="rounded-lg! p-0">
+          <CommandInput
+            variant="plain"
+            aria-label="Search time zones"
+            placeholder="Search time zones"
+          />
+          <CommandList aria-label="Time zones" className="p-1.5">
+            <CommandEmpty>No time zones found.</CommandEmpty>
+            {zones.map((zone) => (
+              <CommandItem
+                key={zone}
+                value={zone}
+                keywords={[zone.replaceAll("_", " ")]}
+                data-checked={zone === value}
+                className="min-h-7 rounded-sm py-1"
+                onSelect={() => {
+                  onChange(zone);
+                  setOpen(false);
+                }}
+              >
+                {zone}
+              </CommandItem>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 function AutomationForm({
@@ -297,43 +360,13 @@ function AutomationForm({
                   <span className="text-sm text-muted-foreground" aria-hidden="true">
                     in
                   </span>
-                  <Combobox
-                    items={timeZones.includes(timeZone) ? timeZones : [timeZone, ...timeZones]}
+                  <TimeZonePicker
                     value={timeZone}
-                    onValueChange={(zone) => {
-                      if (zone !== null) change("timeZone", zone);
+                    disabled={busy}
+                    onChange={(zone) => {
+                      change("timeZone", zone);
                     }}
-                  >
-                    <ComboboxTrigger
-                      aria-label="Time zone"
-                      render={
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-52 min-w-0 justify-between font-normal"
-                        />
-                      }
-                    >
-                      <span className="truncate">
-                        <ComboboxValue />
-                      </span>
-                    </ComboboxTrigger>
-                    <ComboboxContent className="w-72">
-                      <ComboboxInput
-                        showTrigger={false}
-                        aria-label="Search time zones"
-                        placeholder="Search time zones"
-                      />
-                      <ComboboxEmpty>No time zones found.</ComboboxEmpty>
-                      <ComboboxList>
-                        {(zone: string) => (
-                          <ComboboxItem key={zone} value={zone}>
-                            {zone}
-                          </ComboboxItem>
-                        )}
-                      </ComboboxList>
-                    </ComboboxContent>
-                  </Combobox>
+                  />
                 </div>
               </div>
               {frequency === "weekly" && (

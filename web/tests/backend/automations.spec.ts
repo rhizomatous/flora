@@ -18,10 +18,10 @@ test("create, edit, pause, and run an automation in a dedicated chat", async ({ 
   await expect(page.getByText("Continue in the same chat.")).toBeVisible();
   await page.getByLabel("Schedule", { exact: true }).selectOption("weekly");
   await page.getByRole("button", { name: "Friday", exact: true }).click();
-  await page.getByRole("combobox", { name: "Time zone", exact: true }).click();
-  await page.getByRole("combobox", { name: "Search time zones" }).fill("New_York");
-  await page.getByRole("option", { name: "America/New_York", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "Time zone", exact: true })).toHaveText("America/New_York");
+  await page.getByRole("button", { name: "Time zone", exact: true }).click();
+  await page.getByRole("combobox", { name: "Search time zones" }).fill("New York");
+  await page.getByRole("combobox", { name: "Search time zones" }).press("Enter");
+  await expect(page.getByRole("button", { name: "Time zone", exact: true })).toHaveText("America/New_York");
   await expect(page.getByRole("textbox", { name: "Instructions", exact: true })).toHaveCSS("resize", "none");
   await expect(page.getByText(/^Next run:/)).toBeVisible();
   await assertFitsPhone(page);
@@ -31,9 +31,11 @@ test("create, edit, pause, and run an automation in a dedicated chat", async ({ 
   await expect(page.getByRole("button", { name: "Cancel", exact: true })).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: testInfo.outputPath("form-phone.png"), fullPage: false, animations: "disabled" });
   await page.setViewportSize({ width: 1280, height: 1000 });
-  const scheduleBox = await page.getByLabel("Schedule", { exact: true }).boundingBox();
-  const zoneBox = await page.getByLabel("Time zone", { exact: true }).boundingBox();
-  expect(Math.abs((scheduleBox?.y ?? -100) - (zoneBox?.y ?? 100))).toBeLessThan(4);
+  await expect(async () => {
+    const scheduleBox = await page.getByLabel("Schedule", { exact: true }).boundingBox();
+    const zoneBox = await page.getByRole("button", { name: "Time zone", exact: true }).boundingBox();
+    expect(Math.abs((scheduleBox?.y ?? -100) - (zoneBox?.y ?? 100))).toBeLessThan(4);
+  }).toPass();
   await page.screenshot({ path: testInfo.outputPath("form.png"), fullPage: true, animations: "disabled" });
   await page.getByRole("button", { name: "Create automation", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Weekly dependency check", exact: true })).toBeVisible();

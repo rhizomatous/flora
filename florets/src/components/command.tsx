@@ -51,7 +51,25 @@ function CommandDialog({
   );
 }
 
-function CommandInput({ className, ...props }: ComponentProps<typeof CommandPrimitive.Input>) {
+function CommandInput({
+  className,
+  variant = "default",
+  ...props
+}: ComponentProps<typeof CommandPrimitive.Input> & { variant?: "default" | "plain" }) {
+  if (variant === "plain") {
+    return (
+      <div data-slot="command-input-wrapper" className="border-b border-border px-3">
+        <CommandPrimitive.Input
+          data-slot="command-input"
+          className={cn(
+            "h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground",
+            className,
+          )}
+          {...props}
+        />
+      </div>
+    );
+  }
   return (
     <div data-slot="command-input-wrapper" className="p-1 pb-0">
       <InputGroup className="h-8! rounded-lg! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!">
