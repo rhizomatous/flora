@@ -84,6 +84,27 @@ metadata without generating model responses, pulling images or writing to GitHub
 Successful metadata validation does not establish inference quota or repository
 write access. Setup and runtime failures remain visible in each chat's saved activity.
 
+### Automations
+
+Open **Automations** to schedule instructions for a project. Choose daily,
+weekdays, or selected weekdays, a local time and time zone, and either a fresh
+chat for each run or one dedicated chat that retains its workspace and conversation.
+Run now starts real work, including while a schedule is paused. Pause prevents
+future scheduled runs; stop current work from its chat.
+
+Run history records completion, failures, waits, and skipped occurrences and links
+to each run in its chat. Overlapping runs are skipped. After downtime, Flora records a missed occurrence
+as skipped and moves to the next scheduled time, with a one-minute allowance
+for normal scheduling delays. Local
+times follow daylight saving changes: a nonexistent time is skipped, and a
+repeated time runs once. Flora must be running with its chat runtime configured.
+
+Completed automation containers stop after their changes are saved, freeing
+capacity while keeping their workspace and conversation for follow-ups. User
+follow-ups prevent automatic cleanup from taking over that chat. Failed or waiting
+runs remain available for inspection and explicit recovery. Schedules and run
+records persist in SQLite; restarting Flora never resends a claimed run.
+
 ### Chat UI preview
 
 Run `npm ci`, then `npm run preview:chat` and open the loopback URL printed by Vite.

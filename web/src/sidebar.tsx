@@ -201,7 +201,19 @@ export function Sidebar({
                 />
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton disabled title="Automations (coming soon)">
+                <SidebarMenuButton
+                  isActive={path.startsWith("automations")}
+                  render={
+                    <a
+                      href="#automations"
+                      aria-label="Automations"
+                      aria-current={path.startsWith("automations") ? "page" : undefined}
+                      onClick={() => {
+                        setOpenMobile(false);
+                      }}
+                    />
+                  }
+                >
                   <Repeat2Icon />
                   <span>Automations</span>
                 </SidebarMenuButton>

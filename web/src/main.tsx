@@ -16,6 +16,7 @@ import {
 } from "@flora/florets";
 
 import { statusSchema, authenticatedSchema, type Status } from "./auth-schemas";
+import { Automations } from "./automations";
 import { Chats } from "./chats";
 import { Installation } from "./installation";
 import { useNotifications } from "./notifications";
@@ -292,11 +293,15 @@ function App() {
           {ready && path === "settings" && (
             <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
           )}
+          {ready && path.startsWith("automations") && (
+            <Automations key={path} path={path} onExpired={onExpired} />
+          )}
           {ready && path === "usage" && <UsagePage onExpired={onExpired} />}
           {pullsPage && (
             <PullRequests chats={notifications.chats} disconnected={notifications.error !== ""} />
           )}
           {ready &&
+            !path.startsWith("automations") &&
             path !== "settings" &&
             path !== "pulls" &&
             path !== "usage" &&
