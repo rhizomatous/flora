@@ -29,6 +29,7 @@ test("chat cost distinguishes estimates, partial totals, and unavailable pricing
   await cost.click();
   await expect(page.getByText("Input tokens", { exact: true })).toBeVisible();
   await expect(page.locator("dl").filter({ hasText: "Input tokens" })).toContainText("123");
+  await expect(page.getByText("Calls without pricing", { exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
 
   usage.partial = true;
@@ -37,9 +38,7 @@ test("chat cost distinguishes estimates, partial totals, and unavailable pricing
   await expect(cost).toHaveText("Est. $0.04 · Partial");
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await cost.click();
-  await expect(
-    page.getByText("Some usage or pricing is unavailable.", { exact: false }),
-  ).toBeVisible();
+  await expect(page.getByText("Some usage or pricing is missing.", { exact: false })).toBeVisible();
   await page.keyboard.press("Escape");
 
   usage.costUSD = null;
@@ -47,9 +46,7 @@ test("chat cost distinguishes estimates, partial totals, and unavailable pricing
   await expect(cost).toHaveText("Cost —");
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await cost.click();
-  await expect(
-    page.getByText("Cost is unavailable until usage and pricing are reported."),
-  ).toBeVisible();
+  await expect(page.getByText("Cost unavailable.")).toBeVisible();
   await page.keyboard.press("Escape");
 
   usage.costUSD = 0;

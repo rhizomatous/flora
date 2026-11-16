@@ -174,6 +174,7 @@ function ChatViewMenu() {
 
 export function ChatHeaderActions({ usage }: { usage: Usage | undefined }) {
   const [copyState, setCopyState] = useState("Copy link");
+  const costUnavailable = usage?.costUSD === undefined || usage.costUSD === null;
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -195,16 +196,10 @@ export function ChatHeaderActions({ usage }: { usage: Usage | undefined }) {
             : `Est. ${usage.costUSD > 0 && usage.costUSD < 0.01 ? "<$0.01" : `$${usage.costUSD.toFixed(2)}`}${usage.partial ? " · Partial" : ""}`}
         </PopoverTrigger>
         <PopoverContent align="end" className="w-72">
-          <PopoverTitle>Estimated model cost</PopoverTitle>
-          <PopoverDescription>
-            {usage?.costUSD === undefined || usage.costUSD === null
-              ? "Cost is unavailable until usage and pricing are reported."
-              : "USD estimate from reported model usage, including captured subagent work. Provider bills may differ."}
-          </PopoverDescription>
-          {usage?.partial === true && (
-            <p className="text-xs text-muted-foreground">
-              Some usage or pricing is unavailable. Reported totals may increase.
-            </p>
+          <PopoverTitle>Model usage</PopoverTitle>
+          {costUnavailable && <PopoverDescription>Cost unavailable.</PopoverDescription>}
+          {!costUnavailable && usage.partial && (
+            <PopoverDescription>Some usage or pricing is missing.</PopoverDescription>
           )}
           {usage && usage.steps > 0 && (
             <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
@@ -217,18 +212,15 @@ export function ChatHeaderActions({ usage }: { usage: Usage | undefined }) {
                   ["Cache write", usage.cacheWrite],
                   ["Calls without pricing", usage.unpricedSteps],
                 ] as const
-              ).map(([label, value]) => (
-                <div key={label} className="contents">
-                  <dt>{label}</dt>
-                  <dd className="text-right tabular-nums">{value.toLocaleString()}</dd>
-                </div>
-              ))}
+              )
+                .filter(([label, value]) => label !== "Calls without pricing" || value > 0)
+                .map(([label, value]) => (
+                  <div key={label} className="contents">
+                    <dt>{label}</dt>
+                    <dd className="text-right tabular-nums">{value.toLocaleString()}</dd>
+                  </div>
+                ))}
             </dl>
-          )}
-          {usage && usage.steps > 0 && (
-            <p className="text-xs text-muted-foreground">
-              Reasoning may already be included in output tokens.
-            </p>
           )}
         </PopoverContent>
       </Popover>
