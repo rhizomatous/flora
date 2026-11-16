@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
   Alert,
@@ -58,12 +59,14 @@ function blank(projectID: string): Automation {
 
 function AutomationForm({
   initial,
+  topbar,
   projects,
   busy,
   save,
   cancel,
 }: {
   initial: Automation;
+  topbar: HTMLDivElement | null;
   projects: ProjectSummary[];
   busy: boolean;
   save: (value: Automation) => void;
@@ -74,10 +77,11 @@ function AutomationForm({
   const [previewError, setPreviewError] = useState("");
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    heading.current?.focus();
-  }, []);
+    if (topbar) heading.current?.focus();
+  }, [topbar]);
   const { frequency, days, time, timeZone } = value;
   const saveLabel = initial.id ? "Save changes" : "Create automation";
+  const compactSaveLabel = initial.id ? "Save" : "Create";
   useEffect(() => {
     let live = true;
     async function refreshPreview() {
@@ -120,23 +124,36 @@ function AutomationForm({
     }
   }
   return (
-    <section className="mx-auto max-w-3xl [&_input]:scroll-mt-40 [&_textarea]:scroll-mt-40">
-      <header className="sticky top-0 z-20 -mx-4 grid gap-3 border-b bg-background/95 px-4 py-4 backdrop-blur-sm sm:flex sm:items-center sm:justify-between">
-        <Heading level={1} ref={heading} tabIndex={-1}>
-          {initial.id ? "Edit automation" : "New automation"}
-        </Heading>
-        <div className="flex items-center justify-end gap-2">
-          <Button type="button" variant="ghost" disabled={busy} onClick={cancel}>
-            Cancel
-          </Button>
-          <Button type="submit" form="automation-form" disabled={busy || !preview}>
-            {busy ? "Saving…" : saveLabel}
-          </Button>
-        </div>
-      </header>
+    <section className="mx-auto max-w-3xl [&_input]:scroll-mt-20 [&_textarea]:scroll-mt-20">
+      {topbar &&
+        createPortal(
+          <>
+            <Heading
+              level={1}
+              ref={heading}
+              tabIndex={-1}
+              className="min-w-0 flex-1 truncate text-base"
+            >
+              {initial.id ? "Edit automation" : "New automation"}
+            </Heading>
+            <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={cancel}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="automation-form"
+              size="sm"
+              disabled={busy || !preview}
+              aria-label={busy ? "Saving…" : saveLabel}
+            >
+              <span className="hidden sm:inline">{busy ? "Saving…" : saveLabel}</span>
+              <span className="sm:hidden">{busy ? "Saving…" : compactSaveLabel}</span>
+            </Button>
+          </>,
+          topbar,
+        )}
       <form
         id="automation-form"
-        className="mt-6"
         onSubmit={(event) => {
           event.preventDefault();
           save(value);
@@ -211,7 +228,7 @@ function AutomationForm({
                 className="col-span-2 text-sm text-muted-foreground sm:col-span-1 sm:row-start-2"
               >
                 {value.mode === "same"
-                  ? "Runs continue in one dedicated chat, keeping its workspace and conversation."
+                  ? "Keep the workspace and conversation."
                   : "Each run starts with a fresh workspace and conversation."}
               </p>
               {initial.id && value.mode !== initial.mode && (
@@ -331,7 +348,15 @@ function AutomationForm({
   );
 }
 
-export function Automations({ path, onExpired }: { path: string; onExpired: () => void }) {
+export function Automations({
+  path,
+  onExpired,
+  topbar,
+}: {
+  path: string;
+  onExpired: () => void;
+  topbar: HTMLDivElement | null;
+}) {
   const [list, setList] = useState<Automation[]>();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [detail, setDetail] = useState<AutomationDetail>();
@@ -419,6 +444,7 @@ export function Automations({ path, onExpired }: { path: string; onExpired: () =
       {list === undefined && !error && <LoadingStatus />}
       {list !== undefined && (isNew || (editing && item !== undefined)) && (
         <AutomationForm
+          topbar={topbar}
           initial={item ?? blank(projects[0]?.id ?? "")}
           projects={projects}
           busy={busy}

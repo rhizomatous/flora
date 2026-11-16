@@ -129,6 +129,7 @@ function App() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [path, setPath] = useState(currentPath);
+  const [automationTopbar, setAutomationTopbar] = useState<HTMLDivElement | null>(null);
   const ready = status?.authenticated === true && settings !== undefined;
 
   // Re-reads the session so an expired one shows the login screen. A failure here keeps the
@@ -241,8 +242,13 @@ function App() {
       )}
       <Content id="main-content" tabIndex={-1} className={ready ? frameLayout : undefined}>
         {ready && !conversation && !pullsPage && !chatsPage && (
-          <header className="florets-topbar flex shrink-0 items-center border-b px-3">
+          <header
+            className={`florets-topbar flex shrink-0 items-center border-b px-3 ${path.startsWith("automations") ? "sticky top-0 z-20 bg-background" : ""}`}
+          >
             <span className="sidebar-toggle-space" aria-hidden="true" />
+            {path.startsWith("automations") && (
+              <div ref={setAutomationTopbar} className="flex min-w-0 flex-1 items-center gap-2" />
+            )}
           </header>
         )}
         <div className={ready ? contentLayout : undefined}>
@@ -294,7 +300,7 @@ function App() {
             <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
           )}
           {ready && path.startsWith("automations") && (
-            <Automations key={path} path={path} onExpired={onExpired} />
+            <Automations key={path} path={path} onExpired={onExpired} topbar={automationTopbar} />
           )}
           {ready && path === "usage" && <UsagePage onExpired={onExpired} />}
           {pullsPage && (

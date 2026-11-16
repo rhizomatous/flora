@@ -8,10 +8,13 @@ test("create, edit, pause, and run an automation in a dedicated chat", async ({ 
   await logIn(page);
   await page.getByRole("link", { name: "Automations", exact: true }).click();
   await page.getByRole("link", { name: "New automation", exact: true }).click();
+  const topbar = page.locator("#main-content > header.florets-topbar");
+  await expect(topbar.getByRole("heading", { name: "New automation", exact: true })).toBeVisible();
+  await expect(topbar.getByRole("button", { name: "Create automation", exact: true })).toBeVisible();
   await page.getByLabel("Name", { exact: true }).fill("Weekly dependency check");
   await page.getByLabel("Instructions", { exact: true }).fill("Check dependencies and summarize findings.");
   await page.getByLabel("Runs in", { exact: true }).selectOption("same");
-  await expect(page.getByText("Runs continue in one dedicated chat, keeping its workspace and conversation.")).toBeVisible();
+  await expect(page.getByText("Keep the workspace and conversation.")).toBeVisible();
   await page.getByLabel("Schedule", { exact: true }).selectOption("weekly");
   await page.getByRole("button", { name: "Friday", exact: true }).click();
   await page.getByLabel("Time zone", { exact: true }).fill("America/New_York");
