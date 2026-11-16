@@ -91,8 +91,12 @@ function Hunk({ rows, language }: { rows: DiffLine[]; language: string }) {
         if (row.kind === "meta") {
           return (
             <tr key={index}>
-              <td colSpan={4} className="bg-muted/30 px-3 py-1 font-sans text-muted-foreground">
-                {row.text}
+              <td colSpan={4} aria-label={row.text} className="p-0 font-sans text-muted-foreground">
+                <div className="sticky left-0 flex w-[100cqw] items-center gap-3 px-3 py-1">
+                  <span aria-hidden="true" className="h-px min-w-3 flex-1 bg-border" />
+                  <span>{row.text}</span>
+                  <span aria-hidden="true" className="h-px min-w-3 flex-1 bg-border" />
+                </div>
               </td>
             </tr>
           );
@@ -156,20 +160,22 @@ export function Diff({ patch, path }: { patch: string; path: string }) {
     return groups;
   }, [patch]);
   return (
-    <div
-      // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Keyboard users need to scroll long code lines.
-      tabIndex={0}
-      role="region"
-      aria-label={`Diff for ${path}`}
-      className="overflow-auto font-mono text-xs leading-5"
-    >
-      <table className="w-full border-collapse whitespace-pre">
-        <tbody>
-          {hunks.map((rows, index) => (
-            <Hunk key={index} rows={rows} language={fileLanguage(path)} />
-          ))}
-        </tbody>
-      </table>
+    <div className="@container min-w-0">
+      <div
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Keyboard users need to scroll long code lines.
+        tabIndex={0}
+        role="region"
+        aria-label={`Diff for ${path}`}
+        className="overflow-auto font-mono text-xs leading-5"
+      >
+        <table className="w-full border-collapse whitespace-pre">
+          <tbody>
+            {hunks.map((rows, index) => (
+              <Hunk key={index} rows={rows} language={fileLanguage(path)} />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

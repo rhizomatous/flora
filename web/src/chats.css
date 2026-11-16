@@ -32,10 +32,11 @@
 }
 
 .chat-diffs {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   min-width: 0;
-  overflow: auto;
-  padding: 0 0 1rem;
+  overflow: hidden;
 }
 
 .chat-view-panel[hidden] {

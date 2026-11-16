@@ -179,6 +179,25 @@ test("live mock shows multiple languages, inline edits, and separated hunks", as
   const headerBounds = await review.locator("summary").first().boundingBox();
   expect(toolbarBounds?.height).toBeLessThanOrEqual(38);
   expect(headerBounds?.height).toBeLessThanOrEqual(34);
+  const topbar = page.locator(".chat-header");
+  const controls = review.locator(".diff-toolbar");
+  const scroll = review.locator(".diff-scroll");
+  const topbarBounds = await topbar.boundingBox();
+  const scrollBounds = await scroll.boundingBox();
+  expect(toolbarBounds?.x).toBe(topbarBounds?.x);
+  expect(toolbarBounds?.width).toBe(topbarBounds?.width);
+  expect(scrollBounds?.x).toBe(toolbarBounds?.x);
+  expect(scrollBounds?.width).toBe(toolbarBounds?.width);
+  expect(await controls.evaluate((el) => getComputedStyle(el).paddingInline)).toBe(
+    await topbar.evaluate((el) => getComputedStyle(el).paddingInline),
+  );
+  await scroll.evaluate((el) => {
+    el.scrollTop = 500;
+  });
+  expect(await controls.boundingBox()).toEqual(toolbarBounds);
+  await scroll.evaluate((el) => {
+    el.scrollTop = 0;
+  });
   await expect(review.getByText("Modified", { exact: true })).toHaveCount(0);
   const go = page.getByRole("region", { name: "Diff for internal/notes/list.go", exact: true });
   await expect(go.locator('span[style*="--shiki-light"]').first()).toBeVisible();

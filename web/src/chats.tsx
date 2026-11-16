@@ -525,7 +525,7 @@ export function Chats({
               <TabsContent
                 value="diffs"
                 keepMounted
-                className="chat-view-panel min-h-0 min-w-0 flex-1"
+                className="chat-view-panel -mx-4 min-h-0 min-w-0 flex-1 sm:-mx-8"
               >
                 <Changes key={id} chatID={id} onExpired={onExpired} />
               </TabsContent>

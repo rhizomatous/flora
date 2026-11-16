@@ -100,18 +100,7 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
       {snapshot === null && <Text className="mt-3">No successful review saved yet.</Text>}
       {snapshot && (
         <>
-          <div className="diff-toolbar flex min-h-9 flex-wrap items-center gap-1 border-b border-border py-1">
-            <div
-              className="flex items-center gap-3 text-xs text-muted-foreground"
-              aria-label="Change summary"
-            >
-              <span>
-                {snapshot.files.length} {snapshot.files.length === 1 ? "file" : "files"}
-              </span>
-              {countsKnown && (
-                <ChangeCounts additions={totals.additions} deletions={totals.deletions} />
-              )}
-            </div>
+          <div className="diff-toolbar flex min-h-9 shrink-0 items-center gap-1 border-b border-border px-3 py-1">
             <span className="flex-1" />
             <DiffFiles
               files={snapshot.files}
@@ -143,72 +132,85 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
               {anyExpanded ? <ChevronsDownUpIcon /> : <ChevronsUpDownIcon />}
             </Button>
           </div>
-          {(review.stale || error !== "") && (
-            <Text role="status" size="xs" tone="muted" className="my-2">
-              Saved changes may be out of date.
-            </Text>
-          )}
-          {snapshot.files.length === 0 && (
-            <Text className="mt-3">No changes from the starting commit.</Text>
-          )}
-          <ul className="mt-3 space-y-2">
-            {snapshot.files.map((f, i) => (
-              <li key={`${f.repository ?? ""}:${f.previous ?? ""}:${f.path}`} className="min-w-0">
-                {multipleRepositories &&
-                  (i === 0 || snapshot.files[i - 1]?.repository !== f.repository) && (
-                    <Heading level={3} className="py-2 text-sm">
-                      {f.repository ?? "Repository"}
-                    </Heading>
-                  )}
-                <details
-                  open
-                  data-file-index={i}
-                  onToggle={() => {
-                    setAnyExpanded(
-                      [
-                        ...(container.current?.querySelectorAll<HTMLDetailsElement>("details") ??
-                          []),
-                      ].some((file) => file.open),
-                    );
-                  }}
-                  className="overflow-hidden rounded-md border border-border"
-                >
-                  <summary className="diff-file-heading flex cursor-pointer items-center gap-2 bg-muted/30 px-2.5 py-1.5 text-sm break-all">
-                    <ChevronRightIcon
-                      aria-hidden="true"
-                      className="diff-file-caret size-3 shrink-0 text-muted-foreground"
-                    />
-                    <span className="inline-flex min-w-0 flex-1 flex-wrap items-center gap-2 align-middle">
-                      <FileTypeIcon path={f.path} />
-                      <span className="font-medium">{f.path.split("/").at(-1)}</span>
-                      <span className="min-w-0 text-xs text-muted-foreground">
-                        {f.path.includes("/") ? f.path.slice(0, f.path.lastIndexOf("/") + 1) : ""}
-                      </span>
-                      {f.status !== "M" && (
-                        <span className="text-xs text-muted-foreground">
-                          {changeStatus(f.status)}
+          <div className="diff-scroll min-h-0 flex-1 overflow-auto px-3 pb-4">
+            <div
+              className="flex w-fit items-center gap-3 py-3 text-xs text-muted-foreground"
+              aria-label="Change summary"
+            >
+              <span>
+                {snapshot.files.length} {snapshot.files.length === 1 ? "file" : "files"}
+              </span>
+              {countsKnown && (
+                <ChangeCounts additions={totals.additions} deletions={totals.deletions} />
+              )}
+            </div>
+            {(review.stale || error !== "") && (
+              <Text role="status" size="xs" tone="muted" className="my-2">
+                Saved changes may be out of date.
+              </Text>
+            )}
+            {snapshot.files.length === 0 && (
+              <Text className="mt-3">No changes from the starting commit.</Text>
+            )}
+            <ul className="space-y-2">
+              {snapshot.files.map((f, i) => (
+                <li key={`${f.repository ?? ""}:${f.previous ?? ""}:${f.path}`} className="min-w-0">
+                  {multipleRepositories &&
+                    (i === 0 || snapshot.files[i - 1]?.repository !== f.repository) && (
+                      <Heading level={3} className="py-2 text-sm">
+                        {f.repository ?? "Repository"}
+                      </Heading>
+                    )}
+                  <details
+                    open
+                    data-file-index={i}
+                    onToggle={() => {
+                      setAnyExpanded(
+                        [
+                          ...(container.current?.querySelectorAll<HTMLDetailsElement>("details") ??
+                            []),
+                        ].some((file) => file.open),
+                      );
+                    }}
+                    className="overflow-hidden rounded-md border border-border"
+                  >
+                    <summary className="diff-file-heading flex cursor-pointer items-center gap-2 bg-muted/30 px-2.5 py-1.5 text-sm break-all">
+                      <ChevronRightIcon
+                        aria-hidden="true"
+                        className="diff-file-caret size-3 shrink-0 text-muted-foreground"
+                      />
+                      <span className="inline-flex min-w-0 flex-1 flex-wrap items-center gap-2 align-middle">
+                        <FileTypeIcon path={f.path} />
+                        <span className="font-medium">{f.path.split("/").at(-1)}</span>
+                        <span className="min-w-0 text-xs text-muted-foreground">
+                          {f.path.includes("/") ? f.path.slice(0, f.path.lastIndexOf("/") + 1) : ""}
                         </span>
-                      )}
-                      {f.previous !== undefined && <>{f.previous} → </>}
-                      {contentNote(f)}
-                      <ChangeCounts additions={f.additions} deletions={f.deletions} />
-                    </span>
-                  </summary>
-                  {f.truncated && (
-                    <Text className="mt-3">
-                      Diff exceeds the configured inline limit ({f.bytes.toLocaleString()} bytes).{" "}
-                      <Link
-                        href={`/api/chats/${encodeURIComponent(chatID)}/changes/${i}/diff?snapshot=${encodeURIComponent(snapshot.id)}`}
-                      >
-                        Download full diff
-                      </Link>
-                    </Text>
-                  )}
-                  {f.diff !== "" && <Diff patch={f.diff} path={f.path} />}
-                </details>
-              </li>
-            ))}
-          </ul>
+                        {f.status !== "M" && (
+                          <span className="text-xs text-muted-foreground">
+                            {changeStatus(f.status)}
+                          </span>
+                        )}
+                        {f.previous !== undefined && <>{f.previous} → </>}
+                        {contentNote(f)}
+                        <ChangeCounts additions={f.additions} deletions={f.deletions} />
+                      </span>
+                    </summary>
+                    {f.truncated && (
+                      <Text className="mt-3">
+                        Diff exceeds the configured inline limit ({f.bytes.toLocaleString()} bytes).{" "}
+                        <Link
+                          href={`/api/chats/${encodeURIComponent(chatID)}/changes/${i}/diff?snapshot=${encodeURIComponent(snapshot.id)}`}
+                        >
+                          Download full diff
+                        </Link>
+                      </Text>
+                    )}
+                    {f.diff !== "" && <Diff patch={f.diff} path={f.path} />}
+                  </details>
+                </li>
+              ))}
+            </ul>
+          </div>
         </>
       )}
     </section>
