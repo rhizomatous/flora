@@ -37,37 +37,7 @@
   overflow: auto;
   padding: 1rem 0;
 }
-.diff-expanded .chat-conversation,
-.diff-expanded .chat-diff-handle {
+
+.chat-view-panel[hidden] {
   display: none;
-}
-.chat-review-layout.diff-expanded {
-  display: block !important;
-}
-.diff-expanded .chat-diff-panel {
-  height: 100%;
-}
-@media (max-width: 900px) {
-  .chat-review-layout.has-diffs .chat-conversation,
-  .chat-diff-handle {
-    display: none;
-  }
-  .chat-review-layout.has-diffs {
-    display: block !important;
-  }
-  .chat-diff-panel {
-    height: 100%;
-  }
-  .chat-diff-expand {
-    display: none;
-  }
-}
-
-.chat-conversation [data-slot="message-scroller"] {
-  margin-inline: 0;
-  width: 100%;
-}
-
-.has-diffs .chat-transcript-viewport > [data-slot="message-scroller-content"] {
-  padding-inline-start: 40px;
 }

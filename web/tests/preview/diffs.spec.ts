@@ -1,6 +1,6 @@
 import { test, expect } from "./fixtures.ts";
 
-test("plus menu opens saved diffs without losing the chat draft", async ({ page }) => {
+test("plus menu opens a full-width diff tab and preserves both views", async ({ page }) => {
   await page.route("**/api/chats/pagination/changes", (route) =>
     route.fulfill({
       json: {
@@ -53,7 +53,11 @@ test("plus menu opens saved diffs without losing the chat draft", async ({ page 
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
   await page.getByRole("menuitem", { name: "Diffs", exact: true }).click();
   const review = page.getByRole("region", { name: "Chat changes", exact: true });
-  await expect(review.getByRole("heading", { name: "Chat changes" })).toBeFocused();
+  const diffTab = page.getByRole("tab", { name: "Diffs", exact: true });
+  const chatTab = page.getByRole("tab", { name: "Fix duplicate notes between pages", exact: true });
+  await expect(diffTab).toHaveAttribute("aria-selected", "true");
+  const desktopBounds = await review.boundingBox();
+  expect(desktopBounds?.width).toBeGreaterThan(900);
   await expect(review.getByText("const limit = 20;", { exact: true })).toBeVisible();
   await expect(review.getByText(/Saved review, possibly out of date/)).toBeVisible();
   await expect(review.getByText(/logo.png.*Binary/)).toBeVisible();
@@ -65,16 +69,21 @@ test("plus menu opens saved diffs without losing the chat draft", async ({ page 
   await expect(review.getByText("const limit = 20;", { exact: true })).not.toBeVisible();
   await review.getByLabel("Jump to file").selectOption("0");
   await expect(review.getByText("const limit = 20;", { exact: true })).toBeVisible();
-  await review.getByRole("button", { name: "Expand", exact: true }).click();
   await expect(page.getByRole("region", { name: "Conversation", exact: true })).not.toBeVisible();
-  await review.getByRole("button", { name: "Show chat", exact: true }).click();
+  await chatTab.click();
   await expect(page.getByRole("region", { name: "Conversation", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this draft");
+  await chatTab.press("ArrowRight");
+  await expect(diffTab).toBeFocused();
+  await diffTab.press("Enter");
+  await expect(review.getByText("const limit = 20;", { exact: true })).toBeVisible();
+  await expect(review.getByRole("link", { name: "Download full diff" })).not.toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(review).toBeVisible();
   const reviewBounds = await review.boundingBox();
   expect(reviewBounds?.width).toBeGreaterThan(340);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
-  await review.getByRole("button", { name: "Back to chat" }).click();
-  await expect(page.getByRole("button", { name: "Chat views", exact: true })).toBeFocused();
+  await chatTab.click();
+  await expect(chatTab).toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this draft");
 });

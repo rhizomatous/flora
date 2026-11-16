@@ -12,24 +12,8 @@ function contentNote(file: FileChange) {
   return "";
 }
 
-export function Changes({
-  chatID,
-  onExpired,
-  expanded,
-  onExpand,
-  onClose,
-}: {
-  chatID: string;
-  onExpired: () => void;
-  expanded: boolean;
-  onExpand: () => void;
-  onClose: () => void;
-}) {
+export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () => void }) {
   const container = useRef<HTMLElement>(null);
-  const title = useRef<HTMLHeadingElement>(null);
-  useEffect(() => {
-    title.current?.focus();
-  }, []);
   const [review, setReview] = useState<ChatChanges>();
   const [error, setError] = useState("");
   const expire = useEffectEvent(onExpired);
@@ -71,17 +55,9 @@ export function Changes({
   const pulls = review?.pulls.items ?? [];
   return (
     <section aria-label="Chat changes" ref={container} className="chat-diffs">
-      <div className="flex flex-wrap items-center gap-2">
-        <Heading level={2} ref={title} tabIndex={-1} className="mr-auto text-base">
-          Chat changes
-        </Heading>
-        <Button variant="ghost" size="sm" className="chat-diff-expand" onClick={onExpand}>
-          {expanded ? "Show chat" : "Expand"}
-        </Button>
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          Back to chat
-        </Button>
-      </div>
+      <Heading level={2} className="text-base">
+        Chat changes
+      </Heading>
       <Text size="xs" tone="muted" className="mt-2">
         Changes since this chat started.
       </Text>
