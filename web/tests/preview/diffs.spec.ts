@@ -164,7 +164,7 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this draft");
 });
 
-test("live mock shows colored Go and CSS with within-line edits", async ({ page }) => {
+test("live mock shows multiple languages, inline edits, and separated hunks", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`${process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199"}/#chats/pagination`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
@@ -172,7 +172,7 @@ test("live mock shows colored Go and CSS with within-line edits", async ({ page 
   await page.getByRole("menuitem", { name: "Diffs", exact: true }).click();
   const review = page.getByRole("region", { name: "Chat changes", exact: true });
   await expect(
-    review.getByLabel("Change summary").getByLabel("5 additions, 5 deletions"),
+    review.getByLabel("Change summary").getByLabel("36 additions, 17 deletions"),
   ).toBeVisible();
   await expect(review.getByRole("link")).toHaveCount(0);
   const toolbarBounds = await review.locator(".diff-toolbar").boundingBox();
@@ -188,10 +188,22 @@ test("live mock shows colored Go and CSS with within-line edits", async ({ page 
   await expect(
     css.locator('[data-inline-change="add"]').filter({ hasText: "a3a3a3" }),
   ).toBeVisible();
+  const tsx = page.getByRole("region", {
+    name: "Diff for web/src/components/NotesFeed.tsx",
+    exact: true,
+  });
+  await expect(tsx.locator('span[style*="--shiki-light"]').first()).toBeAttached();
+  await expect(tsx.getByText("68 unchanged lines", { exact: true })).toBeAttached();
+  await expect(
+    tsx.locator('[data-inline-change="add"]').filter({ hasText: "id" }).first(),
+  ).toBeAttached();
+  const html = page.getByRole("region", { name: "Diff for web/index.html", exact: true });
+  await expect(html.locator('span[style*="--shiki-light"]').first()).toBeAttached();
+  await expect(html.getByText("58 unchanged lines", { exact: true })).toBeAttached();
   await expect(page.getByText("feed.css", { exact: true })).toBeVisible();
   await review.getByRole("button", { name: "Files", exact: true }).click();
   await expect(page.getByText("internal / notes", { exact: true })).toBeVisible();
-  await expect(page.getByRole("option")).toHaveCount(3);
+  await expect(page.getByRole("option")).toHaveCount(6);
   const search = page.getByRole("combobox", { name: "Search changed files" });
   await search.fill("internal cursor");
   await expect(page.getByRole("option")).toHaveCount(1);
@@ -201,6 +213,6 @@ test("live mock shows colored Go and CSS with within-line edits", async ({ page 
   await page.setViewportSize({ width: 390, height: 844 });
   await review.getByRole("button", { name: "Files", exact: true }).click();
   await expect(search).toHaveValue("");
-  await expect(page.getByRole("option")).toHaveCount(3);
+  await expect(page.getByRole("option")).toHaveCount(6);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });

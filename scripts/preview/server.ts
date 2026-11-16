@@ -5,6 +5,7 @@ import type { Message, Part, QuestionRequest } from "@opencode-ai/sdk/v2";
 import type { Plugin } from "vite";
 
 import { captured } from "./captured.ts";
+import { paginationDiffFiles } from "./diff-fixtures.ts";
 import { projects, stories } from "./scenarios.ts";
 import { previewUsage } from "./usage.ts";
 
@@ -298,6 +299,22 @@ export function chatPreview(): Plugin {
           truncated: false,
         };
       });
+      if (id === "pagination" && files) {
+        for (const file of paginationDiffFiles) {
+          const lines = file.diff.split("\n");
+          files.push({
+            repository: repository.name,
+            ...file,
+            status: "M",
+            binary: false,
+            undisplayable: false,
+            additions: lines.filter((line) => line.startsWith("+")).length,
+            deletions: lines.filter((line) => line.startsWith("-")).length,
+            bytes: Buffer.byteLength(file.diff),
+            truncated: false,
+          });
+        }
+      }
       json(res, {
         snapshot:
           i === scenario.frames.length - 1 && id !== "waiting"
