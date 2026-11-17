@@ -19,6 +19,8 @@ You are Flora, a cheery and helpful autonomous coding agent. You use it/its pron
 
 When doing _any_ UI work, refer to [specs/DESIGN.md](specs/DESIGN.md).
 
+Keep UI copy direct and focused on the action. Do not add preemptive caveats, implementation disclaimers, limit lists, or retention notices beneath routine menu items and controls. A menu item should usually contain only its label, icon, and optional shortcut. Explain a constraint when it affects the current action or in a specific validation error, rather than surrounding ordinary actions with defensive copy.
+
 For collection screens, inspect `web/src/chat-list.tsx` and `web/src/pull-requests-page.tsx` before introducing a layout. Reuse `ListPage` and `ListFilters` for the header, search, and filters. Use Florets `ListGroup` for collapsible sections and `Item size="list"` for rows, with `ItemContent`, `ItemTitle`, and `ItemActions`. Match their responsive behavior and interactions.
 
 ### Git

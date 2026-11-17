@@ -9,6 +9,7 @@ test("attachments survive reload and an uncertain acceptance, and reopen after s
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   const screenshot = await page.screenshot();
   await page.getByRole("button", { name: "Add attachments and context", exact: true }).click();
+  await page.getByRole("menu").screenshot({ path: testInfo.outputPath("attachments-menu.png") });
   await page.getByRole("menuitem", { name: "Upload attachment", exact: true }).focus();
   const chooser = page.waitForEvent("filechooser");
   await page.keyboard.press("Enter");
