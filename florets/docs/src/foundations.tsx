@@ -205,9 +205,10 @@ export function FoundationPage({ id }: { id: string }) {
             </div>
             <p>
               Control fills use <code>--control-background</code>, mapped to the panel surface.
-              Outlines use <code>--control-border</code>. Hover and focus are separate interaction
-              states. Use <code>Card variant=&quot;flush&quot;</code> for divided settings rows
-              without the default card spacing.
+              Canvas outlines, cards, dividers, controls, and overlays share <code>--border</code>.
+              Hover and focus are separate interaction states. Use{" "}
+              <code>Card variant=&quot;flush&quot;</code> for divided settings rows without the
+              default card spacing.
             </p>
           </Section>
           <Section id="compact-patterns" title="Compact navigation and controls">

@@ -56,9 +56,9 @@ Use four semantic surfaces across Flora and Florets. In dark mode, each level is
 
 Use the matching Tailwind utilities, such as `bg-surface-panel`. Surface names describe their role rather than a particular component. Both themes use these roles, with colors defined in the shared stylesheet.
 
-Controls use `--control-background`, which maps to the panel surface, and `--control-border` for their outline. Standalone inputs and inputs inside panels share the same fill. Input groups own the fill; their inner inputs remain transparent.
+Controls use `--control-background`, which maps to the panel surface, and the shared `--border` for their outline. Standalone inputs and inputs inside panels share the same fill. Input groups own the fill; their inner inputs remain transparent.
 
-Containment does not automatically add elevation. Use Card for contained content and `variant="flush"` for groups of divided settings rows. Keep ordinary list rows transparent at rest. Use subtle borders and dividers to separate content within a surface.
+Containment does not automatically add elevation. Use Card for contained content and `variant="flush"` for groups of divided settings rows. Keep ordinary list rows transparent at rest. Use `--border` for canvas outlines, cards, dividers, controls, and overlays. Both themes define one shared neutral border color.
 
 Use `--control-hover` for control hover fills and retain visible keyboard focus and invalid-field indicators.
 

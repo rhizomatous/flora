@@ -207,7 +207,8 @@ function App() {
   }
 
   const Layout = ready ? SidebarProvider : "div";
-  const conversation = ready && path.startsWith("chats/") && !path.startsWith("chats/new");
+  const newChat = ready && path.startsWith("chats/new");
+  const conversation = ready && path.startsWith("chats/") && !newChat;
   const pullsPage = ready && path === "pulls";
   const chatsPage = ready && path.split("?")[0] === "chats";
   const automationsPage = ready && path === "automations";
@@ -246,7 +247,7 @@ function App() {
         </header>
       )}
       <Content id="main-content" tabIndex={-1} className={ready ? frameLayout : undefined}>
-        {ready && !conversation && !pullsPage && !chatsPage && !automationsPage && (
+        {ready && !newChat && !conversation && !pullsPage && !chatsPage && !automationsPage && (
           <header className="florets-topbar flex shrink-0 items-center gap-2 border-b px-3">
             <span className="sidebar-toggle-space" aria-hidden="true" />
             {path.startsWith("automations") && (
