@@ -62,8 +62,14 @@ configured same-origin HTTPS address.
 Settings accept a fine-grained GitHub token and an OpenAI, Anthropic, or Google
 API key. Save validates the GitHub account and access to the chosen model through
 the provider's model metadata endpoint. This initial account check does not
-validate repository permissions. Provider and model
+validate repository permissions. The provider and installation default model
 are fixed on first save; keys can be replaced later. Blank keys keep saved values.
+
+Choose a model and its supported reasoning effort in the chat composer. A selection
+applies when the next message is accepted, and cannot change an active turn. Chats
+retain their last accepted selection. New-chat automations use the installation
+default; same-chat automations retain that chat's selection.
+
 HTTP responses expose non-secret settings and whether each key is saved, never key values.
 Credentials are stored in the private SQLite database, not encrypted separately.
 Protect the storage directory and backups, and never mount them into agents.
@@ -155,7 +161,7 @@ administrator's GitHub token stays on the host. See the installation guide.
 
 After saving installation credentials and connecting a project with one core
 repository, choose **Start chat**. New containers receive the installation's
-provider key and fixed model. Replacing a saved key does not change an existing
+provider key and installation default model. Replacing a saved key does not change an existing
 container's environment. Follow-ups use the existing endpoint, workspace, and
 OpenCode session without rotating its git/gh capability.
 

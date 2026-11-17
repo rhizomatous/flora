@@ -38,7 +38,7 @@ func (f browserTransport) RoundTrip(r *http.Request) (*http.Response, error) { r
 // This code is compiled only into the fixture executable.
 func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	switch scenario {
-	case "chat", "changes", "enrollment", "notifications", "projects", "settings":
+	case "models", "chat", "changes", "enrollment", "notifications", "projects", "settings":
 	default:
 		return nil, fmt.Errorf("unknown browser scenario %q", scenario)
 	}
@@ -155,6 +155,9 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}
 	srv := httptest.NewUnstartedServer(nil)
 	origin := "https://" + srv.Listener.Addr().String()
+	if scenario == "models" {
+		origin = "http://" + srv.Listener.Addr().String()
+	}
 	var app http.Handler
 	if fixture == nil {
 		app = New(webassets.FS(), authentication, configuration, origin)
@@ -205,7 +208,11 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	})
 	mux.Handle("/", app)
 	srv.Config.Handler = mux
-	srv.StartTLS()
+	if scenario == "models" {
+		srv.Start()
+	} else {
+		srv.StartTLS()
+	}
 	cleanup = append(cleanup, func() { srv.CloseClientConnections(); srv.Close() })
 	instance.URL = srv.URL
 	return instance, nil

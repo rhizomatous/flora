@@ -128,11 +128,11 @@
 .follow-up-composer .composer-bottom-bar {
   flex-wrap: nowrap;
 }
-.follow-up-composer .composer-bottom-bar > [aria-label="Model"] {
+.follow-up-composer .composer-bottom-bar > .composer-model {
   min-width: 0;
   flex-shrink: 1;
 }
-.follow-up-composer .composer-bottom-bar > [aria-label="Model"] .florets-control-label {
+.follow-up-composer .composer-bottom-bar > .composer-model .florets-control-label {
   overflow: hidden;
   text-overflow: ellipsis;
 }

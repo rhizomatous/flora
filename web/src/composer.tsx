@@ -17,13 +17,19 @@ import {
   GitPullRequestIcon,
   PaperclipIcon,
   PlusIcon,
-  FlowerIcon,
   FilesIcon,
   MessageSquareIcon,
 } from "@flora/florets";
 
 import { AttachmentPreview } from "./attachment-preview";
-import { attachmentAccept, attachmentDetails, useAttachments } from "./attachments";
+import {
+  attachmentAccept,
+  attachmentDetails,
+  useAttachments,
+  type AttachmentPolicy,
+} from "./attachments";
+import type { Execution } from "./chat-schemas";
+import { ModelControls } from "./model-controls";
 
 export function PlaceholderMenu({
   label,
@@ -92,6 +98,8 @@ export function Composer({
   settings,
   draftScope,
   projectID,
+  execution,
+  activeTurn = false,
 }: {
   id: string;
   label: string;
@@ -104,8 +112,11 @@ export function Composer({
   settings?: ReactNode;
   draftScope?: string;
   projectID?: string;
+  execution?: Execution | undefined;
+  activeTurn?: boolean;
 }) {
-  const attachments = useAttachments(draftScope ?? id, projectID ?? "");
+  const [modelPolicy, setModelPolicy] = useState<AttachmentPolicy>();
+  const attachments = useAttachments(draftScope ?? id, projectID ?? "", modelPolicy);
   const picker = useRef<HTMLInputElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -327,18 +338,13 @@ export function Composer({
           </DropdownMenuContent>
         </DropdownMenu>
         {settings}
-        <PlaceholderMenu
-          label="Model"
-          items={[{ label: "Server default model", icon: <FlowerIcon /> }]}
-        >
-          <span className="composer-model-mark grid size-4 shrink-0 place-items-center rounded-[7px] bg-action text-action-foreground [&_svg]:size-3.5">
-            <FlowerIcon />
-          </span>
-          <span className="florets-control-label">Default model</span>
-        </PlaceholderMenu>
-        <PlaceholderMenu label="Reasoning effort" items={[{ label: "Default reasoning effort" }]}>
-          <span className="florets-control-label">Default</span>
-        </PlaceholderMenu>
+        <ModelControls
+          key={draftScope ?? id}
+          scope={draftScope ?? id}
+          saved={execution}
+          onPolicy={setModelPolicy}
+          disabled={disabled || activeTurn}
+        />
         {action}
       </InputGroupAddon>
     </InputGroup>

@@ -140,9 +140,10 @@ controlling terminal, or read `data-dir/deployment/enrollment-code` privately as
 the app owner. Never put it in URLs, service arguments or logs. Enrollment closes
 permanently once the first administrator exists, including after restart.
 
-In Settings, save hosted model and GitHub credentials. Provider/model selection
-is fixed after first save. Use a fine-grained GitHub token limited to intended
-repositories, with Contents and Pull requests read/write and Metadata read. Add
+In Settings, save hosted model and GitHub credentials. The provider and installation
+default model are fixed after first save. Individual chat turns can select other
+models from the installed provider and use their supported reasoning options. Use
+a fine-grained GitHub token limited to intended repositories, with Contents and Pull requests read/write and Metadata read. Add
 Workflows write only if needed. Chat capabilities can use all permissions of that
 token. Run Check dependencies, then create a project and chat. Metadata checks do
 not prove inference quota or repository writes. Startup performs no paid inference

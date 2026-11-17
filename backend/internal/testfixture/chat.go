@@ -102,7 +102,7 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/provider":
-			fmt.Fprint(w, `{"all":[{"id":"anthropic","models":{"model":{"capabilities":{"input":{"image":true,"pdf":true}}}}}]}`)
+			fmt.Fprint(w, `{"all":[{"id":"anthropic","models":{"model":{"capabilities":{"input":{"image":true,"pdf":true}}},"claude-sonnet-4-6":{"variants":{"low":{},"medium":{},"high":{},"max":{}},"capabilities":{"input":{"image":true,"pdf":true}}},"claude-haiku-4-5":{"capabilities":{"input":{"image":true,"pdf":true}}}}}]}`)
 		case "/config":
 			fmt.Fprint(w, `{"model":"anthropic/model"}`)
 		case "/session":
@@ -151,7 +151,12 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 				return
 			}
 			var input struct {
-				Parts []struct {
+				Model struct {
+					Provider string `json:"providerID"`
+					ID       string `json:"modelID"`
+				} `json:"model"`
+				Variant string `json:"variant"`
+				Parts   []struct {
 					Type     string `json:"type"`
 					Text     string `json:"text"`
 					Filename string `json:"filename,omitempty"`
@@ -190,7 +195,7 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 				return
 			case <-time.After(750 * time.Millisecond):
 			}
-			response := json.RawMessage(fmt.Sprintf(`{"info":{"id":"assistant_%d","parentID":"user_%d","role":"assistant","providerID":"anthropic","modelID":"model"},"parts":[{"type":"text","text":"Saved response %d"},{"type":"tool","tool":"bash","state":{"status":"completed","input":{"command":"pwd"},"output":"/workspace\nprovider-test-secret"}}]}`, n, n, n))
+			response := json.RawMessage(fmt.Sprintf(`{"info":{"id":"assistant_%d","parentID":"user_%d","role":"assistant","providerID":"anthropic","modelID":%q},"parts":[{"type":"text","text":"Saved response %d"},{"type":"tool","tool":"bash","state":{"status":"completed","input":{"command":"pwd"},"output":"/workspace\nprovider-test-secret"}}]}`, n, n, input.Model.ID, n))
 			mu.Lock()
 			history = append(history, response)
 			mu.Unlock()
@@ -209,5 +214,5 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 type catalogTransport struct{}
 
 func (catalogTransport) RoundTrip(*http.Request) (*http.Response, error) {
-	return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"anthropic":{"models":{"model":{"modalities":{"input":["text","image","pdf"]}}}}}`)), Header: make(http.Header)}, nil
+	return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"anthropic":{"models":{"model":{"name":"Installation default","tool_call":true,"modalities":{"input":["text","image","pdf"]}},"claude-sonnet-4-6":{"name":"Claude Sonnet 4.6","tool_call":true,"reasoning":true,"modalities":{"input":["text","image","pdf"]}},"claude-haiku-4-5":{"name":"Claude Haiku 4.5","tool_call":true,"reasoning":false,"modalities":{"input":["text","image","pdf"]}}}}}`)), Header: make(http.Header)}, nil
 }

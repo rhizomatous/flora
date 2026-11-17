@@ -1,0 +1,2 @@
+ALTER TABLE chats ADD COLUMN execution TEXT NOT NULL DEFAULT '{}';
+ALTER TABLE chat_requests ADD COLUMN selection TEXT NOT NULL DEFAULT 'null';
