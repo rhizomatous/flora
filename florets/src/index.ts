@@ -86,6 +86,8 @@ export {
   Repeat2Icon,
   ChevronRightIcon,
   ChevronLeftIcon,
+  ChevronsDownUpIcon,
+  ChevronsUpDownIcon,
   XIcon,
   Share2Icon,
   CrownIcon,
@@ -134,3 +136,7 @@ export {
   FilesIcon,
   MessageSquareIcon,
 } from "lucide-react";
+
+export { Diff } from "./components/diff";
+
+export { FileTypeIcon } from "./components/file-type-icon";

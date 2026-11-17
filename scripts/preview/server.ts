@@ -5,6 +5,7 @@ import type { Message, Part, QuestionRequest } from "@opencode-ai/sdk/v2";
 import type { Plugin } from "vite";
 
 import { PreviewAutomations } from "./automations.ts";
+import { paginationDiffFiles } from "./diff-fixtures.ts";
 import { projects, stories, scenarios as demoScenarios, conversation } from "./scenarios.ts";
 import { previewUsage } from "./usage.ts";
 
@@ -312,7 +313,17 @@ export function chatPreview(): Plugin {
       const repository = present(project.configuration.repositories[0]);
       const files = (story?.files ?? (id.startsWith("automation-") ? [] : undefined))?.map(
         (file) => {
-          const diff = `@@ -1,${file.before.split("\n").length} +1,${file.after.split("\n").length} @@\n-${file.before}\n+${file.after.split("\n").join("\n+")}\n`;
+          const before = file.before.split("\n");
+          const after = file.after.split("\n");
+          const lines: string[] = [];
+          for (let lineIndex = 0; lineIndex < Math.max(before.length, after.length); lineIndex++) {
+            if (before[lineIndex] === after[lineIndex]) lines.push(` ${before[lineIndex]}`);
+            else {
+              if (before[lineIndex] !== undefined) lines.push(`-${before[lineIndex]}`);
+              if (after[lineIndex] !== undefined) lines.push(`+${after[lineIndex]}`);
+            }
+          }
+          const diff = `@@ -1,${before.length} +1,${after.length} @@\n${lines.join("\n")}\n`;
           return {
             repository: repository.name,
             path: file.path,
@@ -320,11 +331,29 @@ export function chatPreview(): Plugin {
             binary: false,
             undisplayable: false,
             diff,
+            additions: lines.filter((line) => line.startsWith("+")).length,
+            deletions: lines.filter((line) => line.startsWith("-")).length,
             bytes: Buffer.byteLength(diff),
             truncated: false,
           };
         },
       );
+      if (id === "pagination" && files) {
+        for (const file of paginationDiffFiles) {
+          const lines = file.diff.split("\n");
+          files.push({
+            repository: repository.name,
+            ...file,
+            status: "M",
+            binary: false,
+            undisplayable: false,
+            additions: lines.filter((line) => line.startsWith("+")).length,
+            deletions: lines.filter((line) => line.startsWith("-")).length,
+            bytes: Buffer.byteLength(file.diff),
+            truncated: false,
+          });
+        }
+      }
       json(res, {
         snapshot:
           i === scenario.frames.length - 1 && id !== "waiting"
