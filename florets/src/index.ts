@@ -27,6 +27,7 @@ export * from "./components/direction";
 export * from "./components/drawer";
 export * from "./components/dropdown-menu";
 export * from "./components/dropdown-button";
+export * from "./components/editable-text";
 export * from "./components/empty";
 export * from "./components/feedback";
 export * from "./components/field";

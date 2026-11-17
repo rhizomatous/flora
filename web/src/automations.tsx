@@ -16,6 +16,7 @@ import {
   PopoverContent,
   ChevronDownIcon,
   FieldLabel,
+  EditableText,
   Heading,
   Input,
   Link,
@@ -310,21 +311,21 @@ function AutomationForm({
         }}
       >
         <fieldset disabled={busy} className="space-y-5">
-          <FieldLabel className="w-full flex-col items-start">
-            Name
-            <Input
+          <div className="space-y-1">
+            <EditableText
+              label="Name"
+              variant="title"
               value={value.name}
-              onChange={(e) => {
-                change("name", e.target.value);
+              onChange={(event) => {
+                change("name", event.target.value);
               }}
               required
               maxLength={200}
-              placeholder="Weekly dependency check"
+              placeholder="Name this automation"
             />
-          </FieldLabel>
-          <FieldLabel className="w-full flex-col items-start">
-            <span className="sr-only">Description</span>
-            <Input
+            <EditableText
+              label="Description"
+              multiline
               value={value.description ?? ""}
               maxLength={2000}
               placeholder="Add a description (optional)"
@@ -332,7 +333,7 @@ function AutomationForm({
                 change("description", event.target.value);
               }}
             />
-          </FieldLabel>
+          </div>
           {initial.id && (
             <div className="flex items-center justify-between gap-3">
               <label className="flex w-fit items-center gap-2 text-sm">
