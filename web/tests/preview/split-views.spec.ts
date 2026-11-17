@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 
 test("side panel keeps chat drafts, resizes, and hosts independent diff tabs", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
