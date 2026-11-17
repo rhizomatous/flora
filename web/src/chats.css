@@ -18,9 +18,12 @@
   background: var(--background);
 }
 
-@media (max-width: 1100px) {
-  .chat-transcript-viewport > [data-slot="message-scroller-content"] {
-    padding-inline-start: 32px;
+.chat-main-pane {
+  container: chat-pane / inline-size;
+}
+@container chat-pane (max-width: 1000px) {
+  .chat-turn-navigation {
+    display: none;
   }
 }
 
@@ -96,4 +99,32 @@
 }
 details[open] > .diff-file-heading .diff-file-caret {
   transform: rotate(90deg);
+}
+
+.chat-split-open .chat-main-pane,
+.chat-split-open .chat-side-pane {
+  min-width: 300px;
+}
+@media (max-width: 900px) {
+  .chat-split-open .chat-main-pane,
+  .chat-split-open .chat-split-handle {
+    display: none;
+  }
+  .chat-split-open .chat-side-pane {
+    min-width: 0;
+    flex-grow: 1 !important;
+  }
+}
+
+.overview-section-heading {
+  list-style: none;
+}
+.overview-section-heading::-webkit-details-marker {
+  display: none;
+}
+.overview-section-caret {
+  transform: rotate(-90deg);
+}
+details[open] > .overview-section-heading .overview-section-caret {
+  transform: rotate(0deg);
 }

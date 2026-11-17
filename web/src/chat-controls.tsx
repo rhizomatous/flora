@@ -157,10 +157,12 @@ export function ChatTitle({
   );
 }
 
-function ChatViewMenu({
+export function ChatViewMenu({
+  label = "Chat views",
   diffsOpen,
   onDiffsChange,
 }: {
+  label?: string;
   diffsOpen: boolean;
   onDiffsChange: (open: boolean) => void;
 }) {
@@ -168,7 +170,7 @@ function ChatViewMenu({
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button variant="ghost" size="icon-sm" aria-label="Chat views">
+          <Button variant="ghost" size="icon-sm" aria-label={label}>
             <PlusIcon />
           </Button>
         }
@@ -233,10 +235,14 @@ function ChatViewMenu({
 }
 
 export function ChatHeaderActions({
+  sideOpen,
+  onSideToggle,
   usage,
   diffsOpen,
   onDiffsChange,
 }: {
+  sideOpen: boolean;
+  onSideToggle: () => void;
   usage: Usage | undefined;
   diffsOpen: boolean;
   onDiffsChange: (open: boolean) => void;
@@ -347,15 +353,7 @@ export function ChatHeaderActions({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Split review (coming soon)"
-        title="Split review (coming soon)"
-        aria-disabled="true"
-      >
-        <PanelRightIcon />
-      </Button>
+      {!sideOpen && <SidePanelToggle open={false} onClick={onSideToggle} />}
     </>
   );
 }
@@ -483,3 +481,18 @@ export function ChatReviewStrip({
 export { ChatTurnNavigation } from "./chat-turn-navigation";
 
 export { ChatPullContext as ChatPullProvider } from "./pull-context";
+
+export function SidePanelToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label={open ? "Close side panel" : "Open side panel"}
+      title={open ? "Close side panel" : "Open side panel"}
+      aria-expanded={open}
+      onClick={onClick}
+    >
+      <PanelRightIcon />
+    </Button>
+  );
+}
