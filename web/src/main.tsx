@@ -208,7 +208,7 @@ function App() {
   const Layout = ready ? SidebarProvider : "div";
   const conversation = ready && path.startsWith("chats/") && !path.startsWith("chats/new");
   const pullsPage = ready && path === "pulls";
-  const chatsPage = ready && path === "chats";
+  const chatsPage = ready && path.split("?")[0] === "chats";
   const automationsPage = ready && path === "automations";
   let contentLayout = "mx-auto w-full max-w-6xl p-4 sm:p-8";
   if (pullsPage || chatsPage || automationsPage) contentLayout = "flex min-h-0 flex-1 flex-col";

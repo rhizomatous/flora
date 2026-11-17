@@ -13,8 +13,11 @@ import {
   Button,
   ButtonLink,
   PlusIcon,
+  PinIcon,
 } from "@flora/florets";
 
+import { pinnedChats } from "./chat-organization";
+import { ChatOrganizationActions } from "./chat-organization-actions";
 import type { Chat } from "./chat-schemas";
 import { chatStatus, chatStatuses } from "./chat-status";
 import { ListPage, ListFilters, ListEmpty } from "./list-page";
@@ -43,10 +46,12 @@ export function ChatList({
   list,
   projects,
   error,
+  archived = false,
 }: {
   list: Chat[] | undefined;
   projects: ProjectSummary[] | undefined;
   error: string;
+  archived?: boolean;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
@@ -61,12 +66,16 @@ export function ChatList({
       window.clearInterval(timer);
     };
   }, []);
-  const rows = list ?? [];
+  const rows = (list ?? []).filter((chat) => (chat.Archived === true) === archived);
+  const emptyMessage = archived ? "No archived chats." : "No chats yet.";
   const projectNames = new Map(projects?.map((item) => [item.id, item.name]));
-  const groups = [...new Set(rows.map((chat) => chat.ProjectID))].map((id) => ({
-    id,
-    name: projectNames.get(id) ?? "Project",
-  }));
+  const groups = [
+    { id: "pinned", name: "Pinned" },
+    ...[...new Set(rows.map((chat) => chat.ProjectID))].map((id) => ({
+      id,
+      name: projectNames.get(id) ?? "Project",
+    })),
+  ];
   const visible = rows
     .filter(
       (chat) =>
@@ -79,7 +88,7 @@ export function ChatList({
     .toSorted((a, b) => Date.parse(b.UpdatedAt) - Date.parse(a.UpdatedAt));
   return (
     <ListPage
-      title="Chats"
+      title={archived ? "Archived chats" : "Chats"}
       searchLabel="Search chats"
       searchPlaceholder="Search chats or projects"
       closeSearchLabel="Close chat search"
@@ -107,6 +116,18 @@ export function ChatList({
           value={filter}
           onChange={setFilter}
         >
+          <NativeSelect
+            size="sm"
+            aria-label="Chat collection"
+            value={archived ? "archived" : "current"}
+            onChange={(event) => {
+              window.location.hash =
+                event.target.value === "archived" ? "chats?view=archived" : "chats";
+            }}
+          >
+            <option value="current">Current chats</option>
+            <option value="archived">Archived chats</option>
+          </NativeSelect>
           <NativeSelect
             size="sm"
             aria-label="Project"
@@ -138,8 +159,8 @@ export function ChatList({
       )}
       {list !== undefined && visible.length === 0 && (
         <ListEmpty>
-          <p>{rows.length === 0 ? "No chats yet." : "No chats match these filters."}</p>
-          {rows.length === 0 ? (
+          <p>{rows.length === 0 ? emptyMessage : "No chats match these filters."}</p>
+          {rows.length === 0 && !archived ? (
             <ButtonLink href="#chats/new" className="mt-2">
               Start a chat
             </ButtonLink>
@@ -151,28 +172,33 @@ export function ChatList({
                 setFilter("all");
                 setProject("");
                 setQuery("");
+                if (archived && rows.length === 0) window.location.hash = "chats";
               }}
             >
-              Show all chats
+              {archived && rows.length === 0 ? "View current chats" : "Show all chats"}
             </Button>
           )}
         </ListEmpty>
       )}
       <div className="space-y-2">
         {groups.map(({ id, name }) => {
-          const chats = visible.filter((chat) => chat.ProjectID === id);
+          const chats =
+            id === "pinned"
+              ? pinnedChats(visible)
+              : visible.filter((chat) => chat.ProjectID === id && (chat.PinnedAt ?? "") === "");
           if (chats.length === 0) return null;
           return (
             <ListGroup key={id} label={name} count={chats.length} listLabel={`${name} chats`}>
               {chats.map((chat) => {
                 const status = chatStatus(chat, isSeen(chat));
                 return (
-                  <li key={chat.ID}>
+                  <li key={chat.ID} className="flex min-w-0 items-center gap-1">
                     <Tooltip>
                       <TooltipTrigger
                         render={
                           <Item
                             size="list"
+                            className="min-w-0 flex-1"
                             render={
                               <a
                                 href={`#chats/${chat.ID}`}
@@ -194,7 +220,12 @@ export function ChatList({
                           <span />
                         </span>
                         <ItemContent>
-                          <ItemTitle>{chat.Title || "Untitled chat"}</ItemTitle>
+                          <ItemTitle>
+                            {(chat.PinnedAt ?? "") !== "" && (
+                              <PinIcon className="size-3 shrink-0 text-muted-foreground" />
+                            )}
+                            {chat.Title || "Untitled chat"}
+                          </ItemTitle>
                           <span className="shrink-0 text-xs text-muted-foreground sm:w-20">
                             {status.label}
                           </span>
@@ -219,6 +250,9 @@ export function ChatList({
                         </span>
                       </TooltipContent>
                     </Tooltip>
+                    <ItemActions className="shrink-0">
+                      <ChatOrganizationActions chat={chat} />
+                    </ItemActions>
                   </li>
                 );
               })}

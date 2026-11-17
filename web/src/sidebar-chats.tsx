@@ -8,7 +8,6 @@ import {
   XIcon,
   EllipsisIcon,
   PinIcon,
-  ArchiveIcon,
   FolderIcon,
   ListIcon,
   Settings2Icon,
@@ -22,6 +21,8 @@ import {
   HoverCardContent,
 } from "@flora/florets";
 
+import { pinnedChats } from "./chat-organization";
+import { ChatOrganizationActions } from "./chat-organization-actions";
 import type { Chat } from "./chat-schemas";
 import { chatStatus } from "./chat-status";
 import { PullCount, PullList } from "./pull-links";
@@ -122,54 +123,7 @@ function ChatRow({
         </HoverCardContent>
       </HoverCard>
       <div className="florets-navigation-actions">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          disabled
-          aria-label={`Pin ${chat.Title} (coming soon)`}
-        >
-          <PinIcon />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          disabled
-          aria-label={`Archive ${chat.Title} (coming soon)`}
-        >
-          <ArchiveIcon />
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${chat.Title}`}>
-                <EllipsisIcon />
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="start" side="right" className="w-48">
-            <DropdownMenuItem disabled>
-              <PinIcon />
-              Pin
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled>
-              <FolderIcon />
-              Move to folder
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled>
-              <ArchiveIcon />
-              Archive
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              nativeButton={false}
-              render={
-                <a href={`#chats/${chat.ID}`} onClick={close}>
-                  Open chat
-                </a>
-              }
-            />
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <ChatOrganizationActions chat={chat} quick />
       </div>
     </li>
   );
@@ -213,6 +167,8 @@ export function SidebarChats({
       rows: (chats ?? [])
         .filter(
           (chat) =>
+            chat.Archived !== true &&
+            (chat.PinnedAt ?? "") === "" &&
             chat.ProjectID === project.id &&
             (!filter || `${chat.Title} ${project.name} ${chat.ID}`.toLowerCase().includes(filter)),
         )
@@ -223,6 +179,13 @@ export function SidebarChats({
         ),
     }))
     .filter(({ rows }) => !filter || rows.length > 0);
+  const pinned = pinnedChats(chats ?? []).filter(
+    (chat) =>
+      !filter ||
+      `${chat.Title} ${chat.ID} ${projects.find((project) => project.id === chat.ProjectID)?.name ?? ""}`
+        .toLowerCase()
+        .includes(filter),
+  );
   return (
     <section aria-label="Chats" className="sidebar-chats px-2 py-4">
       <div className="sidebar-section-heading flex min-h-8 items-center ps-2 pe-0 text-xs text-subtle-foreground">
@@ -310,6 +273,14 @@ export function SidebarChats({
             <DropdownMenuItem
               nativeButton={false}
               render={
+                <a href="#chats?view=archived" onClick={close}>
+                  Archived chats
+                </a>
+              }
+            />
+            <DropdownMenuItem
+              nativeButton={false}
+              render={
                 <a href="#chats" onClick={close}>
                   <ListIcon />
                   View all chats
@@ -323,6 +294,28 @@ export function SidebarChats({
         <p className="sidebar-empty px-4 py-1.5 text-xs text-muted-foreground" role="status">
           Loading chats…
         </p>
+      )}
+      {pinned.length > 0 && (
+        <section aria-label="Pinned" className="florets-navigation-group">
+          <div className="florets-navigation-group-heading">
+            <span className="flex items-center gap-2 px-2 py-2 text-xs text-muted-foreground">
+              <PinIcon className="size-4" />
+              Pinned <span>{pinned.length}</span>
+            </span>
+          </div>
+          <ul>
+            {pinned.map((chat) => (
+              <ChatRow
+                key={chat.ID}
+                chat={chat}
+                seen={isSeen(chat)}
+                path={path}
+                close={close}
+                now={now}
+              />
+            ))}
+          </ul>
+        </section>
       )}
       {groups.map(({ project, rows }) => {
         const expanded = !!filter || !collapsed.includes(project.id);
@@ -382,7 +375,7 @@ export function SidebarChats({
           </section>
         );
       })}
-      {filter && groups.length === 0 && (
+      {filter && groups.length === 0 && pinned.length === 0 && (
         <p className="sidebar-empty px-4 py-1.5 text-xs text-muted-foreground" role="status">
           No chats found.
         </p>
