@@ -1,22 +1,18 @@
 import { useState, type SubmitEvent } from "react";
 
 import {
-  Button,
   DropdownButton,
   Popover,
   PopoverTrigger,
   PopoverContent,
   CheckIcon,
-  DatabaseIcon,
   GitBranchIcon,
-  GlobeIcon,
   InboxIcon,
   KeyRoundIcon,
   PlusIcon,
   PuzzleIcon,
   Settings2Icon,
   SlidersHorizontalIcon,
-  TerminalIcon,
 } from "@flora/florets";
 
 import { Composer, PlaceholderMenu } from "./composer";
@@ -119,16 +115,6 @@ export function NewChatComposer({
             </div>
           </PopoverContent>
         </Popover>
-        <Button
-          type="button"
-          variant="tertiary"
-          size="compact"
-          title="Setup assistance (coming soon)"
-          aria-disabled="true"
-        >
-          <DatabaseIcon />
-          <span className="florets-control-label">Setup</span>
-        </Button>
         <div className="composer-branch ml-auto shrink-0">
           <PlaceholderMenu
             variant="tertiary"
@@ -153,8 +139,6 @@ export function NewChatComposer({
             label="Chat settings"
             iconOnly
             items={[
-              { label: "Access", icon: <GlobeIcon /> },
-              { label: "Setup and snapshots", icon: <TerminalIcon />, separator: true },
               { label: "Environment variables", icon: <KeyRoundIcon /> },
               { label: "MCP servers", icon: <PuzzleIcon /> },
             ]}
