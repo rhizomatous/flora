@@ -73,3 +73,50 @@ test("side panel keeps chat drafts, resizes, and hosts independent diff tabs", a
   await expect(draft).toBeVisible();
   await expect(draft).toHaveValue("Keep this split-view draft");
 });
+
+test("panel preferences survive closing, chat navigation, and reload", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  await page.goto(`${base}/#chats/pagination`);
+  await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+  const rail = page.getByRole("navigation", { name: "Conversation turns" });
+  await expect(rail).toBeVisible();
+  await page.getByRole("button", { name: "Open side panel" }).click();
+  await expect(rail).toBeHidden();
+  const side = page.getByRole("complementary", { name: "Side panel" });
+  await side.locator("summary").click();
+  const handle = page.getByRole("separator", { name: "Resize side panel" });
+  await handle.focus();
+  await page.keyboard.press("ArrowLeft");
+  const resized = await side.boundingBox();
+  await side.getByRole("button", { name: "Side panel views" }).click();
+  await page.getByRole("menuitem", { name: "Diffs", exact: true }).click();
+  await side.getByRole("button", { name: "Close side panel", exact: true }).click();
+  await expect(rail).toBeVisible();
+  await page.getByRole("button", { name: "Open side panel" }).click();
+  await expect(side.getByRole("tab", { name: "Diffs", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect
+    .poll(async () => {
+      const box = await side.boundingBox();
+      return box?.width;
+    })
+    .toBe(resized?.width);
+  await page.getByRole("link", { name: /Keep the cart after signing in/ }).click();
+  await expect(side).toBeHidden();
+  await page.getByRole("link", { name: /Fix duplicate notes between pages/ }).click();
+  await expect(side.getByRole("tab", { name: "Diffs", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await page.reload();
+  await expect(side.getByRole("tab", { name: "Diffs", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await side.getByRole("tab", { name: "Overview", exact: true }).click();
+  await expect(side.getByRole("list", { name: "Linked pull requests" })).toBeHidden();
+  await expect(side.locator("details:visible")).not.toHaveAttribute("open");
+});

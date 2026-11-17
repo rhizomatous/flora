@@ -49,6 +49,7 @@ import {
   ChatReviewStrip,
 } from "./chat-controls";
 import { ChatList } from "./chat-list";
+import { useChatPanelState } from "./chat-panel-state";
 import {
   type Chat,
   type Question,
@@ -139,7 +140,6 @@ export function Chats({
   list: Chat[] | undefined;
   listError: string;
 }) {
-  const [sideChat, setSideChat] = useState<string | null>(null);
   const [diffChat, setDiffChat] = useState<string | null>(null);
   const [activeDiff, setActiveDiff] = useState(false);
   // Undefined until the project list loads.
@@ -353,6 +353,8 @@ export function Chats({
     setBusy(false);
   }
 
+  const [panelState, updatePanel] = useChatPanelState(id);
+
   if (id === "") return <ChatList list={list} projects={projects} error={error || listError} />;
 
   const pulls = list?.find((chat) => chat.ID === id)?.pulls ?? detail?.chat.pulls;
@@ -369,15 +371,20 @@ export function Chats({
     return saved === "" ? "Chat" : saved;
   }
 
-  const sideOpen = existingChat && sideChat === id;
+  const sideOpen = existingChat && panelState.open;
   return (
     <ResizablePanelGroup
       orientation="horizontal"
+      defaultLayout={{ conversation: 100 - panelState.width, review: panelState.width }}
+      onLayoutChanged={(layout, meta) => {
+        const width = (meta.requestedLayout ?? layout).review;
+        if (sideOpen && meta.isUserInteraction && width !== undefined) updatePanel({ width });
+      }}
       className={`chat-split -mx-4 min-h-0 w-auto! flex-1 sm:-mx-8 ${sideOpen ? "chat-split-open" : ""}`}
     >
       <ResizablePanel
         id="conversation"
-        defaultSize="60%"
+        defaultSize={`${100 - panelState.width}%`}
         minSize="300px"
         className="chat-main-pane flex min-w-0 flex-col px-4 sm:px-8"
       >
@@ -458,7 +465,7 @@ export function Chats({
                 <ChatHeaderActions
                   sideOpen={sideOpen}
                   onSideToggle={() => {
-                    setSideChat(sideOpen ? null : id);
+                    updatePanel({ open: !sideOpen });
                   }}
                   usage={detail?.usage}
                   diffsOpen={diffChat === id && activeDiff}
@@ -560,7 +567,7 @@ export function Chats({
           <ResizableHandle aria-label="Resize side panel" className="chat-split-handle" />
           <ResizablePanel
             id="review"
-            defaultSize="40%"
+            defaultSize={`${panelState.width}%`}
             minSize="300px"
             className="chat-side-pane min-w-0"
           >
@@ -570,7 +577,7 @@ export function Chats({
               pulls={pulls}
               onExpired={onExpired}
               onClose={() => {
-                setSideChat(null);
+                updatePanel({ open: false });
                 requestAnimationFrame(() => {
                   document
                     .querySelector<HTMLButtonElement>('button[aria-label="Open side panel"]')
