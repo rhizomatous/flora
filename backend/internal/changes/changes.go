@@ -30,6 +30,8 @@ type Executor interface {
 	Exec(context.Context, string, string, []string, io.Reader, io.Writer, io.Writer) (int, error)
 }
 type File struct {
+	Additions     int    `json:"additions"`
+	Deletions     int    `json:"deletions"`
 	Repository    string `json:"repository,omitempty"`
 	Path          string `json:"path"`
 	Previous      string `json:"previous,omitempty"`
@@ -422,6 +424,7 @@ func (s *Service) Read(ctx context.Context, id string, inline bool) (Review, err
 		}
 		for i := range r.Snapshot.Files {
 			f := &r.Snapshot.Files[i]
+			f.Additions, f.Deletions = lineCounts(f.Diff)
 			if f.Bytes > prefs.InlineDiffBytes {
 				f.Diff = ""
 				f.Truncated = true
@@ -432,4 +435,22 @@ func (s *Service) Read(ctx context.Context, id string, inline bool) (Review, err
 		}
 	}
 	return r, nil
+}
+
+// Count source lines before the inline response omits oversized patches.
+func lineCounts(patch string) (additions, deletions int) {
+	inHunk := false
+	for line := range strings.SplitSeq(patch, "\n") {
+		switch {
+		case strings.HasPrefix(line, "diff --git "):
+			inHunk = false
+		case strings.HasPrefix(line, "@@ "):
+			inHunk = true
+		case inHunk && strings.HasPrefix(line, "+"):
+			additions++
+		case inHunk && strings.HasPrefix(line, "-"):
+			deletions++
+		}
+	}
+	return
 }

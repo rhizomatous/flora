@@ -48,7 +48,15 @@ function TabsList({
   );
 }
 
-function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
+function TabsTrigger({
+  className,
+  variant = "default",
+  ...props
+}: TabsPrimitive.Tab.Props & { variant?: "default" | "control" }) {
+  // Rendered controls supply their own dimensions and appearance.
+  if (variant === "control") {
+    return <TabsPrimitive.Tab data-slot="tabs-trigger" className={className} {...props} />;
+  }
   return (
     <TabsPrimitive.Tab
       data-slot="tabs-trigger"

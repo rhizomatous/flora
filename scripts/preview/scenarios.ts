@@ -271,13 +271,48 @@ export const stories = [
     files: [
       {
         path: "internal/notes/list.go",
-        before: "ORDER BY created_at DESC",
-        after: "ORDER BY created_at DESC, id DESC",
+        before: `package notes
+
+func listQuery(limit int) string {
+    // Keep the newest notes first.
+    query := "SELECT id, title FROM notes ORDER BY created_at DESC"
+    return paginate(query, limit, 10)
+}`,
+        after: `package notes
+
+func listQuery(limit int) string {
+    // Keep the newest notes first.
+    query := "SELECT id, title FROM notes ORDER BY created_at DESC, id DESC"
+    return paginate(query, limit, 50)
+}`,
       },
       {
         path: "internal/notes/cursor.go",
-        before: "return encode(createdAt)",
-        after: "return encode(createdAt, id)",
+        before: `package notes
+
+func nextCursor(createdAt string, id string) string {
+    return encode(createdAt)
+}`,
+        after: `package notes
+
+func nextCursor(createdAt string, id string) string {
+    return encode(createdAt, id)
+}`,
+      },
+      {
+        path: "web/src/feed.css",
+        before: `.notes-feed {
+  display: grid;
+  gap: 8px;
+  color: #777777;
+  padding: 16px;
+}`,
+        after: `.notes-feed {
+  display: grid;
+  gap: 12px;
+  color: #a3a3a3;
+  padding: 16px;
+}`,
       },
     ],
     turns: [

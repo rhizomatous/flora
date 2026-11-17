@@ -31,6 +31,9 @@ func TestInlineThresholdChangesViewWithoutChangingSnapshot(t *testing.T) {
 	for _, f := range inline.Snapshot.Files {
 		if f.Path == "threshold" {
 			found = true
+			if f.Additions != 200 || f.Deletions != 0 {
+				t.Fatalf("truncated counts = +%d -%d", f.Additions, f.Deletions)
+			}
 			if !f.Truncated || f.Diff != "" || f.Bytes <= 1024 {
 				t.Fatal("saved inline limit ignored")
 			}
