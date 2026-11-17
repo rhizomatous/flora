@@ -24,14 +24,21 @@ const diagnosticSchema = z.object({ error: z.string() });
 export async function request<T>(
   schema: z.ZodType<T>,
   path: string,
-  { method = "GET", body }: { method?: string; body?: unknown } = {},
+  {
+    method = "GET",
+    body,
+    rawBody,
+    signal,
+  }: { method?: string; body?: unknown; rawBody?: Blob; signal?: AbortSignal } = {},
 ): Promise<T> {
   const init: RequestInit = {
     method,
     credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": rawBody ? "application/octet-stream" : "application/json" },
+    ...(signal ? { signal } : {}),
   };
   if (body !== undefined) init.body = JSON.stringify(body);
+  if (rawBody !== undefined) init.body = rawBody;
   const response = await fetch(`/api/${path}`, init);
   const fallback = `Request failed (HTTP ${response.status}). Check the server or reverse proxy and try again.`;
   // Proxy error pages may contain internal details. Never display their body.

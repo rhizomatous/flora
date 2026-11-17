@@ -152,7 +152,7 @@ test("shared composer stays compact and exposes honest placeholders", async ({ p
     await page.getByRole("button", { name: "Add attachments and context", exact: true }).click();
     await expect(
       page.getByRole("menuitem", { name: "Upload attachment", exact: true }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     await page.keyboard.press("Escape");
     await expect(followUp).toHaveValue("Draft a follow-up");
     await page.getByRole("button", { name: "Context usage", exact: true }).click();

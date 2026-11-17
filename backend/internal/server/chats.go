@@ -21,7 +21,10 @@ import (
 
 func chatError(w http.ResponseWriter, err error) {
 	var control *chat.ControlError
+	var attachment *storage.AttachmentError
 	switch {
+	case errors.As(err, &attachment):
+		failure(w, 400, attachment.Reason)
 	case errors.As(err, &control):
 		failure(w, http.StatusConflict, control.Reason)
 	case errors.Is(err, storage.ErrNotFound):
@@ -171,14 +174,15 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			return
 		}
 		var in struct {
-			Title     string `json:"title"`
-			RequestID string `json:"requestID"`
-			Text      string `json:"text"`
+			Title       string   `json:"title"`
+			RequestID   string   `json:"requestID"`
+			Text        string   `json:"text"`
+			Attachments []string `json:"attachments"`
 		}
 		if !decodeChat(w, r, &in) {
 			return
 		}
-		c, err := a.chats.Create(r.Context(), r.PathValue("id"), in.Title, in.RequestID, in.Text)
+		c, err := a.chats.Create(r.Context(), r.PathValue("id"), in.Title, in.RequestID, in.Text, in.Attachments...)
 		if err != nil {
 			chatError(w, err)
 			return
@@ -240,13 +244,14 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			return
 		}
 		var in struct {
-			RequestID string `json:"requestID"`
-			Text      string `json:"text"`
+			RequestID   string   `json:"requestID"`
+			Text        string   `json:"text"`
+			Attachments []string `json:"attachments"`
 		}
 		if !decodeChat(w, r, &in) {
 			return
 		}
-		accepted, err := a.chats.Submit(r.Context(), r.PathValue("id"), in.RequestID, in.Text)
+		accepted, err := a.chats.Submit(r.Context(), r.PathValue("id"), in.RequestID, in.Text, in.Attachments...)
 		if err != nil {
 			chatError(w, err)
 			return

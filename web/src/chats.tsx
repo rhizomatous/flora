@@ -123,7 +123,14 @@ export function Chats({
   const id = path.startsWith("chats/") ? (path.slice(6).split("?")[0] ?? "") : "";
   const isNew = id === "new" || id.startsWith("new?");
   const projectID = new URLSearchParams(path.split("?")[1]).get("project") ?? "";
-  const [selectedProjectID, setSelectedProjectID] = useState(projectID);
+  const [selectedProjectID, setSelectedProjectID] = useState(() => {
+    if (projectID !== "") return projectID;
+    try {
+      return sessionStorage.getItem("flora-new-chat-project") ?? "";
+    } catch {
+      return "";
+    }
+  });
   const selectedProject =
     projects?.find((project) => project.id === selectedProjectID) ?? projects?.[0];
   const chatPath = `chats/${encodeURIComponent(id)}`;
@@ -253,7 +260,13 @@ export function Chats({
     const form = event.currentTarget;
     const fields = new FormData(form);
     const message = text(fields, "text");
-    if (message.trim() === "" || new TextEncoder().encode(message).length > messageBytes) {
+    const attachments = fields
+      .getAll("attachments")
+      .filter((value): value is string => typeof value === "string");
+    if (
+      (message.trim() === "" && attachments.length === 0) ||
+      new TextEncoder().encode(message).length > messageBytes
+    ) {
       setError(`Enter a message of at most ${messageBytes.toLocaleString()} UTF-8 bytes.`);
       return;
     }
@@ -264,8 +277,10 @@ export function Chats({
     // Forty-five Unicode code points fit within the server's 200-byte title limit.
     const chatTitle =
       // oxlint-disable-next-line typescript/no-misused-spread -- Bound code points to stay below the UTF-8 byte limit without splitting surrogate pairs.
-      [...message.trim().replaceAll(/\s+/gu, " ")].slice(0, 45).join("");
-    const input = isNew ? { title: chatTitle, text: message } : { text: message };
+      [...(message.trim().replaceAll(/\s+/gu, " ") || "Attached files")].slice(0, 45).join("");
+    const input = isNew
+      ? { title: chatTitle, text: message, attachments }
+      : { text: message, attachments };
     const scope = isNew ? `project:${project}` : `chat:${id}`;
     try {
       const requestID = identity(scope, input);
@@ -277,12 +292,14 @@ export function Chats({
             requestID,
           },
         });
+        form.reset();
         window.location.hash = `chats/${chat.ID}`;
       } else {
         await request(acceptanceSchema, `${chatPath}/messages`, {
           method: "POST",
           body: {
             text: message,
+            attachments,
             requestID,
           },
         });
@@ -520,9 +537,17 @@ export function Chats({
               )}
               {isNew && projects !== undefined && projects.length > 0 && (
                 <NewChatComposer
+                  key={selectedProject?.id ?? ""}
                   projects={projects}
                   selectedProject={selectedProject}
-                  onProjectChange={setSelectedProjectID}
+                  onProjectChange={(selected) => {
+                    setSelectedProjectID(selected);
+                    try {
+                      sessionStorage.setItem("flora-new-chat-project", selected);
+                    } catch {
+                      // Draft selection remains available until this page closes.
+                    }
+                  }}
                   busy={busy}
                   onSend={(event) => {
                     void send(event);
@@ -740,6 +765,7 @@ function ChatDetail({
             </MessageScrollerButton>
           </ChatReviewStrip>
           <FollowUpComposer
+            projectID={detail.chat.ProjectID}
             contextUsage={detail.contextUsage}
             key={id}
             id={id}
@@ -773,6 +799,7 @@ function readDraft(id: string) {
 }
 
 function FollowUpComposer({
+  projectID,
   contextUsage,
   id,
   busy,
@@ -784,6 +811,7 @@ function FollowUpComposer({
 }: {
   contextUsage: Detail["contextUsage"];
   id: string;
+  projectID: string;
   busy: boolean;
   activeTurn: boolean;
   blocked: boolean;
@@ -793,7 +821,7 @@ function FollowUpComposer({
 }) {
   const [draft, setDraft] = useState(() => readDraft(id));
   const sendLabel = stopped ? "Resume" : "Send message";
-  const canSend = !busy && !activeTurn && !blocked && draft.trim() !== "";
+  const canSend = !busy && !activeTurn && !blocked;
 
   return (
     <form
@@ -811,6 +839,8 @@ function FollowUpComposer({
     >
       <Composer
         id="follow-up-message"
+        projectID={projectID}
+        draftScope={`chat:${id}`}
         label="Follow-up"
         message={draft}
         onChange={(value) => {

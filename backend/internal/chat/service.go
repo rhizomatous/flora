@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"maps"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -27,6 +29,8 @@ type Provisioner interface {
 }
 
 type Service struct {
+	ModelCatalogClient      *http.Client
+	attachmentCapabilities  capabilityCache
 	AutomationBeforeStop    func(context.Context, string) error
 	Store                   *storage.Store
 	provisioner             Provisioner
@@ -47,26 +51,34 @@ func New(ctx context.Context, store *storage.Store, p Provisioner) *Service {
 	return &Service{usageRetryInterval: time.Minute, Store: store, provisioner: p, ctx: ctx, turns: map[string]*turnActivity{}, jobs: map[string]*turnJob{}, promptAdmissionTimeout: 30 * time.Second, promptCompletionTimeout: 30 * time.Second, questionPollInterval: time.Second, questionPollTimeout: 3 * time.Second}
 }
 
-func (s *Service) Create(ctx context.Context, project, title, requestID, text string) (storage.Chat, error) {
+func (s *Service) Create(ctx context.Context, project, title, requestID, text string, attachments ...string) (storage.Chat, error) {
 	if s.provisioner == nil {
 		return storage.Chat{}, errors.New("chat runtime is not configured")
 	}
 	if strings.TrimSpace(title) == "" || len(title) > 200 {
 		return storage.Chat{}, storage.ErrInvalid
 	}
+	_, reservedErr := s.Store.ChatRequest(ctx, project, requestID)
+	if errors.Is(reservedErr, storage.ErrNotFound) {
+		if err := s.checkAttachments(ctx, project, attachments); err != nil {
+			return storage.Chat{}, err
+		}
+	} else if reservedErr != nil {
+		return storage.Chat{}, reservedErr
+	}
 	image, harness := s.provisioner.Identity()
-	c, err := s.Store.CreateChatRequest(ctx, project, title, image, harness, requestID, text)
+	c, err := s.Store.CreateChatRequest(ctx, project, title, image, harness, requestID, text, attachments...)
 	if err != nil {
 		return c, err
 	}
-	_, err = s.Submit(ctx, c.ID, requestID, text)
+	_, err = s.Submit(ctx, c.ID, requestID, text, attachments...)
 	if err != nil {
 		return c, err
 	}
 	return s.Store.Chat(ctx, c.ID)
 }
 
-func (s *Service) Submit(ctx context.Context, chatID, requestID, text string) (storage.Acceptance, error) {
+func (s *Service) Submit(ctx context.Context, chatID, requestID, text string, attachments ...string) (storage.Acceptance, error) {
 	unlock := s.lockOperation(chatID)
 	defer unlock()
 	if s.provisioner == nil {
@@ -76,24 +88,23 @@ func (s *Service) Submit(ctx context.Context, chatID, requestID, text string) (s
 	if err != nil {
 		return storage.Acceptance{}, err
 	}
+	if _, err := s.Store.MessageRequest(ctx, chatID, requestID); err == nil {
+		return s.Store.AcceptMessage(ctx, chatID, requestID, text, attachments...)
+	} else if !errors.Is(err, storage.ErrNotFound) {
+		return storage.Acceptance{}, err
+	}
+	if err := s.checkAttachments(ctx, c.ProjectID, attachments); err != nil {
+		return storage.Acceptance{}, err
+	}
 	if c.ActiveMessageID == "" {
 		if err := s.quiesce(ctx, chatID); err != nil {
 			return storage.Acceptance{}, err
 		}
 		if reason := s.ContinuationBlock(ctx, c); reason != "" {
-			messages, err := s.Store.Messages(ctx, chatID)
-			if err != nil {
-				return storage.Acceptance{}, err
-			}
-			for _, message := range messages {
-				if message.RequestID == requestID {
-					return s.Store.AcceptMessage(ctx, chatID, requestID, text)
-				}
-			}
 			return storage.Acceptance{}, &ControlError{Reason: reason}
 		}
 	}
-	a, err := s.Store.AcceptMessage(ctx, chatID, requestID, text)
+	a, err := s.Store.AcceptMessage(ctx, chatID, requestID, text, attachments...)
 	if err != nil || a.Duplicate {
 		return a, err
 	}
@@ -232,6 +243,13 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 		fail("OpenCode configuration or session failed. No message was delivered.")
 		return
 	}
+	partsCtx, partsCancel := context.WithTimeout(ctx, 15*time.Second)
+	parts, partsErr := s.runtimeParts(partsCtx, rt, message, credentials)
+	partsCancel()
+	if partsErr != nil {
+		fail("Attachments could not be delivered, or the runtime model does not support their content. No message was delivered.")
+		return
+	}
 	// OpenCode generates time-ordered message IDs and compares them internally.
 	// Do not substitute Flora's random request IDs. Link the newly observed user
 	// record during capture; a missing link never authorizes automatic redelivery.
@@ -339,7 +357,7 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 		var response runtimeMessage
 		err := rt.call(promptCtx, "POST", sessionPath(c.SessionID)+"/message", map[string]any{
 			"model":  map[string]string{"providerID": credentials.Provider, "modelID": credentials.Model},
-			"system": SystemPrompt, "parts": []map[string]string{{"type": "text", "text": message.Text}},
+			"system": SystemPrompt, "parts": parts,
 		}, &response)
 		if err == nil && (response.Info.ID == "" || response.Info.Role != "assistant") {
 			err = errors.New("runtime completion response was incomplete")
@@ -523,6 +541,7 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 		return false, errors.New("ambiguous runtime message history")
 	}
 	var acceptedText string
+	var acceptedFiles []string
 	if unknownUsers == 1 {
 		messages, err := s.Store.Messages(ctx, c.ID)
 		if err != nil {
@@ -531,6 +550,26 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 		for _, saved := range messages {
 			if saved.ID == messageID {
 				acceptedText = saved.Text
+				var payload struct {
+					Attachments []storage.Attachment `json:"attachments"`
+				}
+				_ = json.Unmarshal(saved.Payload, &payload)
+				for _, file := range payload.Attachments {
+					if file.MIME != "text/plain" {
+						a, data, err := s.Store.Attachment(ctx, file.ID)
+						if err != nil {
+							return false, err
+						}
+						acceptedFiles = append(acceptedFiles, redaction.Text(a.Name+"\x00"+a.MIME+"\x00data:"+a.MIME+";base64,"+base64.StdEncoding.EncodeToString(data), secrets...))
+					}
+					if file.MIME == "text/plain" {
+						a, data, err := s.Store.Attachment(ctx, file.ID)
+						if err != nil {
+							return false, err
+						}
+						acceptedText += "Attached document: " + a.Name + "\n\n" + string(data)
+					}
+				}
 			}
 		}
 	}
@@ -542,12 +581,16 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 		}
 		if m.Info.Role == "user" && !knownUsers[m.Info.ID] {
 			var text strings.Builder
+			var files []string
 			for _, part := range m.Parts {
+				if part.Type == "file" {
+					files = append(files, part.Filename+"\x00"+part.MIME+"\x00"+part.URL)
+				}
 				if part.Type == "text" {
 					text.WriteString(part.Text)
 				}
 			}
-			if text.String() != redaction.Text(acceptedText, secrets...) {
+			if text.String() != redaction.Text(acceptedText, secrets...) || strings.Join(files, "\x01") != strings.Join(acceptedFiles, "\x01") {
 				return false, errors.New("runtime user message does not match accepted input")
 			}
 			if *runtimeID != "" && *runtimeID != m.Info.ID {

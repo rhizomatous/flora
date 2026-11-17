@@ -50,6 +50,9 @@ export const partSchema = z.looseObject({
   type: z.string(),
   text: z.string().optional(),
   tool: z.string().optional(),
+  filename: z.string().optional(),
+  mime: z.string().optional(),
+  url: z.string().optional(),
   time: timeSchema.optional(),
   state: z
     .looseObject({

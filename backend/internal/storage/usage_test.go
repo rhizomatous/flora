@@ -78,7 +78,7 @@ func TestUsageBackfillAndAtomicTranscriptSave(t *testing.T) {
 	must(t, s.BindRuntime(ctx, c.ID, "container", "root"))
 	m := Message{ChatID: c.ID, RuntimeMessageID: "assistant", Role: "assistant", Payload: usageFixture("assistant", "user", "0.01", 100)}
 	must(t, s.SaveRuntimeMessage(ctx, "first", m))
-	_, err := s.db.Exec(`DROP TABLE subagent_messages; DROP TABLE subagents; DROP TABLE automation_runs; DROP TABLE automations; DROP TABLE context_limits; DROP TABLE usage_steps; DROP TABLE usage_messages; DROP TABLE usage_capture; PRAGMA user_version=5`)
+	_, err := s.db.Exec(`DROP TABLE attachments; ALTER TABLE chat_requests DROP COLUMN attachments; DROP TABLE subagent_messages; DROP TABLE subagents; DROP TABLE automation_runs; DROP TABLE automations; DROP TABLE context_limits; DROP TABLE usage_steps; DROP TABLE usage_messages; DROP TABLE usage_capture; PRAGMA user_version=5`)
 	must(t, err)
 	must(t, s.Close())
 	s = openTest(t, root)
@@ -169,7 +169,7 @@ func TestUsageMigrationRestoresReportedZero(t *testing.T) {
  ALTER TABLE usage_messages ADD COLUMN pricing_known INTEGER NOT NULL DEFAULT 0;
  UPDATE usage_steps SET cost_nanos=NULL;
  DROP INDEX usage_messages_created;
- DROP TABLE subagent_messages; DROP TABLE subagents; DROP TABLE automation_runs; DROP TABLE automations; DROP TABLE context_limits;
+ DROP TABLE attachments; ALTER TABLE chat_requests DROP COLUMN attachments; DROP TABLE subagent_messages; DROP TABLE subagents; DROP TABLE automation_runs; DROP TABLE automations; DROP TABLE context_limits;
  PRAGMA user_version=7;`)
 	must(t, err)
 	must(t, s.Close())

@@ -24,6 +24,10 @@
   background: var(--composer-surface);
   box-shadow: 0 12px 24px #00000012;
 }
+.composer-box:has(:disabled) {
+  opacity: 1;
+  background: var(--composer-surface);
+}
 .dark .composer-box {
   background: var(--composer-surface);
 }
