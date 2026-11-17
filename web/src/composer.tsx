@@ -311,12 +311,6 @@ export function Composer({
               <PaperclipIcon />
               <span className="florets-control-label">Upload attachment</span>
             </DropdownMenuItem>
-            <p className="px-2.5 py-1.5 text-xs text-muted-foreground">
-              Images, PDF, and text · 5 files · 5 MiB each
-            </p>
-            <p className="px-2.5 pb-1.5 text-xs text-muted-foreground">
-              Draft files expire after 24 hours. Sent files stay with the chat.
-            </p>
             <DropdownMenuSeparator />
             <DropdownMenuItem disabled>
               <MessageSquareIcon />
