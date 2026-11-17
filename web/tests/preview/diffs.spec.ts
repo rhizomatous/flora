@@ -199,6 +199,11 @@ test("live mock shows multiple languages, inline edits, and separated hunks", as
     el.scrollTop = 0;
   });
   await expect(review.getByText("Modified", { exact: true })).toHaveCount(0);
+  const fileIcon = review.locator("summary img:visible").first();
+  await expect
+    .poll(() => fileIcon.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBeGreaterThan(0);
+  await expect(fileIcon).toHaveAttribute("src", /\/go[^/]*\.svg/);
   const go = page.getByRole("region", { name: "Diff for internal/notes/list.go", exact: true });
   await expect(go.locator('span[style*="--shiki-light"]').first()).toBeVisible();
   await expect(go.locator('[data-inline-change="add"]').filter({ hasText: "50" })).toBeVisible();
