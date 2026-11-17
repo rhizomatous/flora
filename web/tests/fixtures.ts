@@ -12,7 +12,14 @@ type Backend = { url: string; chatID: string; otherChatID: string };
 type WorkerFixtures = { backendBinary: string };
 
 type Fixtures = {
-  scenario: "chat" | "changes" | "enrollment" | "notifications" | "projects" | "settings";
+  scenario:
+    | "models"
+    | "chat"
+    | "changes"
+    | "enrollment"
+    | "notifications"
+    | "projects"
+    | "settings";
   backend: Backend;
 };
 

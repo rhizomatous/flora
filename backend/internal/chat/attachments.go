@@ -186,3 +186,25 @@ func (s *Service) runtimeParts(ctx context.Context, rt *runtime, message storage
 	}
 	return parts, nil
 }
+
+func (s *Service) checkSelectedAttachments(ctx context.Context, project string, selected *storage.Execution, ids []string) error {
+	credentials, _ := s.Store.Credentials(ctx)
+	if selected == nil || selected.Model == "" || selected.Model == credentials.Model {
+		return s.checkAttachments(ctx, project, ids)
+	}
+	if len(ids) > storage.MaxAttachments {
+		return storage.ErrInvalid
+	}
+	total := 0
+	for _, id := range ids {
+		a, _, err := s.Store.Attachment(ctx, id)
+		if err != nil || a.ProjectID != project {
+			return &storage.AttachmentError{Reason: "An attachment expired or belongs to another project. Upload it again."}
+		}
+		total += a.Size
+	}
+	if total > storage.MaxAttachmentTotal {
+		return &storage.AttachmentError{Reason: "Attachments must total at most 20 MiB per message."}
+	}
+	return nil
+}
