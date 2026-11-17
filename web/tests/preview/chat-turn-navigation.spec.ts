@@ -1,6 +1,7 @@
 import { test, expect } from "./fixtures.ts";
 
 test("turn navigation previews replies and jumps without losing the draft", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
   await page.goto(`${base}/#chats/pagination`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
@@ -35,11 +36,7 @@ test("turn navigation previews replies and jumps without losing the draft", asyn
     .poll(() => second.locator("span").evaluate((el) => el.getBoundingClientRect().width))
     .toBe(8);
   await page.setViewportSize({ width: 390, height: 844 });
-  await first.click();
-  await expect(preview).toBeVisible();
-  const bounds = await preview.boundingBox();
-  if (!bounds) throw new Error("Missing turn preview bounds");
-  expect(bounds.x).toBeGreaterThanOrEqual(0);
-  expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
+  await expect(nav).toBeHidden();
+  await expect(preview).not.toBeVisible();
   await expect(draft).toHaveValue("Keep my draft");
 });

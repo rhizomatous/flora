@@ -2,6 +2,9 @@
 import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
   Tabs,
   TabsList,
   TabsTrigger,
@@ -47,6 +50,7 @@ import {
   ChatReviewStrip,
 } from "./chat-controls";
 import { ChatList } from "./chat-list";
+import { useChatPanelState } from "./chat-panel-state";
 import {
   type Chat,
   type Question,
@@ -62,6 +66,7 @@ import {
   type Message,
   type Part,
 } from "./chat-schemas";
+import { ChatSidePanel } from "./chat-side-panel";
 import { chatStatus } from "./chat-status";
 import { Composer } from "./composer";
 import { NewChatComposer } from "./new-chat-composer";
@@ -349,6 +354,8 @@ export function Chats({
     setBusy(false);
   }
 
+  const [panelState, updatePanel] = useChatPanelState(id);
+
   if (id === "") return <ChatList list={list} projects={projects} error={error || listError} />;
 
   const pulls = list?.find((chat) => chat.ID === id)?.pulls ?? detail?.chat.pulls;
@@ -365,177 +372,225 @@ export function Chats({
     return saved === "" ? "Chat" : saved;
   }
 
+  const sideOpen = existingChat && panelState.open;
   return (
-    <Tabs
-      value={diffChat === id && activeDiff ? "diffs" : "chat"}
-      onValueChange={(value) => {
-        setActiveDiff(value === "diffs");
+    <ResizablePanelGroup
+      orientation="horizontal"
+      defaultLayout={{ conversation: 100 - panelState.width, review: panelState.width }}
+      onLayoutChanged={(layout, meta) => {
+        const width = (meta.requestedLayout ?? layout).review;
+        if (sideOpen && meta.isUserInteraction && width !== undefined) updatePanel({ width });
       }}
-      className="min-h-0 flex-1 gap-0"
+      className={`chat-split -mx-4 min-h-0 w-auto! flex-1 sm:-mx-8 ${sideOpen ? "chat-split-open" : ""}`}
     >
-      <section
-        aria-labelledby="chats-heading"
-        className={isNew ? "mx-auto my-12 w-full max-w-[720px] md:mt-[25svh]" : chatLayout}
+      <ResizablePanel
+        id="conversation"
+        defaultSize={`${100 - panelState.width}%`}
+        minSize="300px"
+        className="chat-main-pane flex min-w-0 flex-col px-4 sm:px-8"
       >
-        <div className={isNew ? "sr-only" : headerLayout}>
-          {existingChat && <span className="sidebar-toggle-space" aria-hidden="true" />}
-          <Heading
-            level={1}
-            id="chats-heading"
-            aria-label={title()}
-            ref={heading}
-            tabIndex={-1}
-            className={diffChat === id ? "sr-only" : "min-w-0 truncate text-base"}
+        <Tabs
+          value={diffChat === id && activeDiff ? "diffs" : "chat"}
+          onValueChange={(value) => {
+            setActiveDiff(value === "diffs");
+          }}
+          className="min-h-0 flex-1 gap-0"
+        >
+          <section
+            aria-labelledby="chats-heading"
+            className={isNew ? "mx-auto my-12 w-full max-w-[720px] md:mt-[25svh]" : chatLayout}
           >
-            {existingChat && diffChat !== id ? (
-              <ChatTitle title={title()} chat={detail?.chat} pulls={pulls} />
-            ) : (
-              title()
-            )}
-          </Heading>
-          {diffChat === id && (
-            <TabsList
-              aria-label="Chat views"
-              className="h-auto! min-w-0 shrink justify-start gap-1 bg-transparent p-0"
-            >
-              <ChatTitle
-                title={title()}
-                chat={detail?.chat}
-                pulls={pulls}
-                tabbed
-                active={!activeDiff}
-              />
-              <div className="chat-diff-tab" data-active={activeDiff || undefined}>
-                <TabsTrigger
-                  value="diffs"
-                  variant="control"
-                  render={
+            <div className={isNew ? "sr-only" : headerLayout}>
+              {existingChat && <span className="sidebar-toggle-space" aria-hidden="true" />}
+              <Heading
+                level={1}
+                id="chats-heading"
+                aria-label={title()}
+                ref={heading}
+                tabIndex={-1}
+                className={diffChat === id ? "sr-only" : "min-w-0 truncate text-base"}
+              >
+                {existingChat && diffChat !== id ? (
+                  <ChatTitle title={title()} chat={detail?.chat} pulls={pulls} />
+                ) : (
+                  title()
+                )}
+              </Heading>
+              {diffChat === id && (
+                <TabsList
+                  aria-label="Chat views"
+                  className="h-auto! min-w-0 shrink justify-start gap-1 bg-transparent p-0"
+                >
+                  <ChatTitle
+                    title={title()}
+                    chat={detail?.chat}
+                    pulls={pulls}
+                    tabbed
+                    active={!activeDiff}
+                  />
+                  <div className="chat-diff-tab" data-active={activeDiff || undefined}>
+                    <TabsTrigger
+                      value="diffs"
+                      variant="control"
+                      render={
+                        <Button
+                          variant={activeDiff ? "secondary" : "ghost"}
+                          size="compact"
+                          className="chat-diff-tab-trigger tracking-tight"
+                        />
+                      }
+                    >
+                      <GitBranchIcon />
+                      <span className="florets-control-label">Diffs</span>
+                    </TabsTrigger>
                     <Button
-                      variant={activeDiff ? "secondary" : "ghost"}
-                      size="compact"
-                      className="chat-diff-tab-trigger tracking-tight"
-                    />
-                  }
-                >
-                  <GitBranchIcon />
-                  <span className="florets-control-label">Diffs</span>
-                </TabsTrigger>
-                <Button
-                  variant="ghost"
-                  size="icon-compact"
-                  className="chat-diff-tab-close"
-                  aria-label="Close Diffs"
-                  title="Close Diffs"
-                  onClick={() => {
-                    setDiffChat(null);
-                    setActiveDiff(false);
-                    document
-                      .querySelector<HTMLButtonElement>('button[aria-label="Chat views"]')
-                      ?.focus();
+                      variant="ghost"
+                      size="icon-compact"
+                      className="chat-diff-tab-close"
+                      aria-label="Close Diffs"
+                      title="Close Diffs"
+                      onClick={() => {
+                        setDiffChat(null);
+                        setActiveDiff(false);
+                        document
+                          .querySelector<HTMLButtonElement>('button[aria-label="Chat views"]')
+                          ?.focus();
+                      }}
+                    >
+                      <XIcon />
+                    </Button>
+                  </div>
+                </TabsList>
+              )}
+              {existingChat && (
+                <ChatHeaderActions
+                  sideOpen={sideOpen}
+                  onSideToggle={() => {
+                    updatePanel({ open: !sideOpen });
                   }}
-                >
-                  <XIcon />
-                </Button>
+                  usage={detail?.usage}
+                  diffsOpen={diffChat === id && activeDiff}
+                  onDiffsChange={(open) => {
+                    if (open) setDiffChat(id);
+                    setActiveDiff(open);
+                  }}
+                />
+              )}
+            </div>
+            {error !== "" && (
+              <Alert role="alert" className="mt-6">
+                {error}
+              </Alert>
+            )}
+            {isNew && projects === undefined && error === "" && (
+              <Text role="status">Loading projects…</Text>
+            )}
+            {isNew && projects?.length === 0 && (
+              <div className="space-y-5">
+                <Heading level={2}>Connect your first project</Heading>
+                <Text tone="muted">Choose a GitHub repository so Flora can start working.</Text>
+                <ButtonLink href="#projects/new">Connect a project</ButtonLink>
               </div>
-            </TabsList>
-          )}
-          {existingChat && (
-            <ChatHeaderActions
-              usage={detail?.usage}
-              diffsOpen={diffChat === id && activeDiff}
-              onDiffsChange={(open) => {
-                if (open) setDiffChat(id);
-                setActiveDiff(open);
+            )}
+            {isNew && projects !== undefined && projects.length > 0 && (
+              <NewChatComposer
+                projects={projects}
+                selectedProject={selectedProject}
+                onProjectChange={setSelectedProjectID}
+                busy={busy}
+                onSend={(event) => {
+                  void send(event);
+                }}
+              />
+            )}
+            {id !== "" && !isNew && detail === undefined && error === "" && (
+              <Text size="md" role="status" className="mt-8">
+                Loading…
+              </Text>
+            )}
+            {detail && (
+              <div className="chat-review-layout">
+                <TabsContent
+                  value="chat"
+                  keepMounted
+                  className="chat-view-panel min-h-0 min-w-0 flex-1"
+                >
+                  <div className="flex h-full min-h-0 min-w-0 flex-col">
+                    <ChatDetail
+                      runMessageID={new URLSearchParams(path.split("?")[1]).get("run") ?? ""}
+                      pulls={pulls}
+                      id={id}
+                      detail={detail}
+                      activity={activity}
+                      disconnected={disconnected}
+                      busy={busy}
+                      onControl={(action) => {
+                        void controlWork(action);
+                      }}
+                      onSend={(event) => {
+                        void send(event);
+                      }}
+                    >
+                      {questionError !== "" && (
+                        <Text className="mt-6" role="status">
+                          {questionError}
+                        </Text>
+                      )}
+                      {questions.map((q) => (
+                        <QuestionForm
+                          key={q.id}
+                          question={q}
+                          chatID={id}
+                          onError={report}
+                          onAnswered={() => {
+                            setQuestions((rows) => rows.filter((row) => row.id !== q.id));
+                          }}
+                        />
+                      ))}
+                    </ChatDetail>
+                  </div>
+                </TabsContent>
+                {diffChat === id && (
+                  <TabsContent
+                    value="diffs"
+                    keepMounted
+                    className="chat-view-panel -mx-4 min-h-0 min-w-0 flex-1 sm:-mx-8"
+                  >
+                    <Changes key={id} chatID={id} onExpired={onExpired} />
+                  </TabsContent>
+                )}
+              </div>
+            )}
+          </section>
+        </Tabs>
+      </ResizablePanel>
+      {sideOpen && (
+        <>
+          <ResizableHandle aria-label="Resize side panel" className="chat-split-handle" />
+          <ResizablePanel
+            id="review"
+            defaultSize={`${panelState.width}%`}
+            minSize="300px"
+            className="chat-side-pane min-w-0"
+          >
+            <ChatSidePanel
+              key={id}
+              chatID={id}
+              pulls={pulls}
+              onExpired={onExpired}
+              onClose={() => {
+                updatePanel({ open: false });
+                requestAnimationFrame(() => {
+                  document
+                    .querySelector<HTMLButtonElement>('button[aria-label="Open side panel"]')
+                    ?.focus();
+                });
               }}
             />
-          )}
-        </div>
-        {error !== "" && (
-          <Alert role="alert" className="mt-6">
-            {error}
-          </Alert>
-        )}
-        {isNew && projects === undefined && error === "" && (
-          <Text role="status">Loading projects…</Text>
-        )}
-        {isNew && projects?.length === 0 && (
-          <div className="space-y-5">
-            <Heading level={2}>Connect your first project</Heading>
-            <Text tone="muted">Choose a GitHub repository so Flora can start working.</Text>
-            <ButtonLink href="#projects/new">Connect a project</ButtonLink>
-          </div>
-        )}
-        {isNew && projects !== undefined && projects.length > 0 && (
-          <NewChatComposer
-            projects={projects}
-            selectedProject={selectedProject}
-            onProjectChange={setSelectedProjectID}
-            busy={busy}
-            onSend={(event) => {
-              void send(event);
-            }}
-          />
-        )}
-        {id !== "" && !isNew && detail === undefined && error === "" && (
-          <Text size="md" role="status" className="mt-8">
-            Loading…
-          </Text>
-        )}
-        {detail && (
-          <div className="chat-review-layout">
-            <TabsContent
-              value="chat"
-              keepMounted
-              className="chat-view-panel min-h-0 min-w-0 flex-1"
-            >
-              <div className="flex h-full min-h-0 min-w-0 flex-col">
-                <ChatDetail
-                  runMessageID={new URLSearchParams(path.split("?")[1]).get("run") ?? ""}
-                  pulls={pulls}
-                  id={id}
-                  detail={detail}
-                  activity={activity}
-                  disconnected={disconnected}
-                  busy={busy}
-                  onControl={(action) => {
-                    void controlWork(action);
-                  }}
-                  onSend={(event) => {
-                    void send(event);
-                  }}
-                >
-                  {questionError !== "" && (
-                    <Text className="mt-6" role="status">
-                      {questionError}
-                    </Text>
-                  )}
-                  {questions.map((q) => (
-                    <QuestionForm
-                      key={q.id}
-                      question={q}
-                      chatID={id}
-                      onError={report}
-                      onAnswered={() => {
-                        setQuestions((rows) => rows.filter((row) => row.id !== q.id));
-                      }}
-                    />
-                  ))}
-                </ChatDetail>
-              </div>
-            </TabsContent>
-            {diffChat === id && (
-              <TabsContent
-                value="diffs"
-                keepMounted
-                className="chat-view-panel -mx-4 min-h-0 min-w-0 flex-1 sm:-mx-8"
-              >
-                <Changes key={id} chatID={id} onExpired={onExpired} />
-              </TabsContent>
-            )}
-          </div>
-        )}
-      </section>
-    </Tabs>
+          </ResizablePanel>
+        </>
+      )}
+    </ResizablePanelGroup>
   );
 }
 
