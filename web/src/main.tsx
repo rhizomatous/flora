@@ -243,7 +243,7 @@ function App() {
       <Content id="main-content" tabIndex={-1} className={ready ? frameLayout : undefined}>
         {ready && !conversation && !pullsPage && !chatsPage && (
           <header
-            className={`florets-topbar flex shrink-0 items-center border-b px-3 ${path.startsWith("automations") ? "sticky top-0 z-20 bg-background" : ""}`}
+            className={`florets-topbar flex shrink-0 items-center gap-2 border-b px-3 ${path.startsWith("automations") ? "sticky top-0 z-20 bg-background" : ""}`}
           >
             <span className="sidebar-toggle-space" aria-hidden="true" />
             {path.startsWith("automations") && (
