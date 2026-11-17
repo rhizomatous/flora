@@ -44,12 +44,11 @@ try {
       (element) => getComputedStyle(element).borderTopColor,
     );
     await expect(nested).toHaveCSS("border-top-color", borderColor);
-    assert.ok(
-      await panel.evaluate(
-        (element, color) => getComputedStyle(element).boxShadow.includes(color),
-        borderColor,
-      ),
-    );
+    await expect(panel).toHaveCSS("border-top-color", borderColor);
+    await expect(panel).toHaveCSS("border-top-width", "1px");
+    await expect(panel).toHaveCSS("box-shadow", "none");
+    await expect(panel).toHaveCSS("background-clip", "border-box");
+    await expect(standalone).toHaveCSS("background-clip", "border-box");
     await expect(panel).toHaveCSS("padding-top", "0px");
     await expect(panel).toHaveCSS("row-gap", "0px");
     if (dark) assert.equal(panelColor, "rgb(25, 25, 25)");
