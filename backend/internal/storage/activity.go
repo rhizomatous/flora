@@ -80,6 +80,9 @@ func (s *Store) AcceptMessage(ctx context.Context, chatID, requestID, text strin
 		if _, err := tx.ExecContext(ctx, "UPDATE usage_capture SET complete=0,reason='' WHERE chat_id=?", chatID); err != nil {
 			return err
 		}
+		if _, err := tx.ExecContext(ctx, "UPDATE automation_runs SET chat_id=?,message_id=?,status='working',reason='' WHERE id=? AND status='starting'", chatID, m.ID, requestID); err != nil {
+			return err
+		}
 		a.Message = m
 		return nil
 	})
@@ -208,6 +211,17 @@ func (s *Store) transition(ctx context.Context, chatID, expectedMessageID string
 		}
 		if _, err := tx.ExecContext(ctx, "UPDATE chats SET status=?,status_reason=?,active_message_id=nullif(?,''),updated_at=? WHERE id=?", status, reason, next, now(), chatID); err != nil {
 			return err
+		}
+		if active != "" {
+			runStatus := string(status)
+			if completed {
+				runStatus = "completed"
+			} else if status == Idle || status == Stopped {
+				runStatus = "stopped"
+			}
+			if _, err := tx.ExecContext(ctx, "UPDATE automation_runs SET status=?,reason=? WHERE message_id=? AND status IN ('working','waiting')", runStatus, reason, active); err != nil {
+				return err
+			}
 		}
 		payload, _ := json.Marshal(map[string]string{"status": string(status), "reason": reason, "message_id": active})
 		if err := addActivity(ctx, tx, chatID, id(), "status", payload); err != nil {

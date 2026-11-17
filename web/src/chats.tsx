@@ -39,6 +39,7 @@ import {
 } from "@flora/florets";
 
 import { authenticatedSchema } from "./auth-schemas";
+import { AutomationRunJump } from "./automation-run-jump";
 import { Changes } from "./changes";
 import {
   ChatTurnNavigation,
@@ -153,7 +154,7 @@ export function Chats({
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
-  const id = path.startsWith("chats/") ? path.slice(6) : "";
+  const id = path.startsWith("chats/") ? (path.slice(6).split("?")[0] ?? "") : "";
   const isNew = id === "new" || id.startsWith("new?");
   const projectID = new URLSearchParams(path.split("?")[1]).get("project") ?? "";
   const [selectedProjectID, setSelectedProjectID] = useState(projectID);
@@ -516,6 +517,7 @@ export function Chats({
                 >
                   <div className="flex h-full min-h-0 min-w-0 flex-col">
                     <ChatDetail
+                      runMessageID={new URLSearchParams(path.split("?")[1]).get("run") ?? ""}
                       pulls={pulls}
                       id={id}
                       detail={detail}
@@ -594,6 +596,7 @@ export function Chats({
 
 /** Keeps pending questions above the composer while the transcript scrolls independently. */
 function ChatDetail({
+  runMessageID,
   pulls,
   id,
   detail,
@@ -605,6 +608,7 @@ function ChatDetail({
   children,
 }: {
   id: string;
+  runMessageID: string;
   detail: Detail;
   pulls: Chat["pulls"];
   activity: Activity[];
@@ -624,6 +628,7 @@ function ChatDetail({
   return (
     <ChatPullProvider value={pulls}>
       <MessageScrollerProvider autoScroll>
+        <AutomationRunJump messageID={runMessageID} />
         <MessageScroller className="-mx-4 w-auto flex-1 sm:-mx-8">
           <MessageScrollerViewport aria-label="Conversation" className="chat-transcript-viewport">
             <MessageScrollerContent className="mx-auto w-full max-w-[900px] gap-6 px-4 py-6">
@@ -640,6 +645,23 @@ function ChatDetail({
                   messageId={row.id}
                   scrollAnchor={row.kind === "message" && row.message.Role === "user"}
                 >
+                  {detail.automationRuns
+                    .filter((run) => run.messageID === row.id)
+                    .map((run) => (
+                      <div
+                        key={run.id}
+                        className="mb-4 border-b pb-2 text-xs text-muted-foreground"
+                      >
+                        <a
+                          className="underline underline-offset-4"
+                          href={`#automations/${run.automationID}`}
+                        >
+                          Automation run
+                        </a>
+                        {" · "}
+                        {new Date(run.scheduledAt).toLocaleString()}
+                      </div>
+                    ))}
                   {row.kind === "work" ? (
                     <WorkSummary steps={row.steps} active={row.active} failed={row.failed} />
                   ) : (

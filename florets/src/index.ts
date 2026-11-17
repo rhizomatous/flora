@@ -85,6 +85,7 @@ export {
   CompassIcon,
   Repeat2Icon,
   ChevronRightIcon,
+  ChevronLeftIcon,
   ChevronsDownUpIcon,
   ChevronsUpDownIcon,
   XIcon,

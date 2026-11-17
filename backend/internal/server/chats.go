@@ -202,7 +202,12 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			chatError(w, err)
 			return
 		}
-		jsonResponse(w, 200, map[string]any{"chat": a.chatView(r.Context(), c), "messages": messages, "continuationBlockedReason": blocked, "usage": usage, "contextUsage": contextUsage})
+		runs, err := store.ChatAutomationRuns(r.Context(), c.ID)
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		jsonResponse(w, 200, map[string]any{"chat": a.chatView(r.Context(), c), "messages": messages, "automationRuns": runs, "continuationBlockedReason": blocked, "usage": usage, "contextUsage": contextUsage})
 	})
 	mux.HandleFunc("POST /api/chats/{id}/messages", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {

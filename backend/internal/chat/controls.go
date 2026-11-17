@@ -128,7 +128,9 @@ func (s *Service) control(ctx context.Context, chatID string, stop, timeout bool
 	return s.controlObserved(ctx, observed, stop, timeout)
 }
 
-func (s *Service) controlObserved(_ context.Context, observed storage.Chat, stop, timeout bool) error {
+// onlyIdle is used by automatic cleanup to reject any change since the completed
+// chat was observed, including a user follow-up that has already finished.
+func (s *Service) controlObserved(_ context.Context, observed storage.Chat, stop, timeout bool, onlyIdle ...bool) error {
 	chatID := observed.ID
 	unlock := s.lockOperation(chatID)
 	defer unlock()
@@ -141,6 +143,9 @@ func (s *Service) controlObserved(_ context.Context, observed storage.Chat, stop
 	c, err := s.Store.Chat(ctx, chatID)
 	if err != nil {
 		return err
+	}
+	if len(onlyIdle) > 0 && onlyIdle[0] && (c.Status != storage.Idle || c.ActiveMessageID != "" || c.UpdatedAt != observed.UpdatedAt) {
+		return storage.ErrStale
 	}
 	if c.Status == storage.Stopped || (!stop && c.ActiveMessageID == "" && c.Status == storage.Idle) {
 		return nil

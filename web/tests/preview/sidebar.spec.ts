@@ -61,6 +61,7 @@ test("sidebar and page topbars share vertical alignment", async ({ page }) => {
     expect(header.height).toBe(44);
     expect(brand.y + brand.height / 2).toBe(header.y + header.height / 2);
   }
+  await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   const header = await page.locator(".florets-topbar").boundingBox();
   await page.getByRole("button", { name: "Menu", exact: true }).click();

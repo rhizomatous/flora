@@ -165,9 +165,10 @@ func main() {
 		}
 		reviewCtx, stopReview := context.WithCancel(ctx)
 		reviewDone := make(chan struct{})
+		reviewer := changes.New(store, engine)
 		go func() {
 			defer close(reviewDone)
-			changes.New(store, engine).Run(reviewCtx)
+			reviewer.Run(reviewCtx)
 		}()
 		defer func() { stopReview(); <-reviewDone }()
 		access, _, err := startGitHub(ctx, store, engine, githubbroker.CheckoutConfig{Host: githubHost, CACert: string(ca), UseChatAuthor: true}, githubListen, brokerOption)
@@ -186,6 +187,12 @@ func main() {
 		go chats.RunUsage(ctx)
 		if err := chats.Reconcile(ctx); err != nil {
 			slog.Error("Saved chat reconciliation unavailable; check storage and Docker")
+		}
+		chats.AutomationBeforeStop = reviewer.Refresh
+		if err := store.RecoverAutomationRuns(ctx); err != nil {
+			slog.Error("Automation recovery unavailable", "error", err)
+		} else {
+			go chats.RunAutomations(ctx)
 		}
 		go func() {
 			ticker := time.NewTicker(time.Second)

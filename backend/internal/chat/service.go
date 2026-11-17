@@ -27,6 +27,7 @@ type Provisioner interface {
 }
 
 type Service struct {
+	AutomationBeforeStop    func(context.Context, string) error
 	Store                   *storage.Store
 	provisioner             Provisioner
 	ctx                     context.Context

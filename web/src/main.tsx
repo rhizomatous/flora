@@ -16,6 +16,7 @@ import {
 } from "@flora/florets";
 
 import { statusSchema, authenticatedSchema, type Status } from "./auth-schemas";
+import { Automations } from "./automations";
 import { Chats } from "./chats";
 import { Installation } from "./installation";
 import { useNotifications } from "./notifications";
@@ -128,6 +129,7 @@ function App() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [path, setPath] = useState(currentPath);
+  const [automationTopbar, setAutomationTopbar] = useState<HTMLDivElement | null>(null);
   const ready = status?.authenticated === true && settings !== undefined;
 
   // Re-reads the session so an expired one shows the login screen. A failure here keeps the
@@ -207,11 +209,12 @@ function App() {
   const conversation = ready && path.startsWith("chats/") && !path.startsWith("chats/new");
   const pullsPage = ready && path === "pulls";
   const chatsPage = ready && path === "chats";
+  const automationsPage = ready && path === "automations";
   let contentLayout = "mx-auto w-full max-w-6xl p-4 sm:p-8";
-  if (pullsPage || chatsPage) contentLayout = "flex min-h-0 flex-1 flex-col";
+  if (pullsPage || chatsPage || automationsPage) contentLayout = "flex min-h-0 flex-1 flex-col";
   else if (conversation) contentLayout = "flex min-h-0 flex-1 flex-col px-4 pb-2 sm:px-8";
   const frameLayout =
-    conversation || pullsPage || chatsPage
+    conversation || pullsPage || chatsPage || automationsPage
       ? "h-dvh min-h-0 min-w-0 overflow-hidden md:h-[calc(100dvh-1rem)]"
       : "min-w-0";
   const Content = ready ? SidebarInset : "main";
@@ -239,9 +242,14 @@ function App() {
         </header>
       )}
       <Content id="main-content" tabIndex={-1} className={ready ? frameLayout : undefined}>
-        {ready && !conversation && !pullsPage && !chatsPage && (
-          <header className="florets-topbar flex shrink-0 items-center border-b px-3">
+        {ready && !conversation && !pullsPage && !chatsPage && !automationsPage && (
+          <header
+            className={`florets-topbar flex shrink-0 items-center gap-2 border-b px-3 ${path.startsWith("automations") ? "sticky top-0 z-20 bg-background" : ""}`}
+          >
             <span className="sidebar-toggle-space" aria-hidden="true" />
+            {path.startsWith("automations") && (
+              <div ref={setAutomationTopbar} className="flex min-w-0 flex-1 items-center gap-2" />
+            )}
           </header>
         )}
         <div className={ready ? contentLayout : undefined}>
@@ -292,11 +300,15 @@ function App() {
           {ready && path === "settings" && (
             <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
           )}
+          {ready && path.startsWith("automations") && (
+            <Automations key={path} path={path} onExpired={onExpired} topbar={automationTopbar} />
+          )}
           {ready && path === "usage" && <UsagePage onExpired={onExpired} />}
           {pullsPage && (
             <PullRequests chats={notifications.chats} disconnected={notifications.error !== ""} />
           )}
           {ready &&
+            !path.startsWith("automations") &&
             path !== "settings" &&
             path !== "pulls" &&
             path !== "usage" &&

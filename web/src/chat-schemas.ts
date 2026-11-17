@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { automationRunSchema } from "./automation-schemas";
 import { pullSummarySchema } from "./pull-schemas";
 
 export const chatSchema = z.object({
@@ -91,6 +92,7 @@ export const contextUsageSchema = z.object({
 });
 export type ContextUsage = z.infer<typeof contextUsageSchema>;
 export const detailSchema = z.object({
+  automationRuns: z.array(automationRunSchema).default([]),
   usage: usageSchema.optional(),
   contextUsage: contextUsageSchema.optional(),
   chat: chatSchema,
