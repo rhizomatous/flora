@@ -157,10 +157,12 @@ export function ChatTitle({
   );
 }
 
-function ChatViewMenu({
+export function ChatViewMenu({
+  label = "Chat views",
   diffsOpen,
   onDiffsChange,
 }: {
+  label?: string;
   diffsOpen: boolean;
   onDiffsChange: (open: boolean) => void;
 }) {
@@ -168,7 +170,7 @@ function ChatViewMenu({
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button variant="ghost" size="icon-sm" aria-label="Chat views">
+          <Button variant="ghost" size="icon-sm" aria-label={label}>
             <PlusIcon />
           </Button>
         }
@@ -233,10 +235,14 @@ function ChatViewMenu({
 }
 
 export function ChatHeaderActions({
+  sideOpen,
+  onSideToggle,
   usage,
   diffsOpen,
   onDiffsChange,
 }: {
+  sideOpen: boolean;
+  onSideToggle: () => void;
   usage: Usage | undefined;
   diffsOpen: boolean;
   onDiffsChange: (open: boolean) => void;
@@ -350,9 +356,10 @@ export function ChatHeaderActions({
       <Button
         variant="ghost"
         size="icon-sm"
-        aria-label="Split review (coming soon)"
-        title="Split review (coming soon)"
-        aria-disabled="true"
+        aria-label={sideOpen ? "Close side panel" : "Open side panel"}
+        title={sideOpen ? "Close side panel" : "Open side panel"}
+        aria-expanded={sideOpen}
+        onClick={onSideToggle}
       >
         <PanelRightIcon />
       </Button>
