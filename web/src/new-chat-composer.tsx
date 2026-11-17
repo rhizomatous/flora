@@ -71,7 +71,7 @@ export function NewChatComposer({
             aria-label="Choose project"
           >
             <input
-              className="composer-search w-full border-b border-(--menu-border) bg-transparent px-3 py-2.5 text-[13px] outline-none"
+              className="composer-search w-full border-b border-(--overlay-border) bg-transparent px-3 py-2.5 text-[13px] outline-none"
               aria-label="Search projects"
               placeholder="Search projects"
               value={search}
@@ -103,7 +103,7 @@ export function NewChatComposer({
                 </p>
               )}
             </div>
-            <div className="composer-project-links border-t border-(--menu-border) p-1.5">
+            <div className="composer-project-links border-t border-(--overlay-border) p-1.5">
               <a href="#projects/new">
                 <PlusIcon />
                 <span className="florets-control-label">New project</span>

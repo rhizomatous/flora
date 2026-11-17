@@ -347,7 +347,7 @@ function BubbleReactionsButtons() {
         </Bubble>
         <Bubble variant="tinted">
           <BubbleContent>We are going to the movies first then dinner. Are you in?</BubbleContent>
-          <BubbleReactions className="gap-1 bg-background">
+          <BubbleReactions className="gap-1 bg-surface-canvas">
             <Button
               variant="secondary"
               size="icon-xs"

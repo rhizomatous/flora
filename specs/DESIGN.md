@@ -45,7 +45,22 @@ TBD: leaf green #39745B, blossom peach #EF9D83 ?
 
 ### Surface Palette
 
-TBD: ink
+Use four semantic surfaces across Flora and Florets. In dark mode, each level is lighter than the previous one.
+
+| Token | Role | Used for |
+| --- | --- | --- |
+| `--surface-shell` | Darkest background | Sidebar and surrounding app chrome |
+| `--surface-canvas` | Main working surface | Page content and its header |
+| `--surface-panel` | Contained content | Cards, grouped settings, text fields, textareas, and the composer |
+| `--surface-overlay` | Floating content | Menus, popovers, dialogs, sheets, and the command palette |
+
+Use the matching Tailwind utilities, such as `bg-surface-panel`. Surface names describe their role rather than a particular component. Both themes use these roles, with colors defined in the shared stylesheet.
+
+Controls use `--control-background`, which maps to the panel surface, and `--control-border` for their outline. Standalone inputs and inputs inside panels share the same fill. Input groups own the fill; their inner inputs remain transparent.
+
+Containment does not automatically add elevation. Use Card for contained content and `variant="flush"` for groups of divided settings rows. Keep ordinary list rows transparent at rest. Use subtle borders and dividers to separate content within a surface.
+
+Use `--control-hover` for control hover fills and retain visible keyboard focus and invalid-field indicators.
 
 ### Content Palette
 
