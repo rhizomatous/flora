@@ -10,6 +10,7 @@ import {
   Input,
   LoadingStatus,
   Text,
+  Toaster,
   Wordmark,
   SidebarProvider,
   SidebarInset,
@@ -221,6 +222,7 @@ function App() {
 
   return (
     <Layout className={ready ? "min-h-svh" : "mx-auto min-h-svh max-w-4xl px-6 py-10 sm:px-10"}>
+      {ready && <Toaster id="chat-organization" position="bottom-right" closeButton />}
       {ready ? (
         <Sidebar path={path} chats={notifications.chats} onExpired={onExpired}>
           <WorkspaceMenu

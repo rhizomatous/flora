@@ -28,7 +28,7 @@ test("saved organization survives reload while archived execution finishes", asy
   await expect(nav.getByRole("region", { name: "Pinned", exact: true })).toContainText("Saved release plan");
   await actions.click();
   await page.getByRole("menuitem", { name: "Archive", exact: true }).click();
-  await page.getByRole("button", { name: "Archive chat", exact: true }).click();
+  await expect(page.getByText("Chat archived", { exact: true })).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(nav.getByRole("link", { name: /Saved release plan/ })).toHaveCount(0);
   await page.getByRole("radio", { name: /^Yes/ }).check();
@@ -52,6 +52,6 @@ test("saved organization survives reload while archived execution finishes", asy
   await page.getByRole("combobox", { name: "Chat collection", exact: true }).selectOption("current");
   await page.getByRole("link", { name: "Open chat: Saved release plan", exact: true }).click();
   await expect(page.getByText("Saved response 1", { exact: true })).toBeVisible();
-  await expect(page.getByText("Archived chat. Running work and automations continue.", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Archived chat", { exact: true })).toHaveCount(0);
   expect(errors).toEqual([]);
 });

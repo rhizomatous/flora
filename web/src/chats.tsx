@@ -525,7 +525,7 @@ export function Chats({
                   role="status"
                   className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2 text-xs text-muted-foreground"
                 >
-                  <span>Archived chat. Running work and automations continue.</span>
+                  <span>Archived chat</span>
                   <a href="#chats?view=archived" className="shrink-0 underline underline-offset-4">
                     View archived chats
                   </a>

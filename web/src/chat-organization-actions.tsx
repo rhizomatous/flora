@@ -1,4 +1,5 @@
 import { useId, useRef, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 
 import {
   Button,
@@ -25,11 +26,6 @@ import { errorMessage, request, RequestError } from "./request";
 
 const dialogCopy = {
   rename: { title: "Rename chat", description: "Choose a title for this chat." },
-  archive: {
-    title: "Archive chat?",
-    description:
-      "The chat will move to Archived and be unpinned. Running work continues. Automation schedules and links stay unchanged. You can restore it anytime.",
-  },
   error: { title: "Could not update chat", description: "Your saved chat is still available." },
 };
 
@@ -44,7 +40,7 @@ export function ChatOrganizationActions({
   quick?: boolean;
   children?: ReactNode;
 }) {
-  const [dialog, setDialog] = useState<"rename" | "archive" | "error" | null>(null);
+  const [dialog, setDialog] = useState<"rename" | "error" | null>(null);
   const [title, setTitle] = useState("");
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -56,12 +52,12 @@ export function ChatOrganizationActions({
   const pinned = (chat?.PinnedAt ?? "") !== "";
   const archived = chat?.Archived === true;
   const validTitle = title.trim() !== "" && new TextEncoder().encode(title).length <= 200;
-  function open(next: "rename" | "archive") {
+  function openRename() {
     if (!chat) return;
     setTitle(chat.Title);
     setRevision(chat.OrganizationRevision ?? 0);
     setError("");
-    setDialog(next);
+    setDialog("rename");
   }
   async function save(
     change: { title?: string; pinned?: boolean; archived?: boolean },
@@ -77,6 +73,11 @@ export function ChatOrganizationActions({
         body: { ...change, revision: expected },
       });
       publishOrganization(updated);
+      if (change.archived !== undefined) {
+        toast.success(change.archived ? "Chat archived" : "Chat restored", {
+          toasterId: "chat-organization",
+        });
+      }
       setDialog(null);
       requestAnimationFrame(() => {
         if (trigger.current?.isConnected !== true) document.querySelector("h1")?.focus();
@@ -123,8 +124,7 @@ export function ChatOrganizationActions({
             aria-label={`${archived ? "Restore" : "Archive"} ${chat?.Title ?? "chat"}`}
             title={archived ? "Restore chat" : "Archive chat"}
             onClick={() => {
-              if (archived) void save({ archived: false });
-              else open("archive");
+              void save({ archived: !archived });
             }}
           >
             <ArchiveIcon />
@@ -159,7 +159,7 @@ export function ChatOrganizationActions({
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => {
-              open("rename");
+              openRename();
             }}
           >
             <PencilIcon />
@@ -168,8 +168,7 @@ export function ChatOrganizationActions({
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => {
-              if (archived) void save({ archived: false });
-              else open("archive");
+              void save({ archived: !archived });
             }}
           >
             <ArchiveIcon />
@@ -237,16 +236,6 @@ export function ChatOrganizationActions({
             {dialog === "rename" && (
               <Button type="submit" form={inputID} disabled={busy || !validTitle}>
                 {busy ? "Saving…" : "Save"}
-              </Button>
-            )}
-            {dialog === "archive" && (
-              <Button
-                disabled={busy}
-                onClick={() => {
-                  void save({ archived: true }, revision);
-                }}
-              >
-                {busy ? "Archiving…" : "Archive chat"}
               </Button>
             )}
           </DialogFooter>

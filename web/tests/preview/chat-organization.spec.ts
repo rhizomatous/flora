@@ -110,10 +110,10 @@ test("organize chats across header, sidebar, search, archive, reload, and restor
   });
   await actions.click();
   await page.getByRole("menuitem", { name: "Archive", exact: true }).click();
-  await expect(page.getByRole("dialog")).toContainText("Running work continues");
-  await page.getByRole("button", { name: "Archive chat", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByText("Chat archived", { exact: true })).toBeVisible();
   await expect(nav.getByRole("link", { name: /Release checklist/ })).toHaveCount(0);
-  await expect(page.getByRole("status").filter({ hasText: "Archived chat." })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Archived chat" })).toBeVisible();
   await expect(draft).toHaveValue("Keep this draft while organizing");
   await page.reload();
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
@@ -141,6 +141,7 @@ test("organize chats across header, sidebar, search, archive, reload, and restor
     path: testInfo.outputPath("restore-menu-narrow.png"),
   });
   await page.getByRole("menuitem", { name: "Restore", exact: true }).click();
+  await expect(page.getByText("Chat restored", { exact: true })).toBeVisible();
   await expect(region.getByText("No archived chats.")).toBeVisible();
   await region
     .getByRole("combobox", { name: "Chat collection", exact: true })
@@ -188,4 +189,37 @@ test("rename keeps drafts on errors and conflicts and supports keyboard cancella
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(actions).toBeFocused();
   await expect(page.getByRole("heading", { name: "My retained draft", exact: true })).toBeVisible();
+});
+
+test("archive reports failures and keeps its success toast after the list row disappears", async ({
+  page,
+}) => {
+  const state = await organizationAPI(page);
+  await page.goto(`${base}/#chats`);
+  await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+  const region = page.locator("#main-content").getByRole("region", { name: "Chats", exact: true });
+  const actions = region.getByRole("button", {
+    name: "Actions for Review the workspace changes",
+    exact: true,
+  });
+  state.fail = true;
+  await actions.click();
+  await page.getByRole("menuitem", { name: "Archive", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Storage unavailable");
+  await expect(page.getByText("Chat archived", { exact: true })).toHaveCount(0);
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Close", exact: true })
+    .first()
+    .click();
+  await expect(
+    region.getByRole("link", { name: "Open chat: Review the workspace changes", exact: true }),
+  ).toBeVisible();
+  await actions.click();
+  await page.getByRole("menuitem", { name: "Archive", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    region.getByRole("link", { name: "Open chat: Review the workspace changes", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByText("Chat archived", { exact: true })).toBeVisible();
 });
