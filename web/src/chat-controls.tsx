@@ -2,10 +2,6 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import {
   TabsTrigger,
-  PencilIcon,
-  ArchiveIcon,
-  PinIcon,
-  FolderIcon,
   HoverCard,
   HoverCardTrigger,
   HoverCardContent,
@@ -30,7 +26,6 @@ import {
   PlusIcon,
   TerminalIcon,
   ClockIcon,
-  EllipsisIcon,
   PanelRightIcon,
   ExternalLinkIcon,
   CopyIcon,
@@ -38,6 +33,7 @@ import {
   ListIcon,
 } from "@flora/florets";
 
+import { ChatOrganizationActions } from "./chat-organization-actions";
 import type { Chat, Usage, ContextUsage } from "./chat-schemas";
 import { chatStatus } from "./chat-status";
 import { ContextUsagePopover } from "./context-usage";
@@ -219,12 +215,14 @@ export function ChatViewMenu({
 }
 
 export function ChatHeaderActions({
+  chat,
   sideOpen,
   onSideToggle,
   usage,
   diffsOpen,
   onDiffsChange,
 }: {
+  chat: Chat | undefined;
   sideOpen: boolean;
   onSideToggle: () => void;
   usage: Usage | undefined;
@@ -287,52 +285,26 @@ export function ChatHeaderActions({
           )}
         </PopoverContent>
       </Popover>
-      <DropdownMenu>
-        <DropdownMenuTrigger
+      <ChatOrganizationActions chat={chat} label="More chat actions">
+        <DropdownMenuItem
+          nativeButton={false}
           render={
-            <Button variant="ghost" size="icon-sm" aria-label="More chat actions">
-              <EllipsisIcon />
-            </Button>
+            <a href={window.location.hash} target="_blank" rel="noreferrer">
+              <ExternalLinkIcon />
+              Open in new tab
+            </a>
           }
         />
-        <DropdownMenuContent
-          align="end"
-          className="composer-menu max-h-[70dvh] w-[260px]! max-w-[calc(100vw-24px)] overflow-y-auto [&_[role=menuitem]]:whitespace-nowrap"
+        <DropdownMenuItem
+          onClick={() => {
+            void copyLink();
+          }}
         >
-          <DropdownMenuItem
-            render={
-              <a href={window.location.hash} target="_blank" rel="noreferrer">
-                <ExternalLinkIcon />
-                Open in new tab
-              </a>
-            }
-            nativeButton={false}
-          />
-          {[
-            { label: "Pin", icon: <PinIcon /> },
-            { label: "Move to", icon: <FolderIcon /> },
-            { label: "Rename", icon: <PencilIcon /> },
-          ].map(({ label, icon }) => (
-            <DropdownMenuItem key={label} disabled>
-              {icon}
-              {label}
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuItem
-            onClick={() => {
-              void copyLink();
-            }}
-          >
-            <CopyIcon />
-            {copyState}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem disabled>
-            <ArchiveIcon />
-            Archive
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          <CopyIcon />
+          {copyState}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+      </ChatOrganizationActions>
       {!sideOpen && <SidePanelToggle open={false} onClick={onSideToggle} />}
     </>
   );

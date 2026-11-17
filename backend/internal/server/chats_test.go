@@ -64,10 +64,10 @@ func TestChatAPIAuthenticationValidationAndReplay(t *testing.T) {
 	for _, route := range []struct{ method, path string }{
 		{"GET", "/api/notifications"},
 		{"POST", "/api/chats/missing/interrupt"}, {"POST", "/api/chats/missing/stop"},
-		{"GET", "/api/chats"}, {"GET", "/api/chats/missing/setup-log"}, {"HEAD", "/api/chats/missing/setup-log"}, {"GET", "/api/chats/missing"}, {"GET", "/api/chats/missing/events"}, {"GET", "/api/chats/missing/questions"}, {"POST", "/api/projects/" + project.ID + "/chats"}, {"POST", "/api/chats/missing/messages"}, {"POST", "/api/chats/missing/questions/question/reply"},
+		{"PATCH", "/api/chats/missing"}, {"GET", "/api/chats"}, {"GET", "/api/chats/missing/setup-log"}, {"HEAD", "/api/chats/missing/setup-log"}, {"GET", "/api/chats/missing"}, {"GET", "/api/chats/missing/events"}, {"GET", "/api/chats/missing/questions"}, {"POST", "/api/projects/" + project.ID + "/chats"}, {"POST", "/api/chats/missing/messages"}, {"POST", "/api/chats/missing/questions/question/reply"},
 	} {
 		call(route.method, route.path, "{}", "", origin, 401)
-		if route.method == "POST" {
+		if route.method == "POST" || route.method == "PATCH" {
 			call(route.method, route.path, "{}", token, "https://evil.test", 403)
 		}
 	}
@@ -85,6 +85,31 @@ func TestChatAPIAuthenticationValidationAndReplay(t *testing.T) {
 	if c.ID != duplicate.ID {
 		t.Fatal("creation retry created a second chat")
 	}
+
+	organizationPath := "/api/chats/" + c.ID
+	for _, bad := range []string{`{}`, `{"revision":0}`, `{"revision":0,"title":" "}`, `{"revision":0,"title":"Valid","unknown":true}`, `{"revision":-1,"pinned":true}`} {
+		call("PATCH", organizationPath, bad, token, origin, 400)
+	}
+	call("PATCH", "/api/chats/missing", `{"revision":0,"title":"Valid"}`, token, origin, 404)
+	var organized storage.Chat
+	if err := json.Unmarshal(call("PATCH", organizationPath, `{"revision":0,"title":"Useful name","pinned":true}`, token, origin, 200), &organized); err != nil {
+		t.Fatal(err)
+	}
+	if organized.Title != "Useful name" || organized.PinnedAt == "" || organized.OrganizationRevision != 1 {
+		t.Fatal(organized)
+	}
+	call("PATCH", organizationPath, `{"revision":0,"title":"Stale name"}`, token, origin, 409)
+	json.Unmarshal(call("PATCH", organizationPath, `{"revision":1,"archived":true}`, token, origin, 200), &organized)
+	if !organized.Archived || organized.PinnedAt != "" {
+		t.Fatal(organized)
+	}
+	for _, endpoint := range []string{"/api/chats", "/api/notifications", organizationPath} {
+		data := call("GET", endpoint, "", token, "", 200)
+		if !strings.Contains(string(data), `"Title":"Useful name"`) || !strings.Contains(string(data), `"Archived":true`) {
+			t.Fatalf("organization missing from %s: %s", endpoint, data)
+		}
+	}
+	call("PATCH", organizationPath, `{"revision":2,"archived":false}`, token, origin, 200)
 	call("GET", "/api/chats/"+c.ID+"/setup-log", "", token, "", 404)
 	paths, err := store.Paths(context.Background(), c.ID)
 	if err != nil {

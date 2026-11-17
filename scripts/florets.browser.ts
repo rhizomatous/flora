@@ -26,6 +26,30 @@ try {
     assert.deepEqual(errors, [], name);
   };
 
+  await page.goto(`${base}#theming`, { waitUntil: "domcontentloaded" });
+  for (const dark of [true, false]) {
+    await page.evaluate(
+      (enabled) => document.documentElement.classList.toggle("dark", enabled),
+      dark,
+    );
+    const standalone = page.getByRole("textbox", { name: "Standalone input", exact: true });
+    const nested = page.locator("#surface-panel-name");
+    const panel = nested.locator('xpath=ancestor::*[@data-slot="card"]');
+    await expect(nested).toBeVisible();
+    const panelColor = await panel.evaluate((element) => getComputedStyle(element).backgroundColor);
+    assert.notEqual(panelColor, "rgba(0, 0, 0, 0)");
+    await expect(standalone).toHaveCSS("background-color", panelColor);
+    await expect(nested).toHaveCSS("background-color", panelColor);
+    await expect(panel).toHaveCSS("padding-top", "0px");
+    await expect(panel).toHaveCSS("row-gap", "0px");
+    if (dark) assert.equal(panelColor, "rgb(25, 25, 25)");
+    await page.getByRole("button", { name: "Open overlay", exact: true }).click();
+    const overlay = page.locator('[data-slot="popover-content"]');
+    await expect(overlay).toBeVisible();
+    if (dark) await expect(overlay).toHaveCSS("background-color", "rgb(32, 32, 32)");
+    await page.keyboard.press("Escape");
+  }
+
   const files = await readdir(new URL("../florets/docs/src/examples/upstream/", import.meta.url));
   for (const file of files.filter((name) => name.endsWith(".tsx"))) {
     await openExample(file.slice(0, -4));

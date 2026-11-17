@@ -109,7 +109,7 @@ export function Sidebar({
           <SidebarHeader>
             <a
               href="#main-content"
-              className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-sidebar focus:p-2"
+              className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-surface-shell focus:p-2"
               onClick={(event) => {
                 event.preventDefault();
                 skipToContent.current = openMobile;

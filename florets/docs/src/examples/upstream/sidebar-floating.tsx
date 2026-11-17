@@ -170,7 +170,7 @@ export function Preview() {
   };
 
   return (
-    <SidebarProvider className="bg-background">
+    <SidebarProvider className="bg-surface-canvas">
       <Sidebar variant="floating">
         <SidebarHeader>
           <SidebarMenu>

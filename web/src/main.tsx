@@ -10,6 +10,7 @@ import {
   Input,
   LoadingStatus,
   Text,
+  Toaster,
   Wordmark,
   SidebarProvider,
   SidebarInset,
@@ -208,19 +209,22 @@ function App() {
   const Layout = ready ? SidebarProvider : "div";
   const conversation = ready && path.startsWith("chats/") && !path.startsWith("chats/new");
   const pullsPage = ready && path === "pulls";
-  const chatsPage = ready && path === "chats";
+  const chatsPage = ready && path.split("?")[0] === "chats";
   const automationsPage = ready && path === "automations";
+  const automationEditor = ready && path.startsWith("automations/");
   let contentLayout = "mx-auto w-full max-w-6xl p-4 sm:p-8";
   if (pullsPage || chatsPage || automationsPage) contentLayout = "flex min-h-0 flex-1 flex-col";
+  else if (automationEditor) contentLayout = "min-h-0 flex-1 overflow-y-auto p-4 sm:p-8";
   else if (conversation) contentLayout = "flex min-h-0 flex-1 flex-col px-4 pb-2 sm:px-8";
   const frameLayout =
-    conversation || pullsPage || chatsPage || automationsPage
+    conversation || pullsPage || chatsPage || automationsPage || automationEditor
       ? "h-dvh min-h-0 min-w-0 overflow-hidden md:h-[calc(100dvh-1rem)]"
       : "min-w-0";
   const Content = ready ? SidebarInset : "main";
 
   return (
     <Layout className={ready ? "min-h-svh" : "mx-auto min-h-svh max-w-4xl px-6 py-10 sm:px-10"}>
+      {ready && <Toaster id="chat-organization" position="bottom-right" closeButton />}
       {ready ? (
         <Sidebar path={path} chats={notifications.chats} onExpired={onExpired}>
           <WorkspaceMenu
@@ -243,9 +247,7 @@ function App() {
       )}
       <Content id="main-content" tabIndex={-1} className={ready ? frameLayout : undefined}>
         {ready && !conversation && !pullsPage && !chatsPage && !automationsPage && (
-          <header
-            className={`florets-topbar flex shrink-0 items-center gap-2 border-b px-3 ${path.startsWith("automations") ? "sticky top-0 z-20 bg-background" : ""}`}
-          >
+          <header className="florets-topbar flex shrink-0 items-center gap-2 border-b px-3">
             <span className="sidebar-toggle-space" aria-hidden="true" />
             {path.startsWith("automations") && (
               <div ref={setAutomationTopbar} className="flex min-w-0 flex-1 items-center gap-2" />

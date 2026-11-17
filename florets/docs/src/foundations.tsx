@@ -2,6 +2,12 @@ import type { ReactNode } from "react";
 
 import {
   ButtonLink,
+  Card,
+  Input,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  Button,
   FlowerMark,
   Heading,
   Link,
@@ -34,7 +40,7 @@ function Demo({ children }: { children: ReactNode }) {
 const colorClasses: Record<string, string> = {
   Primary: "bg-primary text-primary-foreground",
   Muted: "bg-muted text-muted-foreground",
-  Background: "bg-background text-foreground",
+  Background: "bg-surface-canvas text-foreground",
 };
 
 export function FoundationPage({ id }: { id: string }) {
@@ -153,6 +159,56 @@ export function FoundationPage({ id }: { id: string }) {
                 '<div className="rounded-lg border border-border bg-muted p-4 text-muted-foreground">\n  Supporting information\n</div>'
               }
             />
+          </Section>
+          <Section id="surfaces" title="Surface roles">
+            <p>
+              Shell frames the app, canvas holds the page, panel contains related content, and
+              overlay floats above it. Use these roles in both themes. Nesting a control inside a
+              panel does not add another elevation level.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-4">
+              {[
+                ["Shell", "bg-surface-shell text-surface-shell-foreground"],
+                ["Canvas", "bg-surface-canvas text-foreground"],
+                ["Panel", "bg-surface-panel text-surface-panel-foreground"],
+                ["Overlay", "bg-surface-overlay text-surface-overlay-foreground"],
+              ].map(([name, classes]) => (
+                <div key={name} className={`rounded-lg border p-4 ${classes}`}>
+                  {name}
+                </div>
+              ))}
+            </div>
+            <div className="space-y-4 rounded-xl border bg-surface-canvas p-6">
+              <Input aria-label="Standalone input" placeholder="Standalone input" />
+              <Card variant="flush" className="divide-y">
+                <label
+                  htmlFor="surface-panel-name"
+                  className="flex flex-wrap items-center gap-3 p-4"
+                >
+                  Name{" "}
+                  <Input
+                    id="surface-panel-name"
+                    className="min-w-40 flex-1"
+                    placeholder="Input inside a panel"
+                  />
+                </label>
+                <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+                  <span>Floating content</span>
+                  <Popover>
+                    <PopoverTrigger render={<Button variant="outline" />}>
+                      Open overlay
+                    </PopoverTrigger>
+                    <PopoverContent>Menus and popovers use the overlay surface.</PopoverContent>
+                  </Popover>
+                </div>
+              </Card>
+            </div>
+            <p>
+              Control fills use <code>--control-background</code>, mapped to the panel surface.
+              Outlines use <code>--control-border</code>. Hover and focus are separate interaction
+              states. Use <code>Card variant=&quot;flush&quot;</code> for divided settings rows
+              without the default card spacing.
+            </p>
           </Section>
           <Section id="compact-patterns" title="Compact navigation and controls">
             <p>

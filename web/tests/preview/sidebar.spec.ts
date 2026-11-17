@@ -28,7 +28,7 @@ test("sidebar searches, collapses projects, and preserves navigation on narrow s
   await nav
     .getByRole("button", { name: "Actions for Fix duplicate notes between pages", exact: true })
     .click();
-  await expect(page.getByRole("menuitem", { name: "Archive", exact: true })).toBeDisabled();
+  await expect(page.getByRole("menuitem", { name: "Archive", exact: true })).toBeEnabled();
   await page.keyboard.press("Escape");
   await nav.getByRole("button", { name: "Chat list options", exact: true }).click();
   await page.getByRole("menuitem", { name: "Sort: Updated", exact: true }).click();

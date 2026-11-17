@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useState } from "react";
 
-import { feedSchema, type Chat, type Completion } from "./chat-schemas";
+import { latestOrganization, organizationEvent } from "./chat-organization";
+import { feedSchema, chatSchema, type Chat, type Completion } from "./chat-schemas";
 import { isExpired, request } from "./request";
 import { useCompletionSound } from "./sound";
 
@@ -34,7 +35,14 @@ export function useNotifications(authenticated: boolean, sound: boolean, onExpir
         if (!active) return;
         const fresh = feed.completions.filter((e) => e.Sequence > (cursor ?? feed.cursor));
         cursor = feed.cursor;
-        setChats(feed.chats);
+        setChats((saved) =>
+          feed.chats.map((chat) =>
+            latestOrganization(
+              chat,
+              saved?.find((row) => row.ID === chat.ID),
+            ),
+          ),
+        );
         setError("");
         if (fresh.length === 0) return;
         const title = (id: string) => feed.chats.find((c) => c.ID === id)?.Title ?? "Chat";
@@ -50,12 +58,25 @@ export function useNotifications(authenticated: boolean, sound: boolean, onExpir
         loading = false;
       }
     };
+    const organize = (event: Event) => {
+      if (!(event instanceof CustomEvent)) return;
+      const parsed = chatSchema.safeParse(event.detail);
+      if (!parsed.success) return;
+      const chat = parsed.data;
+      setChats((rows) => {
+        const saved = rows ?? [];
+        if (!saved.some((row) => row.ID === chat.ID)) return [...saved, chat];
+        return saved.map((row) => (row.ID === chat.ID ? latestOrganization(chat, row) : row));
+      });
+    };
+    window.addEventListener(organizationEvent, organize);
     void load();
     const timer = setInterval(() => {
       void load();
     }, 1000);
     return () => {
       active = false;
+      window.removeEventListener(organizationEvent, organize);
       clearInterval(timer);
       setChats(undefined);
       setToasts([]);
