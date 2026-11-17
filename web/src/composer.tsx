@@ -23,7 +23,7 @@ import {
 } from "@flora/florets";
 
 import { AttachmentPreview } from "./attachment-preview";
-import { attachmentAccept, formatAttachmentSize, useAttachments } from "./attachments";
+import { attachmentAccept, attachmentDetails, useAttachments } from "./attachments";
 
 export function PlaceholderMenu({
   label,
@@ -197,9 +197,30 @@ export function Composer({
       {attachments.items.map((file) => (
         <input key={file.id} type="hidden" name="attachments" value={file.id} />
       ))}
+      <FieldLabel className="sr-only" htmlFor={id}>
+        {label}
+      </FieldLabel>
+      <InputGroupTextarea
+        id={id}
+        name="text"
+        className="composer-textarea"
+        rows={1}
+        placeholder="Ask anything, / for commands, @ for context"
+        value={message}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            if (ready) event.currentTarget.form?.requestSubmit();
+          }
+        }}
+        disabled={disabled}
+      />
       {attachments.items.length > 0 && (
         <div
-          className="flex w-full min-w-0 flex-wrap gap-2 px-3 pt-3"
+          className="composer-attachments flex w-full min-w-0 flex-wrap gap-1.5"
           aria-label="Draft attachments"
         >
           {attachments.items.map((file) => (
@@ -211,7 +232,7 @@ export function Composer({
               description={
                 file.state === "uploading"
                   ? "Uploading…"
-                  : attachments.issue(file) || formatAttachmentSize(file.size)
+                  : attachments.issue(file) || attachmentDetails(file)
               }
               onRemove={() => {
                 void attachments.remove(file.id);
@@ -227,10 +248,6 @@ export function Composer({
           ))}
         </div>
       )}
-      <div className="w-full px-3 text-xs text-muted-foreground" role="status">
-        {attachments.items.length > 0 &&
-          "Draft files expire after 24 hours. Sent files stay with the chat."}
-      </div>
       {attachments.error !== "" && (
         <p className="w-full px-3 pt-2 text-xs text-destructive" role="alert">
           {attachments.error}
@@ -263,27 +280,6 @@ export function Composer({
           )}
         </div>
       )}
-      <FieldLabel className="sr-only" htmlFor={id}>
-        {label}
-      </FieldLabel>
-      <InputGroupTextarea
-        id={id}
-        name="text"
-        className="composer-textarea"
-        rows={1}
-        placeholder="Ask anything, / for commands, @ for context"
-        value={message}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-            event.preventDefault();
-            if (ready) event.currentTarget.form?.requestSubmit();
-          }
-        }}
-        disabled={disabled}
-      />
       <InputGroupAddon align="block-end" className="composer-bottom-bar">
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -317,6 +313,9 @@ export function Composer({
             </DropdownMenuItem>
             <p className="px-2.5 py-1.5 text-xs text-muted-foreground">
               Images, PDF, and text · 5 files · 5 MiB each
+            </p>
+            <p className="px-2.5 pb-1.5 text-xs text-muted-foreground">
+              Draft files expire after 24 hours. Sent files stay with the chat.
             </p>
             <DropdownMenuSeparator />
             <DropdownMenuItem disabled>

@@ -13,7 +13,7 @@ import {
   Spinner,
 } from "@flora/florets";
 
-import { formatAttachmentSize, type UploadedAttachment } from "./attachments";
+import { attachmentDetails, type UploadedAttachment } from "./attachments";
 
 export function AttachmentPreview({
   file,
@@ -35,7 +35,11 @@ export function AttachmentPreview({
   if (state === "uploading") media = <Spinner />;
   else if (file.mime.startsWith("image/") && state === "done") media = <img src={url} alt="" />;
   return (
-    <Attachment size="sm" state={state} className="max-w-full min-w-0 grow-0 basis-[220px]">
+    <Attachment
+      size="sm"
+      state={state}
+      className={onRemove ? "composer-attachment" : "max-w-full min-w-0 grow-0 basis-[220px]"}
+    >
       <AttachmentMedia
         variant={file.mime.startsWith("image/") && state === "done" ? "image" : "icon"}
       >
@@ -44,7 +48,7 @@ export function AttachmentPreview({
       <AttachmentContent>
         <AttachmentTitle title={file.name}>{file.name}</AttachmentTitle>
         <AttachmentDescription title={description}>
-          {description ?? formatAttachmentSize(file.size)}
+          {description ?? attachmentDetails(file)}
         </AttachmentDescription>
       </AttachmentContent>
       {state === "done" && (

@@ -141,3 +141,40 @@
     font-size: 16px;
   }
 }
+
+.composer-attachments {
+  padding: 0 12px 4px;
+}
+.composer-attachment {
+  width: 240px;
+  max-width: 100%;
+  min-width: 0;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 5px 6px;
+  border-color: var(--composer-border);
+  border-radius: 8px;
+  background: var(--composer-surface);
+  box-shadow: 0 1px 2px #00000030;
+}
+.composer-attachment [data-slot="attachment-media"] {
+  width: 36px;
+  border-radius: 6px;
+}
+.composer-attachment [data-slot="attachment-title"] {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+}
+.composer-attachment [data-slot="attachment-description"] {
+  margin-top: 0;
+  font-size: 12px;
+  line-height: 16px;
+}
+.composer-box:has(.composer-attachments) .composer-textarea {
+  min-height: 44px;
+  padding: 14px 15px 10px;
+}
+.composer-box:has(.composer-attachments) .composer-bottom-bar {
+  padding-top: 4px;
+}

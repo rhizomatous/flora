@@ -250,5 +250,10 @@ export function useAttachments(scope: string, project: string) {
 }
 
 export function formatAttachmentSize(size: number) {
-  return size < 1024 ? `${size} B` : `${(size / 1024).toFixed(1)} KiB`;
+  return size < 1000 ? `${size} B` : `${Math.round(size / 1000)} KB`;
+}
+
+export function attachmentDetails(file: UploadedAttachment) {
+  const extension = file.name.split(".").at(-1)?.toUpperCase() ?? "File";
+  return `${formatAttachmentSize(file.size)} · ${extension}`;
 }
