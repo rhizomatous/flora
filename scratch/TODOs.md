@@ -1,4 +1,8 @@
-# UI TODOs
+# UI checklist
+
+Remaining UI work is tracked in [GitHub issues](https://github.com/rhizomatous/flora/issues), including separate decision issues for features that still need a defined scope. Voice transcription has been dropped from the backlog.
+
+Subagent conversation capture and browsing are covered by [PR #108](https://github.com/rhizomatous/flora/pull/108), which is still open.
 
 ## Shared chat composers
 
@@ -9,20 +13,6 @@
 - [x] Text submission starts a chat through the existing API, including retry identity, byte-limit validation, and error handling.
 - [x] Enter sends, Shift+Enter adds a newline, and composing text with an IME does not send.
 - [x] The microphone changes to a send button when a message is entered.
-
-### Disconnected placeholders
-
-The menus open, but their unfinished actions are disabled. Default model, reasoning, and branch labels do not claim a particular backend configuration.
-
-- [ ] Setup: implement setup assistance and snapshots. The plain button is currently disabled.
-- [ ] Branch: load the project's actual branches and allow a per-chat base branch override. Currently the server uses the saved project configuration.
-- [ ] Attachments: upload, store, preview, remove, and send attachments with messages.
-- [ ] Context: add people, threads, pull requests, skills, and files to a message.
-- [ ] Chat settings: implement access, setup/snapshots, environment variables, and MCP servers.
-- [ ] Model: load supported models and pass the selected model to the backend. Currently uses the server default.
-- [ ] Reasoning effort: load supported options and pass the selection to the backend. Currently uses the server default.
-- [ ] Voice input: record and transcribe audio. The microphone button is currently disabled.
-- [ ] Slash commands and @ context: implement suggestions, keyboard selection, and structured message payloads. The reference placeholder is present, but text is sent literally.
 
 ## Chat screen
 
@@ -40,22 +30,8 @@ The menus open, but their unfinished actions are disabled. Default model, reason
 - [x] Cost: show estimated model cost and token counts from persisted usage, including captured subagent work; show reported totals and collection failures.
 - [x] Context: show latest main-session model-call usage against its runtime model limit.
 - [x] Subagent accounting: discover descendant sessions, persist their usage, reconcile after reconnects and restarts, and include it in parent-chat totals without double-counting.
-
-### Disconnected placeholders
-
-- [ ] PR review: expose in-app changes review and CI checks from the linked PR UI.
-- [ ] Terminals: list active shells, open a terminal, and reflect their count in the summary strip.
-- [ ] Runtime: report actual machine size, CPU, memory, disk, awake/asleep state, and wake controls. The neutral dot does not report machine health.
-- [ ] Context: expose configurable compaction thresholds.
-- [ ] Title summary: display model identity from saved reported calls. Model selection remains a separate composer follow-up.
-- [ ] Subagent conversation capture: persist full child-session conversations and tool activity for display, including recovery after reconnects and restarts. Usage accounting is already connected.
-- [ ] Subagent UI: show spawned agents inline with their task and live status; open their conversation and tool activity in a side pane; expose completion, failures, and requests for input while keeping the parent conversation accessible.
-- [ ] Plus menu: search views; add diffs, machine files, setup, browser, side threads, new shell, desktop, and keep-awake controls. Overview is the current chat view.
-- [ ] Split review: open a resizable review pane next to the conversation.
-- [ ] Chat actions: implement pin, move to folder, rename, archive, and delete.
-- [ ] Rich PR references: add expanded PR cards and CI/check status. Inline PR links already show saved open/draft/merged/closed status.
-
-Attachment/context, model, reasoning, slash-command, and voice placeholders listed above apply to both composers.
+- [x] Plus menu: open saved workspace changes in the Diffs view.
+- [x] Split review: show Overview and Diffs in a resizable side panel, preserving the conversation and draft.
 
 ## Chats and Pull requests pages
 
@@ -77,16 +53,4 @@ Attachment/context, model, reasoning, slash-command, and voice placeholders list
 - [x] Show linked PR counts in chat rows and saved PR titles, statuses, additions/deletions, and GitHub links in hover summaries.
 - [x] Mark a viewed chat revision as seen for this tab, surviving reloads through session storage; later updates become unread again.
 - [x] Workspace menu: connect Usage with date ranges, cost and token charts, project/model breakdowns, and linked chat history.
-
-### Disconnected placeholders
-
-- [ ] Navigation: implement the disabled Automations destination.
-- [ ] Chat row actions: implement Pin and Archive in both the hover toolbar and action menu; add the pinned section.
-- [ ] Folders: connect New folder and Move to folder, including folder creation and saved chat membership.
-- [ ] Sidebar list options: connect Display and filters and add grouping preferences. The separate Chats page already has working status and project filters.
-- [ ] Read state: implement Mark all as read and durable read/unread persistence across tabs and browser sessions. Per-tab viewed revisions already use session storage.
-- [ ] Persist sorting and collapsed project preferences; currently these work only for the current sidebar session.
-- [ ] Populate hover summaries with model identity from saved reported calls and connect CI/check details. Saved PR details and additions/deletions are already connected.
-- [ ] Workspace identity: replace the generic Flora/Workspace footer with saved identity and avatar data when available.
-
-Sidebar actions that are not connected are disabled; timestamps and statuses come from the saved chat feed.
+- [x] Navigation: open Automations to create and edit schedules and view linked run history.
