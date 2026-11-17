@@ -48,14 +48,14 @@ test("side panel keeps chat drafts, resizes, and hosts independent diff tabs", a
   await page.keyboard.press("ArrowLeft");
   await side.getByRole("button", { name: "Side panel views" }).click();
   await page.getByRole("menuitem", { name: "Diffs", exact: true }).click();
-  await expect(side.getByRole("region", { name: "Chat changes" })).toBeVisible();
+  await expect(side.getByRole("region", { name: "Workspace changes" })).toBeVisible();
   await expect(draft).toHaveValue("Keep this split-view draft");
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
   await page.getByRole("menuitem", { name: "Diffs", exact: true }).click();
-  await expect(page.getByRole("region", { name: "Chat changes", exact: true })).toHaveCount(2);
+  await expect(page.getByRole("region", { name: "Workspace changes", exact: true })).toHaveCount(2);
   await side.getByRole("tab", { name: "Overview", exact: true }).click();
   await expect(
-    page.locator(".chat-main-pane").getByRole("region", { name: "Chat changes" }),
+    page.locator(".chat-main-pane").getByRole("region", { name: "Workspace changes" }),
   ).toBeVisible();
   await page.getByRole("tab", { name: "Fix duplicate notes between pages", exact: true }).click();
   await side.getByRole("tab", { name: "Diffs", exact: true }).click();

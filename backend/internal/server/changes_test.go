@@ -2,13 +2,16 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/rhizomatous/flora/backend/internal/changes"
@@ -147,5 +150,62 @@ func TestChatPullSummaries(t *testing.T) {
 	broken := changes.New(store, nil).ReadPulls(context.Background(), c.ID)
 	if broken.Items == nil || len(broken.Items) != 0 || broken.Error == "" {
 		t.Fatalf("corrupt artifact: %+v", broken)
+	}
+}
+
+func TestPullComparisonSavedDownloadAndAuthorization(t *testing.T) {
+	store, svc, auth, token, p, cleanup := chatAPI(t)
+	defer cleanup()
+	c := savedReview(t, store, p)
+	paths, _ := store.Paths(context.Background(), c.ID)
+	link := "https://github.com/first/app/pull/7"
+	sum := sha256.Sum256([]byte(link))
+	snapshot := changes.PullReview{Snapshot: &changes.PullSnapshot{Snapshot: changes.Snapshot{ID: "pr-revision", CapturedAt: "2026-01-01T00:00:00Z", Base: strings.Repeat("a", 40), Files: []changes.File{{Path: "large.txt", Diff: "full saved PR diff", Bytes: 2000000}}}, URL: link, BaseRevision: changes.PullRevision{Repository: "first/app", Ref: "main", SHA: strings.Repeat("a", 40)}, HeadRevision: changes.PullRevision{Repository: "fork/app", Ref: "topic", SHA: strings.Repeat("b", 40)}}}
+	data, _ := json.Marshal(snapshot)
+	if err := os.WriteFile(filepath.Join(paths.Artifacts, fmt.Sprintf("pull-review-%x.json", sum)), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	h := New(webassets.FS(), auth, settings.New(store), "https://flora.test", svc)
+	base := "/api/chats/" + c.ID + "/pull-comparison"
+	call := func(method, path, session string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(method, path, nil)
+		r.Header.Set("Origin", "https://flora.test")
+		if session != "" {
+			r.AddCookie(&http.Cookie{Name: cookieName, Value: session})
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+	query := "?repository=first/app&number=7"
+	download := base + "/0/diff" + query + "&snapshot=pr-revision"
+	for _, path := range []string{base + query, download} {
+		if w := call("GET", path, ""); w.Code != 401 {
+			t.Fatalf("unprotected comparison %d", w.Code)
+		}
+	}
+	if w := call("POST", base+query, ""); w.Code != 401 {
+		t.Fatal("unprotected refresh")
+	}
+	w := call("GET", base+query, token)
+	var review changes.PullReview
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &review) != nil || review.Snapshot == nil || !review.Snapshot.Files[0].Truncated || review.Snapshot.Files[0].Diff != "" {
+		t.Fatalf("inline response %d %s", w.Code, w.Body.String())
+	}
+	w = call("GET", download, token)
+	if w.Code != 200 || w.Body.String() != "full saved PR diff" || w.Header().Get("Content-Disposition") == "" {
+		t.Fatal("full comparison download unavailable")
+	}
+	if w = call("GET", strings.Replace(download, "pr-revision", "old", 1), token); w.Code != 409 {
+		t.Fatal("stale revision downloaded")
+	}
+	if w = call("GET", base+"?repository=second/app&number=7", token); w.Code != 200 || !strings.Contains(w.Body.String(), `"snapshot":null`) {
+		t.Fatal("independent repository comparison lost")
+	}
+	if w = call("GET", base+"?repository=third/private&number=10", token); w.Code != 404 {
+		t.Fatalf("unverified PR accepted: %d", w.Code)
+	}
+	if w = call("GET", base+"?repository=unlinked/repo&number=1", token); w.Code != 404 {
+		t.Fatal("unlinked PR accepted")
 	}
 }

@@ -1,5 +1,5 @@
 // oxlint-disable import/max-dependencies -- The chat view imports its feature controls and boundary schemas directly.
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 
 import {
   ResizablePanelGroup,
@@ -50,6 +50,7 @@ import {
   acceptanceSchema,
   type Activity,
   type Detail,
+  type Subagent,
 } from "./chat-schemas";
 import { ChatSidePanel } from "./chat-side-panel";
 import { chatStatus } from "./chat-status";
@@ -57,6 +58,7 @@ import { Composer } from "./composer";
 import { ConversationMessage, WorkSummary } from "./conversation";
 import { NewChatComposer } from "./new-chat-composer";
 import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
+import { OpenPullContext } from "./pull-context";
 import { QuestionForm } from "./question";
 import { errorMessage, isExpired, request } from "./request";
 import { SubagentConversation } from "./subagent-conversation";
@@ -348,9 +350,7 @@ export function Chats({
   }
 
   return (
-    <SubagentsContext
-      value={{ chatID: id, agents: detail?.chat.ID === id ? detail.subagents : [] }}
-    >
+    <ChatContexts value={{ chatID: id, agents: detail?.chat.ID === id ? detail.subagents : [] }}>
       <ResizablePanelGroup
         orientation="horizontal"
         defaultLayout={{ conversation: 100 - panelState.width, review: panelState.width }}
@@ -627,7 +627,7 @@ export function Chats({
           </>
         )}
       </ResizablePanelGroup>
-    </SubagentsContext>
+    </ChatContexts>
   );
 }
 
@@ -836,5 +836,29 @@ function FollowUpComposer({
         onControl={onControl}
       />
     </form>
+  );
+}
+
+function ChatContexts({
+  value,
+  children,
+}: {
+  value: { chatID: string; agents: Subagent[] };
+  children: ReactNode;
+}) {
+  const [, updatePanel] = useChatPanelState(value.chatID);
+  return (
+    <OpenPullContext
+      value={(pull) => {
+        updatePanel({ selectedPull: pull.url, open: true, view: "pull" });
+        requestAnimationFrame(() => {
+          document
+            .querySelector<HTMLButtonElement>('.chat-side-pane [role="tab"][aria-selected="true"]')
+            ?.focus();
+        });
+      }}
+    >
+      <SubagentsContext value={value}>{children}</SubagentsContext>
+    </OpenPullContext>
   );
 }

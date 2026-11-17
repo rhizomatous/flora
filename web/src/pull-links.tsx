@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useContext, type ReactNode } from "react";
 
 import {
   GitMergeIcon,
@@ -8,6 +8,7 @@ import {
 } from "@flora/florets";
 
 import { pullStatus } from "./pull";
+import { OpenPullContext } from "./pull-context";
 import type { Pull, PullSummary } from "./pull-schemas";
 
 const appearances = {
@@ -79,7 +80,14 @@ export function PullCount({ pulls }: { pulls: Pull[] }) {
   );
 }
 
-export function PullList({ summary }: { summary: PullSummary | undefined }) {
+export function PullList({
+  summary,
+  onSelect,
+}: {
+  summary: PullSummary | undefined;
+  onSelect?: () => void;
+}) {
+  const openPull = useContext(OpenPullContext);
   const pulls = summary?.items ?? [];
   const error = summary?.error ?? "";
   let emptyMessage = "No linked pull requests yet.";
@@ -96,6 +104,20 @@ export function PullList({ summary }: { summary: PullSummary | undefined }) {
               <li key={pull.url}>
                 <a
                   href={pull.url}
+                  onClick={(event) => {
+                    if (
+                      openPull &&
+                      !event.metaKey &&
+                      !event.ctrlKey &&
+                      !event.shiftKey &&
+                      !event.altKey &&
+                      event.button === 0
+                    ) {
+                      event.preventDefault();
+                      openPull(pull);
+                      onSelect?.();
+                    }
+                  }}
                   aria-label={`${repository} #${pull.number} ${label}${(pull.title ?? "") === "" ? "" : `: ${pull.title}`}${pull.additions !== undefined && pull.deletions !== undefined ? `, ${pull.additions} additions, ${pull.deletions} deletions` : ""}`}
                   title={`${repository} #${pull.number} · ${label}${(pull.title ?? "") === "" ? "" : ` · ${pull.title}`}`}
                   target="_blank"
@@ -135,11 +157,26 @@ export function InlinePullLink({
   href: string;
   children: ReactNode;
 }) {
+  const openPull = useContext(OpenPullContext);
   const { Icon, color, label } = appearance(pull);
   const repository = pull.repository ?? pull.url.split("/").slice(3, 5).join("/");
   return (
     <a
       href={href}
+      onClick={(event) => {
+        if (
+          openPull &&
+          !event.metaKey &&
+          !event.ctrlKey &&
+          !event.shiftKey &&
+          !event.altKey &&
+          event.button === 0 &&
+          !new URL(href).hash
+        ) {
+          event.preventDefault();
+          openPull(pull);
+        }
+      }}
       target="_blank"
       rel="noreferrer"
       className="inline-flex max-w-full cursor-pointer items-baseline gap-1 rounded-sm align-baseline font-medium text-foreground underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"

@@ -147,7 +147,12 @@ export function ChatTitle({
           <PullCount pulls={pulls?.items ?? []} />
         </div>
         <div className="mt-2 border-t border-border pt-2">
-          <PullList summary={pulls} />
+          <PullList
+            summary={pulls}
+            onSelect={() => {
+              setOpen(false);
+            }}
+          />
         </div>
       </HoverCardContent>
     </HoverCard>
@@ -421,12 +426,13 @@ export function ChatReviewStrip({
   children: ReactNode;
   pulls: PullSummary | undefined;
 }) {
+  const [open, setOpen] = useState(false);
   const count = pulls?.items.length ?? 0;
   return (
     <div className="composer-review flex flex-col items-center gap-1.5 pb-1.5">
       <div className="composer-accessories flex min-h-7 items-center justify-center gap-1.5">
         {children}
-        <Popover>
+        <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger
             render={
               <Button
@@ -450,7 +456,12 @@ export function ChatReviewStrip({
             <PopoverDescription className="sr-only">
               Saved GitHub pull requests for this chat.
             </PopoverDescription>
-            <PullList summary={pulls} />
+            <PullList
+              summary={pulls}
+              onSelect={() => {
+                setOpen(false);
+              }}
+            />
           </PopoverContent>
         </Popover>
       </div>

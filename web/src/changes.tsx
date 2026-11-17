@@ -28,8 +28,6 @@ function contentNote(file: FileChange) {
 }
 
 export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () => void }) {
-  const container = useRef<HTMLElement>(null);
-  const [anyExpanded, setAnyExpanded] = useState(true);
   const [review, setReview] = useState<ChatChanges>();
   const [error, setError] = useState("");
   const expire = useEffectEvent(onExpired);
@@ -67,6 +65,31 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
       clearInterval(timer);
     };
   }, [chatID]);
+  return (
+    <ChangeReview
+      review={review}
+      error={error}
+      download={(index, snapshot) =>
+        `/api/chats/${encodeURIComponent(chatID)}/changes/${index}/diff?snapshot=${encodeURIComponent(snapshot)}`
+      }
+      label="Workspace changes"
+    />
+  );
+}
+
+export function ChangeReview({
+  review,
+  error = "",
+  download,
+  label,
+}: {
+  review: Pick<ChatChanges, "snapshot" | "stale" | "error"> | undefined;
+  error?: string;
+  download: (index: number, snapshot: string) => string;
+  label: string;
+}) {
+  const container = useRef<HTMLElement>(null);
+  const [anyExpanded, setAnyExpanded] = useState(true);
   const snapshot = review?.snapshot;
   const multipleRepositories = new Set(snapshot?.files.map((file) => file.repository)).size > 1;
   const countsKnown =
@@ -78,17 +101,17 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
     totals.deletions += file.deletions ?? 0;
   }
   return (
-    <section aria-label="Chat changes" ref={container} className="chat-diffs">
+    <section aria-label={label} ref={container} className="chat-diffs min-h-0 flex-1">
       <Heading level={2} className="sr-only">
-        Chat changes
+        {label}
       </Heading>
       {error !== "" && (
-        <Text role="alert" className="mt-3">
+        <Text role="alert" size="xs" className="shrink-0 px-3 py-2">
           {error}
         </Text>
       )}
       {review !== undefined && review.error !== "" && (
-        <Text role="alert" className="mt-3">
+        <Text role="alert" size="xs" className="shrink-0 px-3 py-2">
           {review.error}
         </Text>
       )}
@@ -101,7 +124,7 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
       {snapshot && (
         <>
           <div className="diff-toolbar relative z-10 flex min-h-9 shrink-0 items-center gap-1 border-b border-border bg-background px-3 py-1 shadow-md">
-            <span className="flex-1" />
+            <span className="flex-1 text-xs text-muted-foreground">{label}</span>
             <DiffFiles
               files={snapshot.files}
               onSelect={(index) => {
@@ -150,7 +173,7 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
               </Text>
             )}
             {snapshot.files.length === 0 && (
-              <Text className="mt-3">No changes from the starting commit.</Text>
+              <Text className="mt-3">No changes in this comparison.</Text>
             )}
             <ul className="space-y-2">
               {snapshot.files.map((f, i) => (
@@ -195,14 +218,18 @@ export function Changes({ chatID, onExpired }: { chatID: string; onExpired: () =
                         <ChangeCounts additions={f.additions} deletions={f.deletions} />
                       </span>
                     </summary>
+                    {(f.binary || f.undisplayable) && (
+                      <Text size="xs" tone="muted" className="p-3">
+                        {f.binary
+                          ? "Binary file. No inline preview."
+                          : "File contents cannot be displayed."}{" "}
+                        <Link href={download(i, snapshot.id)}>Download diff</Link>
+                      </Text>
+                    )}
                     {f.truncated && (
-                      <Text className="mt-3">
+                      <Text size="xs" tone="muted" className="p-3">
                         Diff exceeds the configured inline limit ({f.bytes.toLocaleString()} bytes).{" "}
-                        <Link
-                          href={`/api/chats/${encodeURIComponent(chatID)}/changes/${i}/diff?snapshot=${encodeURIComponent(snapshot.id)}`}
-                        >
-                          Download full diff
-                        </Link>
+                        <Link href={download(i, snapshot.id)}>Download full diff</Link>
                       </Text>
                     )}
                     {f.diff !== "" && <Diff patch={f.diff} path={f.path} />}

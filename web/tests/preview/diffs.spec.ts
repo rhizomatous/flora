@@ -60,7 +60,7 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   await page.getByLabel("Follow-up", { exact: true }).fill("Keep this draft");
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
   await page.getByRole("menuitem", { name: "Diffs", exact: true }).click();
-  const review = page.getByRole("region", { name: "Chat changes", exact: true });
+  const review = page.getByRole("region", { name: "Workspace changes", exact: true });
   const diffTab = page.getByRole("tab", { name: "Diffs", exact: true });
   const chatTab = page.getByRole("tab", { name: "Fix duplicate notes between pages", exact: true });
   await expect(diffTab).toHaveAttribute("aria-selected", "true");
@@ -170,7 +170,7 @@ test("live mock shows multiple languages, inline edits, and separated hunks", as
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
   await page.getByRole("menuitem", { name: "Diffs", exact: true }).click();
-  const review = page.getByRole("region", { name: "Chat changes", exact: true });
+  const review = page.getByRole("region", { name: "Workspace changes", exact: true });
   await expect(
     review.getByLabel("Change summary").getByLabel("36 additions, 17 deletions"),
   ).toBeVisible();

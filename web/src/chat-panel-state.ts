@@ -6,6 +6,7 @@ const schema = z.object({
   mainView: z.string().default("chat"),
   mainDiffOpen: z.boolean().default(false),
   mainSubagentTabs: z.array(z.string()).default([]),
+  selectedPull: z.string().default(""),
   diffOpen: z.boolean().default(false),
   view: z.string().default("overview"),
   subagentTabs: z.array(z.string()).default([]),

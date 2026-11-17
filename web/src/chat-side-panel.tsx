@@ -7,12 +7,14 @@ import {
   TabsContent,
   ListIcon,
   GitBranchIcon,
+  GitPullRequestIcon,
   XIcon,
 } from "@flora/florets";
 
 import { Changes } from "./changes";
 import { ChatViewMenu, SidePanelToggle } from "./chat-controls";
 import { useChatPanelState } from "./chat-panel-state";
+import { PullComparison } from "./pull-comparison";
 import { PullList } from "./pull-links";
 import type { PullSummary } from "./pull-schemas";
 import { SubagentConversation } from "./subagent-conversation";
@@ -59,6 +61,21 @@ export function ChatSidePanel({
                 <ListIcon />
                 <span className="florets-control-label">Overview</span>
               </TabsTrigger>
+              {state.selectedPull && (
+                <TabsTrigger
+                  value="pull"
+                  title={state.selectedPull}
+                  variant="control"
+                  render={
+                    <Button variant={view === "pull" ? "secondary" : "ghost"} size="compact" />
+                  }
+                >
+                  <GitPullRequestIcon />
+                  <span className="florets-control-label">
+                    #{state.selectedPull.split("/").at(-1)}
+                  </span>
+                </TabsTrigger>
+              )}
               {diffOpen && (
                 <div className="chat-diff-tab" data-active={view === "diffs" || undefined}>
                   <TabsTrigger
@@ -159,6 +176,20 @@ export function ChatSidePanel({
             </details>
             <SubagentList />
           </TabsContent>
+          {state.selectedPull && (
+            <TabsContent
+              value="pull"
+              keepMounted
+              className="chat-view-panel min-h-0 min-w-0 flex-1"
+            >
+              <PullComparison
+                key={state.selectedPull}
+                chatID={chatID}
+                url={state.selectedPull}
+                onExpired={onExpired}
+              />
+            </TabsContent>
+          )}
           {diffOpen && (
             <TabsContent
               value="diffs"

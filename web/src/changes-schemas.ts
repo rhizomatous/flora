@@ -16,7 +16,7 @@ export const fileChangeSchema = z.object({
   truncated: z.boolean(),
 });
 export type FileChange = z.infer<typeof fileChangeSchema>;
-const snapshotSchema = z.object({
+export const snapshotSchema = z.object({
   id: z.string(),
   capturedAt: z.string(),
   base: z.string(),
