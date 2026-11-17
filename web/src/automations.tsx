@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import {
   Alert,
   Button,
-  ButtonLink,
   Command,
   CommandInput,
   CommandEmpty,
@@ -27,6 +26,7 @@ import {
   ChevronLeftIcon,
 } from "@flora/florets";
 
+import { AutomationList } from "./automation-list";
 import {
   automationSchema,
   automationRunSchema,
@@ -56,12 +56,6 @@ function stamp(value: string, timeZone: string) {
     dateStyle: "medium",
     timeStyle: "short",
   });
-}
-function scheduleLabel(a: Automation) {
-  let frequency = "Daily";
-  if (a.frequency === "weekly") frequency = (a.days ?? []).map((day) => weekdays[day]).join(", ");
-  else if (a.frequency === "weekdays") frequency = "Weekdays";
-  return `${frequency} at ${a.time} · ${a.timeZone}`;
 }
 function blank(projectID: string): Automation {
   return {
@@ -607,6 +601,7 @@ export function Automations({
   }
   const item = detail?.automation;
   const runs = detail?.runs ?? [];
+  if (!isNew && id === "") return <AutomationList list={list} projects={projects} error={error} />;
   return (
     <>
       {error && (
@@ -691,75 +686,6 @@ export function Automations({
           )}
           {runs.length === 100 && (
             <p className="mt-3 text-xs text-muted-foreground">Showing the latest 100 runs.</p>
-          )}
-        </section>
-      )}
-      {list !== undefined && !isNew && id === "" && (
-        <section>
-          {topbar &&
-            createPortal(
-              <>
-                <Heading level={1} className="min-w-0 flex-1 truncate text-base">
-                  Automations
-                </Heading>
-                <ButtonLink className="h-8 px-3 text-sm" href="#automations/new">
-                  New automation
-                </ButtonLink>
-              </>,
-              topbar,
-            )}
-          {list.length === 0 ? (
-            <div className="py-16 text-center">
-              <p>Run a task on a schedule.</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Choose a project, give Flora instructions, and return to review its work.
-              </p>
-              {projects.length === 0 && (
-                <Link className="mt-4 inline-block" href="#projects/new">
-                  Create a project to get started
-                </Link>
-              )}
-            </div>
-          ) : (
-            <ul className="divide-y rounded-lg border px-5">
-              {list.map((automation) => (
-                <li key={automation.id} className="py-5">
-                  <div className="flex justify-between gap-4">
-                    <Link href={`#automations/${automation.id}`} className="font-medium">
-                      {automation.name}
-                    </Link>
-                    <span className="text-sm text-muted-foreground">
-                      {automation.enabled ? "Scheduled" : "Paused"}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {projects.find((p) => p.id === automation.projectID)?.name} ·{" "}
-                    {scheduleLabel(automation)}
-                  </p>
-                  {automation.latestRun && (
-                    <p className="mt-2 text-sm">
-                      Latest run: <span className="capitalize">{automation.latestRun.status}</span>
-                      {automation.latestRun.chatID && (
-                        <>
-                          {" "}
-                          ·{" "}
-                          <Link
-                            href={`#chats/${automation.latestRun.chatID}?run=${encodeURIComponent(automation.latestRun.messageID)}`}
-                          >
-                            Open chat
-                          </Link>
-                        </>
-                      )}
-                    </p>
-                  )}
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {automation.enabled
-                      ? `Next: ${stamp(automation.nextRun, automation.timeZone)}`
-                      : "No scheduled runs"}
-                  </p>
-                </li>
-              ))}
-            </ul>
           )}
         </section>
       )}
