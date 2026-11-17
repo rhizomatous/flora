@@ -1,6 +1,26 @@
 import { z } from "zod";
 
+const pullCheckSchema = z.object({
+  key: z.string().optional(),
+  name: z.string(),
+  state: z.string(),
+  url: z.string().optional(),
+});
+const pullChecksSchema = z.object({
+  sha: z.string().optional(),
+  items: z
+    .array(pullCheckSchema)
+    .nullable()
+    .transform((items) => items ?? []),
+  checkedAt: z.string().optional(),
+  attemptedAt: z.string().optional(),
+  error: z.string().optional(),
+});
+
 export const pullSchema = z.object({
+  headSHA: z.string().optional(),
+  headCheckedAt: z.string().optional(),
+  checks: pullChecksSchema.optional(),
   title: z.string().optional(),
   additions: z.number().optional(),
   deletions: z.number().optional(),

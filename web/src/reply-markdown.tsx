@@ -1,10 +1,11 @@
-import type { ComponentProps } from "react";
+import { useContext, type ComponentProps } from "react";
 import { defaultComponents } from "streamdown";
 
+import { Card } from "@flora/florets";
 import { Markdown } from "@flora/florets/ai";
 
-import { useLinkedPull } from "./pull-context";
-import { InlinePullLink } from "./pull-links";
+import { ChatPullContext, useLinkedPull } from "./pull-context";
+import { InlinePullLink, PullList } from "./pull-links";
 
 function ReplyLink(props: ComponentProps<typeof defaultComponents.a>) {
   const pull = useLinkedPull(props.href);
@@ -22,5 +23,29 @@ function ReplyLink(props: ComponentProps<typeof defaultComponents.a>) {
 const components = { a: ReplyLink };
 
 export function ReplyMarkdown({ children }: { children: string }) {
-  return <Markdown components={components}>{children}</Markdown>;
+  const summary = useContext(ChatPullContext);
+  const links = new Set(
+    [
+      ...children.matchAll(
+        /https:\/\/github\.com\/([a-z0-9_.-]+\/[a-z0-9_.-]+)\/pull\/([1-9][0-9]*)(?=[/?#\s)\]>.!,;]|$)/gi,
+      ),
+    ].map((match) => `https://github.com/${match[1]}/pull/${match[2]}`.toLowerCase()),
+  );
+  const pulls = summary?.items.filter((pull) => links.has(pull.url.toLowerCase())) ?? [];
+  return (
+    <>
+      <Markdown components={components}>{children}</Markdown>
+      {pulls.length > 0 && (
+        <Card size="sm" className="mt-3 rounded-lg p-2" aria-label="Pull request details">
+          <PullList
+            summary={{
+              items: pulls,
+              error: summary?.error ?? "",
+              checkedAt: summary?.checkedAt ?? "",
+            }}
+          />
+        </Card>
+      )}
+    </>
+  );
 }

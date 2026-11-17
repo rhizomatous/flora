@@ -5,6 +5,7 @@ import type { Message, Part, QuestionRequest } from "@opencode-ai/sdk/v2";
 import type { Plugin } from "vite";
 
 import { PreviewAutomations } from "./automations.ts";
+import { previewPullChecks } from "./check-fixtures.ts";
 import { paginationDiffFiles } from "./diff-fixtures.ts";
 import {
   projects,
@@ -131,7 +132,9 @@ export function chatAt(scenario: (typeof demoScenarios)[number], frame: Frame, f
   return {
     subagents: subagentSnapshots(frame).map(({ agent }) => agent),
     pulls: {
-      items: finished ? (stories.find((s) => s.id === id)?.pulls ?? []) : [],
+      items: finished
+        ? (stories.find((s) => s.id === id)?.pulls ?? []).map((pull) => previewPullChecks(pull))
+        : [],
       error: "",
       checkedAt: epoch,
     },
