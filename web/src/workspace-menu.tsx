@@ -44,7 +44,6 @@ export function WorkspaceMenu({
             </span>
             <span className="min-w-0 flex-1 text-left">
               <span className="block">Flora</span>
-              <span className="block text-xs text-muted-foreground">Workspace</span>
             </span>
             <ChevronUpIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
           </SidebarMenuButton>

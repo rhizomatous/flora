@@ -4,7 +4,6 @@ import {
   TabsTrigger,
   PencilIcon,
   ArchiveIcon,
-  Trash2Icon,
   PinIcon,
   FolderIcon,
   HoverCard,
@@ -26,19 +25,16 @@ import {
   PopoverTitle,
   PopoverDescription,
   CloudIcon,
-  DatabaseIcon,
   GitBranchIcon,
   GitPullRequestIcon,
   PlusIcon,
   TerminalIcon,
-  MonitorIcon,
   ClockIcon,
   EllipsisIcon,
   PanelRightIcon,
   ExternalLinkIcon,
   CopyIcon,
   FilesIcon,
-  GlobeIcon,
   ListIcon,
 } from "@flora/florets";
 
@@ -206,25 +202,11 @@ export function ChatViewMenu({
           <FilesIcon />
           Machine files
         </DropdownMenuItem>
-        <DropdownMenuItem disabled>
-          <DatabaseIcon />
-          Setup
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled>
-          <GlobeIcon />
-          Browser
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
         <SubagentMenuItems />
-        <DropdownMenuItem disabled>Side threads</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled>
           <TerminalIcon />
           New shell
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled>
-          <MonitorIcon />
-          Desktop
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled>
@@ -348,10 +330,6 @@ export function ChatHeaderActions({
           <DropdownMenuItem disabled>
             <ArchiveIcon />
             Archive
-          </DropdownMenuItem>
-          <DropdownMenuItem disabled variant="destructive">
-            <Trash2Icon />
-            Delete
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

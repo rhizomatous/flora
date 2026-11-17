@@ -15,12 +15,9 @@ import {
   InputGroupAddon,
   ArrowUpIcon,
   GitPullRequestIcon,
-  MicIcon,
   PaperclipIcon,
   PlusIcon,
-  SparklesIcon,
   FlowerIcon,
-  UsersIcon,
   FilesIcon,
   MessageSquareIcon,
 } from "@flora/florets";
@@ -101,51 +98,32 @@ export function Composer({
   onInterrupt?: (() => void) | undefined;
   settings?: ReactNode;
 }) {
-  let action: ReactNode;
-  if (onInterrupt) {
-    action = (
-      <Button
-        variant="primary"
-        size="icon-sm"
-        className="composer-send ml-auto size-7! rounded-lg! p-0! [&_svg]:size-[15px]!"
-        type="button"
-        disabled={disabled}
-        onClick={onInterrupt}
-        aria-label="Interrupt"
-        title="Interrupt work and keep the container running"
-      >
-        <SquareIcon />
-      </Button>
-    );
-  } else if (message.trim() || sendLabel === "Resume" || disabled) {
-    action = (
-      <Button
-        variant="primary"
-        size="icon-sm"
-        className="composer-send ml-auto size-7! rounded-lg! p-0! [&_svg]:size-[15px]!"
-        type="submit"
-        disabled={!canSend}
-        aria-label={sendLabel}
-        title={sendLabel}
-      >
-        <ArrowUpIcon />
-      </Button>
-    );
-  } else {
-    action = (
-      <Button
-        variant="primary"
-        size="icon-sm"
-        className="composer-send ml-auto size-7! rounded-lg! p-0! [&_svg]:size-[15px]!"
-        type="button"
-        aria-label="Voice input (coming soon)"
-        title="Voice input (coming soon)"
-        aria-disabled="true"
-      >
-        <MicIcon />
-      </Button>
-    );
-  }
+  const action = onInterrupt ? (
+    <Button
+      variant="primary"
+      size="icon-sm"
+      className="composer-send ml-auto size-7! rounded-lg! p-0! [&_svg]:size-[15px]!"
+      type="button"
+      disabled={disabled}
+      onClick={onInterrupt}
+      aria-label="Interrupt"
+      title="Interrupt work and keep the container running"
+    >
+      <SquareIcon />
+    </Button>
+  ) : (
+    <Button
+      variant="primary"
+      size="icon-sm"
+      className="composer-send ml-auto size-7! rounded-lg! p-0! [&_svg]:size-[15px]!"
+      type="submit"
+      disabled={!canSend}
+      aria-label={sendLabel}
+      title={sendLabel}
+    >
+      <ArrowUpIcon />
+    </Button>
+  );
   return (
     <InputGroup className="composer-box">
       <FieldLabel className="sr-only" htmlFor={id}>
@@ -176,10 +154,8 @@ export function Composer({
           iconOnly
           items={[
             { label: "Upload attachment", icon: <PaperclipIcon /> },
-            { label: "People", icon: <UsersIcon />, separator: true },
-            { label: "Threads", icon: <MessageSquareIcon /> },
+            { label: "Threads", icon: <MessageSquareIcon />, separator: true },
             { label: "Pull requests", icon: <GitPullRequestIcon /> },
-            { label: "Skills", icon: <SparklesIcon /> },
             { label: "Files", icon: <FilesIcon /> },
           ]}
         >
