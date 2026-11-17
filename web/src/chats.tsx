@@ -140,7 +140,6 @@ export function Chats({
   listError: string;
 }) {
   const [sideChat, setSideChat] = useState<string | null>(null);
-  const [sideExpanded, setSideExpanded] = useState(false);
   const [diffChat, setDiffChat] = useState<string | null>(null);
   const [activeDiff, setActiveDiff] = useState(false);
   // Undefined until the project list loads.
@@ -374,7 +373,7 @@ export function Chats({
   return (
     <ResizablePanelGroup
       orientation="horizontal"
-      className={`chat-split -mx-4 min-h-0 w-auto! flex-1 sm:-mx-8 ${sideOpen ? "chat-split-open" : ""} ${sideExpanded && sideOpen ? "chat-split-expanded" : ""}`}
+      className={`chat-split -mx-4 min-h-0 w-auto! flex-1 sm:-mx-8 ${sideOpen ? "chat-split-open" : ""}`}
     >
       <ResizablePanel
         id="conversation"
@@ -460,7 +459,6 @@ export function Chats({
                   sideOpen={sideOpen}
                   onSideToggle={() => {
                     setSideChat(sideOpen ? null : id);
-                    setSideExpanded(false);
                   }}
                   usage={detail?.usage}
                   diffsOpen={diffChat === id && activeDiff}
@@ -571,13 +569,8 @@ export function Chats({
               chatID={id}
               pulls={pulls}
               onExpired={onExpired}
-              expanded={sideExpanded}
-              onExpand={() => {
-                setSideExpanded(!sideExpanded);
-              }}
               onClose={() => {
                 setSideChat(null);
-                setSideExpanded(false);
                 requestAnimationFrame(() => {
                   document
                     .querySelector<HTMLButtonElement>('button[aria-label="Open side panel"]')

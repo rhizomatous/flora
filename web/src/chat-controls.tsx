@@ -353,16 +353,7 @@ export function ChatHeaderActions({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={sideOpen ? "Close side panel" : "Open side panel"}
-        title={sideOpen ? "Close side panel" : "Open side panel"}
-        aria-expanded={sideOpen}
-        onClick={onSideToggle}
-      >
-        <PanelRightIcon />
-      </Button>
+      {!sideOpen && <SidePanelToggle open={false} onClick={onSideToggle} />}
     </>
   );
 }
@@ -490,3 +481,18 @@ export function ChatReviewStrip({
 export { ChatTurnNavigation } from "./chat-turn-navigation";
 
 export { ChatPullContext as ChatPullProvider } from "./pull-context";
+
+export function SidePanelToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label={open ? "Close side panel" : "Open side panel"}
+      title={open ? "Close side panel" : "Open side panel"}
+      aria-expanded={open}
+      onClick={onClick}
+    >
+      <PanelRightIcon />
+    </Button>
+  );
+}

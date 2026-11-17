@@ -6,12 +6,26 @@ test("side panel keeps chat drafts, resizes, and hosts independent diff tabs", a
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const draft = page.getByLabel("Follow-up", { exact: true });
   await draft.fill("Keep this split-view draft");
+  const toggle = page.getByRole("button", { name: "Open side panel", exact: true });
+  const toggleBounds = await toggle.boundingBox();
+  const toggleIcon = await toggle.locator("svg").getAttribute("class");
   await page.getByRole("button", { name: "Open side panel", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Close side panel", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Open side panel", exact: true })).toHaveCount(0);
+  const closeToggle = page.getByRole("button", { name: "Close side panel", exact: true });
+  expect(await closeToggle.boundingBox()).toEqual(toggleBounds);
+  expect(await closeToggle.locator("svg").getAttribute("class")).toBe(toggleIcon);
+  await expect(page.getByRole("button", { name: "Expand side panel", exact: true })).toHaveCount(0);
   const side = page.getByRole("complementary", { name: "Side panel" });
   await expect(side.getByRole("tab", { name: "Overview", exact: true })).toHaveAttribute(
     "aria-selected",
     "true",
   );
+  await expect(side.getByRole("list", { name: "Linked pull requests" })).toBeVisible();
+  const section = side.locator("summary");
+  await section.click();
+  await expect(side.getByRole("list", { name: "Linked pull requests" })).toBeHidden();
+  await section.click();
   await expect(side.getByRole("list", { name: "Linked pull requests" })).toBeVisible();
   await expect(draft).toBeVisible();
   const handle = page.getByRole("separator", { name: "Resize side panel" });
@@ -45,10 +59,6 @@ test("side panel keeps chat drafts, resizes, and hosts independent diff tabs", a
   ).toBeVisible();
   await page.getByRole("tab", { name: "Fix duplicate notes between pages", exact: true }).click();
   await side.getByRole("tab", { name: "Diffs", exact: true }).click();
-  await side.getByRole("button", { name: "Expand side panel" }).click();
-  await expect(draft).toBeHidden();
-  await side.getByRole("button", { name: "Restore split view" }).click();
-  await expect(draft).toBeVisible();
   await side.getByRole("tab", { name: "Diffs", exact: true }).hover();
   await side.getByRole("button", { name: "Close side panel Diffs" }).click();
   await expect(side.getByRole("tab", { name: "Overview" })).toHaveAttribute(

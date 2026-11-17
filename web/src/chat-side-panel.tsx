@@ -1,7 +1,7 @@
-import { Maximize2Icon, Minimize2Icon, PanelRightCloseIcon } from "lucide-react";
 import { useState } from "react";
 
 import {
+  ChevronDownIcon,
   Button,
   Tabs,
   TabsList,
@@ -13,7 +13,7 @@ import {
 } from "@flora/florets";
 
 import { Changes } from "./changes";
-import { ChatViewMenu } from "./chat-controls";
+import { ChatViewMenu, SidePanelToggle } from "./chat-controls";
 import { PullList } from "./pull-links";
 import type { PullSummary } from "./pull-schemas";
 
@@ -21,15 +21,11 @@ export function ChatSidePanel({
   chatID,
   pulls,
   onExpired,
-  expanded,
-  onExpand,
   onClose,
 }: {
   chatID: string;
   pulls: PullSummary | undefined;
   onExpired: () => void;
-  expanded: boolean;
-  onExpand: () => void;
   onClose: () => void;
 }) {
   const [diffOpen, setDiffOpen] = useState(false);
@@ -92,17 +88,7 @@ export function ChatSidePanel({
             }}
           />
           <span className="flex-1" />
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={expanded ? "Restore split view" : "Expand side panel"}
-            onClick={onExpand}
-          >
-            {expanded ? <Minimize2Icon /> : <Maximize2Icon />}
-          </Button>
-          <Button variant="ghost" size="icon-sm" aria-label="Close side panel" onClick={onClose}>
-            <PanelRightCloseIcon />
-          </Button>
+          <SidePanelToggle open onClick={onClose} />
         </div>
         <TabsContent
           value="overview"
@@ -110,9 +96,13 @@ export function ChatSidePanel({
           className="chat-view-panel min-h-0 overflow-auto p-3"
         >
           <details open>
-            <summary className="cursor-pointer rounded-md bg-muted/30 px-3 py-2 text-sm">
-              Pull requests{" "}
-              <span className="ml-1 text-muted-foreground">{pulls?.items.length ?? 0}</span>
+            <summary className="overview-section-heading flex cursor-pointer items-center gap-2 rounded-md bg-muted/30 px-3 py-2 text-sm">
+              <span>Pull requests</span>
+              <span className="text-muted-foreground opacity-60">{pulls?.items.length ?? 0}</span>
+              <ChevronDownIcon
+                aria-hidden="true"
+                className="overview-section-caret size-3 text-muted-foreground opacity-60"
+              />
             </summary>
             <PullList summary={pulls} />
           </details>

@@ -102,13 +102,6 @@ details[open] > .diff-file-heading .diff-file-caret {
 .chat-split-open .chat-side-pane {
   min-width: 300px;
 }
-.chat-split-expanded .chat-main-pane,
-.chat-split-expanded .chat-split-handle {
-  display: none;
-}
-.chat-split-expanded .chat-side-pane {
-  flex-grow: 1 !important;
-}
 @media (max-width: 900px) {
   .chat-split-open .chat-main-pane,
   .chat-split-open .chat-split-handle {
@@ -118,4 +111,17 @@ details[open] > .diff-file-heading .diff-file-caret {
     min-width: 0;
     flex-grow: 1 !important;
   }
+}
+
+.overview-section-heading {
+  list-style: none;
+}
+.overview-section-heading::-webkit-details-marker {
+  display: none;
+}
+.overview-section-caret {
+  transform: rotate(-90deg);
+}
+details[open] > .overview-section-heading .overview-section-caret {
+  transform: rotate(0deg);
 }
