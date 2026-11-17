@@ -21,6 +21,7 @@ import {
   LoadingStatus,
   NativeSelect,
   Textarea,
+  Switch,
 } from "@flora/florets";
 
 import {
@@ -146,23 +147,31 @@ function AutomationForm({
   busy,
   save,
   cancel,
+  runNow,
+  toggleActive,
 }: {
   initial: Automation;
   topbar: HTMLDivElement | null;
   projects: ProjectSummary[];
   busy: boolean;
-  save: (value: Automation) => void;
+  save: (value: Automation, runAfter?: boolean) => void;
+  runNow: () => void;
+  toggleActive: () => void;
   cancel: () => void;
 }) {
   const [value, setValue] = useState(initial);
   const [preview, setPreview] = useState("");
   const [previewError, setPreviewError] = useState("");
   const heading = useRef<HTMLHeadingElement>(null);
+  const form = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (topbar) heading.current?.focus();
   }, [topbar]);
   const { frequency, days, time, timeZone } = value;
-  const saveLabel = initial.id ? "Save changes" : "Create automation";
+  const dirty = (
+    ["name", "instructions", "projectID", "mode", "frequency", "days", "time", "timeZone"] as const
+  ).some((key) => JSON.stringify(value[key]) !== JSON.stringify(initial[key]));
+  const saveLabel = initial.id ? "Save" : "Create automation";
   const compactSaveLabel = initial.id ? "Save" : "Create";
   useEffect(() => {
     let live = true;
@@ -205,27 +214,65 @@ function AutomationForm({
       setPreview("");
     }
   }
+  function submit(runAfter = false) {
+    save(
+      { ...value, revision: initial.revision, enabled: initial.enabled, chatID: initial.chatID },
+      runAfter,
+    );
+  }
+  let nextRunLabel = preview
+    ? `Next run: ${stamp(preview, timeZone)} · ${timeZone}`
+    : "Checking schedule…";
+  if (initial.id && !initial.enabled) nextRunLabel = "Inactive";
   return (
     <section className="mx-auto max-w-3xl [&_input]:scroll-mt-20 [&_textarea]:scroll-mt-20">
       {topbar &&
         createPortal(
           <>
+            {initial.id && (
+              <>
+                <Link
+                  href="#automations"
+                  className="hidden text-sm text-muted-foreground sm:inline"
+                >
+                  Automations
+                </Link>
+                <span className="hidden text-muted-foreground sm:inline" aria-hidden="true">
+                  ›
+                </span>
+              </>
+            )}
             <Heading
               level={1}
               ref={heading}
               tabIndex={-1}
               className="min-w-0 flex-1 truncate text-base"
             >
-              {initial.id ? "Edit automation" : "New automation"}
+              {initial.id ? initial.name : "New automation"}
             </Heading>
-            <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={cancel}>
-              Cancel
-            </Button>
+            {initial.id ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy || !preview}
+                onClick={() => {
+                  if (!dirty) runNow();
+                  else if (form.current?.reportValidity() === true) submit(true);
+                }}
+              >
+                {dirty ? "Save and run" : "Run now"}
+              </Button>
+            ) : (
+              <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={cancel}>
+                Cancel
+              </Button>
+            )}
             <Button
               type="submit"
               form="automation-form"
               size="sm"
-              disabled={busy || !preview}
+              disabled={busy || !preview || (initial.id !== "" && !dirty)}
               aria-label={busy ? "Saving…" : saveLabel}
             >
               <span className="hidden sm:inline">{busy ? "Saving…" : saveLabel}</span>
@@ -235,13 +282,30 @@ function AutomationForm({
           topbar,
         )}
       <form
+        ref={form}
         id="automation-form"
         onSubmit={(event) => {
           event.preventDefault();
-          save(value);
+          submit();
         }}
       >
         <fieldset disabled={busy} className="space-y-5">
+          {initial.id && (
+            <div className="flex items-center justify-between gap-3">
+              <FieldLabel>
+                <Switch
+                  disabled={busy}
+                  checked={initial.enabled}
+                  onCheckedChange={toggleActive}
+                  aria-label="Active"
+                />
+                {initial.enabled ? "Active" : "Inactive"}
+              </FieldLabel>
+              <Link href="#automations" className="text-sm sm:hidden">
+                All automations
+              </Link>
+            </div>
+          )}
           <FieldLabel className="w-full flex-col items-start">
             Name
             <Input
@@ -313,6 +377,11 @@ function AutomationForm({
                   ? "Continue in the same chat."
                   : "Start a new chat each run."}
               </p>
+              {initial.mode === "same" && value.mode === "same" && initial.chatID && (
+                <Link className="col-span-2 text-sm" href={`#chats/${initial.chatID}`}>
+                  Open chat
+                </Link>
+              )}
               {initial.id && value.mode !== initial.mode && (
                 <p className="col-span-2 text-sm">
                   The next run will start a new chat. Previous chats stay available.
@@ -397,15 +466,7 @@ function AutomationForm({
                 </fieldset>
               )}
               <div className="text-xs text-muted-foreground" aria-live="polite">
-                {previewError ? (
-                  <p>{previewError}</p>
-                ) : (
-                  <p>
-                    {preview
-                      ? `Next run: ${stamp(preview, timeZone)} · ${timeZone}`
-                      : "Checking schedule…"}
-                  </p>
-                )}
+                {previewError ? <p>{previewError}</p> : <p>{nextRunLabel}</p>}
               </div>
             </div>
           </div>
@@ -427,7 +488,6 @@ export function Automations({
   const [list, setList] = useState<Automation[]>();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [detail, setDetail] = useState<AutomationDetail>();
-  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -473,16 +533,26 @@ export function Automations({
       setBusy(false);
     }
   }
-  function save(value: Automation) {
+  async function runAutomation(automationID: string) {
+    manualID.current ??= crypto.randomUUID();
+    const run = await request(automationRunSchema, `automations/${automationID}/run`, {
+      method: "POST",
+      body: { requestID: manualID.current },
+    });
+    manualID.current = null;
+    setNotice(run.status === "skipped" || run.status === "failed" ? run.reason : "Run started.");
+  }
+  function save(value: Automation, runAfter = false) {
     void action(async () => {
       const saved = await request(
         automationSchema,
         value.id ? `automations/${value.id}` : "automations",
         { method: value.id ? "PUT" : "POST", body: value },
       );
-      setEditing(false);
+      setDetail((current) => ({ automation: saved, runs: current?.runs ?? [] }));
       window.location.hash = `automations/${saved.id}`;
       setNotice("Automation saved.");
+      if (runAfter) await runAutomation(saved.id);
     });
   }
   const item = detail?.automation;
@@ -509,87 +579,34 @@ export function Automations({
         </Alert>
       )}
       {list === undefined && !error && <LoadingStatus />}
-      {list !== undefined && (isNew || (editing && item !== undefined)) && (
+      {list !== undefined && (isNew || item !== undefined) && (
         <AutomationForm
           topbar={topbar}
           initial={item ?? blank(projects[0]?.id ?? "")}
           projects={projects}
           busy={busy}
           save={save}
+          runNow={() => {
+            if (item) void action(() => runAutomation(item.id));
+          }}
+          toggleActive={() => {
+            if (item) {
+              void action(async () => {
+                const saved = await request(automationSchema, `automations/${item.id}`, {
+                  method: "PUT",
+                  body: { ...item, latestRun: undefined, enabled: !item.enabled },
+                });
+                setDetail((current) => ({ automation: saved, runs: current?.runs ?? [] }));
+              });
+            }
+          }}
           cancel={() => {
-            if (editing) setEditing(false);
-            else window.location.hash = "automations";
+            window.location.hash = "automations";
           }}
         />
       )}
-      {list !== undefined && !isNew && !editing && id !== "" && item !== undefined && (
-        <section className="mx-auto max-w-3xl">
-          <Link href="#automations">Automations</Link>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
-            <Heading level={1}>{item.name}</Heading>
-            <span className="text-sm text-muted-foreground">
-              {item.enabled ? "Scheduled" : "Paused"}
-            </span>
-          </div>
-          <p className="mt-3 text-sm text-muted-foreground">
-            {projects.find((p) => p.id === item.projectID)?.name} · {scheduleLabel(item)}
-          </p>
-          <p className="mt-2 text-sm">
-            {item.enabled
-              ? `Next run: ${stamp(item.nextRun, item.timeZone)}`
-              : "Paused. No scheduled runs will start."}
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {item.mode === "same" ? "The same chat each run" : "A new chat each run"}
-          </p>
-          <div className="mt-6 flex flex-wrap gap-2">
-            <Button
-              disabled={busy}
-              onClick={() => {
-                void action(async () => {
-                  manualID.current ??= crypto.randomUUID();
-                  const run = await request(automationRunSchema, `automations/${id}/run`, {
-                    method: "POST",
-                    body: { requestID: manualID.current },
-                  });
-                  manualID.current = null;
-                  setNotice(
-                    run.status === "skipped" || run.status === "failed"
-                      ? run.reason
-                      : "Run started. Follow its progress below.",
-                  );
-                });
-              }}
-            >
-              Run now
-            </Button>
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => {
-                void action(async () => {
-                  await request(automationSchema, `automations/${id}`, {
-                    method: "PUT",
-                    body: { ...item, latestRun: undefined, enabled: !item.enabled },
-                  });
-                });
-              }}
-            >
-              {item.enabled ? "Pause" : "Resume"}
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={busy}
-              onClick={() => {
-                setEditing(true);
-              }}
-            >
-              Edit
-            </Button>
-          </div>
-          <div className="my-8 rounded-lg border p-4 text-sm whitespace-pre-wrap">
-            {item.instructions}
-          </div>
+      {list !== undefined && !isNew && id !== "" && item !== undefined && (
+        <section className="mx-auto mt-10 max-w-3xl" aria-label="Run history">
           <Heading level={2}>Run history</Heading>
           {runs.length === 0 ? (
             <p className="mt-4 text-sm text-muted-foreground">
@@ -621,7 +638,7 @@ export function Automations({
           )}
         </section>
       )}
-      {list !== undefined && !isNew && !editing && id === "" && (
+      {list !== undefined && !isNew && id === "" && (
         <section>
           {topbar &&
             createPortal(
