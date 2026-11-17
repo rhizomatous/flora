@@ -210,11 +210,13 @@ function App() {
   const pullsPage = ready && path === "pulls";
   const chatsPage = ready && path === "chats";
   const automationsPage = ready && path === "automations";
+  const automationEditor = ready && path.startsWith("automations/");
   let contentLayout = "mx-auto w-full max-w-6xl p-4 sm:p-8";
   if (pullsPage || chatsPage || automationsPage) contentLayout = "flex min-h-0 flex-1 flex-col";
+  else if (automationEditor) contentLayout = "min-h-0 flex-1 overflow-y-auto p-4 sm:p-8";
   else if (conversation) contentLayout = "flex min-h-0 flex-1 flex-col px-4 pb-2 sm:px-8";
   const frameLayout =
-    conversation || pullsPage || chatsPage || automationsPage
+    conversation || pullsPage || chatsPage || automationsPage || automationEditor
       ? "h-dvh min-h-0 min-w-0 overflow-hidden md:h-[calc(100dvh-1rem)]"
       : "min-w-0";
   const Content = ready ? SidebarInset : "main";
@@ -243,9 +245,7 @@ function App() {
       )}
       <Content id="main-content" tabIndex={-1} className={ready ? frameLayout : undefined}>
         {ready && !conversation && !pullsPage && !chatsPage && !automationsPage && (
-          <header
-            className={`florets-topbar flex shrink-0 items-center gap-2 border-b px-3 ${path.startsWith("automations") ? "sticky top-0 z-20 bg-surface-canvas" : ""}`}
-          >
+          <header className="florets-topbar flex shrink-0 items-center gap-2 border-b px-3">
             <span className="sidebar-toggle-space" aria-hidden="true" />
             {path.startsWith("automations") && (
               <div ref={setAutomationTopbar} className="flex min-w-0 flex-1 items-center gap-2" />
