@@ -46,6 +46,15 @@
   display: none;
 }
 
+.chat-view-tabs {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.chat-view-tabs::-webkit-scrollbar {
+  display: none;
+}
+
 .chat-diff-tab {
   position: relative;
   flex-shrink: 0;
@@ -57,10 +66,13 @@
   background: var(--secondary);
 }
 .chat-diff-tab .chat-diff-tab-trigger {
+  padding-inline-end: 28px;
   background: transparent;
 }
 .chat-diff-tab .chat-diff-tab-close {
   position: absolute;
+  z-index: 1;
+  transition: none;
   inset-inline-end: 0;
   top: 0;
   width: 24px;
@@ -79,6 +91,7 @@
   outline: 1px solid var(--ring);
   outline-offset: -2px;
 }
+.chat-subagent-tab[data-active] .chat-diff-tab-close,
 .chat-diff-tab:hover .chat-diff-tab-close,
 .chat-diff-tab:focus-within .chat-diff-tab-close {
   opacity: 1;
@@ -106,13 +119,16 @@ details[open] > .diff-file-heading .diff-file-caret {
   min-width: 300px;
 }
 @media (max-width: 900px) {
-  .chat-split-open .chat-main-pane,
+  .chat-split-open [data-panel]:has(> .chat-main-pane),
   .chat-split-open .chat-split-handle {
-    display: none;
+    display: none !important;
+  }
+  .chat-split-open [data-panel]:has(> .chat-side-pane) {
+    min-width: 0;
+    flex-grow: 1 !important;
   }
   .chat-split-open .chat-side-pane {
     min-width: 0;
-    flex-grow: 1 !important;
   }
 }
 

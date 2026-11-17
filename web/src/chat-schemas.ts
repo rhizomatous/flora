@@ -3,8 +3,15 @@ import { z } from "zod";
 import { automationRunSchema } from "./automation-schemas";
 import { pullSummarySchema } from "./pull-schemas";
 
+const subagentSummarySchema = z.object({
+  id: z.string(),
+  number: z.number().int().positive(),
+  title: z.string(),
+});
+
 export const chatSchema = z.object({
   pulls: pullSummarySchema.optional(),
+  subagents: z.array(subagentSummarySchema).optional(),
   ID: z.string(),
   ProjectID: z.string(),
   Title: z.string(),
@@ -91,12 +98,25 @@ export const contextUsageSchema = z.object({
   model: z.string(),
 });
 export type ContextUsage = z.infer<typeof contextUsageSchema>;
+export const subagentSchema = z.object({
+  id: z.string(),
+  number: z.number().int().positive(),
+  parentID: z.string(),
+  title: z.string(),
+  status: z.enum(["unknown", "working", "waiting", "idle", "failed", "stopped"]),
+  collection: z.string(),
+  created: z.number(),
+  updatedAt: z.string(),
+});
+export type Subagent = z.infer<typeof subagentSchema>;
+export const subagentDetailSchema = z.object({ messages: z.array(messageSchema) });
 export const detailSchema = z.object({
   automationRuns: z.array(automationRunSchema).default([]),
   usage: usageSchema.optional(),
   contextUsage: contextUsageSchema.optional(),
   chat: chatSchema,
   messages: z.array(messageSchema),
+  subagents: z.array(subagentSchema).default([]),
   continuationBlockedReason: z.string().default(""),
 });
 export type Detail = z.infer<typeof detailSchema>;

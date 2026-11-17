@@ -108,6 +108,10 @@ func (s *Service) captureUsage(ctx context.Context, rt *runtime, c storage.Chat,
 			}
 		}
 		var children []struct {
+			Title string `json:"title"`
+			Time  struct {
+				Created int64 `json:"created"`
+			} `json:"time"`
 			ID       string `json:"id"`
 			ParentID string `json:"parentID"`
 		}
@@ -119,12 +123,27 @@ func (s *Service) captureUsage(ctx context.Context, rt *runtime, c storage.Chat,
 			if captureCtx.Err() != nil {
 				return false
 			}
-			if child.ID == "" || child.ParentID != session {
+			if child.ID == "" || child.ParentID != session || visited[child.ID] {
 				ok = false
 				continue
 			}
+			agent := storage.Subagent{ID: child.ID, ParentID: session, Title: redaction.Text(child.Title, secrets...), Created: child.Time.Created, Status: "unknown", Collection: "history_unavailable"}
 			var childHistory []json.RawMessage
 			if err := usageCall(captureCtx, rt, "GET", sessionPath(child.ID)+"/message", nil, &childHistory); err != nil {
+				ok = false
+				_ = s.Store.SaveSubagent(captureCtx, c.ID, agent, nil)
+				continue
+			}
+			agent.Collection = "complete"
+			agent.Status = subagentStatus(childHistory)
+			if c.ActiveMessageID == "" && agent.Status == "working" {
+				agent.Status = "unknown"
+			}
+			clean := make([]json.RawMessage, len(childHistory))
+			for i, raw := range childHistory {
+				clean[i] = redaction.JSON(raw, secrets...)
+			}
+			if err := s.Store.SaveSubagent(captureCtx, c.ID, agent, clean); err != nil {
 				ok = false
 				continue
 			}
@@ -135,6 +154,9 @@ func (s *Service) captureUsage(ctx context.Context, rt *runtime, c storage.Chat,
 		return ok
 	}
 	complete = collect(c.SessionID, history, nil)
+	if !complete {
+		_ = s.Store.MarkSubagentsUnavailable(ctx, c.ID, "history_unavailable")
+	}
 }
 
 // Child sessions can be resumed by later turns. Match the child user message's
@@ -241,6 +263,7 @@ func (s *Service) reconcileChatUsage(ctx context.Context, c storage.Chat) {
 			reason = "runtime_stopped"
 		}
 		if ctx.Err() == nil {
+			_ = s.Store.MarkSubagentsUnavailable(ctx, c.ID, reason)
 			_ = s.Store.SetUsageCapture(ctx, c.ID, storage.UsageCapture{Reason: reason, Revision: c.UpdatedAt})
 		}
 		return
@@ -250,10 +273,38 @@ func (s *Service) reconcileChatUsage(ctx context.Context, c storage.Chat) {
 	var history []json.RawMessage
 	if err := usageCall(ctx, rt, "GET", sessionPath(c.SessionID)+"/message", nil, &history); err != nil {
 		if ctx.Err() == nil {
+			_ = s.Store.MarkSubagentsUnavailable(ctx, c.ID, "history_unavailable")
 			_ = s.Store.SetUsageCapture(ctx, c.ID, storage.UsageCapture{Reason: "history_unavailable", Revision: c.UpdatedAt})
 		}
 		return
 	}
 	s.captureUsage(ctx, rt, c, history, redaction.Values(ctx, s.Store, c.ID, endpoint.Password, endpoint.ProviderKey))
 	s.captureContextLimit(ctx, rt, c)
+}
+
+// A completed task invocation can be resumed later. Derive status from the latest
+// exchange rather than treating the session as permanently finished.
+func subagentStatus(history []json.RawMessage) string {
+	status := "unknown"
+	for _, raw := range history {
+		var m runtimeMessage
+		if json.Unmarshal(raw, &m) != nil {
+			return "unknown"
+		}
+		if m.Info.Role == "user" {
+			status = "working"
+		}
+		if m.Info.Role != "assistant" {
+			continue
+		}
+		if len(m.Info.Error) > 0 && string(m.Info.Error) != "null" {
+			status = "failed"
+			continue
+		}
+		status = "working"
+		if m.Info.Time.Completed > 0 && m.Info.Finish != "" && m.Info.Finish != "tool-calls" {
+			status = "idle"
+		}
+	}
+	return status
 }

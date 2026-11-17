@@ -43,6 +43,7 @@ import { chatStatus } from "./chat-status";
 import { ContextUsagePopover } from "./context-usage";
 import { PullCount, PullList } from "./pull-links";
 import type { PullSummary } from "./pull-schemas";
+import { SubagentMenuItems } from "./subagents";
 
 /** Shows saved chat metadata and linked pull requests. */
 export function ChatTitle({
@@ -201,6 +202,7 @@ export function ChatViewMenu({
           <FilesIcon />
           Machine files
         </DropdownMenuItem>
+        <SubagentMenuItems />
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled>
           <TerminalIcon />
