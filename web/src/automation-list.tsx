@@ -2,15 +2,18 @@ import { useState } from "react";
 
 import {
   Button,
-  ButtonLink,
   Link,
   NativeSelect,
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
+  ListGroup,
+  Item,
+  ItemContent,
+  ItemTitle,
+  ItemActions,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  ClockIcon,
+  PlusIcon,
 } from "@flora/florets";
 
 import type { Automation } from "./automation-schemas";
@@ -18,7 +21,7 @@ import { ListPage, ListFilters, ListEmpty } from "./list-page";
 import type { ProjectSummary } from "./project-schemas";
 
 const filters = [
-  { id: "all", label: "All" },
+  { id: "all", label: "All automations" },
   { id: "active", label: "Active" },
   { id: "inactive", label: "Inactive" },
 ] as const;
@@ -60,9 +63,15 @@ export function AutomationList({
       query={query}
       onQueryChange={setQuery}
       actions={
-        <ButtonLink href="#automations/new" className="h-8 px-3 text-sm">
-          New automation
-        </ButtonLink>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          nativeButton={false}
+          render={<a href="#automations/new" aria-label="New automation" />}
+          aria-label="New automation"
+        >
+          <PlusIcon />
+        </Button>
       }
       filters={
         <ListFilters
@@ -124,92 +133,96 @@ export function AutomationList({
           )}
         </ListEmpty>
       )}
-      {visible.length > 0 && (
-        <Table aria-label="Automations" className="table-fixed">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[65%] sm:w-auto">Name</TableHead>
-              <TableHead className="hidden w-36 lg:table-cell">Project</TableHead>
-              <TableHead className="hidden w-56 sm:table-cell">Schedule</TableHead>
-              <TableHead className="w-[35%] sm:w-32">Last run</TableHead>
-            </TableRow>
-          </TableHeader>
-          {[true, false].map((enabled) => {
-            const group = visible.filter((a) => a.enabled === enabled);
-            return (
-              group.length > 0 && (
-                <TableBody key={String(enabled)}>
-                  <TableRow className="bg-muted/40">
-                    <TableHead colSpan={4} scope="rowgroup" className="h-8 text-xs">
-                      {enabled ? "Active" : "Inactive"}{" "}
-                      <span className="ml-1 text-muted-foreground">{group.length}</span>
-                    </TableHead>
-                  </TableRow>
-                  {group.map((a) => (
-                    <TableRow key={a.id}>
-                      <TableCell className="py-3 whitespace-normal">
-                        <Link
+      <div className="space-y-2">
+        {[true, false].map((enabled) => {
+          const group = visible.filter((a) => a.enabled === enabled);
+          const label = enabled ? "Active" : "Inactive";
+          if (group.length === 0) return null;
+          return (
+            <ListGroup
+              key={label}
+              label={label}
+              count={group.length}
+              listLabel={`${label} automations`}
+            >
+              {group.map((a) => (
+                <Item key={a.id} size="list" render={<li />} className="flex-wrap sm:flex-nowrap">
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <a
                           href={`#automations/${a.id}`}
-                          className="block truncate font-medium no-underline"
-                          title={a.name}
-                        >
-                          {a.name}
-                        </Link>
-                        {(a.description ?? "") !== "" && (
-                          <p
-                            className="truncate text-xs text-muted-foreground"
-                            title={a.description}
-                          >
-                            {a.description}
-                          </p>
-                        )}
-                        <p className="truncate text-xs text-muted-foreground lg:hidden">
+                          aria-label={`Open automation: ${a.name}`}
+                          className="flex min-w-0 flex-[1_1_16rem] items-center gap-2.5 rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
+                        />
+                      }
+                    >
+                      <ClockIcon
+                        className="size-4 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                      <ItemContent>
+                        <ItemTitle>{a.name}</ItemTitle>
+                        <span className="hidden w-32 max-w-40 shrink-0 truncate text-xs text-muted-foreground sm:block">
                           {names.get(a.projectID)}
-                        </p>
-                        <p
-                          className="truncate text-xs text-muted-foreground sm:hidden"
-                          title={a.timeZone}
-                        >
-                          {schedule(a)} · {a.timeZone}
-                        </p>
-                      </TableCell>
-                      <TableCell
-                        className="hidden truncate text-muted-foreground lg:table-cell"
-                        title={names.get(a.projectID)}
-                      >
-                        {names.get(a.projectID)}
-                      </TableCell>
-                      <TableCell className="hidden text-muted-foreground sm:table-cell">
-                        <div>{schedule(a)}</div>
-                        <div className="truncate text-xs" title={a.timeZone}>
-                          {a.timeZone}
-                        </div>
-                      </TableCell>
-                      <TableCell className="whitespace-normal">
-                        {a.latestRun ? (
-                          a.latestRun.chatID ? (
-                            <Link
-                              className="capitalize no-underline"
-                              aria-label={`Open latest run for ${a.name}: ${a.latestRun.status}`}
-                              href={`#chats/${a.latestRun.chatID}?run=${encodeURIComponent(a.latestRun.messageID)}`}
-                            >
-                              {a.latestRun.status}
-                            </Link>
-                          ) : (
-                            <span className="capitalize">{a.latestRun.status}</span>
-                          )
-                        ) : (
-                          <span className="text-muted-foreground">No runs</span>
+                        </span>
+                      </ItemContent>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <span>
+                        <span className="block">{a.name}</span>
+                        {(a.description ?? "") !== "" && (
+                          <span className="block">{a.description}</span>
                         )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              )
-            );
-          })}
-        </Table>
-      )}
+                        <span className="block">
+                          {schedule(a)} · {a.timeZone}
+                        </span>
+                      </span>
+                    </TooltipContent>
+                  </Tooltip>
+                  <ItemActions className="ml-auto w-full min-w-0 shrink-0 gap-3 sm:w-auto">
+                    <span
+                      className="w-24 shrink-0 truncate text-xs text-muted-foreground sm:hidden"
+                      title={names.get(a.projectID)}
+                    >
+                      {names.get(a.projectID)}
+                    </span>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground sm:w-40 sm:flex-none" />
+                        }
+                      >
+                        {schedule(a)}
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {schedule(a)} · {a.timeZone}
+                      </TooltipContent>
+                    </Tooltip>
+                    <span className="w-20 shrink-0 text-right text-xs text-muted-foreground">
+                      {a.latestRun ? (
+                        a.latestRun.chatID ? (
+                          <a
+                            className="capitalize hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                            aria-label={`Open latest run for ${a.name}: ${a.latestRun.status}`}
+                            href={`#chats/${a.latestRun.chatID}?run=${encodeURIComponent(a.latestRun.messageID)}`}
+                          >
+                            {a.latestRun.status}
+                          </a>
+                        ) : (
+                          <span className="capitalize">{a.latestRun.status}</span>
+                        )
+                      ) : (
+                        "No runs"
+                      )}
+                    </span>
+                  </ItemActions>
+                </Item>
+              ))}
+            </ListGroup>
+          );
+        })}
+      </div>
     </ListPage>
   );
 }
