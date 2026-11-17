@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -100,6 +101,8 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 		}
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
+		case "/provider":
+			fmt.Fprint(w, `{"all":[{"id":"anthropic","models":{"model":{"capabilities":{"input":{"image":true,"pdf":true}}}}}]}`)
 		case "/config":
 			fmt.Fprint(w, `{"model":"anthropic/model"}`)
 		case "/session":
@@ -149,8 +152,11 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 			}
 			var input struct {
 				Parts []struct {
-					Type string `json:"type"`
-					Text string `json:"text"`
+					Type     string `json:"type"`
+					Text     string `json:"text"`
+					Filename string `json:"filename,omitempty"`
+					MIME     string `json:"mime,omitempty"`
+					URL      string `json:"url,omitempty"`
 				} `json:"parts"`
 			}
 			if json.NewDecoder(r.Body).Decode(&input) != nil {
@@ -194,6 +200,14 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 		}
 	}))
 	svc := chat.New(ctx, store, &Provisioner{store, runtime.URL})
+	svc.ModelCatalogClient = &http.Client{Transport: catalogTransport{}}
 	success = true
 	return &Fixture{Store: store, Service: svc, Auth: authentication, Token: token, Project: project, Close: func() { cancel(); runtime.Close(); store.Close() }}, nil
+}
+
+// The browser fixture checks capabilities without contacting a live catalog.
+type catalogTransport struct{}
+
+func (catalogTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"anthropic":{"models":{"model":{"modalities":{"input":["text","image","pdf"]}}}}}`)), Header: make(http.Header)}, nil
 }

@@ -26,19 +26,19 @@ type Activity struct {
 
 // AcceptMessage atomically saves a user message, marks it active, sets the chat to
 // Working, and records message and status activity. Retrying the same request ID
-// and text returns the saved message with Duplicate=true, even after completion;
-// different text returns ErrConflict. New requests return ErrActive while the
+// and ordered attachment references returns the saved message with Duplicate=true,
+// even after completion; different input returns ErrConflict. New requests return ErrActive while the
 // chat has active work. Callers must submit only new acceptances to the runtime
 // and reconcile uncertain delivery without automatically resending the message.
-func (s *Store) AcceptMessage(ctx context.Context, chatID, requestID, text string) (Acceptance, error) {
-	if requestID == "" || len(requestID) > 200 || strings.TrimSpace(text) == "" || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
+func (s *Store) AcceptMessage(ctx context.Context, chatID, requestID, text string, attachments ...string) (Acceptance, error) {
+	if requestID == "" || len(requestID) > 200 || (strings.TrimSpace(text) == "" && len(attachments) == 0) || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
 		return Acceptance{}, ErrInvalid
 	}
 	var a Acceptance
 	err := s.write(ctx, func(tx *sql.Tx) error {
 		m, err := scanMessage(tx.QueryRowContext(ctx, messageSelect+" WHERE chat_id=? AND request_id=?", chatID, requestID))
 		if err == nil {
-			if m.Text != text {
+			if m.Text != text || !sameAttachmentIDs(attachmentIDs(m.Payload), attachments) {
 				return ErrConflict
 			}
 			a = Acceptance{Message: m, Duplicate: true}
@@ -63,8 +63,23 @@ func (s *Store) AcceptMessage(ctx context.Context, chatID, requestID, text strin
 			return ErrActive
 		}
 		m = Message{ID: id(), ChatID: chatID, RequestID: requestID, Role: "user", Text: text, CreatedAt: now(), Payload: json.RawMessage(`{}`)}
+		var project string
+		if err := tx.QueryRowContext(ctx, "SELECT project_id FROM chats WHERE id=?", chatID).Scan(&project); err != nil {
+			return found(err)
+		}
+		// Insert the message before binding its foreign-key attachment references.
 		if err := insertMessage(ctx, tx, m); err != nil {
 			return err
+		}
+		files, err := reserveAttachments(ctx, tx, project, chatID, m.ID, attachments)
+		if err != nil {
+			return err
+		}
+		if len(files) > 0 {
+			m.Payload = attachmentPayload(text, files)
+			if _, err := tx.ExecContext(ctx, "UPDATE messages SET payload=? WHERE id=?", string(m.Payload), m.ID); err != nil {
+				return err
+			}
 		}
 		if _, err := tx.ExecContext(ctx, "UPDATE chats SET status='working',status_reason='Message accepted',active_message_id=?,updated_at=? WHERE id=?", m.ID, m.CreatedAt, chatID); err != nil {
 			return err
