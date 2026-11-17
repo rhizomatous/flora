@@ -260,6 +260,23 @@ func TestSavedSubagentAPIWithoutRuntime(t *testing.T) {
 	server.Config.Handler = New(webassets.FS(), authentication, settings.New(store), origin)
 	server.Start()
 	defer server.Close()
+	req, _ := http.NewRequest("GET", server.URL+"/api/chats", nil)
+	req.AddCookie(&http.Cookie{Name: cookieName, Value: token})
+	res, err := server.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var chats []chatView
+	err = json.NewDecoder(res.Body).Decode(&chats)
+	res.Body.Close()
+	if err != nil || res.StatusCode != 200 || len(chats) != 1 || len(chats[0].Subagents) != 1 {
+		t.Fatalf("missing chat subagent summaries: %+v %v", chats, err)
+	}
+	summary := chats[0].Subagents[0]
+	if summary.ID != "child" || summary.Number != 1 || summary.Title != "Inspect code" {
+		t.Fatalf("incorrect subagent summary: %+v", summary)
+	}
+
 	for _, tc := range []struct {
 		path          string
 		authenticated bool

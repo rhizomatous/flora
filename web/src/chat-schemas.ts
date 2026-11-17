@@ -3,8 +3,15 @@ import { z } from "zod";
 import { automationRunSchema } from "./automation-schemas";
 import { pullSummarySchema } from "./pull-schemas";
 
+const subagentSummarySchema = z.object({
+  id: z.string(),
+  number: z.number().int().positive(),
+  title: z.string(),
+});
+
 export const chatSchema = z.object({
   pulls: pullSummarySchema.optional(),
+  subagents: z.array(subagentSummarySchema).optional(),
   ID: z.string(),
   ProjectID: z.string(),
   Title: z.string(),

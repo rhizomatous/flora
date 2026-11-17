@@ -1,4 +1,4 @@
-import { detailSchema, type Message, type Subagent } from "../../src/chat-schemas";
+import { detailSchema, feedSchema, type Message, type Subagent } from "../../src/chat-schemas";
 import { test, expect } from "./fixtures.ts";
 
 const message = (ID: string, Role: string, text: string): Message => ({
@@ -104,4 +104,34 @@ test("subagent links, menus, and restored tabs share a saved conversation", asyn
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   await page.setViewportSize({ width: 1440, height: 1000 });
   expect(errors).toEqual([]);
+});
+
+test("chat hover cards show saved subagent names and tasks", async ({ page }) => {
+  await page.route("**/api/notifications*", async (route) => {
+    const response = await route.fetch();
+    const feed = feedSchema.parse(await response.json());
+    const chat = feed.chats.find((item) => item.ID === "completed");
+    if (!chat) throw new Error("Missing completed chat");
+    chat.subagents = [
+      { id: "review-ui", number: 2, title: "Review UI and product experience" },
+      { id: "review-agent", number: 1, title: "Review agent reliability" },
+    ];
+    await route.fulfill({ json: feed });
+  });
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  await page.goto(`${base}/#chats/new`);
+  await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+  const nav = page.getByRole("navigation", { name: "Main", exact: true });
+  await nav.getByRole("link", { name: /Review the workspace changes/ }).hover();
+  const preview = page.locator(".sidebar-chat-preview");
+  await expect(preview.getByRole("region", { name: "Subagents" })).toBeVisible();
+  await expect(preview.getByText("Subagent 2", { exact: true })).toBeVisible();
+  await expect(
+    preview.getByText("Review UI and product experience", { exact: true }),
+  ).toBeVisible();
+  await expect(preview.getByText("Subagent 1", { exact: true })).toBeVisible();
+  await expect(preview.getByText("Review agent reliability", { exact: true })).toBeVisible();
+  await nav.getByRole("link", { name: /Check the project setup/ }).hover();
+  await expect(preview.getByText("Check the project setup", { exact: true })).toBeVisible();
+  await expect(preview.getByRole("region", { name: "Subagents" })).toHaveCount(0);
 });
