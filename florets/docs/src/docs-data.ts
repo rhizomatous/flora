@@ -26,6 +26,8 @@ const descriptions: Record<string, string> = {
   direction: "Set the reading direction for layouts and interactive components.",
   drawer: "Present content in a panel that slides in from an edge.",
   "dropdown-menu": "Open a menu of actions from a trigger.",
+  "editable-text":
+    "Edit a title or description in place with native form controls. The containing page owns saving.",
   empty: "Explain an empty state and offer a useful next action.",
   field: "Compose form labels, controls, descriptions, and validation messages.",
   "hover-card": "Preview supporting information when a link receives focus or hover.",
@@ -80,7 +82,7 @@ const importNames: Record<string, string> = {
   sonner: "Toaster",
 };
 
-export const componentDocs = upstream
+export const componentDocs = [...upstream, { name: "editable-text", url: "", examples: 4 }]
   .map(({ name, url, examples }) => ({
     id: name,
     title:
