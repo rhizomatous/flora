@@ -56,10 +56,13 @@ test("create, edit, pause, and run an automation in a dedicated chat", async ({ 
   await expect(page.getByRole("switch", { name: "Active", exact: true })).not.toBeChecked();
   await page.getByRole("textbox", { name: "Instructions", exact: true }).fill("Check dependencies and summarize findings.");
   await page.getByRole("button", { name: "Save and run", exact: true }).click();
+  const startedToast = page.locator("[data-sonner-toast]").filter({ hasText: "Run started" });
+  await expect(startedToast).toContainText("Weekly dependency check");
+  await expect(startedToast.getByRole("button", { name: "Open chat", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Run history", exact: true }).getByRole("link", { name: "Open chat", exact: true })).toHaveCount(1);
   const firstLink = await page.getByRole("region", { name: "Run history", exact: true }).getByRole("link", { name: "Open chat", exact: true }).getAttribute("href");
   await page.screenshot({ path: testInfo.outputPath("history.png"), fullPage: true, animations: "disabled" });
-  await page.getByRole("region", { name: "Run history", exact: true }).getByRole("link", { name: "Open chat", exact: true }).click();
+  await startedToast.getByRole("button", { name: "Open chat", exact: true }).click();
   await expect(page.getByRole("link", { name: "Automation run", exact: true })).toBeVisible();
   await page.getByRole("radio", { name: /^Yes/ }).click();
   await page.getByRole("button", { name: "Answer and continue", exact: true }).click();

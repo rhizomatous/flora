@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { toast } from "sonner";
 
 import {
   Alert,
@@ -22,6 +23,8 @@ import {
   NativeSelect,
   Textarea,
   Switch,
+  Toaster,
+  ChevronLeftIcon,
 } from "@flora/florets";
 
 import {
@@ -145,6 +148,7 @@ function AutomationForm({
   topbar,
   projects,
   busy,
+  pending,
   save,
   cancel,
   runNow,
@@ -154,6 +158,7 @@ function AutomationForm({
   topbar: HTMLDivElement | null;
   projects: ProjectSummary[];
   busy: boolean;
+  pending: "save" | "run" | "active" | null;
   save: (value: Automation, runAfter?: boolean) => void;
   runNow: () => void;
   toggleActive: () => void;
@@ -171,6 +176,8 @@ function AutomationForm({
   const dirty = (
     ["name", "instructions", "projectID", "mode", "frequency", "days", "time", "timeZone"] as const
   ).some((key) => JSON.stringify(value[key]) !== JSON.stringify(initial[key]));
+  let runLabel = dirty ? "Save and run" : "Run now";
+  if (pending === "run") runLabel = "Starting…";
   const saveLabel = initial.id ? "Save" : "Create automation";
   const compactSaveLabel = initial.id ? "Save" : "Create";
   useEffect(() => {
@@ -233,6 +240,13 @@ function AutomationForm({
               <>
                 <Link
                   href="#automations"
+                  aria-label="Back to automations"
+                  className="inline-flex size-8 shrink-0 items-center justify-center sm:hidden"
+                >
+                  <ChevronLeftIcon className="size-4" />
+                </Link>
+                <Link
+                  href="#automations"
                   className="hidden text-sm text-muted-foreground sm:inline"
                 >
                   Automations
@@ -261,7 +275,7 @@ function AutomationForm({
                   else if (form.current?.reportValidity() === true) submit(true);
                 }}
               >
-                {dirty ? "Save and run" : "Run now"}
+                {runLabel}
               </Button>
             ) : (
               <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={cancel}>
@@ -273,10 +287,10 @@ function AutomationForm({
               form="automation-form"
               size="sm"
               disabled={busy || !preview || (initial.id !== "" && !dirty)}
-              aria-label={busy ? "Saving…" : saveLabel}
+              aria-label={pending === "save" ? "Saving…" : saveLabel}
             >
-              <span className="hidden sm:inline">{busy ? "Saving…" : saveLabel}</span>
-              <span className="sm:hidden">{busy ? "Saving…" : compactSaveLabel}</span>
+              <span className="hidden sm:inline">{pending === "save" ? "Saving…" : saveLabel}</span>
+              <span className="sm:hidden">{pending === "save" ? "Saving…" : compactSaveLabel}</span>
             </Button>
           </>,
           topbar,
@@ -301,9 +315,6 @@ function AutomationForm({
                 />
                 {initial.enabled ? "Active" : "Inactive"}
               </FieldLabel>
-              <Link href="#automations" className="text-sm sm:hidden">
-                All automations
-              </Link>
             </div>
           )}
           <FieldLabel className="w-full flex-col items-start">
@@ -488,9 +499,9 @@ export function Automations({
   const [list, setList] = useState<Automation[]>();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [detail, setDetail] = useState<AutomationDetail>();
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<"save" | "run" | "active" | null>(null);
+  const busy = pending !== null;
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const manualID = useRef<string | null>(null);
   const isNew = path === "automations/new";
   const id = isNew ? "" : (path.split("/")[1] ?? "");
@@ -519,10 +530,9 @@ export function Automations({
       window.clearInterval(timer);
     };
   }, []);
-  async function action(task: () => Promise<void>) {
-    setBusy(true);
+  async function action(kind: "save" | "run" | "active", task: () => Promise<void>) {
+    setPending(kind);
     setError("");
-    setNotice("");
     try {
       await task();
       await load();
@@ -530,20 +540,39 @@ export function Automations({
       setError(errorMessage(e, "Could not save this change."));
       if (isExpired(e)) onExpired();
     } finally {
-      setBusy(false);
+      setPending(null);
     }
   }
-  async function runAutomation(automationID: string) {
+  async function runAutomation(automationID: string, name: string) {
+    setPending("run");
     manualID.current ??= crypto.randomUUID();
     const run = await request(automationRunSchema, `automations/${automationID}/run`, {
       method: "POST",
       body: { requestID: manualID.current },
     });
     manualID.current = null;
-    setNotice(run.status === "skipped" || run.status === "failed" ? run.reason : "Run started.");
+    if (run.status === "failed" || run.status === "skipped") {
+      toast.error(run.status === "failed" ? "Run failed to start" : "Run skipped", {
+        description: run.reason,
+        duration: 10_000,
+      });
+    } else {
+      toast.success("Run started", {
+        description: name,
+        duration: 10_000,
+        action: run.chatID
+          ? {
+              label: "Open chat",
+              onClick: () => {
+                window.location.hash = `chats/${run.chatID}?run=${encodeURIComponent(run.messageID)}`;
+              },
+            }
+          : undefined,
+      });
+    }
   }
   function save(value: Automation, runAfter = false) {
-    void action(async () => {
+    void action("save", async () => {
       const saved = await request(
         automationSchema,
         value.id ? `automations/${value.id}` : "automations",
@@ -551,8 +580,7 @@ export function Automations({
       );
       setDetail((current) => ({ automation: saved, runs: current?.runs ?? [] }));
       window.location.hash = `automations/${saved.id}`;
-      setNotice("Automation saved.");
-      if (runAfter) await runAutomation(saved.id);
+      if (runAfter) await runAutomation(saved.id, saved.name);
     });
   }
   const item = detail?.automation;
@@ -573,11 +601,7 @@ export function Automations({
           </Button>
         </Alert>
       )}
-      {notice && (
-        <Alert role="status" className="mb-6">
-          {notice}
-        </Alert>
-      )}
+      <Toaster position="bottom-right" closeButton />
       {list === undefined && !error && <LoadingStatus />}
       {list !== undefined && (isNew || item !== undefined) && (
         <AutomationForm
@@ -585,13 +609,14 @@ export function Automations({
           initial={item ?? blank(projects[0]?.id ?? "")}
           projects={projects}
           busy={busy}
+          pending={pending}
           save={save}
           runNow={() => {
-            if (item) void action(() => runAutomation(item.id));
+            if (item) void action("run", () => runAutomation(item.id, item.name));
           }}
           toggleActive={() => {
             if (item) {
-              void action(async () => {
+              void action("active", async () => {
                 const saved = await request(automationSchema, `automations/${item.id}`, {
                   method: "PUT",
                   body: { ...item, latestRun: undefined, enabled: !item.enabled },
