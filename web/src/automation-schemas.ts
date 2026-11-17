@@ -15,6 +15,7 @@ export const automationSchema = z.object({
   projectID: z.string(),
   name: z.string(),
   instructions: z.string(),
+  description: z.string().max(2000).optional(),
   mode: z.enum(["new", "same"]),
   frequency: z.enum(["daily", "weekdays", "weekly"]),
   days: z.array(z.number()).nullable(),

@@ -69,6 +69,7 @@ function blank(projectID: string): Automation {
     projectID,
     name: "",
     instructions: "",
+    description: "",
     mode: "new",
     frequency: "weekdays",
     days: [1],
@@ -174,7 +175,17 @@ function AutomationForm({
   }, [topbar]);
   const { frequency, days, time, timeZone } = value;
   const dirty = (
-    ["name", "instructions", "projectID", "mode", "frequency", "days", "time", "timeZone"] as const
+    [
+      "name",
+      "description",
+      "instructions",
+      "projectID",
+      "mode",
+      "frequency",
+      "days",
+      "time",
+      "timeZone",
+    ] as const
   ).some((key) => JSON.stringify(value[key]) !== JSON.stringify(initial[key]));
   let runLabel = dirty ? "Save and run" : "Run now";
   if (pending === "run") runLabel = "Starting…";
@@ -247,7 +258,7 @@ function AutomationForm({
                 </Link>
                 <Link
                   href="#automations"
-                  className="hidden text-sm text-muted-foreground sm:inline"
+                  className="hidden text-base font-semibold text-foreground no-underline sm:inline"
                 >
                   Automations
                 </Link>
@@ -304,19 +315,6 @@ function AutomationForm({
         }}
       >
         <fieldset disabled={busy} className="space-y-5">
-          {initial.id && (
-            <div className="flex items-center justify-between gap-3">
-              <FieldLabel>
-                <Switch
-                  disabled={busy}
-                  checked={initial.enabled}
-                  onCheckedChange={toggleActive}
-                  aria-label="Active"
-                />
-                {initial.enabled ? "Active" : "Inactive"}
-              </FieldLabel>
-            </div>
-          )}
           <FieldLabel className="w-full flex-col items-start">
             Name
             <Input
@@ -329,6 +327,30 @@ function AutomationForm({
               placeholder="Weekly dependency check"
             />
           </FieldLabel>
+          <FieldLabel className="w-full flex-col items-start">
+            <span className="sr-only">Description</span>
+            <Input
+              value={value.description ?? ""}
+              maxLength={2000}
+              placeholder="Add a description (optional)"
+              onChange={(event) => {
+                change("description", event.target.value);
+              }}
+            />
+          </FieldLabel>
+          {initial.id && (
+            <div className="flex items-center justify-between gap-3">
+              <label className="flex w-fit items-center gap-2 text-sm">
+                <Switch
+                  disabled={busy}
+                  checked={initial.enabled}
+                  onCheckedChange={toggleActive}
+                  aria-label="Active"
+                />
+                {initial.enabled ? "Active" : "Inactive"}
+              </label>
+            </div>
+          )}
           <FieldLabel className="w-full flex-col items-start">
             Instructions
             <Textarea
@@ -554,12 +576,12 @@ export function Automations({
     if (run.status === "failed" || run.status === "skipped") {
       toast.error(run.status === "failed" ? "Run failed to start" : "Run skipped", {
         description: run.reason,
-        duration: 10_000,
+        duration: 5000,
       });
     } else {
       toast.success("Run started", {
         description: name,
-        duration: 10_000,
+        duration: 5000,
         action: run.chatID
           ? {
               label: "Open chat",
@@ -601,7 +623,16 @@ export function Automations({
           </Button>
         </Alert>
       )}
-      <Toaster position="bottom-right" closeButton />
+      <Toaster
+        position="bottom-right"
+        closeButton
+        toastOptions={{
+          classNames: {
+            toast: "florets-toast",
+            success: "[&_[data-icon]]:text-emerald-600 dark:[&_[data-icon]]:text-emerald-400",
+          },
+        }}
+      />
       {list === undefined && !error && <LoadingStatus />}
       {list !== undefined && (isNew || item !== undefined) && (
         <AutomationForm

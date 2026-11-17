@@ -11,6 +11,7 @@ import (
 )
 
 type AutomationConfig struct {
+	Description  string `json:"description"`
 	Name         string `json:"name"`
 	Instructions string `json:"instructions"`
 	Mode         string `json:"mode"`
@@ -40,6 +41,9 @@ type AutomationRun struct {
 }
 
 func (c AutomationConfig) Validate() error {
+	if len(c.Description) > 2000 || !utf8.ValidString(c.Description) {
+		return ErrInvalid
+	}
 	if strings.TrimSpace(c.Name) == "" || len(c.Name) > 200 || !utf8.ValidString(c.Name) || strings.TrimSpace(c.Instructions) == "" || !utf8.ValidString(c.Instructions) || len(c.Instructions) > MaxAllowedMessageBytes {
 		return ErrInvalid
 	}
