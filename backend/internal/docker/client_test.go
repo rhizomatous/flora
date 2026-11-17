@@ -419,3 +419,41 @@ func TestPasswordRandom(t *testing.T) {
 		t.Fatalf("passwords must be unique 24-byte hex: %q %q", a, b)
 	}
 }
+
+func TestContainerUsageScopeAndIncompleteSamples(t *testing.T) {
+	for _, incomplete := range []bool{false, true} {
+		t.Run(strconv.FormatBool(incomplete), func(t *testing.T) {
+			client, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch r.URL.Path {
+				case "/v" + APIVersion + "/containers/c1/stats":
+					if r.URL.Query().Get("stream") != "false" || r.URL.Query().Get("one-shot") != "true" {
+						t.Error("stats must use a single bounded sample")
+					}
+					if incomplete {
+						fmt.Fprint(w, `{"read":"2026-11-17T00:00:00Z"}`)
+					} else {
+						fmt.Fprint(w, `{"read":"2026-11-17T00:00:00Z","cpu_stats":{"cpu_usage":{"total_usage":2500000000}},"memory_stats":{"usage":1048576}}`)
+					}
+				case "/v" + APIVersion + "/containers/c1/json":
+					if r.URL.Query().Get("size") != "1" && r.URL.Query().Get("size") != "true" {
+						t.Error("disk size not requested")
+					}
+					fmt.Fprint(w, `{"Id":"c1","SizeRw":4096}`)
+				default:
+					t.Errorf("unexpected request %s", r.URL.Path)
+				}
+			})
+			usage, err := client.ContainerUsage(context.Background(), "c1")
+			if incomplete {
+				if err == nil {
+					t.Fatal("incomplete sample fabricated zero usage")
+				}
+				return
+			}
+			if err != nil || usage.CPUSeconds != 2.5 || usage.MemoryBytes != 1048576 || usage.DiskBytes == nil || *usage.DiskBytes != 4096 || usage.SampledAt.IsZero() {
+				t.Fatalf("%+v %v", usage, err)
+			}
+		})
+	}
+}

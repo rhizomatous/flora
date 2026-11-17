@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS runtime_leases (
+ chat_id TEXT PRIMARY KEY REFERENCES chats(id) ON DELETE CASCADE,
+ expires_at TEXT NOT NULL
+);

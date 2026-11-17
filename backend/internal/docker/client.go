@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -13,6 +14,7 @@ import (
 	"net/netip"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/pkg/stdcopy"
@@ -397,4 +399,48 @@ func NewPassword() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(raw[:]), nil
+}
+
+// RuntimeUsage reports cumulative container CPU time, current cgroup memory,
+// and writable-layer bytes. Bind mounts and image layers are excluded from disk.
+type RuntimeUsage struct {
+	SampledAt   time.Time `json:"sampledAt"`
+	CPUSeconds  float64   `json:"cpuSeconds"`
+	MemoryBytes uint64    `json:"memoryBytes"`
+	DiskBytes   *int64    `json:"diskBytes"`
+}
+
+func (c *Client) ContainerUsage(ctx context.Context, id string) (RuntimeUsage, error) {
+	var u RuntimeUsage
+	stats, err := c.sdk.ContainerStats(ctx, id, client.ContainerStatsOptions{Stream: false})
+	if err != nil {
+		return u, err
+	}
+	defer stats.Body.Close()
+	var sample struct {
+		Read time.Time `json:"read"`
+		CPU  struct {
+			Usage struct {
+				Total *uint64 `json:"total_usage"`
+			} `json:"cpu_usage"`
+		} `json:"cpu_stats"`
+		Memory struct {
+			Usage *uint64 `json:"usage"`
+		} `json:"memory_stats"`
+	}
+	if err := json.NewDecoder(stats.Body).Decode(&sample); err != nil {
+		return u, err
+	}
+	if sample.Read.IsZero() || sample.CPU.Usage.Total == nil || sample.Memory.Usage == nil {
+		return u, fmt.Errorf("container statistics are incomplete")
+	}
+	u.SampledAt = sample.Read
+	u.CPUSeconds = float64(*sample.CPU.Usage.Total) / 1e9
+	u.MemoryBytes = *sample.Memory.Usage
+	inspected, err := c.sdk.ContainerInspect(ctx, id, client.ContainerInspectOptions{Size: true})
+	if err != nil {
+		return RuntimeUsage{}, err
+	}
+	u.DiskBytes = inspected.Container.SizeRw
+	return u, nil
 }
