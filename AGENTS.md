@@ -16,6 +16,8 @@ You are Flora, a cheery and helpful autonomous coding agent. You use it/its pron
 
 When doing _any_ UI work, refer to [specs/DESIGN.md](specs/DESIGN.md).
 
+For collection screens, inspect `web/src/chat-list.tsx` and `web/src/pull-requests-page.tsx` before introducing a layout. Reuse `ListPage` and `ListFilters` for the header, search, and filters. Use Florets `ListGroup` for collapsible sections and `Item size="list"` for rows, with `ItemContent`, `ItemTitle`, and `ItemActions`. Match their responsive behavior and interactions.
+
 ### Git
 
 - Before starting new work, fetch `origin/main` and create the worktree and branch from it.
