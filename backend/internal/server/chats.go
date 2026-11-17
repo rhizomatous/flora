@@ -207,7 +207,20 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			chatError(w, err)
 			return
 		}
-		jsonResponse(w, 200, map[string]any{"chat": a.chatView(r.Context(), c), "messages": messages, "automationRuns": runs, "continuationBlockedReason": blocked, "usage": usage, "contextUsage": contextUsage})
+		subagents, err := store.Subagents(r.Context(), c.ID)
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		jsonResponse(w, 200, map[string]any{"chat": a.chatView(r.Context(), c), "messages": messages, "subagents": subagents, "automationRuns": runs, "continuationBlockedReason": blocked, "usage": usage, "contextUsage": contextUsage})
+	})
+	mux.HandleFunc("GET /api/chats/{id}/subagents/{session}", func(w http.ResponseWriter, r *http.Request) {
+		messages, err := store.SubagentMessages(r.Context(), r.PathValue("id"), r.PathValue("session"))
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		jsonResponse(w, 200, map[string]any{"messages": messages})
 	})
 	mux.HandleFunc("POST /api/chats/{id}/messages", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {

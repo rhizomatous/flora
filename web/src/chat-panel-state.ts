@@ -4,7 +4,8 @@ import { z } from "zod";
 const schema = z.object({
   open: z.boolean().default(false),
   diffOpen: z.boolean().default(false),
-  view: z.enum(["overview", "diffs"]).default("overview"),
+  view: z.string().default("overview"),
+  subagentTabs: z.array(z.string()).default([]),
   width: z.number().min(1).max(99).default(40),
   pullsOpen: z.boolean().default(true),
 });

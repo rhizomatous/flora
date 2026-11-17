@@ -1,5 +1,5 @@
 // oxlint-disable import/max-dependencies -- The chat view imports its feature controls and boundary schemas directly.
-import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import {
   ResizablePanelGroup,
@@ -17,25 +17,13 @@ import {
   ButtonLink,
   FlowerMark,
   Heading,
-  CrossCircledIcon,
   Text,
-  Message as ChatMessage,
-  MessageContent,
   MessageScrollerProvider,
   MessageScroller,
   MessageScrollerViewport,
   MessageScrollerContent,
   MessageScrollerItem,
   MessageScrollerButton,
-  Bubble,
-  BubbleContent,
-  Trace,
-  TraceLine,
-  TraceTitle,
-  TraceDescription,
-  TraceCollapsible,
-  TraceCollapsibleTrigger,
-  TraceCollapsibleContent,
 } from "@flora/florets";
 
 import { authenticatedSchema } from "./auth-schemas";
@@ -55,7 +43,6 @@ import {
   type Chat,
   type Question,
   activitySchema,
-  toolDisplayInputSchema,
   requestIdentitySchema,
   detailSchema,
   questionSchema,
@@ -63,38 +50,18 @@ import {
   acceptanceSchema,
   type Activity,
   type Detail,
-  type Message,
-  type Part,
 } from "./chat-schemas";
 import { ChatSidePanel } from "./chat-side-panel";
 import { chatStatus } from "./chat-status";
 import { Composer } from "./composer";
+import { ConversationMessage, WorkSummary } from "./conversation";
 import { NewChatComposer } from "./new-chat-composer";
 import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
 import { QuestionForm } from "./question";
 import { errorMessage, isExpired, request } from "./request";
-import {
-  buildTranscript,
-  formatDuration,
-  isFailedPart,
-  isLivePart,
-  workTiming,
-  type WorkStep,
-} from "./transcript";
+import { SubagentsContext } from "./subagent-state";
+import { buildTranscript } from "./transcript";
 import { text } from "./ui";
-
-const Markdown = lazy(async () => {
-  const { ReplyMarkdown } = await import("./reply-markdown");
-  return { default: ReplyMarkdown };
-});
-
-function ReplyText({ children }: { children: string }) {
-  return (
-    <Suspense fallback={<div className="whitespace-pre-wrap">{children}</div>}>
-      <Markdown>{children}</Markdown>
-    </Suspense>
-  );
-}
 
 const requestKey = (scope: string) => `flora-request:${scope}`;
 
@@ -374,223 +341,227 @@ export function Chats({
 
   const sideOpen = existingChat && panelState.open;
   return (
-    <ResizablePanelGroup
-      orientation="horizontal"
-      defaultLayout={{ conversation: 100 - panelState.width, review: panelState.width }}
-      onLayoutChanged={(layout, meta) => {
-        const width = (meta.requestedLayout ?? layout).review;
-        if (sideOpen && meta.isUserInteraction && width !== undefined) updatePanel({ width });
-      }}
-      className={`chat-split -mx-4 min-h-0 w-auto! flex-1 sm:-mx-8 ${sideOpen ? "chat-split-open" : ""}`}
+    <SubagentsContext
+      value={{ chatID: id, agents: detail?.chat.ID === id ? detail.subagents : [] }}
     >
-      <ResizablePanel
-        id="conversation"
-        defaultSize={`${100 - panelState.width}%`}
-        minSize="300px"
-        className="chat-main-pane flex min-w-0 flex-col px-4 sm:px-8"
+      <ResizablePanelGroup
+        orientation="horizontal"
+        defaultLayout={{ conversation: 100 - panelState.width, review: panelState.width }}
+        onLayoutChanged={(layout, meta) => {
+          const width = (meta.requestedLayout ?? layout).review;
+          if (sideOpen && meta.isUserInteraction && width !== undefined) updatePanel({ width });
+        }}
+        className={`chat-split -mx-4 min-h-0 w-auto! flex-1 sm:-mx-8 ${sideOpen ? "chat-split-open" : ""}`}
       >
-        <Tabs
-          value={diffChat === id && activeDiff ? "diffs" : "chat"}
-          onValueChange={(value) => {
-            setActiveDiff(value === "diffs");
-          }}
-          className="min-h-0 flex-1 gap-0"
+        <ResizablePanel
+          id="conversation"
+          defaultSize={`${100 - panelState.width}%`}
+          minSize="300px"
+          className="chat-main-pane flex min-w-0 flex-col px-4 sm:px-8"
         >
-          <section
-            aria-labelledby="chats-heading"
-            className={isNew ? "mx-auto my-12 w-full max-w-[720px] md:mt-[25svh]" : chatLayout}
+          <Tabs
+            value={diffChat === id && activeDiff ? "diffs" : "chat"}
+            onValueChange={(value) => {
+              setActiveDiff(value === "diffs");
+            }}
+            className="min-h-0 flex-1 gap-0"
           >
-            <div className={isNew ? "sr-only" : headerLayout}>
-              {existingChat && <span className="sidebar-toggle-space" aria-hidden="true" />}
-              <Heading
-                level={1}
-                id="chats-heading"
-                aria-label={title()}
-                ref={heading}
-                tabIndex={-1}
-                className={diffChat === id ? "sr-only" : "min-w-0 truncate text-base"}
-              >
-                {existingChat && diffChat !== id ? (
-                  <ChatTitle title={title()} chat={detail?.chat} pulls={pulls} />
-                ) : (
-                  title()
-                )}
-              </Heading>
-              {diffChat === id && (
-                <TabsList
-                  aria-label="Chat views"
-                  className="h-auto! min-w-0 shrink justify-start gap-1 bg-transparent p-0"
+            <section
+              aria-labelledby="chats-heading"
+              className={isNew ? "mx-auto my-12 w-full max-w-[720px] md:mt-[25svh]" : chatLayout}
+            >
+              <div className={isNew ? "sr-only" : headerLayout}>
+                {existingChat && <span className="sidebar-toggle-space" aria-hidden="true" />}
+                <Heading
+                  level={1}
+                  id="chats-heading"
+                  aria-label={title()}
+                  ref={heading}
+                  tabIndex={-1}
+                  className={diffChat === id ? "sr-only" : "min-w-0 truncate text-base"}
                 >
-                  <ChatTitle
-                    title={title()}
-                    chat={detail?.chat}
-                    pulls={pulls}
-                    tabbed
-                    active={!activeDiff}
+                  {existingChat && diffChat !== id ? (
+                    <ChatTitle title={title()} chat={detail?.chat} pulls={pulls} />
+                  ) : (
+                    title()
+                  )}
+                </Heading>
+                {diffChat === id && (
+                  <TabsList
+                    aria-label="Chat views"
+                    className="h-auto! min-w-0 shrink justify-start gap-1 bg-transparent p-0"
+                  >
+                    <ChatTitle
+                      title={title()}
+                      chat={detail?.chat}
+                      pulls={pulls}
+                      tabbed
+                      active={!activeDiff}
+                    />
+                    <div className="chat-diff-tab" data-active={activeDiff || undefined}>
+                      <TabsTrigger
+                        value="diffs"
+                        variant="control"
+                        render={
+                          <Button
+                            variant={activeDiff ? "secondary" : "ghost"}
+                            size="compact"
+                            className="chat-diff-tab-trigger tracking-tight"
+                          />
+                        }
+                      >
+                        <GitBranchIcon />
+                        <span className="florets-control-label">Diffs</span>
+                      </TabsTrigger>
+                      <Button
+                        variant="ghost"
+                        size="icon-compact"
+                        className="chat-diff-tab-close"
+                        aria-label="Close Diffs"
+                        title="Close Diffs"
+                        onClick={() => {
+                          setDiffChat(null);
+                          setActiveDiff(false);
+                          document
+                            .querySelector<HTMLButtonElement>('button[aria-label="Chat views"]')
+                            ?.focus();
+                        }}
+                      >
+                        <XIcon />
+                      </Button>
+                    </div>
+                  </TabsList>
+                )}
+                {existingChat && (
+                  <ChatHeaderActions
+                    sideOpen={sideOpen}
+                    onSideToggle={() => {
+                      updatePanel({ open: !sideOpen });
+                    }}
+                    usage={detail?.usage}
+                    diffsOpen={diffChat === id && activeDiff}
+                    onDiffsChange={(open) => {
+                      if (open) setDiffChat(id);
+                      setActiveDiff(open);
+                    }}
                   />
-                  <div className="chat-diff-tab" data-active={activeDiff || undefined}>
-                    <TabsTrigger
-                      value="diffs"
-                      variant="control"
-                      render={
-                        <Button
-                          variant={activeDiff ? "secondary" : "ghost"}
-                          size="compact"
-                          className="chat-diff-tab-trigger tracking-tight"
-                        />
-                      }
-                    >
-                      <GitBranchIcon />
-                      <span className="florets-control-label">Diffs</span>
-                    </TabsTrigger>
-                    <Button
-                      variant="ghost"
-                      size="icon-compact"
-                      className="chat-diff-tab-close"
-                      aria-label="Close Diffs"
-                      title="Close Diffs"
-                      onClick={() => {
-                        setDiffChat(null);
-                        setActiveDiff(false);
-                        document
-                          .querySelector<HTMLButtonElement>('button[aria-label="Chat views"]')
-                          ?.focus();
-                      }}
-                    >
-                      <XIcon />
-                    </Button>
-                  </div>
-                </TabsList>
+                )}
+              </div>
+              {error !== "" && (
+                <Alert role="alert" className="mt-6">
+                  {error}
+                </Alert>
               )}
-              {existingChat && (
-                <ChatHeaderActions
-                  sideOpen={sideOpen}
-                  onSideToggle={() => {
-                    updatePanel({ open: !sideOpen });
-                  }}
-                  usage={detail?.usage}
-                  diffsOpen={diffChat === id && activeDiff}
-                  onDiffsChange={(open) => {
-                    if (open) setDiffChat(id);
-                    setActiveDiff(open);
+              {isNew && projects === undefined && error === "" && (
+                <Text role="status">Loading projects…</Text>
+              )}
+              {isNew && projects?.length === 0 && (
+                <div className="space-y-5">
+                  <Heading level={2}>Connect your first project</Heading>
+                  <Text tone="muted">Choose a GitHub repository so Flora can start working.</Text>
+                  <ButtonLink href="#projects/new">Connect a project</ButtonLink>
+                </div>
+              )}
+              {isNew && projects !== undefined && projects.length > 0 && (
+                <NewChatComposer
+                  projects={projects}
+                  selectedProject={selectedProject}
+                  onProjectChange={setSelectedProjectID}
+                  busy={busy}
+                  onSend={(event) => {
+                    void send(event);
                   }}
                 />
               )}
-            </div>
-            {error !== "" && (
-              <Alert role="alert" className="mt-6">
-                {error}
-              </Alert>
-            )}
-            {isNew && projects === undefined && error === "" && (
-              <Text role="status">Loading projects…</Text>
-            )}
-            {isNew && projects?.length === 0 && (
-              <div className="space-y-5">
-                <Heading level={2}>Connect your first project</Heading>
-                <Text tone="muted">Choose a GitHub repository so Flora can start working.</Text>
-                <ButtonLink href="#projects/new">Connect a project</ButtonLink>
-              </div>
-            )}
-            {isNew && projects !== undefined && projects.length > 0 && (
-              <NewChatComposer
-                projects={projects}
-                selectedProject={selectedProject}
-                onProjectChange={setSelectedProjectID}
-                busy={busy}
-                onSend={(event) => {
-                  void send(event);
+              {id !== "" && !isNew && detail === undefined && error === "" && (
+                <Text size="md" role="status" className="mt-8">
+                  Loading…
+                </Text>
+              )}
+              {detail && (
+                <div className="chat-review-layout">
+                  <TabsContent
+                    value="chat"
+                    keepMounted
+                    className="chat-view-panel min-h-0 min-w-0 flex-1"
+                  >
+                    <div className="flex h-full min-h-0 min-w-0 flex-col">
+                      <ChatDetail
+                        runMessageID={new URLSearchParams(path.split("?")[1]).get("run") ?? ""}
+                        pulls={pulls}
+                        id={id}
+                        detail={detail}
+                        activity={activity}
+                        disconnected={disconnected}
+                        busy={busy}
+                        onControl={(action) => {
+                          void controlWork(action);
+                        }}
+                        onSend={(event) => {
+                          void send(event);
+                        }}
+                      >
+                        {questionError !== "" && (
+                          <Text className="mt-6" role="status">
+                            {questionError}
+                          </Text>
+                        )}
+                        {questions.map((q) => (
+                          <QuestionForm
+                            key={q.id}
+                            question={q}
+                            chatID={id}
+                            onError={report}
+                            onAnswered={() => {
+                              setQuestions((rows) => rows.filter((row) => row.id !== q.id));
+                            }}
+                          />
+                        ))}
+                      </ChatDetail>
+                    </div>
+                  </TabsContent>
+                  {diffChat === id && (
+                    <TabsContent
+                      value="diffs"
+                      keepMounted
+                      className="chat-view-panel -mx-4 min-h-0 min-w-0 flex-1 sm:-mx-8"
+                    >
+                      <Changes key={id} chatID={id} onExpired={onExpired} />
+                    </TabsContent>
+                  )}
+                </div>
+              )}
+            </section>
+          </Tabs>
+        </ResizablePanel>
+        {sideOpen && (
+          <>
+            <ResizableHandle aria-label="Resize side panel" className="chat-split-handle" />
+            <ResizablePanel
+              id="review"
+              defaultSize={`${panelState.width}%`}
+              minSize="300px"
+              className="chat-side-pane min-w-0"
+            >
+              <ChatSidePanel
+                key={id}
+                chatID={id}
+                pulls={pulls}
+                onExpired={onExpired}
+                onClose={() => {
+                  updatePanel({ open: false });
+                  requestAnimationFrame(() => {
+                    document
+                      .querySelector<HTMLButtonElement>('button[aria-label="Open side panel"]')
+                      ?.focus();
+                  });
                 }}
               />
-            )}
-            {id !== "" && !isNew && detail === undefined && error === "" && (
-              <Text size="md" role="status" className="mt-8">
-                Loading…
-              </Text>
-            )}
-            {detail && (
-              <div className="chat-review-layout">
-                <TabsContent
-                  value="chat"
-                  keepMounted
-                  className="chat-view-panel min-h-0 min-w-0 flex-1"
-                >
-                  <div className="flex h-full min-h-0 min-w-0 flex-col">
-                    <ChatDetail
-                      runMessageID={new URLSearchParams(path.split("?")[1]).get("run") ?? ""}
-                      pulls={pulls}
-                      id={id}
-                      detail={detail}
-                      activity={activity}
-                      disconnected={disconnected}
-                      busy={busy}
-                      onControl={(action) => {
-                        void controlWork(action);
-                      }}
-                      onSend={(event) => {
-                        void send(event);
-                      }}
-                    >
-                      {questionError !== "" && (
-                        <Text className="mt-6" role="status">
-                          {questionError}
-                        </Text>
-                      )}
-                      {questions.map((q) => (
-                        <QuestionForm
-                          key={q.id}
-                          question={q}
-                          chatID={id}
-                          onError={report}
-                          onAnswered={() => {
-                            setQuestions((rows) => rows.filter((row) => row.id !== q.id));
-                          }}
-                        />
-                      ))}
-                    </ChatDetail>
-                  </div>
-                </TabsContent>
-                {diffChat === id && (
-                  <TabsContent
-                    value="diffs"
-                    keepMounted
-                    className="chat-view-panel -mx-4 min-h-0 min-w-0 flex-1 sm:-mx-8"
-                  >
-                    <Changes key={id} chatID={id} onExpired={onExpired} />
-                  </TabsContent>
-                )}
-              </div>
-            )}
-          </section>
-        </Tabs>
-      </ResizablePanel>
-      {sideOpen && (
-        <>
-          <ResizableHandle aria-label="Resize side panel" className="chat-split-handle" />
-          <ResizablePanel
-            id="review"
-            defaultSize={`${panelState.width}%`}
-            minSize="300px"
-            className="chat-side-pane min-w-0"
-          >
-            <ChatSidePanel
-              key={id}
-              chatID={id}
-              pulls={pulls}
-              onExpired={onExpired}
-              onClose={() => {
-                updatePanel({ open: false });
-                requestAnimationFrame(() => {
-                  document
-                    .querySelector<HTMLButtonElement>('button[aria-label="Open side panel"]')
-                    ?.focus();
-                });
-              }}
-            />
-          </ResizablePanel>
-        </>
-      )}
-    </ResizablePanelGroup>
+            </ResizablePanel>
+          </>
+        )}
+      </ResizablePanelGroup>
+    </SubagentsContext>
   );
 }
 
@@ -800,307 +771,4 @@ function FollowUpComposer({
       />
     </form>
   );
-}
-
-function ConversationMessage({ message: m }: { message: Message }) {
-  const parts = m.Payload.parts.filter(
-    (part) => part.type !== "step-start" && part.type !== "step-finish",
-  );
-  const failure = m.Payload.info?.error ?? null;
-  const [copyStatus, setCopyStatus] = useState("Copy");
-  const copyText =
-    parts
-      .filter((part) => part.type === "text")
-      .map((part) => part.text ?? "")
-      .join("\n\n") || m.Text;
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(copyText);
-      setCopyStatus("Copied");
-    } catch {
-      setCopyStatus("Could not copy");
-    }
-  }
-
-  return (
-    <div className="group min-w-0">
-      <ChatMessage align={m.Role === "user" ? "end" : "start"}>
-        <MessageContent>
-          <span className="sr-only">{m.Role === "user" ? "You" : "Flora"}</span>
-          <Bubble variant={m.Role === "user" ? "muted" : "ghost"}>
-            <BubbleContent className="space-y-4 text-sm leading-6">
-              {parts.length > 0 ? (
-                parts.map((part, index) => (
-                  <MessagePart key={part.id ?? index} part={part} user={m.Role === "user"} />
-                ))
-              ) : (
-                <MessagePart part={{ type: "text", text: m.Text }} user={m.Role === "user"} />
-              )}
-            </BubbleContent>
-          </Bubble>
-          {failure !== null && (
-            <Alert variant="destructive" role="alert">
-              <pre className="text-sm break-words whitespace-pre-wrap">
-                {JSON.stringify(failure, null, 2)}
-              </pre>
-            </Alert>
-          )}
-          {copyText !== "" && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="w-fit text-xs text-muted-foreground md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
-              onClick={() => {
-                void copy();
-              }}
-              aria-label="Copy message"
-            >
-              <span role="status">{copyStatus}</span>
-            </Button>
-          )}
-        </MessageContent>
-      </ChatMessage>
-    </div>
-  );
-}
-
-function WorkSummary({
-  steps,
-  active,
-  failed,
-}: {
-  steps: WorkStep[];
-  active: boolean;
-  failed: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(() => new Set());
-  const root = useRef<HTMLDivElement>(null);
-  function stepDetails(step: WorkStep) {
-    return (
-      <div key={step.id} data-step-id={step.id}>
-        <MessagePart
-          part={step.part}
-          user={false}
-          live={active}
-          expanded={expandedSteps.has(step.id)}
-          onExpandedChange={(expanded) => {
-            setExpandedSteps((current) => {
-              const next = new Set(current);
-              if (expanded) next.add(step.id);
-              else next.delete(step.id);
-              return next;
-            });
-            if (expanded && active && !open) {
-              setOpen(true);
-              requestAnimationFrame(() => {
-                root.current
-                  ?.querySelector<HTMLButtonElement>(
-                    `[data-step-id="${CSS.escape(step.id)}"] button`,
-                  )
-                  ?.focus();
-              });
-            }
-          }}
-        />
-      </div>
-    );
-  }
-  const timing = workTiming(steps, active);
-  const now = useActivityClock(active && timing !== undefined);
-  const failures = steps.filter((step) => isFailedPart(step.part)).length;
-  const running = steps.filter((step) => isLivePart(step.part));
-  const elapsed = timing
-    ? formatDuration(Math.max(0, (timing.end ?? now) - timing.start))
-    : undefined;
-  let title = elapsed === undefined ? "Work details" : `Worked for ${elapsed}`;
-  if (active) title = elapsed === undefined ? "Working" : `Working for ${elapsed}`;
-  return (
-    <div ref={root} data-slot="work-summary" className="space-y-2">
-      <Trace>
-        <TraceCollapsible open={open} onOpenChange={setOpen}>
-          <TraceCollapsibleTrigger>
-            <TraceLine status={failed ? "error" : undefined}>
-              <TraceTitle>{title}</TraceTitle>
-              <TraceDescription>
-                {steps.length} {steps.length === 1 ? "step" : "steps"}
-                {failures > 0 && (
-                  <>
-                    {" · "}
-                    <span className="inline-flex items-center gap-1 text-destructive">
-                      {failures} failed
-                      <CrossCircledIcon aria-hidden="true" className="size-3.5 shrink-0" />
-                    </span>
-                  </>
-                )}
-              </TraceDescription>
-            </TraceLine>
-          </TraceCollapsibleTrigger>
-          <TraceCollapsibleContent className="space-y-3">
-            {steps.map((step) => stepDetails(step))}
-          </TraceCollapsibleContent>
-        </TraceCollapsible>
-      </Trace>
-      {active && !open && (
-        <div aria-label="Current activity" className="space-y-2">
-          {running.map((step) => stepDetails(step))}
-          {running.length === 0 && (
-            <FlowerMark className="text-muted-foreground motion-safe:animate-pulse" />
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function useActivityClock(ticking: boolean) {
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    if (!ticking) return;
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-    return () => {
-      clearInterval(timer);
-    };
-  }, [ticking]);
-  return now;
-}
-
-function MessagePart({
-  part: p,
-  user,
-  live = false,
-  expanded,
-  onExpandedChange,
-}: {
-  part: Part;
-  user: boolean;
-  live?: boolean;
-  expanded?: boolean;
-  onExpandedChange?: (expanded: boolean) => void;
-}) {
-  const [localOpen, setLocalOpen] = useState(false);
-  if (p.type === "text") {
-    return user ? (
-      <div className="whitespace-pre-wrap">{p.text}</div>
-    ) : (
-      <ReplyText>{p.text ?? ""}</ReplyText>
-    );
-  }
-  if (p.type === "reasoning") {
-    return (
-      <Trace>
-        <TraceCollapsible
-          open={expanded ?? localOpen}
-          onOpenChange={onExpandedChange ?? setLocalOpen}
-        >
-          <TraceCollapsibleTrigger>
-            <TraceLine>
-              <TraceTitle>
-                {live && p.time?.end === undefined ? "Thinking" : "Reasoning"}
-              </TraceTitle>
-              {(live || p.time?.end !== undefined) && (
-                <ActivityDuration start={p.time?.start} end={p.time?.end} />
-              )}
-            </TraceLine>
-          </TraceCollapsibleTrigger>
-          <TraceCollapsibleContent className="whitespace-pre-wrap">
-            {p.text}
-          </TraceCollapsibleContent>
-        </TraceCollapsible>
-      </Trace>
-    );
-  }
-  if (p.type === "tool") {
-    const output = p.state?.output ?? "";
-    const error = p.state?.error ?? "";
-    const status = p.state?.status;
-    let description = status;
-    if (!live && isLivePart(p)) description = "Incomplete";
-    if (error !== "" || status === "error") description = "Failed";
-    let traceStatus: "error" | "running" | "pending" | undefined;
-    if (error !== "" || status === "error") traceStatus = "error";
-    else if (live && (status === "running" || status === "pending")) traceStatus = status;
-    return (
-      <Trace>
-        <TraceCollapsible
-          open={expanded ?? localOpen}
-          onOpenChange={onExpandedChange ?? setLocalOpen}
-        >
-          <TraceCollapsibleTrigger>
-            <TraceLine status={traceStatus}>
-              <TraceTitle>{toolTitle(p)}</TraceTitle>
-              <TraceDescription>{description}</TraceDescription>
-              {(live || p.state?.time?.end !== undefined) && (
-                <ActivityDuration start={p.state?.time?.start} end={p.state?.time?.end} />
-              )}
-            </TraceLine>
-          </TraceCollapsibleTrigger>
-          <TraceCollapsibleContent>
-            <pre className="overflow-auto text-xs break-words whitespace-pre-wrap">
-              {JSON.stringify(p.state?.input, null, 2)}
-            </pre>
-            {output !== "" && (
-              <pre className="mt-3 max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
-                {output}
-              </pre>
-            )}
-            {error !== "" && (
-              <pre role="alert" className="mt-3 text-xs break-words whitespace-pre-wrap">
-                {error}
-              </pre>
-            )}
-          </TraceCollapsibleContent>
-        </TraceCollapsible>
-      </Trace>
-    );
-  }
-  return (
-    <Trace>
-      <TraceCollapsible
-        open={expanded ?? localOpen}
-        onOpenChange={onExpandedChange ?? setLocalOpen}
-      >
-        <TraceCollapsibleTrigger>
-          <TraceLine>
-            <TraceTitle>{p.type}</TraceTitle>
-          </TraceLine>
-        </TraceCollapsibleTrigger>
-        <TraceCollapsibleContent>
-          <pre className="overflow-auto text-xs break-words whitespace-pre-wrap">
-            {JSON.stringify(p, null, 2)}
-          </pre>
-        </TraceCollapsibleContent>
-      </TraceCollapsible>
-    </Trace>
-  );
-}
-
-function toolTitle(part: Part) {
-  if (part.state?.title !== undefined && part.state.title !== "") return part.state.title;
-  const names: Record<string, string> = {
-    bash: "Running command",
-    read: "Reading file",
-    edit: "Editing file",
-    write: "Writing file",
-    grep: "Searching files",
-    glob: "Finding files",
-    question: "Waiting for your answer",
-    webfetch: "Fetching page",
-  };
-  const input = toolDisplayInputSchema.parse(part.state?.input);
-  if (input.description !== undefined && input.description !== "") return input.description;
-  if (input.filePath !== undefined) {
-    return `${names[part.tool ?? ""] ?? part.tool ?? "File"} ${input.filePath}`;
-  }
-  return names[part.tool ?? ""] ?? part.tool ?? "Tool";
-}
-
-/** Uses recorded runtime timestamps so reconnecting does not restart the elapsed time. */
-function ActivityDuration({ start, end }: { start: number | undefined; end?: number | undefined }) {
-  const now = useActivityClock(start !== undefined && end === undefined);
-  if (start === undefined) return null;
-  return <TraceDescription>{formatDuration(Math.max(0, (end ?? now) - start))}</TraceDescription>;
 }

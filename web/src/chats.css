@@ -106,13 +106,16 @@ details[open] > .diff-file-heading .diff-file-caret {
   min-width: 300px;
 }
 @media (max-width: 900px) {
-  .chat-split-open .chat-main-pane,
+  .chat-split-open [data-panel]:has(> .chat-main-pane),
   .chat-split-open .chat-split-handle {
-    display: none;
+    display: none !important;
+  }
+  .chat-split-open [data-panel]:has(> .chat-side-pane) {
+    min-width: 0;
+    flex-grow: 1 !important;
   }
   .chat-split-open .chat-side-pane {
     min-width: 0;
-    flex-grow: 1 !important;
   }
 }
 

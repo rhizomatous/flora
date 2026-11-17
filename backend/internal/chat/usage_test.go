@@ -77,6 +77,14 @@ func TestUsageCollectsDescendantsOnceWithoutMixingTranscripts(t *testing.T) {
 	if err != nil || len(messages) != 1 {
 		t.Fatal("usage collection inserted child messages into the main transcript")
 	}
+	agents, err := s.Store.Subagents(ctx, c.ID)
+	if err != nil || len(agents) != 2 {
+		t.Fatalf("missing descendants: %+v %v", agents, err)
+	}
+	childMessages, err := s.Store.SubagentMessages(ctx, c.ID, "child")
+	if err != nil || len(childMessages) != 2 || childMessages[0].Role != "user" {
+		t.Fatalf("missing child prompt: %+v %v", childMessages, err)
+	}
 	unavailable = true
 	s.captureUsage(ctx, rt, c, history, nil)
 	check(true)
@@ -283,5 +291,28 @@ func TestUsageReconciliationDoesNotStartStoppedRuntime(t *testing.T) {
 	u, err := s.Store.ChatUsage(ctx, c.ID)
 	if err != nil || u.Collection != "runtime_stopped" || base.starts.Load() != 0 || f.prompts.Load() != 0 {
 		t.Fatalf("stopped runtime was not left alone: %+v %v", u, err)
+	}
+}
+
+func TestSubagentStatusFollowsLatestExchange(t *testing.T) {
+	user := json.RawMessage(`{"info":{"role":"user"}}`)
+	complete := json.RawMessage(`{"info":{"role":"assistant","finish":"stop","time":{"completed":1}}}`)
+	failed := json.RawMessage(`{"info":{"role":"assistant","error":{"name":"ProviderError"}}}`)
+	for _, tc := range []struct {
+		name    string
+		history []json.RawMessage
+		want    string
+	}{
+		{"empty", nil, "unknown"},
+		{"working", []json.RawMessage{user}, "working"},
+		{"finished", []json.RawMessage{user, complete}, "idle"},
+		{"resumed", []json.RawMessage{user, complete, user}, "working"},
+		{"failed", []json.RawMessage{user, failed}, "failed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := subagentStatus(tc.history); got != tc.want {
+				t.Fatalf("status=%s want %s", got, tc.want)
+			}
+		})
 	}
 }

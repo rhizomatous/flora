@@ -297,7 +297,14 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 		captureReady = ready
 		captureErrors = make(chan error, 1)
 		result := captureErrors
-		go func() { result <- rt.stream(turnCtx, c.SessionID, ready, captureEvent) }()
+		go func() {
+			result <- rt.stream(turnCtx, c.SessionID, ready, captureEvent, func(session, kind string, payload json.RawMessage) error {
+				if kind == "message.part.delta" {
+					return nil
+				}
+				return s.Store.CaptureSubagentEvent(turnCtx, chatID, session, kind, redaction.JSON(payload, secrets...))
+			})
+		}()
 	}
 	startCapture(ready)
 	defer func() {

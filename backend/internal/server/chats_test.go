@@ -239,3 +239,52 @@ func TestChatDetailIncludesUsageWithoutLeakingChildTranscript(t *testing.T) {
 		t.Fatalf("incorrect usage detail: %+v", detail)
 	}
 }
+
+func TestSavedSubagentAPIWithoutRuntime(t *testing.T) {
+	store, _, authentication, token, project, cleanup := chatAPI(t)
+	defer cleanup()
+	ctx := context.Background()
+	c, err := store.CreateChat(ctx, project.ID, "Subagents", "flora@sha256:"+strings.Repeat("a", 64), "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.BindRuntime(ctx, c.ID, "container", "root"); err != nil {
+		t.Fatal(err)
+	}
+	raw := json.RawMessage(`{"info":{"id":"prompt","sessionID":"child","role":"user","time":{"created":1}},"parts":[{"type":"text","text":"Inspect code"}]}`)
+	if err := store.SaveSubagent(ctx, c.ID, storage.Subagent{ID: "child", ParentID: "root", Title: "Inspect code", Status: "idle", Collection: "complete"}, []json.RawMessage{raw}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewUnstartedServer(nil)
+	origin := "http://" + server.Listener.Addr().String()
+	server.Config.Handler = New(webassets.FS(), authentication, settings.New(store), origin)
+	server.Start()
+	defer server.Close()
+	for _, tc := range []struct {
+		path          string
+		authenticated bool
+		status        int
+	}{
+		{"/api/chats/" + c.ID + "/subagents/child", false, 401},
+		{"/api/chats/" + c.ID + "/subagents/child", true, 200},
+		{"/api/chats/foreign/subagents/child", true, 404},
+		{"/api/chats/" + c.ID + "/subagents/missing", true, 404},
+	} {
+		req, _ := http.NewRequest("GET", server.URL+tc.path, nil)
+		if tc.authenticated {
+			req.AddCookie(&http.Cookie{Name: cookieName, Value: token})
+		}
+		res, err := server.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		if res.StatusCode != tc.status {
+			t.Fatalf("%s: %d %s", tc.path, res.StatusCode, body)
+		}
+		if tc.status == 200 && !strings.Contains(string(body), "Inspect code") {
+			t.Fatal("missing saved prompt")
+		}
+	}
+}
