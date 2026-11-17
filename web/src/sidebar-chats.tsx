@@ -298,9 +298,10 @@ export function SidebarChats({
       {pinned.length > 0 && (
         <section aria-label="Pinned" className="florets-navigation-group">
           <div className="florets-navigation-group-heading">
-            <span className="flex items-center gap-2 px-2 py-2 text-xs text-muted-foreground">
-              <PinIcon className="size-4" />
-              Pinned <span>{pinned.length}</span>
+            <span className="flex min-w-0 items-center gap-[9px]">
+              <PinIcon className="size-3.5 shrink-0" />
+              <span className="truncate">Pinned</span>
+              <span className="florets-navigation-count">{pinned.length}</span>
             </span>
           </div>
           <ul>
