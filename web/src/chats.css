@@ -15,7 +15,7 @@
 }
 .chat-composer-dock .follow-up-composer,
 .chat-pending-questions {
-  background: var(--background);
+  background: var(--surface-canvas);
 }
 
 .chat-main-pane {

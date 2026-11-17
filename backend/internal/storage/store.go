@@ -218,6 +218,9 @@ const (
 )
 
 type Chat struct {
+	PinnedAt                                            string
+	Archived                                            bool
+	OrganizationRevision                                int64
 	ID, ProjectID, Title                                string
 	Configuration                                       Configuration
 	ImageDigest, HarnessVersion, ContainerID, SessionID string
@@ -401,7 +404,7 @@ func (s *Store) Chat(ctx context.Context, chatID string) (Chat, error) {
 	var config string
 	// Read the row and starting commits in one snapshot.
 	err := s.write(ctx, func(tx *sql.Tx) error {
-		err := tx.QueryRowContext(ctx, `SELECT id,project_id,title,config,image_digest,harness_version,coalesce(container_id,''),coalesce(session_id,''),status,status_reason,coalesce(active_message_id,''),created_at,updated_at FROM chats WHERE id=?`, chatID).Scan(&c.ID, &c.ProjectID, &c.Title, &config, &c.ImageDigest, &c.HarnessVersion, &c.ContainerID, &c.SessionID, &c.Status, &c.StatusReason, &c.ActiveMessageID, &c.CreatedAt, &c.UpdatedAt)
+		err := tx.QueryRowContext(ctx, `SELECT id,project_id,title,config,image_digest,harness_version,coalesce(container_id,''),coalesce(session_id,''),status,status_reason,coalesce(active_message_id,''),created_at,updated_at,pinned_at,archived,organization_revision FROM chats WHERE id=?`, chatID).Scan(&c.ID, &c.ProjectID, &c.Title, &config, &c.ImageDigest, &c.HarnessVersion, &c.ContainerID, &c.SessionID, &c.Status, &c.StatusReason, &c.ActiveMessageID, &c.CreatedAt, &c.UpdatedAt, &c.PinnedAt, &c.Archived, &c.OrganizationRevision)
 		if err != nil {
 			return found(err)
 		}

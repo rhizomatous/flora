@@ -457,7 +457,7 @@ function ChartRadialExample() {
                 gridType="circle"
                 radialLines={false}
                 stroke="none"
-                className="first:fill-muted last:fill-background"
+                className="first:fill-muted last:fill-surface-canvas"
                 polarRadius={[86, 74]}
               />
               <RadialBar dataKey="visitors" background />

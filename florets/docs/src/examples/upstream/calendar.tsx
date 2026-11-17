@@ -200,7 +200,7 @@ function CalendarWithTime() {
         <CardContent>
           <Calendar mode="single" selected={date} onSelect={setDate} className="p-0" />
         </CardContent>
-        <CardFooter className="border-t bg-card">
+        <CardFooter className="border-t bg-surface-panel">
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="time-from">Start Time</FieldLabel>

@@ -157,3 +157,27 @@ func TestAttachmentMessageLimitsAreAtomic(t *testing.T) {
 		t.Fatal("20 MiB acceptance failed")
 	}
 }
+
+func TestAttachmentsUpgradePreservesChatOrganization(t *testing.T) {
+	root := t.TempDir()
+	s := openTest(t, root)
+	_, chat := fixture(t, s)
+	_, err := s.db.Exec("UPDATE chats SET pinned_at=?,archived=1,organization_revision=3 WHERE id=?", "2026-11-17T00:00:00Z", chat.ID)
+	must(t, err)
+	_, err = s.db.Exec("DROP TABLE attachments; ALTER TABLE chat_requests DROP COLUMN attachments; PRAGMA user_version=13")
+	must(t, err)
+	must(t, s.Close())
+	s = openTest(t, root)
+	saved, err := s.Chat(ctx, chat.ID)
+	must(t, err)
+	if saved.PinnedAt != "2026-11-17T00:00:00Z" || !saved.Archived || saved.OrganizationRevision != 3 {
+		t.Fatalf("upgrade changed organization: %+v", saved)
+	}
+	file, err := s.PutAttachment(ctx, saved.ProjectID, "upgraded-attachment-001", "task.txt", []byte("new input"))
+	must(t, err)
+	accepted, err := s.AcceptMessage(ctx, saved.ID, "after-upgrade", "", file.ID)
+	must(t, err)
+	if accepted.Message.ID == "" {
+		t.Fatal("upgraded chat cannot accept attachments")
+	}
+}
