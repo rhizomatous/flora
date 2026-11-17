@@ -222,7 +222,7 @@ function History({ rows }: { rows: UsageGroup[] }) {
         </TableHeader>
         <TableBody>
           {sorted.map((row) => (
-            <TableRow key={row.id} className="border-b border-border/60">
+            <TableRow key={row.id} className="border-b border-border">
               <TableCell className="min-w-48 py-4">
                 <a
                   href={`#chats/${encodeURIComponent(row.id)}`}

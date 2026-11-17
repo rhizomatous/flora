@@ -62,7 +62,7 @@ function RepositoryFields({ repositories }: { repositories: Repository[] }) {
         <FieldSet
           key={key}
           data-repository-key={key}
-          className="space-y-4 rounded-md border border-foreground/20 p-4"
+          className="space-y-4 rounded-md border border-border p-4"
         >
           <legend className="px-1 text-sm font-medium">Repository {index + 1}</legend>
           <FieldLabel className="w-full flex-col items-start">

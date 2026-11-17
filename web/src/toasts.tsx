@@ -19,7 +19,7 @@ export function CompletionToasts({
       {toasts.map((t) => (
         <div
           key={t.Sequence}
-          className="rounded-md border border-foreground/40 bg-surface-overlay p-4 shadow-lg"
+          className="rounded-md border border-border bg-surface-overlay p-4 shadow-lg"
         >
           <Text className="break-words">
             <Link className="font-medium" href={`#chats/${encodeURIComponent(t.ChatID)}`}>

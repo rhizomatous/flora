@@ -14,7 +14,16 @@ for (const width of [1440, 390]) {
       const viewport = main.locator(":scope > div");
       const headerBounds = await header.boundingBox();
       await expect(main).toHaveCSS("overflow", "hidden");
-      if (width >= 768) await expect(main).toHaveCSS("border-top-left-radius", "14px");
+      if (width >= 768) {
+        await expect(main).toHaveCSS("border-top-left-radius", "14px");
+        const border = await page
+          .getByRole("textbox", { name: "Name", exact: true })
+          .evaluate((element) => getComputedStyle(element).borderTopColor);
+        expect(await main.evaluate((element) => getComputedStyle(element).boxShadow)).toContain(
+          border,
+        );
+        await expect(header).toHaveCSS("border-bottom-color", border);
+      }
       await viewport.evaluate((element) => {
         element.scrollTop = element.scrollHeight;
       });

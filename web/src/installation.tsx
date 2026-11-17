@@ -164,7 +164,7 @@ export function Installation({
         </Button>
       </form>
       <section
-        className="mt-10 space-y-4 border-t border-foreground/20 pt-6"
+        className="mt-10 space-y-4 border-t border-border pt-6"
         aria-labelledby="diagnostics-heading"
       >
         <Heading level={2} id="diagnostics-heading">

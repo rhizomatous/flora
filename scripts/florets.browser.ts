@@ -40,12 +40,23 @@ try {
     assert.notEqual(panelColor, "rgba(0, 0, 0, 0)");
     await expect(standalone).toHaveCSS("background-color", panelColor);
     await expect(nested).toHaveCSS("background-color", panelColor);
+    const borderColor = await standalone.evaluate(
+      (element) => getComputedStyle(element).borderTopColor,
+    );
+    await expect(nested).toHaveCSS("border-top-color", borderColor);
+    assert.ok(
+      await panel.evaluate(
+        (element, color) => getComputedStyle(element).boxShadow.includes(color),
+        borderColor,
+      ),
+    );
     await expect(panel).toHaveCSS("padding-top", "0px");
     await expect(panel).toHaveCSS("row-gap", "0px");
     if (dark) assert.equal(panelColor, "rgb(25, 25, 25)");
     await page.getByRole("button", { name: "Open overlay", exact: true }).click();
     const overlay = page.locator('[data-slot="popover-content"]');
     await expect(overlay).toBeVisible();
+    await expect(overlay).toHaveCSS("border-top-color", borderColor);
     if (dark) await expect(overlay).toHaveCSS("background-color", "rgb(32, 32, 32)");
     await page.keyboard.press("Escape");
   }
