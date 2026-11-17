@@ -10,6 +10,7 @@ import {
   Input,
   LoadingStatus,
   Text,
+  Toaster,
   Wordmark,
   SidebarProvider,
   SidebarInset,
@@ -208,7 +209,7 @@ function App() {
   const Layout = ready ? SidebarProvider : "div";
   const conversation = ready && path.startsWith("chats/") && !path.startsWith("chats/new");
   const pullsPage = ready && path === "pulls";
-  const chatsPage = ready && path === "chats";
+  const chatsPage = ready && path.split("?")[0] === "chats";
   const automationsPage = ready && path === "automations";
   const automationEditor = ready && path.startsWith("automations/");
   let contentLayout = "mx-auto w-full max-w-6xl p-4 sm:p-8";
@@ -223,6 +224,7 @@ function App() {
 
   return (
     <Layout className={ready ? "min-h-svh" : "mx-auto min-h-svh max-w-4xl px-6 py-10 sm:px-10"}>
+      {ready && <Toaster id="chat-organization" position="bottom-right" closeButton />}
       {ready ? (
         <Sidebar path={path} chats={notifications.chats} onExpired={onExpired}>
           <WorkspaceMenu

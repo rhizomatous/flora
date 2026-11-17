@@ -83,6 +83,18 @@ func (a *api) chatViews(ctx context.Context, chats []storage.Chat) []chatView {
 
 func (a *api) chatRoutes(mux *http.ServeMux) {
 	store := a.settings.Store
+	mux.HandleFunc("PATCH /api/chats/{id}", func(w http.ResponseWriter, r *http.Request) {
+		var in storage.ChatOrganization
+		if !decodeChat(w, r, &in) {
+			return
+		}
+		c, err := store.OrganizeChat(r.Context(), r.PathValue("id"), in)
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		jsonResponse(w, 200, a.chatView(r.Context(), c))
+	})
 	mux.HandleFunc("GET /api/notifications", func(w http.ResponseWriter, r *http.Request) {
 		var after *int64
 		if r.URL.Query().Has("after") {

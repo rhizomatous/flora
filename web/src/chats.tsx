@@ -38,6 +38,7 @@ import {
   ChatReviewStrip,
 } from "./chat-controls";
 import { ChatList } from "./chat-list";
+import { latestOrganization } from "./chat-organization";
 import { useChatPanelState } from "./chat-panel-state";
 import {
   type Chat,
@@ -322,8 +323,23 @@ export function Chats({
 
   const [panelState, updatePanel] = useChatPanelState(id);
 
-  if (id === "") return <ChatList list={list} projects={projects} error={error || listError} />;
+  if (id === "") {
+    return (
+      <ChatList
+        list={list}
+        projects={projects}
+        error={error || listError}
+        archived={new URLSearchParams(path.split("?")[1]).get("view") === "archived"}
+      />
+    );
+  }
 
+  const currentChat = detail?.chat
+    ? latestOrganization(
+        detail.chat,
+        list?.find((chat) => chat.ID === id),
+      )
+    : undefined;
   const pulls = list?.find((chat) => chat.ID === id)?.pulls ?? detail?.chat.pulls;
   const existingChat = !isNew && id !== "";
   const headerLayout = existingChat
@@ -334,7 +350,7 @@ export function Chats({
   function title() {
     if (isNew) return "New chat";
     if (id === "") return "Chats";
-    const saved = detail?.chat.Title ?? "";
+    const saved = currentChat?.Title ?? "";
     return saved === "" ? "Chat" : saved;
   }
 
@@ -388,7 +404,7 @@ export function Chats({
                   className={mainTabbed ? "sr-only" : "min-w-0 truncate text-base"}
                 >
                   {existingChat && !mainTabbed ? (
-                    <ChatTitle title={title()} chat={detail?.chat} pulls={pulls} />
+                    <ChatTitle title={title()} chat={currentChat} pulls={pulls} />
                   ) : (
                     title()
                   )}
@@ -400,7 +416,7 @@ export function Chats({
                   >
                     <ChatTitle
                       title={title()}
-                      chat={detail?.chat}
+                      chat={currentChat}
                       pulls={pulls}
                       tabbed
                       active={panelState.mainView === "chat"}
@@ -488,6 +504,7 @@ export function Chats({
                 )}
                 {existingChat && (
                   <ChatHeaderActions
+                    chat={currentChat}
                     sideOpen={sideOpen}
                     onSideToggle={() => {
                       updatePanel({ open: !sideOpen });
@@ -503,6 +520,17 @@ export function Chats({
                   />
                 )}
               </div>
+              {currentChat?.Archived === true && (
+                <div
+                  role="status"
+                  className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2 text-xs text-muted-foreground"
+                >
+                  <span>Archived chat</span>
+                  <a href="#chats?view=archived" className="shrink-0 underline underline-offset-4">
+                    View archived chats
+                  </a>
+                </div>
+              )}
               {error !== "" && (
                 <Alert role="alert" className="mt-6">
                   {error}
