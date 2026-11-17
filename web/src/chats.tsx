@@ -59,7 +59,8 @@ import { NewChatComposer } from "./new-chat-composer";
 import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
 import { QuestionForm } from "./question";
 import { errorMessage, isExpired, request } from "./request";
-import { SubagentsContext } from "./subagent-state";
+import { SubagentConversation } from "./subagent-conversation";
+import { SubagentsContext, subagentLabel } from "./subagent-state";
 import { buildTranscript } from "./transcript";
 import { text } from "./ui";
 
@@ -108,8 +109,6 @@ export function Chats({
   list: Chat[] | undefined;
   listError: string;
 }) {
-  const [diffChat, setDiffChat] = useState<string | null>(null);
-  const [activeDiff, setActiveDiff] = useState(false);
   // Undefined until the project list loads.
   const [projects, setProjects] = useState<ProjectSummary[]>();
   const [detail, setDetail] = useState<Detail>();
@@ -340,6 +339,14 @@ export function Chats({
   }
 
   const sideOpen = existingChat && panelState.open;
+  const agents = detail?.chat.ID === id ? detail.subagents : [];
+  const mainAgents = agents.filter((agent) => panelState.mainSubagentTabs.includes(agent.id));
+  const mainTabbed = panelState.mainDiffOpen || mainAgents.length > 0;
+  const activeDiff = panelState.mainView === "diffs";
+  function selectMain(view: string) {
+    updatePanel({ mainView: view });
+  }
+
   return (
     <SubagentsContext
       value={{ chatID: id, agents: detail?.chat.ID === id ? detail.subagents : [] }}
@@ -360,9 +367,9 @@ export function Chats({
           className="chat-main-pane flex min-w-0 flex-col px-4 sm:px-8"
         >
           <Tabs
-            value={diffChat === id && activeDiff ? "diffs" : "chat"}
+            value={panelState.mainView}
             onValueChange={(value) => {
-              setActiveDiff(value === "diffs");
+              selectMain(String(value));
             }}
             className="min-h-0 flex-1 gap-0"
           >
@@ -378,58 +385,105 @@ export function Chats({
                   aria-label={title()}
                   ref={heading}
                   tabIndex={-1}
-                  className={diffChat === id ? "sr-only" : "min-w-0 truncate text-base"}
+                  className={mainTabbed ? "sr-only" : "min-w-0 truncate text-base"}
                 >
-                  {existingChat && diffChat !== id ? (
+                  {existingChat && !mainTabbed ? (
                     <ChatTitle title={title()} chat={detail?.chat} pulls={pulls} />
                   ) : (
                     title()
                   )}
                 </Heading>
-                {diffChat === id && (
+                {mainTabbed && (
                   <TabsList
                     aria-label="Chat views"
-                    className="h-auto! min-w-0 shrink justify-start gap-1 bg-transparent p-0"
+                    className="chat-view-tabs h-auto! min-w-0 shrink justify-start gap-1 bg-transparent p-0"
                   >
                     <ChatTitle
                       title={title()}
                       chat={detail?.chat}
                       pulls={pulls}
                       tabbed
-                      active={!activeDiff}
+                      active={panelState.mainView === "chat"}
                     />
-                    <div className="chat-diff-tab" data-active={activeDiff || undefined}>
-                      <TabsTrigger
-                        value="diffs"
-                        variant="control"
-                        render={
-                          <Button
-                            variant={activeDiff ? "secondary" : "ghost"}
-                            size="compact"
-                            className="chat-diff-tab-trigger tracking-tight"
-                          />
-                        }
+                    {panelState.mainDiffOpen && (
+                      <div className="chat-diff-tab" data-active={activeDiff || undefined}>
+                        <TabsTrigger
+                          value="diffs"
+                          variant="control"
+                          render={
+                            <Button
+                              variant={activeDiff ? "secondary" : "ghost"}
+                              size="compact"
+                              className="chat-diff-tab-trigger tracking-tight"
+                            />
+                          }
+                        >
+                          <GitBranchIcon />
+                          <span className="florets-control-label">Diffs</span>
+                        </TabsTrigger>
+                        <Button
+                          variant="ghost"
+                          size="icon-compact"
+                          className="chat-diff-tab-close"
+                          aria-label="Close Diffs"
+                          title="Close Diffs"
+                          onClick={() => {
+                            updatePanel({
+                              mainDiffOpen: false,
+                              mainView: activeDiff ? "chat" : panelState.mainView,
+                            });
+                            document
+                              .querySelector<HTMLButtonElement>('button[aria-label="Chat views"]')
+                              ?.focus();
+                          }}
+                        >
+                          <XIcon />
+                        </Button>
+                      </div>
+                    )}
+                    {mainAgents.map((agent) => (
+                      <div
+                        key={agent.id}
+                        className="chat-diff-tab chat-subagent-tab"
+                        data-active={panelState.mainView === `subagent:${agent.id}` || undefined}
                       >
-                        <GitBranchIcon />
-                        <span className="florets-control-label">Diffs</span>
-                      </TabsTrigger>
-                      <Button
-                        variant="ghost"
-                        size="icon-compact"
-                        className="chat-diff-tab-close"
-                        aria-label="Close Diffs"
-                        title="Close Diffs"
-                        onClick={() => {
-                          setDiffChat(null);
-                          setActiveDiff(false);
-                          document
-                            .querySelector<HTMLButtonElement>('button[aria-label="Chat views"]')
-                            ?.focus();
-                        }}
-                      >
-                        <XIcon />
-                      </Button>
-                    </div>
+                        <TabsTrigger
+                          value={`subagent:${agent.id}`}
+                          variant="control"
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="compact"
+                              className="chat-diff-tab-trigger"
+                            />
+                          }
+                        >
+                          <span className="florets-control-label">{subagentLabel(agent)}</span>
+                        </TabsTrigger>
+                        <Button
+                          variant="ghost"
+                          size="icon-compact"
+                          className="chat-diff-tab-close"
+                          aria-label={`Close ${subagentLabel(agent)}`}
+                          onClick={() => {
+                            updatePanel({
+                              mainSubagentTabs: panelState.mainSubagentTabs.filter(
+                                (value) => value !== agent.id,
+                              ),
+                              mainView:
+                                panelState.mainView === `subagent:${agent.id}`
+                                  ? "chat"
+                                  : panelState.mainView,
+                            });
+                            document
+                              .querySelector<HTMLButtonElement>('button[aria-label="Chat views"]')
+                              ?.focus();
+                          }}
+                        >
+                          <XIcon />
+                        </Button>
+                      </div>
+                    ))}
                   </TabsList>
                 )}
                 {existingChat && (
@@ -439,10 +493,12 @@ export function Chats({
                       updatePanel({ open: !sideOpen });
                     }}
                     usage={detail?.usage}
-                    diffsOpen={diffChat === id && activeDiff}
+                    diffsOpen={activeDiff}
                     onDiffsChange={(open) => {
-                      if (open) setDiffChat(id);
-                      setActiveDiff(open);
+                      updatePanel({
+                        mainDiffOpen: open || panelState.mainDiffOpen,
+                        mainView: open ? "diffs" : "chat",
+                      });
                     }}
                   />
                 )}
@@ -520,7 +576,7 @@ export function Chats({
                       </ChatDetail>
                     </div>
                   </TabsContent>
-                  {diffChat === id && (
+                  {panelState.mainDiffOpen && (
                     <TabsContent
                       value="diffs"
                       keepMounted
@@ -529,6 +585,16 @@ export function Chats({
                       <Changes key={id} chatID={id} onExpired={onExpired} />
                     </TabsContent>
                   )}
+                  {mainAgents.map((agent) => (
+                    <TabsContent
+                      key={agent.id}
+                      value={`subagent:${agent.id}`}
+                      keepMounted
+                      className="chat-view-panel -mx-4 min-h-0 min-w-0 flex-1 sm:-mx-8"
+                    >
+                      <SubagentConversation agent={agent} onExpired={onExpired} />
+                    </TabsContent>
+                  ))}
                 </div>
               )}
             </section>

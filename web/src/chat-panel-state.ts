@@ -3,6 +3,9 @@ import { z } from "zod";
 
 const schema = z.object({
   open: z.boolean().default(false),
+  mainView: z.string().default("chat"),
+  mainDiffOpen: z.boolean().default(false),
+  mainSubagentTabs: z.array(z.string()).default([]),
   diffOpen: z.boolean().default(false),
   view: z.string().default("overview"),
   subagentTabs: z.array(z.string()).default([]),

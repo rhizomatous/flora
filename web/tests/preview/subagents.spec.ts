@@ -66,20 +66,19 @@ test("subagent links, menus, and restored tabs share a saved conversation", asyn
   await draft.fill("Keep my draft");
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
   await page.getByRole("menuitem", { name: /Subagent 1/ }).click();
-  const side = page.getByRole("complementary", { name: "Side panel" });
-  await expect(side.getByRole("tab", { name: "Subagent 1", exact: true })).toHaveAttribute(
+  const main = page.locator(".chat-main-pane");
+  await expect(page.getByRole("complementary", { name: "Side panel" })).toHaveCount(0);
+  await expect(main.getByRole("tab", { name: "Subagent 1", exact: true })).toHaveAttribute(
     "aria-selected",
     "true",
   );
-  await expect(side.getByText("Inspect the agent runtime.", { exact: true })).toBeVisible();
-  await expect(side.getByText("The saved result is available.", { exact: true })).toBeVisible();
+  await expect(main.getByText("Inspect the agent runtime.", { exact: true })).toBeVisible();
+  await expect(main.getByText("The saved result is available.", { exact: true })).toBeVisible();
   await expect(draft).toHaveValue("Keep my draft");
   await page.reload();
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
-  await expect(side.getByText("The saved result is available.", { exact: true })).toBeVisible();
-  await side.getByRole("tab", { name: "Subagent 1", exact: true }).hover();
-  await side.getByRole("button", { name: "Close Subagent 1", exact: true }).click();
-  await side.getByRole("button", { name: "Close side panel", exact: true }).click();
+  await expect(main.getByText("The saved result is available.", { exact: true })).toBeVisible();
+  await main.getByRole("button", { name: "Close Subagent 1", exact: true }).click();
   await page.getByRole("button", { name: /Worked for 2s.*Subagent activity/ }).click();
   const link = page
     .locator(".chat-main-pane")
@@ -92,15 +91,15 @@ test("subagent links, menus, and restored tabs share a saved conversation", asyn
   await expect(page.getByText("Finished · 2s", { exact: true })).toBeVisible();
   await link.click();
   await expect(page.getByText("Finished · 2s", { exact: true })).toBeHidden();
-  await expect(side.getByText("The saved result is available.", { exact: true })).toBeVisible();
+  await expect(main.getByText("The saved result is available.", { exact: true })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(side).toBeVisible();
+  await expect(main).toBeVisible();
   await expect
     .poll(async () => {
-      const bounds = await side.boundingBox();
+      const bounds = await main.boundingBox();
       return bounds?.width ?? 0;
     })
-    .toBeGreaterThan(380);
+    .toBeGreaterThan(350);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   await page.setViewportSize({ width: 1440, height: 1000 });
   expect(errors).toEqual([]);
@@ -136,19 +135,49 @@ test("chat hover cards show saved subagent names and tasks", async ({ page }) =>
   await expect(preview.getByRole("region", { name: "Subagents" })).toHaveCount(0);
 });
 
-test("regular preview includes browsable subagent conversations", async ({ page }) => {
+test("subagent tabs follow their pane and close like Diffs", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto(`${base}/#chats/subagents`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
-  await page.getByRole("button", { name: "Chat views", exact: true }).click();
+  const main = page.locator(".chat-main-pane");
+  await main.getByRole("button", { name: "Chat views", exact: true }).click();
   await page.getByRole("menuitem", { name: /Subagent 1/ }).click();
+  await expect(page.getByRole("complementary", { name: "Side panel" })).toHaveCount(0);
+  await expect(main.getByText(/Review the agent runtime and transcript persistence/)).toBeVisible();
+  await main.getByRole("button", { name: "Chat views", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Diffs", exact: true }).click();
+  await expect(main.getByRole("tab", { name: "Diffs", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await main.getByRole("tab", { name: "Diffs", exact: true }).hover();
+  await main.getByRole("button", { name: "Close Diffs", exact: true }).click();
+  await main.getByRole("tab", { name: "Subagent 1", exact: true }).click();
+  await expect(main.getByRole("button", { name: "Close Subagent 1", exact: true })).toHaveCSS(
+    "opacity",
+    "1",
+  );
+  await main.getByRole("button", { name: "Close Subagent 1", exact: true }).click();
+  await expect(main.getByRole("tab", { name: "Subagent 1", exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("Follow-up", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Open side panel", exact: true }).click();
   const side = page.getByRole("complementary", { name: "Side panel" });
-  await expect(side.getByText(/Review the agent runtime and transcript persistence/)).toBeVisible();
-  await expect(
-    side.getByText(/parent and child conversations retain separate identities/),
-  ).toBeVisible();
   await side.getByRole("button", { name: "Side panel views", exact: true }).click();
   await page.getByRole("menuitem", { name: /Subagent 2/ }).click();
   await expect(side.getByText(/Review the chat UI and subagent navigation/)).toBeVisible();
-  await expect(side.getByText(/Subagents are discoverable from chat hover cards/)).toBeVisible();
+  await expect(main.getByRole("tab", { name: "Subagent 2", exact: true })).toHaveCount(0);
+  await side.getByRole("button", { name: "Side panel views", exact: true }).click();
+  await page.getByRole("menuitem", { name: /Subagent 1/ }).click();
+  await side.getByRole("tab", { name: "Subagent 2", exact: true }).click();
+  await side.getByRole("button", { name: "Close Subagent 2", exact: true }).click();
+  await expect(side.getByRole("tab", { name: "Subagent 2", exact: true })).toHaveCount(0);
+  await side.getByRole("tab", { name: "Subagent 1", exact: true }).click();
+  await side.getByRole("button", { name: "Close Subagent 1", exact: true }).click();
+  await expect(side.getByRole("tab", { name: "Overview", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(side.getByRole("tablist")).toHaveCSS("scrollbar-width", "none");
 });
