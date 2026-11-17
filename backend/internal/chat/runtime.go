@@ -204,8 +204,9 @@ type runtimeEvent struct {
 }
 
 // stream uses a standards-compliant SSE decoder. Upstream has no replay cursor;
-// the caller records a capture gap if this stream ends unexpectedly.
-func (c *runtime) stream(ctx context.Context, session string, ready chan<- error, capture func(string, json.RawMessage) error) error {
+// the caller records a capture gap if this stream ends unexpectedly. Optional
+// descendant handlers must verify ancestry before saving another session's events.
+func (c *runtime) stream(ctx context.Context, session string, ready chan<- error, capture func(string, json.RawMessage) error, descendants ...func(string, string, json.RawMessage) error) error {
 	streamClient := newRuntime(c.endpoint)
 	streamClient.client.Transport.(*http.Transport).ResponseHeaderTimeout = 10 * time.Second
 	defer streamClient.client.CloseIdleConnections()
@@ -231,6 +232,20 @@ func (c *runtime) stream(ctx context.Context, session string, ready chan<- error
 		}
 		p := envelope.Properties
 		if p.SessionID != session && p.Info.SessionID != session && p.Part.SessionID != session {
+			child := p.SessionID
+			if child == "" {
+				child = p.Info.SessionID
+			}
+			if child == "" {
+				child = p.Part.SessionID
+			}
+			if child != "" {
+				for _, captureChild := range descendants {
+					if err := captureChild(child, envelope.Type, json.RawMessage(event.Data)); err != nil {
+						return err
+					}
+				}
+			}
 			continue
 		}
 		if err := capture(envelope.Type, json.RawMessage(event.Data)); err != nil {

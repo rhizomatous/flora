@@ -106,6 +106,19 @@ function ChatRow({
               <PullList summary={chat.pulls} />
             </div>
           )}
+          {(chat.subagents?.length ?? 0) > 0 && (
+            <section aria-label="Subagents" className="mt-3 border-t border-border pt-2">
+              <p className="mb-2 text-xs text-muted-foreground">Subagents</p>
+              <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
+                {chat.subagents?.map((agent) => (
+                  <div key={agent.id} className="contents">
+                    <dt className="text-muted-foreground">Subagent {agent.number}</dt>
+                    <dd>{agent.title || "Delegated task"}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
         </HoverCardContent>
       </HoverCard>
       <div className="florets-navigation-actions">

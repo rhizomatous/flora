@@ -239,3 +239,69 @@ func TestChatDetailIncludesUsageWithoutLeakingChildTranscript(t *testing.T) {
 		t.Fatalf("incorrect usage detail: %+v", detail)
 	}
 }
+
+func TestSavedSubagentAPIWithoutRuntime(t *testing.T) {
+	store, _, authentication, token, project, cleanup := chatAPI(t)
+	defer cleanup()
+	ctx := context.Background()
+	c, err := store.CreateChat(ctx, project.ID, "Subagents", "flora@sha256:"+strings.Repeat("a", 64), "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.BindRuntime(ctx, c.ID, "container", "root"); err != nil {
+		t.Fatal(err)
+	}
+	raw := json.RawMessage(`{"info":{"id":"prompt","sessionID":"child","role":"user","time":{"created":1}},"parts":[{"type":"text","text":"Inspect code"}]}`)
+	if err := store.SaveSubagent(ctx, c.ID, storage.Subagent{ID: "child", ParentID: "root", Title: "Inspect code", Status: "idle", Collection: "complete"}, []json.RawMessage{raw}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewUnstartedServer(nil)
+	origin := "http://" + server.Listener.Addr().String()
+	server.Config.Handler = New(webassets.FS(), authentication, settings.New(store), origin)
+	server.Start()
+	defer server.Close()
+	req, _ := http.NewRequest("GET", server.URL+"/api/chats", nil)
+	req.AddCookie(&http.Cookie{Name: cookieName, Value: token})
+	res, err := server.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var chats []chatView
+	err = json.NewDecoder(res.Body).Decode(&chats)
+	res.Body.Close()
+	if err != nil || res.StatusCode != 200 || len(chats) != 1 || len(chats[0].Subagents) != 1 {
+		t.Fatalf("missing chat subagent summaries: %+v %v", chats, err)
+	}
+	summary := chats[0].Subagents[0]
+	if summary.ID != "child" || summary.Number != 1 || summary.Title != "Inspect code" {
+		t.Fatalf("incorrect subagent summary: %+v", summary)
+	}
+
+	for _, tc := range []struct {
+		path          string
+		authenticated bool
+		status        int
+	}{
+		{"/api/chats/" + c.ID + "/subagents/child", false, 401},
+		{"/api/chats/" + c.ID + "/subagents/child", true, 200},
+		{"/api/chats/foreign/subagents/child", true, 404},
+		{"/api/chats/" + c.ID + "/subagents/missing", true, 404},
+	} {
+		req, _ := http.NewRequest("GET", server.URL+tc.path, nil)
+		if tc.authenticated {
+			req.AddCookie(&http.Cookie{Name: cookieName, Value: token})
+		}
+		res, err := server.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		if res.StatusCode != tc.status {
+			t.Fatalf("%s: %d %s", tc.path, res.StatusCode, body)
+		}
+		if tc.status == 200 && !strings.Contains(string(body), "Inspect code") {
+			t.Fatal("missing saved prompt")
+		}
+	}
+}

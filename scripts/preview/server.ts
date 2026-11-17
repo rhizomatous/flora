@@ -6,7 +6,13 @@ import type { Plugin } from "vite";
 
 import { PreviewAutomations } from "./automations.ts";
 import { paginationDiffFiles } from "./diff-fixtures.ts";
-import { projects, stories, scenarios as demoScenarios, conversation } from "./scenarios.ts";
+import {
+  projects,
+  stories,
+  scenarios as demoScenarios,
+  conversation,
+  subagentFixtures,
+} from "./scenarios.ts";
 import { previewUsage } from "./usage.ts";
 
 export type Frame = { history: { info: Message; parts: Part[] }[]; questions: QuestionRequest[] };
@@ -66,6 +72,53 @@ export function messages(frame: Frame, chatID: string) {
   });
 }
 
+function subagentSnapshots(frame: Frame) {
+  const snapshots = new Map<
+    string,
+    {
+      agent: {
+        id: string;
+        number: number;
+        parentID: string;
+        title: string;
+        status: string;
+        collection: string;
+        created: number;
+        updatedAt: string;
+      };
+      frame: Frame;
+    }
+  >();
+  for (const message of frame.history) {
+    for (const part of message.parts) {
+      if (part.type !== "tool" || part.state.status === "pending") continue;
+      const { state } = part;
+      const fixture = subagentFixtures.find((agent) => agent.id === state.metadata?.sessionId);
+      if (!fixture) continue;
+      const finished = part.state.status === "completed";
+      const child = present(fixture.frames[finished ? fixture.frames.length - 1 : 3]);
+      const offset =
+        part.state.time.start - present(fixture.frames[0]?.history[0]).info.time.created;
+      snapshots.set(fixture.id, {
+        agent: {
+          id: fixture.id,
+          number: fixture.number,
+          parentID: message.info.sessionID,
+          title: fixture.title,
+          status: finished ? "idle" : "working",
+          collection: "complete",
+          created: part.state.time.start,
+          updatedAt: new Date(
+            state.status === "completed" ? state.time.end : state.time.start,
+          ).toISOString(),
+        },
+        frame: rebaseFrame(child, offset),
+      });
+    }
+  }
+  return [...snapshots.values()];
+}
+
 export function chatAt(scenario: (typeof demoScenarios)[number], frame: Frame, finished: boolean) {
   const { id } = scenario;
   const project = present(projects.find((p) => p.id === scenario.projectID));
@@ -76,6 +129,7 @@ export function chatAt(scenario: (typeof demoScenarios)[number], frame: Frame, f
     reason = "Waiting for your answer";
   }
   return {
+    subagents: subagentSnapshots(frame).map(({ agent }) => agent),
     pulls: {
       items: finished ? (stories.find((s) => s.id === id)?.pulls ?? []) : [],
       error: "",
@@ -292,6 +346,7 @@ export function chatPreview(): Plugin {
       json(res, {
         chat: chatAt(scenario, frame, i === scenario.frames.length - 1),
         messages: messages(frame, id),
+        subagents: subagentSnapshots(frame).map(({ agent }) => agent),
         continuationBlockedReason: "",
         automationRuns: automations.forChat(id),
         contextUsage: frame.history.some(
@@ -300,6 +355,15 @@ export function chatPreview(): Plugin {
           ? { tokens: 79_600, limit: 200_000, provider: "anthropic", model: "claude-sonnet-4-6" }
           : { tokens: null, limit: null, provider: "", model: "" },
       });
+      return;
+    }
+    if (endpoint.startsWith("subagents/")) {
+      const child = subagentSnapshots(frame).find(({ agent }) => agent.id === endpoint.slice(10));
+      json(
+        res,
+        child ? { messages: messages(child.frame, id) } : { error: "Unknown preview subagent." },
+        child ? 200 : 404,
+      );
       return;
     }
     if (endpoint === "questions") {

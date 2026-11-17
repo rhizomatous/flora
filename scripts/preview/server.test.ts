@@ -5,9 +5,17 @@ import { setTimeout as delay } from "node:timers/promises";
 import { createServer } from "vite";
 import { test } from "vitest";
 
+import { detailSchema, subagentDetailSchema } from "../../web/src/chat-schemas.ts";
 import { captured } from "./captured.ts";
-import { projects as fixtureProjects, stories } from "./scenarios.ts";
-import { chatPreview, messages, previewFrameMs, rebaseFrame, type Frame } from "./server.ts";
+import { projects as fixtureProjects, stories, scenarios } from "./scenarios.ts";
+import {
+  chatPreview,
+  chatAt,
+  messages,
+  previewFrameMs,
+  rebaseFrame,
+  type Frame,
+} from "./server.ts";
 
 test("captures match the pinned SDK and cover real OpenCode tool and question states", async () => {
   const image = await readFile(new URL("../../agent/image/Dockerfile", import.meta.url), "utf8");
@@ -63,6 +71,7 @@ test("preview serves isolated fixtures and replays saved events with resumable I
       "checkout",
       "pagination",
       "focus",
+      "subagents",
     ]) {
       const response = await fetch(`${base}/api/chats/${id}`);
       assert.equal(response.status, 200);
@@ -70,6 +79,28 @@ test("preview serves isolated fixtures and replays saved events with resumable I
       assert.match(text, /"messages":\[/);
       assert.doesNotMatch(text, /preview:(completed|waiting|recovery|long)/);
       assert.match(text, /"HarnessVersion":"1.2.27"/);
+    }
+    const subagentResponse = await fetch(`${base}/api/chats/subagents`);
+    const subagentReview = detailSchema.parse(await subagentResponse.json());
+    assert.equal(subagentReview.subagents.length, 2);
+    assert.equal(subagentReview.chat.subagents?.length, 2);
+    for (const agent of subagentReview.subagents) {
+      const childResponse = await fetch(`${base}/api/chats/subagents/subagents/${agent.id}`);
+      assert.equal(childResponse.status, 200);
+      const child = subagentDetailSchema.parse(await childResponse.json());
+      assert.equal(child.messages[0]?.Role, "user");
+      assert.ok(
+        child.messages.some((message) =>
+          message.Payload.parts.some((part) => part.type === "tool"),
+        ),
+      );
+      assert.ok(
+        (child.messages.at(-1)?.Text ?? "").includes(
+          agent.number === 1 ? "separate identities" : "discoverable",
+        ),
+      );
+      const unrelated = await fetch(`${base}/api/chats/completed/subagents/${agent.id}`);
+      assert.equal(unrelated.status, 404);
     }
     const projectResponse = await fetch(`${base}/api/projects`);
     assert.deepEqual(await projectResponse.json(), fixtureProjects);
@@ -178,4 +209,21 @@ test("replay timestamps are fresh without changing recorded durations or inputs"
       }
     }
   }
+});
+
+test("subagent replay discovers children as tasks start and finishes their status", () => {
+  const scenario = scenarios.find((item) => item.id === "subagents");
+  assert.ok(scenario);
+  const chats = scenario.frames.map((frame, index) =>
+    chatAt(scenario, frame, index === scenario.frames.length - 1),
+  );
+  assert.equal(chats[0]?.subagents.length, 0);
+  assert.ok(chats.some((chat) => chat.subagents.some((agent) => agent.status === "working")));
+  assert.deepEqual(
+    chats.at(-1)?.subagents.map((agent) => [agent.number, agent.status]),
+    [
+      [1, "idle"],
+      [2, "idle"],
+    ],
+  );
 });

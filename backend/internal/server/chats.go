@@ -54,11 +54,23 @@ func decodeChat(w http.ResponseWriter, r *http.Request, v any) bool {
 
 type chatView struct {
 	storage.Chat
-	Pulls changes.PullSummary `json:"pulls"`
+	Pulls     changes.PullSummary `json:"pulls"`
+	Subagents []subagentSummary   `json:"subagents"`
+}
+
+type subagentSummary struct {
+	ID     string `json:"id"`
+	Number int    `json:"number"`
+	Title  string `json:"title"`
 }
 
 func (a *api) chatView(ctx context.Context, c storage.Chat) chatView {
-	return chatView{Chat: c, Pulls: changes.New(a.settings.Store, nil).ReadPulls(ctx, c.ID)}
+	agents, _ := a.settings.Store.Subagents(ctx, c.ID)
+	summaries := make([]subagentSummary, 0, len(agents))
+	for _, agent := range agents {
+		summaries = append(summaries, subagentSummary{ID: agent.ID, Number: agent.Number, Title: agent.Title})
+	}
+	return chatView{Chat: c, Pulls: changes.New(a.settings.Store, nil).ReadPulls(ctx, c.ID), Subagents: summaries}
 }
 
 func (a *api) chatViews(ctx context.Context, chats []storage.Chat) []chatView {
@@ -207,7 +219,20 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			chatError(w, err)
 			return
 		}
-		jsonResponse(w, 200, map[string]any{"chat": a.chatView(r.Context(), c), "messages": messages, "automationRuns": runs, "continuationBlockedReason": blocked, "usage": usage, "contextUsage": contextUsage})
+		subagents, err := store.Subagents(r.Context(), c.ID)
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		jsonResponse(w, 200, map[string]any{"chat": a.chatView(r.Context(), c), "messages": messages, "subagents": subagents, "automationRuns": runs, "continuationBlockedReason": blocked, "usage": usage, "contextUsage": contextUsage})
+	})
+	mux.HandleFunc("GET /api/chats/{id}/subagents/{session}", func(w http.ResponseWriter, r *http.Request) {
+		messages, err := store.SubagentMessages(r.Context(), r.PathValue("id"), r.PathValue("session"))
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		jsonResponse(w, 200, map[string]any{"messages": messages})
 	})
 	mux.HandleFunc("POST /api/chats/{id}/messages", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {
