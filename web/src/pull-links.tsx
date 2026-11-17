@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 
 import {
+  HoverCard,
+  HoverCardTrigger,
+  HoverCardContent,
   GitMergeIcon,
   GitPullRequestClosedIcon,
   GitPullRequestDraftIcon,
@@ -8,6 +11,7 @@ import {
 } from "@flora/florets";
 
 import { pullStatus } from "./pull";
+import { PullChecksDetails } from "./pull-checks";
 import type { Pull, PullSummary } from "./pull-schemas";
 
 const appearances = {
@@ -86,9 +90,9 @@ export function PullList({ summary }: { summary: PullSummary | undefined }) {
   if (summary === undefined) emptyMessage = "Loading pull requests…";
   else if (error !== "") emptyMessage = "Pull requests unavailable.";
   return (
-    <div className="min-w-0 text-xs">
+    <div className="max-h-[60dvh] min-w-0 overflow-y-auto text-xs">
       {pulls.length > 0 ? (
-        <ul aria-label="Linked pull requests" className="max-h-56 space-y-1 overflow-y-auto">
+        <ul aria-label="Linked pull requests" className="space-y-2">
           {pulls.map((pull) => {
             const { Icon, color, label } = appearance(pull);
             const repository = pull.repository ?? pull.url.split("/").slice(3, 5).join("/");
@@ -110,6 +114,9 @@ export function PullList({ summary }: { summary: PullSummary | undefined }) {
                   </span>
                   <PullLineCounts pull={pull} />
                 </a>
+                <div className="px-2 pb-1">
+                  <PullChecksDetails pull={pull} />
+                </div>
               </li>
             );
           })}
@@ -138,17 +145,31 @@ export function InlinePullLink({
   const { Icon, color, label } = appearance(pull);
   const repository = pull.repository ?? pull.url.split("/").slice(3, 5).join("/");
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="inline-flex max-w-full cursor-pointer items-baseline gap-1 rounded-sm align-baseline font-medium text-foreground underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-      aria-label={`${repository} #${pull.number} ${label}`}
-      title={`${repository} #${pull.number} · ${label}${(pull.title ?? "") === "" ? "" : ` · ${pull.title}`}`}
-      data-inline-pr={label.toLowerCase()}
-    >
-      <Icon className={`size-3.5 shrink-0 self-center ${color}`} aria-hidden="true" />
-      <span className="min-w-0 break-words">{children}</span>
-    </a>
+    <HoverCard>
+      <HoverCardTrigger
+        render={
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex max-w-full cursor-pointer items-baseline gap-1 rounded-sm align-baseline font-medium text-foreground underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            aria-label={`${repository} #${pull.number} ${label}`}
+            title={`${repository} #${pull.number} · ${label}${(pull.title ?? "") === "" ? "" : ` · ${pull.title}`}`}
+            data-inline-pr={label.toLowerCase()}
+          />
+        }
+      >
+        <Icon className={`size-3.5 shrink-0 self-center ${color}`} aria-hidden="true" />
+        <span className="min-w-0 break-words">{children}</span>
+      </HoverCardTrigger>
+      <HoverCardContent className="w-96! max-w-[calc(100vw-24px)]!" density="compact">
+        <p className="text-xs text-muted-foreground">
+          {repository} #{pull.number} · {label}
+        </p>
+        <p className="mt-1 mb-2 text-sm">{pull.title}</p>
+        <PullLineCounts pull={pull} />
+        <PullChecksDetails pull={pull} />
+      </HoverCardContent>
+    </HoverCard>
   );
 }

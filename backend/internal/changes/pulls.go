@@ -21,14 +21,17 @@ import (
 )
 
 type Pull struct {
-	Title      string `json:"title,omitempty"`
-	Additions  *int   `json:"additions,omitempty"`
-	Deletions  *int   `json:"deletions,omitempty"`
-	Repository string `json:"repository,omitempty"`
-	URL        string `json:"url"`
-	Number     int    `json:"number"`
-	State      string `json:"state"`
-	Draft      bool   `json:"draft"`
+	HeadSHA       string      `json:"headSHA,omitempty"`
+	HeadCheckedAt string      `json:"headCheckedAt,omitempty"`
+	Checks        *PullChecks `json:"checks,omitempty"`
+	Title         string      `json:"title,omitempty"`
+	Additions     *int        `json:"additions,omitempty"`
+	Deletions     *int        `json:"deletions,omitempty"`
+	Repository    string      `json:"repository,omitempty"`
+	URL           string      `json:"url"`
+	Number        int         `json:"number"`
+	State         string      `json:"state"`
+	Draft         bool        `json:"draft"`
 }
 
 // PullSummary contains saved links and their last discovery result without scan bookkeeping.
@@ -394,7 +397,7 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 		}
 		if res.StatusCode != 200 {
 			failure()
-			return 0
+			return res.StatusCode
 		}
 		if json.NewDecoder(io.LimitReader(res.Body, 8<<20)).Decode(target) != nil {
 			failure()
@@ -408,6 +411,16 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 			return
 		}
 		attempted[link] = true
+		// A failed identity refresh cannot confirm that saved checks still match
+		// the remote head, even when the last known SHA has not changed.
+		if previous, ok := known[link]; ok {
+			if previous.Checks == nil {
+				previous.Checks = &PullChecks{Items: []PullCheck{}}
+			}
+			previous.Checks.Error = "PR head could not be verified. Saved checks may be out of date."
+			previous.Checks.AttemptedAt = state.CheckedAt
+			known[link] = previous
+		}
 		match := pullLink.FindStringSubmatch(link)
 		if len(match) != 3 {
 			failure()
@@ -434,7 +447,16 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 		if remote.Merged {
 			remote.State = "merged"
 		}
-		known[link] = Pull{Repository: strings.ToLower(match[1]), URL: link, Number: number, State: remote.State, Draft: remote.Draft, Title: remote.Title, Additions: remote.Additions, Deletions: remote.Deletions}
+		previous := known[link]
+		pull := Pull{Repository: strings.ToLower(match[1]), URL: link, Number: number, State: remote.State, Draft: remote.Draft, Title: remote.Title, Additions: remote.Additions, Deletions: remote.Deletions, HeadSHA: remote.Head.SHA, HeadCheckedAt: state.CheckedAt, Checks: previous.Checks}
+		if hash.MatchString(remote.Head.SHA) {
+			pull.Checks = collectPullChecks(pull, get, state.CheckedAt)
+		} else if pull.Checks != nil {
+			pull.HeadSHA = previous.HeadSHA
+			pull.HeadCheckedAt = previous.HeadCheckedAt
+			pull.Checks.Error = "PR head unavailable. Saved checks may be out of date."
+		}
+		known[link] = pull
 		delete(state.Missing, link)
 	}
 	confirmed := map[string]bool{}
