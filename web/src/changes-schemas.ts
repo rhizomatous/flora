@@ -11,6 +11,8 @@ export const fileChangeSchema = z.object({
   undisplayable: z.boolean(),
   diff: z.string(),
   bytes: z.number(),
+  additions: z.number().optional(),
+  deletions: z.number().optional(),
   truncated: z.boolean(),
 });
 export type FileChange = z.infer<typeof fileChangeSchema>;
@@ -28,3 +30,18 @@ export const chatChangesSchema = z.object({
   pulls: pullSummarySchema,
 });
 export type ChatChanges = z.infer<typeof chatChangesSchema>;
+
+export function changeStatus(status: string) {
+  return (
+    (
+      {
+        A: "Added",
+        D: "Deleted",
+        R: "Renamed",
+        C: "Copied",
+        T: "Type changed",
+        M: "Modified",
+      } as Record<string, string>
+    )[status[0] ?? ""] ?? status
+  );
+}
