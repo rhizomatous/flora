@@ -182,7 +182,7 @@ export function ChatDemo() {
 
   return (
     <MessageScrollerProvider>
-      <div className="relative flex w-full flex-col gap-4 [[data-slot=preview]:has(&)]:bg-background [[data-slot=preview]:has(&)>div]:p-0!">
+      <div className="relative flex w-full flex-col gap-4 [[data-slot=preview]:has(&)]:bg-surface-canvas [[data-slot=preview]:has(&)>div]:p-0!">
         <div className="flex h-200 w-full flex-col gap-4">
           <div className="flex items-start justify-between gap-4 p-8 pb-4">
             <div className="flex flex-col gap-1">

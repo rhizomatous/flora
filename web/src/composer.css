@@ -1,12 +1,12 @@
 .chat-composer {
-  --composer-surface: #fafafa;
-  --composer-border: #dedede;
+  --composer-surface: var(--surface-panel);
+  --composer-border: var(--control-border);
   width: 100%;
   container-type: inline-size;
 }
 .dark .chat-composer {
-  --composer-surface: #161616;
-  --composer-border: #333;
+  --composer-surface: var(--surface-panel);
+  --composer-border: var(--control-border);
 }
 .composer-topbar {
   display: flex;

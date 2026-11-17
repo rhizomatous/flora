@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   Alert,
   Button,
+  Card,
   Command,
   CommandInput,
   CommandEmpty,
@@ -357,7 +358,7 @@ function AutomationForm({
               placeholder="Check for outdated dependencies. Update safe minor versions, run tests, and open a draft PR if anything changes."
             />
           </FieldLabel>
-          <div className="divide-y rounded-lg border">
+          <Card variant="flush" className="divide-y">
             <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
               <FieldLabel htmlFor="automation-project">Project</FieldLabel>
               <NativeSelect
@@ -496,7 +497,7 @@ function AutomationForm({
                 {previewError ? <p>{previewError}</p> : <p>{nextRunLabel}</p>}
               </div>
             </div>
-          </div>
+          </Card>
         </fieldset>
       </form>
     </section>
@@ -664,7 +665,7 @@ export function Automations({
               No runs yet. Wait for the schedule or choose Run now.
             </p>
           ) : (
-            <ol className="mt-4 divide-y rounded-lg border px-4">
+            <ol className="mt-4 divide-y rounded-lg border bg-surface-panel px-4">
               {runs.map((run) => (
                 <li key={run.id} className="py-4">
                   <div className="flex flex-wrap justify-between gap-2">

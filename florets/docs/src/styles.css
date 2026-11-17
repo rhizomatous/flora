@@ -6,7 +6,7 @@
     scroll-padding-top: 6rem;
   }
   ::selection {
-    @apply bg-foreground text-background;
+    @apply bg-foreground text-surface-canvas;
   }
   body {
     margin: 0;
@@ -17,7 +17,7 @@
   position: sticky;
   top: 0;
   z-index: 30;
-  background: color-mix(in srgb, var(--background) 94%, transparent);
+  background: color-mix(in srgb, var(--surface-canvas) 94%, transparent);
   backdrop-filter: blur(12px);
 }
 .docs-header-inner {
@@ -216,7 +216,7 @@
   top: -100px;
   left: 16px;
   z-index: 100;
-  background: var(--background);
+  background: var(--surface-canvas);
   border: 1px solid var(--border);
   padding: 12px;
   border-radius: 6px;

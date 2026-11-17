@@ -93,7 +93,7 @@ export function CodeExample({
             : code}
         </CodeBlockContent>
         {!expanded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-linear-to-b from-transparent to-background/95">
+          <div className="absolute inset-0 flex items-center justify-center bg-linear-to-b from-transparent to-surface-canvas/95">
             <Button
               variant="outline"
               size="sm"
