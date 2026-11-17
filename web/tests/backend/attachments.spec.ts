@@ -20,8 +20,10 @@ test("attachments survive reload and an uncertain acceptance, and reopen after s
   await expect(page.getByRole("button", { name: "Start chat", exact: true })).toBeEnabled();
   await expect(page.getByRole("menu")).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath("attachments-desktop.png") });
+  await page.locator(".composer-box").screenshot({ path: testInfo.outputPath("attachments-composer-desktop.png") });
   await assertFitsPhone(page);
   await page.screenshot({ path: testInfo.outputPath("attachments-narrow.png") });
+  await page.locator(".composer-box").screenshot({ path: testInfo.outputPath("attachments-composer-narrow.png") });
   await page.reload();
   await expect(page.getByRole("link", { name: "Open requirements.md", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Start chat", exact: true })).toBeEnabled();
