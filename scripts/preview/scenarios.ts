@@ -58,7 +58,14 @@ export const projects = [
   },
 ];
 
-type Step = { text: string } | { tool: string; input: Record<string, unknown>; output: string };
+type Step =
+  | { text: string }
+  | {
+      tool: string;
+      input: Record<string, unknown>;
+      output: string;
+      metadata?: Record<string, unknown>;
+    };
 type Turn = { user: string; steps: Step[] };
 
 // Authored conversations use SDK message shapes; each tool has a running and completed frame.
@@ -111,7 +118,12 @@ export function conversation(id: string, turns: Turn[]): Frame[] {
               type: "tool",
               callID: `${messageID}-call`,
               tool: step.tool,
-              state: { status: "running", input: step.input, time: { start: tick } },
+              state: {
+                status: "running",
+                input: step.input,
+                metadata: step.metadata ?? {},
+                time: { start: tick },
+              },
             };
       history.push({ info, parts: [part] });
       snapshot();
@@ -123,7 +135,7 @@ export function conversation(id: string, turns: Turn[]): Frame[] {
           input: step.input,
           output: step.output,
           title: typeof step.input.description === "string" ? step.input.description : step.tool,
-          metadata: {},
+          metadata: step.metadata ?? {},
           time: { start: tick - 3000, end: tick },
         };
       }
@@ -143,6 +155,73 @@ function edit(filePath: string, oldString: string, newString: string): Step {
 function check(command: string, output: string): Step {
   return { tool: "bash", input: { command, description: command }, output };
 }
+
+export const subagentFixtures = [
+  {
+    id: "session-review-agent",
+    number: 1,
+    title: "Review agent reliability",
+    frames: conversation("review-agent", [
+      {
+        user: "Review the agent runtime and transcript persistence. Inspect the code and tests, then report concrete findings. Do not edit files.",
+        steps: [
+          {
+            text: "I'll trace session capture and recovery, then check the tests for missed history and resumed agents.",
+          },
+          check(
+            "rg -n 'captureHistory|captureUsage|SessionID' backend/internal/chat",
+            "Found root transcript capture, descendant history collection, and session identity checks.",
+          ),
+          {
+            text: "The parent and child conversations retain separate identities. Saved transcripts remain readable after the runtime stops. The tests cover resumed sessions and chat isolation. History that could not be collected should stay visibly incomplete.",
+          },
+        ],
+      },
+    ]),
+  },
+  {
+    id: "session-review-ui",
+    number: 2,
+    title: "Review UI and product experience",
+    frames: conversation("review-ui", [
+      {
+        user: "Review the chat UI and subagent navigation. Check keyboard access, preserved drafts, and narrow-screen layouts. Do not edit files.",
+        steps: [
+          {
+            text: "I'll inspect the navigation and conversation components, then check the browser coverage.",
+          },
+          check(
+            "rg -n 'Subagent|HoverCard|ChatSidePanel' web/src",
+            "Found chat hover cards, plus-menu entries, transcript links, and shared conversation rendering.",
+          ),
+          {
+            text: "Subagents are discoverable from chat hover cards, the plus menu, and trace links. Opening a child conversation preserves the parent draft. Narrow screens use the full panel width, and preview cards support keyboard focus.",
+          },
+        ],
+      },
+    ]),
+  },
+];
+
+const subagentReviewFrames = conversation("subagents", [
+  {
+    user: "Understand the project. Ask subagents to review the UI and agent reliability, then summarize their findings.",
+    steps: [
+      {
+        text: "I'll ask two subagents to review the UI and agent reliability, then bring their findings together.",
+      },
+      ...subagentFixtures.map((agent) => ({
+        tool: "task",
+        input: { description: agent.title, subagent_type: "general" },
+        metadata: { sessionId: agent.id },
+        output: "Review complete. Open the subagent conversation to read its findings.",
+      })),
+      {
+        text: "Both reviews are complete. Child transcripts remain separate and durable, and the UI exposes them through hover cards, the plus menu, and linked traces. The main areas to keep testing are resumed sessions, incomplete history, and keyboard navigation.",
+      },
+    ],
+  },
+]);
 
 export const stories = [
   {
@@ -465,5 +544,11 @@ export const scenarios: { id: string; projectID: string; title: string; frames: 
       )[s.name] ?? s.name,
     frames: s.frames,
   })),
+  {
+    id: "subagents",
+    projectID: "preview",
+    title: "Understand the project",
+    frames: subagentReviewFrames,
+  },
   ...stories,
 ];

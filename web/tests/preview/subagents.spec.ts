@@ -135,3 +135,20 @@ test("chat hover cards show saved subagent names and tasks", async ({ page }) =>
   await expect(preview.getByText("Check the project setup", { exact: true })).toBeVisible();
   await expect(preview.getByRole("region", { name: "Subagents" })).toHaveCount(0);
 });
+
+test("regular preview includes browsable subagent conversations", async ({ page }) => {
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  await page.goto(`${base}/#chats/subagents`);
+  await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+  await page.getByRole("button", { name: "Chat views", exact: true }).click();
+  await page.getByRole("menuitem", { name: /Subagent 1/ }).click();
+  const side = page.getByRole("complementary", { name: "Side panel" });
+  await expect(side.getByText(/Review the agent runtime and transcript persistence/)).toBeVisible();
+  await expect(
+    side.getByText(/parent and child conversations retain separate identities/),
+  ).toBeVisible();
+  await side.getByRole("button", { name: "Side panel views", exact: true }).click();
+  await page.getByRole("menuitem", { name: /Subagent 2/ }).click();
+  await expect(side.getByText(/Review the chat UI and subagent navigation/)).toBeVisible();
+  await expect(side.getByText(/Subagents are discoverable from chat hover cards/)).toBeVisible();
+});
