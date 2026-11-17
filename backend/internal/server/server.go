@@ -24,6 +24,7 @@ func New(assets fs.FS, authentication *auth.Service, credentials *settings.Servi
 		api.chats = chats[0]
 	}
 	api.chatRoutes(mux)
+	api.attachmentRoutes(mux)
 	api.changesRoutes(mux)
 	api.usageRoutes(mux)
 	api.automationRoutes(mux)

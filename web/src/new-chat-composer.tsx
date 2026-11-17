@@ -33,14 +33,31 @@ export function NewChatComposer({
   busy: boolean;
   onSend: (event: SubmitEvent<HTMLFormElement>) => void;
 }) {
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(() => {
+    try {
+      return sessionStorage.getItem(`flora-draft:new:${selectedProject?.id ?? ""}`) ?? "";
+    } catch {
+      return "";
+    }
+  });
   const [search, setSearch] = useState("");
   const [projectOpen, setProjectOpen] = useState(false);
   const filtered = projects.filter((project) =>
     project.name.toLowerCase().includes(search.toLowerCase()),
   );
   return (
-    <form onSubmit={onSend} className="chat-composer new-chat-composer">
+    <form
+      onSubmit={onSend}
+      onReset={() => {
+        setMessage("");
+        try {
+          sessionStorage.removeItem(`flora-draft:new:${selectedProject?.id ?? ""}`);
+        } catch {
+          // Storage may be disabled.
+        }
+      }}
+      className="chat-composer new-chat-composer"
+    >
       <div className="composer-topbar">
         <input type="hidden" name="project" value={selectedProject?.id ?? ""} />
         <Popover
@@ -130,9 +147,18 @@ export function NewChatComposer({
         id="new-chat-message"
         label="Message"
         message={message}
-        onChange={setMessage}
+        onChange={(value) => {
+          setMessage(value);
+          try {
+            sessionStorage.setItem(`flora-draft:new:${selectedProject?.id ?? ""}`, value);
+          } catch {
+            // Storage may be disabled.
+          }
+        }}
+        draftScope={`new:${selectedProject?.id ?? ""}`}
+        projectID={selectedProject?.id ?? ""}
         disabled={busy}
-        canSend={!busy && message.trim() !== ""}
+        canSend={!busy}
         sendLabel={busy ? "Starting chat" : "Start chat"}
         settings={
           <PlaceholderMenu

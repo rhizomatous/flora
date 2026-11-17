@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
   Button,
@@ -21,6 +21,9 @@ import {
   FilesIcon,
   MessageSquareIcon,
 } from "@flora/florets";
+
+import { AttachmentPreview } from "./attachment-preview";
+import { attachmentAccept, attachmentDetails, useAttachments } from "./attachments";
 
 export function PlaceholderMenu({
   label,
@@ -87,6 +90,8 @@ export function Composer({
   sendLabel,
   onInterrupt,
   settings,
+  draftScope,
+  projectID,
 }: {
   id: string;
   label: string;
@@ -97,7 +102,25 @@ export function Composer({
   sendLabel: string;
   onInterrupt?: (() => void) | undefined;
   settings?: ReactNode;
+  draftScope?: string;
+  projectID?: string;
 }) {
+  const attachments = useAttachments(draftScope ?? id, projectID ?? "");
+  const picker = useRef<HTMLInputElement>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const hasInput = message.trim() !== "" || attachments.items.length > 0;
+  const ready = canSend && attachments.ready && hasInput;
+  useEffect(() => {
+    const form = root.current?.closest("form");
+    const reset = () => {
+      attachments.clear();
+    };
+    form?.addEventListener("reset", reset);
+    return () => {
+      form?.removeEventListener("reset", reset);
+    };
+  });
   const action = onInterrupt ? (
     <Button
       variant="primary"
@@ -117,7 +140,7 @@ export function Composer({
       size="icon-sm"
       className="composer-send ml-auto size-7! rounded-lg! p-0! [&_svg]:size-[15px]!"
       type="submit"
-      disabled={!canSend}
+      disabled={!ready}
       aria-label={sendLabel}
       title={sendLabel}
     >
@@ -125,7 +148,55 @@ export function Composer({
     </Button>
   );
   return (
-    <InputGroup className="composer-box">
+    <InputGroup
+      ref={root}
+      className={`composer-box ${dragging ? "ring-2 ring-ring" : ""}`}
+      onDragOver={(event) => {
+        if (!disabled && event.dataTransfer.types.includes("Files")) {
+          event.preventDefault();
+          setDragging(true);
+        }
+      }}
+      onDragLeave={(event) => {
+        if (
+          !(
+            event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)
+          )
+        ) {
+          setDragging(false);
+        }
+      }}
+      onDrop={(event) => {
+        if (event.dataTransfer.files.length > 0) {
+          event.preventDefault();
+          setDragging(false);
+          if (!disabled) attachments.add([...event.dataTransfer.files]);
+        }
+      }}
+      onPaste={(event) => {
+        if (!disabled && event.clipboardData.files.length > 0) {
+          event.preventDefault();
+          attachments.add([...event.clipboardData.files]);
+        }
+      }}
+    >
+      <input
+        ref={picker}
+        type="file"
+        multiple
+        accept={attachmentAccept}
+        hidden
+        tabIndex={-1}
+        aria-label="Choose attachments"
+        disabled={disabled}
+        onChange={(event) => {
+          attachments.add([...(event.target.files ?? [])]);
+          event.target.value = "";
+        }}
+      />
+      {attachments.items.map((file) => (
+        <input key={file.id} type="hidden" name="attachments" value={file.id} />
+      ))}
       <FieldLabel className="sr-only" htmlFor={id}>
         {label}
       </FieldLabel>
@@ -142,25 +213,119 @@ export function Composer({
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
             event.preventDefault();
-            if (canSend) event.currentTarget.form?.requestSubmit();
+            if (ready) event.currentTarget.form?.requestSubmit();
           }
         }}
-        required
         disabled={disabled}
       />
-      <InputGroupAddon align="block-end" className="composer-bottom-bar">
-        <PlaceholderMenu
-          label="Add attachments and context"
-          iconOnly
-          items={[
-            { label: "Upload attachment", icon: <PaperclipIcon /> },
-            { label: "Threads", icon: <MessageSquareIcon />, separator: true },
-            { label: "Pull requests", icon: <GitPullRequestIcon /> },
-            { label: "Files", icon: <FilesIcon /> },
-          ]}
+      {attachments.items.length > 0 && (
+        <div
+          className="composer-attachments flex w-full min-w-0 flex-wrap gap-1.5"
+          aria-label="Draft attachments"
         >
-          <PlusIcon />
-        </PlaceholderMenu>
+          {attachments.items.map((file) => (
+            <AttachmentPreview
+              key={file.id}
+              file={file}
+              state={file.state}
+              disabled={disabled}
+              description={
+                file.state === "uploading"
+                  ? "Uploading…"
+                  : attachments.issue(file) || attachmentDetails(file)
+              }
+              onRemove={() => {
+                void attachments.remove(file.id);
+              }}
+              onRetry={
+                file.state === "error" && attachments.canRetry(file.id)
+                  ? () => {
+                      void attachments.retry(file.id);
+                    }
+                  : undefined
+              }
+            />
+          ))}
+        </div>
+      )}
+      {attachments.error !== "" && (
+        <p className="w-full px-3 pt-2 text-xs text-destructive" role="alert">
+          {attachments.error}
+        </p>
+      )}
+      {attachments.items.some(
+        (file) => file.state !== "uploading" && attachments.issue(file) !== "",
+      ) && (
+        <div className="w-full px-3 pt-2 text-xs" role="alert">
+          {attachments.items
+            .filter((file) => file.state !== "uploading" && attachments.issue(file) !== "")
+            .map((file) => (
+              <p key={file.id}>
+                {file.name}: {attachments.issue(file)}
+              </p>
+            ))}
+          {attachments.items.some(
+            (file) => file.state === "done" && attachments.issue(file) !== "",
+          ) && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="compact"
+              onClick={() => {
+                void attachments.checkPolicy();
+              }}
+            >
+              Retry model check
+            </Button>
+          )}
+        </div>
+      )}
+      <InputGroupAddon align="block-end" className="composer-bottom-bar">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-compact"
+                aria-label="Add attachments and context"
+                disabled={disabled}
+              >
+                <PlusIcon />
+              </Button>
+            }
+          />
+          <DropdownMenuContent
+            className="composer-menu w-[260px]! max-w-[calc(100vw-24px)]"
+            align="start"
+            side="top"
+          >
+            <DropdownMenuItem
+              disabled={
+                attachments.items.length >= 5 || projectID === undefined || projectID === ""
+              }
+              onClick={() => {
+                picker.current?.click();
+              }}
+            >
+              <PaperclipIcon />
+              <span className="florets-control-label">Upload attachment</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem disabled>
+              <MessageSquareIcon />
+              Threads
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled>
+              <GitPullRequestIcon />
+              Pull requests
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled>
+              <FilesIcon />
+              Files
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         {settings}
         <PlaceholderMenu
           label="Model"

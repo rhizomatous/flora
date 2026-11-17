@@ -18,6 +18,7 @@ import {
   TraceCollapsibleContent,
 } from "@flora/florets";
 
+import { AttachmentPreview } from "./attachment-preview";
 import { type Message, type Part, toolDisplayInputSchema } from "./chat-schemas";
 import { subagentSession } from "./subagent-state";
 import { SubagentLink } from "./subagents";
@@ -226,6 +227,24 @@ function MessagePart({
   onExpandedChange?: (expanded: boolean) => void;
 }) {
   const [localOpen, setLocalOpen] = useState(false);
+  if (p.type === "file" && user && p.url !== undefined) {
+    const match = /^\/api\/attachments\/([a-zA-Z0-9-]+)\/content$/u.exec(p.url);
+    if (match?.[1] !== undefined) {
+      return (
+        <AttachmentPreview
+          file={{
+            id: match[1],
+            name: p.filename ?? "Attachment",
+            mime: p.mime ?? "application/octet-stream",
+            size: 0,
+            projectID: "",
+            createdAt: "",
+          }}
+          description="Open attachment"
+        />
+      );
+    }
+  }
   if (p.type === "text") {
     return user ? (
       <div className="whitespace-pre-wrap">{p.text}</div>

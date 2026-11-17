@@ -168,9 +168,12 @@ type runtimeMessage struct {
 		} `json:"time"`
 	} `json:"info"`
 	Parts []struct {
-		Type  string `json:"type"`
-		Text  string `json:"text"`
-		State struct {
+		Type     string `json:"type"`
+		Text     string `json:"text"`
+		Filename string `json:"filename"`
+		MIME     string `json:"mime"`
+		URL      string `json:"url"`
+		State    struct {
 			Status string `json:"status"`
 		} `json:"state"`
 	} `json:"parts"`

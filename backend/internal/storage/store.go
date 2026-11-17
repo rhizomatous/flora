@@ -35,8 +35,10 @@ var (
 var migrations embed.FS
 
 type Store struct {
-	db   *sql.DB
-	root string
+	db            *sql.DB
+	root          string
+	cleanupCancel context.CancelFunc
+	cleanupDone   chan struct{}
 }
 type Paths struct{ Workspace, RuntimeState, Logs, Artifacts string }
 
@@ -91,6 +93,25 @@ func Open(ctx context.Context, root string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize storage schema: %w", err)
 	}
+	if err := s.CleanupAttachments(ctx); err != nil {
+		db.Close()
+		return nil, err
+	}
+	cleanupCtx, cancel := context.WithCancel(context.Background())
+	s.cleanupCancel, s.cleanupDone = cancel, make(chan struct{})
+	go func() {
+		defer close(s.cleanupDone)
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-cleanupCtx.Done():
+				return
+			case <-ticker.C:
+				_ = s.CleanupAttachments(cleanupCtx)
+			}
+		}
+	}()
 	return s, nil
 }
 
@@ -142,7 +163,13 @@ func (s *Store) migrate(ctx context.Context) error {
 	})
 }
 
-func (s *Store) Close() error { return s.db.Close() }
+func (s *Store) Close() error {
+	if s.cleanupCancel != nil {
+		s.cleanupCancel()
+		<-s.cleanupDone
+	}
+	return s.db.Close()
+}
 func (s *Store) write(ctx context.Context, fn func(*sql.Tx) error) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -295,19 +322,19 @@ func (s *Store) UpdateProject(ctx context.Context, projectID, name string, c Con
 }
 
 func (s *Store) CreateChat(ctx context.Context, projectID, title, imageDigest, harnessVersion string) (Chat, error) {
-	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, "", "")
+	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, "", "", nil)
 }
 
 // CreateChatRequest reserves a creation identity with the immutable first input.
 // A retry returns the same chat even if project settings have since changed.
-func (s *Store) CreateChatRequest(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string) (Chat, error) {
-	if requestID == "" || len(requestID) > 200 || strings.TrimSpace(text) == "" || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
+func (s *Store) CreateChatRequest(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, attachments ...string) (Chat, error) {
+	if requestID == "" || len(requestID) > 200 || (strings.TrimSpace(text) == "" && len(attachments) == 0) || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
 		return Chat{}, ErrInvalid
 	}
-	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, requestID, text)
+	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, requestID, text, attachments)
 }
 
-func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string) (Chat, error) {
+func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, attachments []string) (Chat, error) {
 	imageName, digest, pinned := strings.Cut(imageDigest, "@sha256:")
 	if title == "" || imageName == "" || !pinned || !hexHash(digest, 64) || harnessVersion == "" {
 		return Chat{}, ErrInvalid
@@ -315,10 +342,12 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 	chatID := id()
 	err := s.write(ctx, func(tx *sql.Tx) error {
 		if requestID != "" {
-			var savedTitle, savedText string
-			err := tx.QueryRowContext(ctx, "SELECT chat_id,title,text FROM chat_requests WHERE project_id=? AND request_id=?", projectID, requestID).Scan(&chatID, &savedTitle, &savedText)
+			var savedTitle, savedText, savedAttachments string
+			err := tx.QueryRowContext(ctx, "SELECT chat_id,title,text,attachments FROM chat_requests WHERE project_id=? AND request_id=?", projectID, requestID).Scan(&chatID, &savedTitle, &savedText, &savedAttachments)
 			if err == nil {
-				if title != savedTitle || text != savedText {
+				var savedIDs []string
+				_ = json.Unmarshal([]byte(savedAttachments), &savedIDs)
+				if title != savedTitle || text != savedText || !sameAttachmentIDs(savedIDs, attachments) {
 					return ErrConflict
 				}
 				return nil
@@ -354,7 +383,11 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 			return err
 		}
 		if requestID != "" {
-			if _, err := tx.ExecContext(ctx, "INSERT INTO chat_requests VALUES (?,?,?,?,?)", projectID, requestID, chatID, title, text); err != nil {
+			if _, err := reserveAttachments(ctx, tx, projectID, chatID, "", attachments); err != nil {
+				return err
+			}
+			encodedAttachments, _ := json.Marshal(append([]string{}, attachments...))
+			if _, err := tx.ExecContext(ctx, "INSERT INTO chat_requests(project_id,request_id,chat_id,title,text,attachments) VALUES (?,?,?,?,?,?)", projectID, requestID, chatID, title, text, string(encodedAttachments)); err != nil {
 				return err
 			}
 		}

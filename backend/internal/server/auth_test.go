@@ -47,7 +47,7 @@ func TestAuthenticationBoundaries(t *testing.T) {
 			t.Fatalf("status %d want %d: %s", w.Code, status, w.Body)
 		}
 	}
-	for _, path := range []string{"/api/projects", "/api/chats/1", "/api/chats/1/logs", "/api/chats/1/diff", "/api/chats/1/download", "/api/chats/1/events", "/api/settings", "/api/missing", "/api"} {
+	for _, path := range []string{"/api/attachments/policy", "/api/attachments/missing", "/api/attachments/missing/content", "/api/projects/missing/attachments/missing", "/api/projects", "/api/chats/1", "/api/chats/1/logs", "/api/chats/1/diff", "/api/chats/1/download", "/api/chats/1/events", "/api/settings", "/api/missing", "/api"} {
 		for _, method := range []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"} {
 			expect(call(method, path, "{}", "https://flora.test", "same-origin", ""), 401)
 		}
@@ -68,6 +68,7 @@ func TestAuthenticationBoundaries(t *testing.T) {
 		t.Fatalf("unsafe cookie: %+v", c)
 	}
 	cookie := c.Name + "=" + c.Value
+	expect(call("PUT", "/api/projects/missing/attachments/upload-identity-0001?name=task.txt", "content", "https://evil.test", "cross-site", cookie), 403)
 	expect(call("POST", "/api/auth/bootstrap", password, "https://flora.test", "", cookie), 409)
 	expect(call("GET", "/api/settings", "", "", "", cookie), 200)
 	expect(call("GET", "/api/projects", "", "", "", cookie), 200)
