@@ -51,6 +51,8 @@ const descriptions: Record<string, string> = {
   resizable: "Divide a layout into panels that users can resize.",
   "scroll-area": "Display overflowing content with styled scrollbars.",
   select: "Choose a value from a popup list of options.",
+  "settings-group":
+    "Compose settings rows, aligned sections, and text entry with supporting controls.",
   section:
     "Group detail-page content with consistent spacing between sections, headings, and fields.",
   separator: "Visually separate groups of related content.",
@@ -88,6 +90,7 @@ export const componentDocs = [
   ...upstream,
   { name: "editable-text", url: "", examples: 4 },
   { name: "section", url: "", examples: 1 },
+  { name: "settings-group", url: "", examples: 2 },
   { name: "madlib-picker", url: "", examples: 1 },
 ]
   .map(({ name, url, examples }) => ({

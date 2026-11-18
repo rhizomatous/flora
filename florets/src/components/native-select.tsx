@@ -5,13 +5,20 @@ import { cn } from "../lib/utils";
 
 type NativeSelectProps = Omit<ComponentProps<"select">, "size"> & {
   size?: "sm" | "default";
+  width?: "default" | "content";
 };
 
-function NativeSelect({ className, size = "default", ...props }: NativeSelectProps) {
+function NativeSelect({
+  className,
+  size = "default",
+  width = "default",
+  ...props
+}: NativeSelectProps) {
   return (
     <div
       className={cn(
         "group/native-select relative w-fit has-[select:disabled]:opacity-50",
+        width === "content" && "max-w-full",
         className,
       )}
       data-slot="native-select-wrapper"
@@ -20,7 +27,8 @@ function NativeSelect({ className, size = "default", ...props }: NativeSelectPro
       <select
         data-slot="native-select"
         data-size={size}
-        className="h-8 w-full min-w-0 appearance-none rounded-lg border border-border bg-control-background py-1 pr-8 pl-2.5 text-sm transition-colors outline-none select-none selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground hover:bg-control-hover focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-[size=sm]:h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-[size=sm]:py-0.5 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
+        data-width={width}
+        className="h-8 w-full min-w-0 appearance-none rounded-lg border border-border bg-control-background py-1 pr-8 pl-2.5 text-sm transition-colors outline-none select-none selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground hover:bg-control-hover focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-[size=sm]:h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-[size=sm]:py-0.5 data-[width=content]:field-sizing-content data-[width=content]:w-auto data-[width=content]:max-w-full dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
         {...props}
       />
       <ChevronDownIcon

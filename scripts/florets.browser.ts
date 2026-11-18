@@ -26,6 +26,42 @@ try {
     assert.deepEqual(errors, [], name);
   };
 
+  await openExample("settings-group");
+  for (const dark of [true, false]) {
+    await page.evaluate(
+      (enabled) => document.documentElement.classList.toggle("dark", enabled),
+      dark,
+    );
+    for (const width of [1200, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const example of await page.locator('[data-slot="example"]').all()) {
+        const project = example.getByLabel("Project", { exact: true });
+        await project.selectOption("long");
+        await expect(project).toHaveAccessibleDescription("The project this review works in");
+        const row = project.locator('xpath=ancestor::*[@data-slot="field"]');
+        const controlBox = await project.boundingBox();
+        const rowBox = await row.boundingBox();
+        assert.ok(controlBox && rowBox);
+        assert.ok(
+          controlBox.x >= rowBox.x && controlBox.x + controlBox.width <= rowBox.x + rowBox.width,
+        );
+        const toggle = example.getByRole("switch");
+        await toggle.focus();
+        const checked = await toggle.isChecked();
+        await toggle.press("Space");
+        assert.notEqual(await toggle.isChecked(), checked);
+        const instructions = example.getByLabel("Instructions", { exact: true });
+        await expect(instructions).toHaveAccessibleDescription("What to include in each review");
+        await instructions.fill("A keyboard-editable review");
+        await instructions.press("Tab");
+        await expect(example.getByRole("combobox", { name: "Output format" })).toBeFocused();
+      }
+      assert.ok(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      );
+    }
+  }
+
   await page.goto(`${base}#theming`, { waitUntil: "domcontentloaded" });
   for (const dark of [true, false]) {
     await page.evaluate(
