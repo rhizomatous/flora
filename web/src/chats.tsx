@@ -58,6 +58,7 @@ import { Composer } from "./composer";
 import { ConversationMessage, WorkSummary } from "./conversation";
 import { NewChatComposer } from "./new-chat-composer";
 import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
+import { pullEvents } from "./pull-events";
 import { QuestionForm } from "./question";
 import { errorMessage, isExpired, request } from "./request";
 import { SubagentConversation } from "./subagent-conversation";
@@ -665,6 +666,7 @@ export function Chats({
               <ChatSidePanel
                 key={id}
                 chatID={id}
+                chatTitle={title()}
                 pulls={pulls}
                 onExpired={onExpired}
                 onClose={() => {
@@ -713,6 +715,7 @@ function ChatDetail({
   const stopped = chat.Status === "stopped";
   const blocked = detail.continuationBlockedReason !== "";
   const rows = buildTranscript(detail.messages, chat.Status);
+  const events = pullEvents(detail.messages, pulls?.items ?? []);
   const visibleActivity = rows.some((row) => row.kind === "work" && row.active);
 
   return (
@@ -755,7 +758,10 @@ function ChatDetail({
                   {row.kind === "work" ? (
                     <WorkSummary steps={row.steps} active={row.active} failed={row.failed} />
                   ) : (
-                    <ConversationMessage message={row.message} />
+                    <ConversationMessage
+                      message={row.message}
+                      pullEvents={events.get(row.message.ID)}
+                    />
                   )}
                 </MessageScrollerItem>
               ))}

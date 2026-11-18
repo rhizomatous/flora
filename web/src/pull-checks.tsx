@@ -1,4 +1,11 @@
-import { CheckIcon, XIcon, ClockIcon, CircleDotIcon, ChevronDownIcon } from "@flora/florets";
+import {
+  CheckIcon,
+  XIcon,
+  ClockIcon,
+  CircleDotIcon,
+  ChevronDownIcon,
+  ExternalLinkIcon,
+} from "@flora/florets";
 
 import { pullChecksSummary } from "./pull-checks-summary";
 import type { Pull } from "./pull-schemas";
@@ -21,7 +28,7 @@ function CheckState({ state }: { state: string }) {
     />
   );
 }
-export function PullChecksLabel({ pull }: { pull: Pull }) {
+export function PullChecksLabel({ pull, size = "sm" }: { pull: Pull; size?: "sm" | "default" }) {
   const now = useChecksNow();
   const { label, state, stale } = pullChecksSummary(pull, now);
   let prefix = "";
@@ -33,7 +40,7 @@ export function PullChecksLabel({ pull }: { pull: Pull }) {
   }
   return (
     <span
-      className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
+      className={`inline-flex min-w-0 items-center gap-2 ${size === "sm" ? "text-xs" : "text-sm"} text-muted-foreground`}
       data-check-state={state}
     >
       <CheckState state={state} />
@@ -44,73 +51,101 @@ export function PullChecksLabel({ pull }: { pull: Pull }) {
     </span>
   );
 }
-export function PullChecksDetails({ pull }: { pull: Pull }) {
+export function PullChecksDetails({ pull, error = "" }: { pull: Pull; error?: string }) {
   const { checks } = pull;
+  const { stale } = pullChecksSummary(pull, useChecksNow());
   const previous = (checks?.sha ?? "") !== "" && checks?.sha !== pull.headSHA;
+  const warning = (checks?.error ?? "") === "" ? error : (checks?.error ?? "");
   return (
-    <details className="group min-w-0 text-xs" data-pull-checks>
-      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-sm py-1.5 focus-visible:outline-2 focus-visible:outline-ring">
-        <PullChecksLabel pull={pull} />
-        <ChevronDownIcon
-          aria-hidden="true"
-          className="ml-auto size-3.5 shrink-0 text-muted-foreground group-open:rotate-180"
-        />
-      </summary>
-      <div className="space-y-2 pt-1 pb-2 text-muted-foreground">
-        <p className="wrap-anywhere">
-          Head <code title={pull.headSHA}>{pull.headSHA?.slice(0, 7) ?? "unavailable"}</code>
+    <section aria-label="Checks" data-pull-checks>
+      {stale && (
+        <div
+          className="mb-6 space-y-2 rounded-lg border border-border px-3 py-3 text-sm text-muted-foreground"
+          role="status"
+        >
+          <p>{warning || "Saved checks may be out of date."}</p>
           {previous && (
-            <>
-              {" "}
-              · Saved checks for previous head{" "}
-              <code title={checks?.sha}>{checks?.sha?.slice(0, 7)}</code>
-            </>
+            <p>
+              Saved checks for previous head{" "}
+              <code title={checks?.sha}>{checks?.sha?.slice(0, 7)}</code>.
+            </p>
           )}
-        </p>
-        {(checks?.checkedAt ?? "") !== "" && (
-          <p>
-            Saved{" "}
-            <time dateTime={checks?.checkedAt}>
-              {new Date(checks?.checkedAt ?? "").toLocaleString()}
-            </time>
+          {(pull.headSHA ?? "") !== "" && (
+            <p>
+              Current head <code title={pull.headSHA}>{pull.headSHA?.slice(0, 7)}</code>
+            </p>
+          )}
+          {(checks?.checkedAt ?? "") !== "" && (
+            <p>
+              Saved{" "}
+              <time dateTime={checks?.checkedAt}>
+                {new Date(checks?.checkedAt ?? "").toLocaleString()}
+              </time>
+            </p>
+          )}
+        </div>
+      )}
+      <details open className="group">
+        <summary className="mb-3 flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-sm text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring">
+          Checks{" "}
+          <ChevronDownIcon
+            className="size-3 rotate-[-90deg] group-open:rotate-0"
+            aria-hidden="true"
+          />
+        </summary>
+        {(checks?.items.length ?? 0) === 0 ? (
+          <p className="py-2 text-sm text-muted-foreground">
+            {(checks?.checkedAt ?? "") === ""
+              ? "Checks unavailable."
+              : "No checks reported for this revision."}
           </p>
-        )}
-        {(checks?.error ?? "") !== "" && <p role="status">{checks?.error}</p>}
-        {(checks?.items.length ?? 0) > 0 && (
-          <ul aria-label={`Checks for PR #${pull.number}`} className="space-y-1">
-            {checks?.items.map((item) => (
-              <li
-                key={item.key ?? `${item.name}-${item.url ?? ""}`}
-                className="flex min-w-0 items-center gap-2 py-1"
-              >
-                <CheckState state={item.state} />
-                {(item.url ?? "") === "" ? (
+        ) : (
+          <ul aria-label={`Checks for PR #${pull.number}`}>
+            {checks?.items.map((item) => {
+              const content = (
+                <>
+                  <CheckState state={item.state} />
                   <span className="min-w-0 flex-1 break-words">{item.name}</span>
-                ) : (
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="min-w-0 flex-1 rounded-sm break-words text-foreground underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-current focus-visible:outline-2 focus-visible:outline-ring"
-                  >
-                    {item.name}
-                  </a>
-                )}
-                <span className="shrink-0">
-                  {(
-                    {
-                      success: "Passed",
-                      failure: "Failed",
-                      pending: "Pending",
-                      neutral: "Skipped",
-                    } as Record<string, string>
-                  )[item.state] ?? "Unavailable"}
-                </span>
-              </li>
-            ))}
+                  <span className="shrink-0 text-muted-foreground">
+                    {(
+                      {
+                        success: "Passed",
+                        failure: "Failed",
+                        pending: "Pending",
+                        neutral: "Skipped",
+                      } as Record<string, string>
+                    )[item.state] ?? "Unavailable"}
+                  </span>
+                </>
+              );
+              const rowClass = "flex min-w-0 items-center gap-3 rounded-md py-2.5 text-sm";
+              return (
+                <li key={item.key ?? `${item.name}-${item.url ?? ""}`}>
+                  {(item.url ?? "") === "" ? (
+                    <div className={rowClass}>
+                      {content}
+                      <span className="w-4" />
+                    </div>
+                  ) : (
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`${rowClass} hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring`}
+                    >
+                      {content}
+                      <ExternalLinkIcon
+                        className="size-3.5 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                    </a>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
-      </div>
-    </details>
+      </details>
+    </section>
   );
 }

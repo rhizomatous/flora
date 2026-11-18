@@ -18,6 +18,10 @@ const pullChecksSchema = z.object({
 });
 
 export const pullSchema = z.object({
+  body: z.string().optional(),
+  author: z.string().optional(),
+  headRef: z.string().optional(),
+  baseRef: z.string().optional(),
   headSHA: z.string().optional(),
   headCheckedAt: z.string().optional(),
   checks: pullChecksSchema.optional(),

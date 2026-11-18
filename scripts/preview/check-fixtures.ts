@@ -13,6 +13,21 @@ export function previewPullChecks(pull: Pull, mode = "saved"): Pull {
   if (mode !== "saved" && mode !== "stale") browserState = mode;
   return {
     ...pull,
+    author: "flora",
+    headRef:
+      (
+        {
+          18: "fix/pagination",
+          19: "fix/pagination-release",
+          42: "fix/cart-session",
+          73: "fix/repository-focus",
+        } as Record<number, string>
+      )[pull.number] ?? "fix/update",
+    baseRef: pull.number === 18 ? "main" : "release",
+    body:
+      pull.number === 18 || pull.number === 19
+        ? "Keep notes stable between pages by using an ID alongside the timestamp in each cursor.\n\nExisting timestamp-only cursors remain supported. The replacement PR includes compatibility coverage for older clients and tests for notes created at the same time."
+        : (pull.title ?? ""),
     headSHA,
     headCheckedAt: savedAt,
     checks: {

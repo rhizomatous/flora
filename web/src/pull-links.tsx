@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from "react";
 
 import {
+  Card,
   HoverCard,
   HoverCardTrigger,
   HoverCardContent,
@@ -11,7 +12,8 @@ import {
 } from "@flora/florets";
 
 import { pullAppearance } from "./pull-appearance";
-import { PullChecksDetails, PullChecksLabel } from "./pull-checks";
+import { PullChecksLabel } from "./pull-checks";
+import { openPull, usePullNavigation } from "./pull-navigation";
 import type { Pull, PullSummary } from "./pull-schemas";
 import { useChecksNow } from "./use-checks-now";
 
@@ -105,13 +107,16 @@ export function PullCount({ pulls }: { pulls: Pull[] }) {
 
 export function PullList({
   summary,
-  checks = "summary",
+  checks = "none",
+  chatID,
 }: {
   summary: PullSummary | undefined;
-  checks?: "none" | "summary" | "details";
+  checks?: "none" | "summary";
+  chatID?: string | undefined;
 }) {
   const id = useId();
   const now = useChecksNow();
+  const navigation = usePullNavigation(chatID);
   const pulls = summary?.items ?? [];
   const error = summary?.error ?? "";
   let emptyMessage = "No linked pull requests yet.";
@@ -128,6 +133,9 @@ export function PullList({
               <li key={pull.url}>
                 <a
                   href={pull.url}
+                  onClick={(event) => {
+                    openPull(event, pull, navigation);
+                  }}
                   aria-label={`${repository} #${pull.number} ${label}${(pull.title ?? "") === "" ? "" : `: ${pull.title}`}${pull.additions !== undefined && pull.deletions !== undefined ? `, ${pull.additions} additions, ${pull.deletions} deletions` : ""}`}
                   aria-describedby={`${id}-${pull.url}`}
                   title={`${repository} #${pull.number} · ${description}${(pull.title ?? "") === "" ? "" : ` · ${pull.title}`}`}
@@ -149,11 +157,7 @@ export function PullList({
                 </span>
                 {checks !== "none" && (
                   <div className="px-2 pb-1">
-                    {checks === "details" ? (
-                      <PullChecksDetails pull={pull} />
-                    ) : (
-                      <PullChecksLabel pull={pull} />
-                    )}
+                    <PullChecksLabel pull={pull} />
                   </div>
                 )}
               </li>
@@ -182,6 +186,7 @@ export function InlinePullLink({
   children: ReactNode;
 }) {
   const id = useId();
+  const navigation = usePullNavigation();
   const { Icon, color, label, description, tone } = appearance(pull, useChecksNow());
   const repository = pull.repository ?? pull.url.split("/").slice(3, 5).join("/");
   return (
@@ -193,6 +198,9 @@ export function InlinePullLink({
         render={
           <a
             href={href}
+            onClick={(event) => {
+              openPull(event, pull, navigation);
+            }}
             target="_blank"
             rel="noreferrer"
             className="inline-flex max-w-full cursor-pointer items-baseline gap-1 rounded-sm align-baseline font-medium text-foreground underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -216,5 +224,43 @@ export function InlinePullLink({
         <PullChecksLabel pull={pull} />
       </HoverCardContent>
     </HoverCard>
+  );
+}
+
+export function PullEventCard({ pull, opened }: { pull: Pull; opened: boolean }) {
+  const navigation = usePullNavigation();
+  const { Icon, color, tone, description } = appearance(pull, useChecksNow());
+  const repository = (pull.repository ?? pull.url.split("/").slice(3, 5).join("/"))
+    .split("/")
+    .at(-1);
+  return (
+    <Card
+      size="sm"
+      className="mt-3 rounded-xl px-4 py-3.5"
+      aria-label={`Pull request #${pull.number}`}
+      data-pull-event={pull.url}
+    >
+      <p className="text-sm text-muted-foreground">
+        {opened ? "Opened" : "Pull request"} {repository}#{pull.number}
+      </p>
+      <a
+        href={pull.url}
+        target="_blank"
+        rel="noreferrer"
+        onClick={(event) => {
+          openPull(event, pull, navigation);
+        }}
+        title={description}
+        className="flex min-w-0 items-center gap-2.5 rounded-sm text-sm focus-visible:outline-2 focus-visible:outline-ring"
+        data-pr-tone={tone}
+      >
+        <Icon className={`size-4 shrink-0 ${color}`} aria-hidden="true" />
+        <span className="shrink-0 text-muted-foreground">
+          {repository}#{pull.number}
+        </span>
+        <span className="min-w-0 flex-1 truncate font-medium">{pull.title ?? "Pull request"}</span>
+        <PullLineCounts pull={pull} />
+      </a>
+    </Card>
   );
 }

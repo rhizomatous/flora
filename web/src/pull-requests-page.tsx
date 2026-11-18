@@ -21,6 +21,7 @@ import type { Chat } from "./chat-schemas";
 import { ListPage, ListFilters, ListEmpty } from "./list-page";
 import { pullStatus } from "./pull";
 import { PullLineCounts, PullStatusIcon } from "./pull-links";
+import { openPull, usePullNavigation } from "./pull-navigation";
 import { collectPullRequests, type TrackedPull } from "./pull-requests";
 
 const filters = [
@@ -68,6 +69,7 @@ function ChatLink({ chat, expanded = false }: { chat: Chat; expanded?: boolean }
 function PullRow({ row }: { row: TrackedPull }) {
   const { pull, repository, chats } = row;
   const [first, ...remaining] = chats;
+  const navigation = usePullNavigation(first?.ID);
   return (
     <Item size="list" render={<li />} className="flex-wrap sm:flex-nowrap">
       <Tooltip>
@@ -75,6 +77,9 @@ function PullRow({ row }: { row: TrackedPull }) {
           render={
             <a
               href={pull.url}
+              onClick={(event) => {
+                openPull(event, pull, navigation);
+              }}
               target="_blank"
               rel="noreferrer"
               aria-label={`${repository} #${pull.number}: ${pull.title ?? "Pull request"}`}
