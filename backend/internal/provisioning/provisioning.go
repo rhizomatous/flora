@@ -172,6 +172,7 @@ type Engine interface {
 	ImagePull(ctx context.Context, ref string) error
 	ContainerCreate(ctx context.Context, spec docker.ContainerSpec) (string, error)
 	ContainerStart(ctx context.Context, id string) error
+	ContainerRemove(context.Context, string, bool) error
 	ContainerStop(ctx context.Context, id string, timeoutSeconds int) error
 	ContainerInspect(ctx context.Context, idOrName string) (docker.ContainerInfo, error)
 	ContainerList(ctx context.Context, running bool, labels map[string]string) ([]docker.ContainerSummary, error)

@@ -8,10 +8,8 @@ import (
 	"fmt"
 	"image"
 	"image/png"
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/rhizomatous/flora/backend/internal/provisioning"
@@ -24,12 +22,12 @@ type attachmentCatalogTransport struct {
 	calls  int
 }
 
-func (c *attachmentCatalogTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+func (c *attachmentCatalogTransport) read(context.Context, storage.Credentials) (json.RawMessage, error) {
 	c.calls++
-	if r.URL.String() != "https://models.dev/api.json" {
-		return nil, fmt.Errorf("unexpected catalog URL")
+	if c.status != 200 {
+		return nil, fmt.Errorf("metadata unavailable")
 	}
-	return &http.Response{StatusCode: c.status, Body: io.NopCloser(strings.NewReader(c.body)), Header: make(http.Header)}, nil
+	return json.RawMessage(c.body), nil
 }
 
 func TestAttachmentCapabilityPreflightAndRuntimeDelivery(t *testing.T) {
@@ -53,7 +51,7 @@ func TestAttachmentCapabilityPreflightAndRuntimeDelivery(t *testing.T) {
 		t.Fatal(err)
 	}
 	catalog := &attachmentCatalogTransport{status: 503}
-	s.ModelCatalogClient = &http.Client{Transport: catalog}
+	s.provisioner.(*testProvisioner).metadata = catalog.read
 	if err := s.checkAttachments(ctx, project.ID, []string{document.ID}); err != nil || catalog.calls != 0 {
 		t.Fatalf("text requires no capability lookup: %v", err)
 	}
@@ -65,7 +63,7 @@ func TestAttachmentCapabilityPreflightAndRuntimeDelivery(t *testing.T) {
 		t.Fatal("unsupported input created a chat")
 	}
 	catalog.status = 200
-	catalog.body = `{"anthropic":{"models":{"model":{"modalities":{"input":["text","image","pdf"]}}}}}`
+	catalog.body = `{"connected":["anthropic"],"all":[{"id":"anthropic","models":{"model":{"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}}}}]}`
 	if err := s.checkAttachments(ctx, project.ID, []string{screen.ID, pdf.ID, document.ID}); err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +89,7 @@ func TestAttachmentCapabilityPreflightAndRuntimeDelivery(t *testing.T) {
 	}
 	// An accepted retry succeeds even if the catalog becomes unavailable.
 	catalog.status = 503
-	s.attachmentCapabilities.expires = s.attachmentCapabilities.expires.AddDate(-1, 0, 0)
+	s.models.expires = s.models.expires.AddDate(-1, 0, 0)
 	duplicate, err := s.Submit(ctx, c.ID, "first", "Look", screen.ID, pdf.ID, document.ID)
 	if err != nil || !duplicate.Duplicate {
 		t.Fatalf("accepted retry failed: %v", err)

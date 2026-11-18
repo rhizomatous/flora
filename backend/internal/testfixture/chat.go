@@ -102,7 +102,7 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/provider":
-			fmt.Fprint(w, `{"all":[{"id":"anthropic","models":{"model":{"capabilities":{"input":{"image":true,"pdf":true}}},"claude-sonnet-4-6":{"variants":{"low":{},"medium":{},"high":{},"max":{}},"capabilities":{"input":{"image":true,"pdf":true}}},"claude-haiku-4-5":{"capabilities":{"input":{"image":true,"pdf":true}}}}}]}`)
+			fmt.Fprint(w, `{"connected":["anthropic"],"all":[{"id":"anthropic","models":{"model":{"name":"Installation default","capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}},"claude-sonnet-4-6":{"name":"Claude Sonnet 4.6","variants":{"low":{},"medium":{},"high":{},"max":{}},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}},"claude-haiku-4-5":{"name":"Claude Haiku 4.5","capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}}}}]}`)
 		case "/config":
 			fmt.Fprint(w, `{"model":"anthropic/model"}`)
 		case "/session":
@@ -205,14 +205,22 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 		}
 	}))
 	svc := chat.New(ctx, store, &Provisioner{store, runtime.URL})
-	svc.ModelCatalogClient = &http.Client{Transport: catalogTransport{}}
+
 	success = true
 	return &Fixture{Store: store, Service: svc, Auth: authentication, Token: token, Project: project, Close: func() { cancel(); runtime.Close(); store.Close() }}, nil
 }
 
-// The browser fixture checks capabilities without contacting a live catalog.
-type catalogTransport struct{}
-
-func (catalogTransport) RoundTrip(*http.Request) (*http.Response, error) {
-	return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"anthropic":{"models":{"model":{"name":"Installation default","tool_call":true,"modalities":{"input":["text","image","pdf"]}},"claude-sonnet-4-6":{"name":"Claude Sonnet 4.6","tool_call":true,"reasoning":true,"modalities":{"input":["text","image","pdf"]}},"claude-haiku-4-5":{"name":"Claude Haiku 4.5","tool_call":true,"reasoning":false,"modalities":{"input":["text","image","pdf"]}}}}}`)), Header: make(http.Header)}, nil
+func (p *Provisioner) ModelMetadata(ctx context.Context, _ storage.Credentials) (json.RawMessage, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", p.url+"/provider", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.SetBasicAuth("opencode", "test-runtime-password")
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	raw, err := io.ReadAll(response.Body)
+	return json.RawMessage(raw), err
 }

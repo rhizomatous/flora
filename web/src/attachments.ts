@@ -67,9 +67,12 @@ export function useAttachments(scope: string, project: string, modelPolicy?: Pol
     },
     [scope],
   );
+  const policyPath = scope.startsWith("chat:")
+    ? `attachments/policy?chat=${encodeURIComponent(scope.slice(5))}`
+    : "attachments/policy";
   const checkPolicy = useCallback(async () => {
     try {
-      const next = await request(policySchema, "attachments/policy");
+      const next = await request(policySchema, policyPath);
       if (mounted.current) setPolicy(next);
     } catch {
       if (mounted.current) {
@@ -80,7 +83,7 @@ export function useAttachments(scope: string, project: string, modelPolicy?: Pol
         });
       }
     }
-  }, []);
+  }, [policyPath]);
   useEffect(() => {
     mounted.current = true;
     const saved = current.current;

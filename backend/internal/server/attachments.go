@@ -17,7 +17,14 @@ func (a *api) attachmentRoutes(mux *http.ServeMux) {
 			failure(w, 503, "Chat runtime is not configured.")
 			return
 		}
-		jsonResponse(w, 200, a.chats.AttachmentCapabilities(r.Context()))
+		id := r.URL.Query().Get("chat")
+		if id != "" {
+			if _, err := a.settings.Store.Chat(r.Context(), id); err != nil {
+				chatError(w, err)
+				return
+			}
+		}
+		jsonResponse(w, 200, a.chats.AttachmentCapabilities(r.Context(), id))
 	})
 	mux.HandleFunc("PUT /api/projects/{project}/attachments/{attachment}", func(w http.ResponseWriter, r *http.Request) {
 		// A raw body avoids multipart temporary files and bounds memory before parsing.

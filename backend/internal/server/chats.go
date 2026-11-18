@@ -91,7 +91,14 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			failure(w, 503, "Chat runtime is not configured.")
 			return
 		}
-		jsonResponse(w, 200, a.chats.Models(r.Context()))
+		id := r.URL.Query().Get("chat")
+		if id != "" {
+			if _, err := store.Chat(r.Context(), id); err != nil {
+				chatError(w, err)
+				return
+			}
+		}
+		jsonResponse(w, 200, a.chats.Models(r.Context(), id))
 	})
 	mux.HandleFunc("PATCH /api/chats/{id}", func(w http.ResponseWriter, r *http.Request) {
 		var in storage.ChatOrganization

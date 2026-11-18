@@ -56,7 +56,8 @@ Same-release checksums detect corruption, not compromise of the release source.
 Choose an explicit published release with `-public-url` and managed private
 networking support. Older experimental releases use different startup contracts.
 No Go, Node, Nix, OpenCode installation or Docker CLI is needed by the binary.
-Allow outbound HTTPS to GHCR, GitHub and your hosted model provider. Plan for the
+Allow outbound HTTPS to GHCR, GitHub, models.dev (OpenCode's metadata catalog),
+and your hosted model provider. Plan for the
 default ten running chats, each limited to 2 CPUs, 8 GiB and 512 processes.
 
 ```sh
