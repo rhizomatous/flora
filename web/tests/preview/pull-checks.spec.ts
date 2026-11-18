@@ -203,6 +203,7 @@ test("PR collection rows open the selected PR beside its chat", async ({ page })
 test("PR descriptions render Markdown headings, lists, links, code, and tables", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
   const markdown = [
     "## Summary",
