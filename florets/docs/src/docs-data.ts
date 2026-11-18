@@ -88,6 +88,7 @@ export const componentDocs = [
   ...upstream,
   { name: "editable-text", url: "", examples: 4 },
   { name: "section", url: "", examples: 1 },
+  { name: "madlib-picker", url: "", examples: 1 },
 ]
   .map(({ name, url, examples }) => ({
     id: name,
