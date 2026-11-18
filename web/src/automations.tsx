@@ -275,6 +275,17 @@ function AutomationForm({
             >
               {initial.id ? initial.name : "New automation"}
             </Heading>
+            {initial.mode === "same" && value.mode === "same" && initial.chatID && (
+              <Button
+                variant="outline"
+                size="sm"
+                nativeButton={false}
+                role="link"
+                render={<a href={`#chats/${initial.chatID}`} aria-label="Open chat" />}
+              >
+                Open chat
+              </Button>
+            )}
             {initial.id ? (
               <Button
                 type="button"
@@ -416,14 +427,6 @@ function AutomationForm({
                   {value.mode === "same"
                     ? "Continue in the same chat."
                     : "Start a new chat each run."}
-                  {initial.mode === "same" && value.mode === "same" && initial.chatID && (
-                    <>
-                      {" "}
-                      <Link className="inline-block" href={`#chats/${initial.chatID}`}>
-                        Open chat
-                      </Link>
-                    </>
-                  )}
                 </p>
                 {initial.id && value.mode !== initial.mode && (
                   <p className="col-span-2 text-sm">
