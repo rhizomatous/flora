@@ -126,7 +126,7 @@ export function ModelControls({
         <PopoverContent
           align="start"
           side="top"
-          className="composer-menu max-h-(--available-height) w-[440px]! max-w-[calc(100vw-24px)]! gap-0 overflow-hidden p-0! transition-none"
+          className="composer-menu max-h-(--available-height) w-[320px]! max-w-[calc(100vw-24px)]! gap-0 overflow-hidden p-0! transition-none"
           aria-label="Choose model"
         >
           <ModelPicker

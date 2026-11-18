@@ -1,14 +1,10 @@
-import { useRef, useState } from "react";
-
 import {
-  Button,
   Command,
   CommandInput,
   CommandList,
   CommandEmpty,
   CommandItem,
   CommandGroup,
-  ListIcon,
   Spinner,
 } from "@flora/florets";
 
@@ -51,55 +47,21 @@ export function ModelPicker({
   loading: boolean;
   onSelect: (model: ModelOption) => void;
 }) {
-  const search = useRef<HTMLInputElement>(null);
-  const [grouped, setGrouped] = useState(() => {
-    try {
-      return localStorage.getItem("flora-model-grouping") !== "all";
-    } catch {
-      return true;
-    }
-  });
   const groups = new Map<string, ModelOption[]>();
   for (const model of models) {
-    const key = grouped ? model.provider : "";
+    const key = model.provider;
     const entries = groups.get(key) ?? [];
     entries.push(model);
     groups.set(key, entries);
   }
   return (
     <Command filter={matchModel} className="min-h-0 rounded-lg! p-0!">
-      <div className="flex shrink-0 items-center border-b border-border pr-2">
-        <div className="min-w-0 flex-1 [&_[data-slot=command-input-wrapper]]:border-0 [&_[data-slot=command-input-wrapper]]:px-3">
-          <CommandInput
-            ref={search}
-            variant="plain"
-            className="h-12 text-base"
-            aria-label="Search models"
-            placeholder="Search models"
-          />
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="compact"
-          aria-label="Group models by provider"
-          aria-pressed={grouped}
-          className="shrink-0 text-muted-foreground aria-pressed:text-foreground"
-          onClick={() => {
-            const next = !grouped;
-            setGrouped(next);
-            try {
-              localStorage.setItem("flora-model-grouping", next ? "provider" : "all");
-            } catch {
-              /* Storage may be disabled. */
-            }
-            search.current?.focus();
-          }}
-        >
-          <ListIcon />
-          <span>By provider</span>
-        </Button>
-      </div>
+      <CommandInput
+        variant="plain"
+        className="h-9 text-base sm:text-sm"
+        aria-label="Search models"
+        placeholder="Search models"
+      />
       {loading ? (
         <div
           className="flex items-center gap-2 px-3 py-4 text-sm text-muted-foreground"
@@ -109,21 +71,19 @@ export function ModelPicker({
           Loading models…
         </div>
       ) : (
-        <CommandList className="max-h-[min(360px,calc(var(--available-height)-100px))] scroll-py-2">
+        <CommandList className="max-h-[min(360px,calc(var(--available-height)-44px))] scroll-py-2">
           <CommandEmpty>No models found.</CommandEmpty>
           {[...groups.entries()]
             .toSorted(([a], [b]) => a.localeCompare(b))
             .map(([provider, entries]) => (
               <CommandGroup
                 key={provider}
-                className="border-t border-border p-1.5! first:border-t-0"
+                className="border-t border-border p-1! first:border-t-0 **:[[cmdk-group-heading]]:py-1"
                 heading={
-                  grouped ? (
-                    <span className="flex items-center gap-2">
-                      <ModelIcon provider={provider} model={undefined} />
-                      {providerName(provider)}
-                    </span>
-                  ) : undefined
+                  <span className="flex items-center gap-2">
+                    <ModelIcon provider={provider} model={undefined} />
+                    {providerName(provider)}
+                  </span>
                 }
               >
                 {entries.map((model) => {
@@ -148,13 +108,15 @@ export function ModelPicker({
                       data-checked={
                         selected?.provider === model.provider && selected.model === model.id
                       }
-                      className="gap-2.5 px-2.5 py-2.5 [&>svg:last-child]:ml-0 [&>svg:last-child]:size-3.5"
+                      className="gap-2 px-2 py-1 [&>svg:last-child]:ml-0 [&>svg:last-child]:size-3.5"
                       onSelect={() => {
                         onSelect(model);
                       }}
                     >
                       <ModelIcon provider={model.provider} model={model.id} />
-                      <span className="min-w-0 flex-1 truncate">{model.name}</span>
+                      <span className="min-w-0 flex-1 truncate" title={model.name}>
+                        {model.name}
+                      </span>
                       <span
                         aria-hidden="true"
                         className="shrink-0 text-xs text-muted-foreground tabular-nums"
@@ -169,9 +131,6 @@ export function ModelPicker({
             ))}
         </CommandList>
       )}
-      <div className="shrink-0 border-t border-border px-3 py-2 text-[11px] text-muted-foreground">
-        Input / output · USD per 1M tokens
-      </div>
     </Command>
   );
 }
