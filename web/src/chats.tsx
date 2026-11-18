@@ -60,6 +60,7 @@ import { NewChatComposer } from "./new-chat-composer";
 import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
 import { QuestionForm } from "./question";
 import { errorMessage, isExpired, request } from "./request";
+import { useMarkViewed } from "./sidebar-status";
 import { SubagentConversation } from "./subagent-conversation";
 import { SubagentsContext, subagentLabel } from "./subagent-state";
 import { buildTranscript } from "./transcript";
@@ -122,6 +123,7 @@ export function Chats({
   const submitting = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const id = path.startsWith("chats/") ? (path.slice(6).split("?")[0] ?? "") : "";
+  const readError = useMarkViewed(detail?.chat.ID === id ? detail.chat : undefined);
   const isNew = id === "new" || id.startsWith("new?");
   const projectID = new URLSearchParams(path.split("?")[1]).get("project") ?? "";
   const [selectedProjectID, setSelectedProjectID] = useState(() => {
@@ -549,9 +551,9 @@ export function Chats({
                   </a>
                 </div>
               )}
-              {error !== "" && (
+              {(error !== "" || readError !== "") && (
                 <Alert role="alert" className="mt-6">
-                  {error}
+                  {error || readError}
                 </Alert>
               )}
               {isNew && projects === undefined && error === "" && (
