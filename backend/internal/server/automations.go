@@ -71,6 +71,27 @@ func (a *api) automationRoutes(mux *http.ServeMux) {
 			}
 			in.ID = r.PathValue("id")
 			in.ChatID = ""
+			if in.Execution != nil {
+				if a.chats == nil {
+					failure(w, 503, "Chat runtime is not configured.")
+					return
+				}
+				var chatIDs []string
+				if in.ID != "" && in.Mode == "same" {
+					existing, err := store.Automation(r.Context(), in.ID)
+					if err != nil {
+						automationError(w, err)
+						return
+					}
+					if existing.Mode == "same" && existing.ChatID != "" {
+						chatIDs = append(chatIDs, existing.ChatID)
+					}
+				}
+				if err := a.chats.ValidateAutomationExecution(r.Context(), in.Execution, chatIDs...); err != nil {
+					automationError(w, err)
+					return
+				}
+			}
 			saved, err := store.SaveAutomation(r.Context(), in, time.Now())
 			if err != nil {
 				automationError(w, err)

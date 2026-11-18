@@ -29,19 +29,28 @@ const modelsSchema = z.object({
 const effortLabel = (value: string) =>
   value === "xhigh" ? "Extra high" : value.charAt(0).toUpperCase() + value.slice(1);
 
-/** Draft choices are submitted with the message; only acceptance changes saved chat preferences. */
+/** Chat drafts save on message acceptance; controlled automation choices save with the form. */
 export function ModelControls({
   scope,
   saved,
   disabled,
   onPolicy,
+  automation,
 }: {
   scope: string;
   saved?: Execution | undefined;
   disabled: boolean;
-  onPolicy: (policy: AttachmentPolicy | undefined) => void;
+  onPolicy?: ((policy: AttachmentPolicy | undefined) => void) | undefined;
+  automation?:
+    | {
+        value: Execution | null;
+        inheritedLabel: string;
+        onChange: (value: Execution | null) => void;
+      }
+    | undefined;
 }) {
   const [selected, setSelected] = useState<Execution | null>(() => {
+    if (automation) return null;
     try {
       const draft = executionSchema.safeParse(
         JSON.parse(sessionStorage.getItem(`flora-model:${scope}`) ?? "null"),
@@ -79,11 +88,12 @@ export function ModelControls({
     };
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Retrying starts a fresh discovery request.
   }, [attempt, discoveryPath]);
-  const effective =
-    selected ?? (saved?.model !== undefined && saved.model !== "" ? saved : options?.default);
+  const effective = automation
+    ? (automation.value ?? undefined)
+    : (selected ?? (saved?.model !== undefined && saved.model !== "" ? saved : options?.default));
   const current = options?.models.find((model) => model.id === effective?.model);
   useEffect(() => {
-    onPolicy(
+    onPolicy?.(
       current && current.id !== options?.default.model && options?.error === ""
         ? {
             image: current.image,
@@ -95,8 +105,12 @@ export function ModelControls({
   }, [current, options, onPolicy]);
   const reasoningAvailable =
     (current?.variants.length ?? 0) > 0 || (effective?.variant ?? "") !== "";
-  const label = current?.name ?? effective?.model ?? "Default model";
+  const label = current?.name ?? effective?.model ?? automation?.inheritedLabel ?? "Default model";
   function choose(value: Execution) {
+    if (automation) {
+      automation.onChange(value);
+      return;
+    }
     setSelected(value);
     try {
       sessionStorage.setItem(`flora-model:${scope}`, JSON.stringify(value));
@@ -106,7 +120,9 @@ export function ModelControls({
   }
   return (
     <>
-      {selected && <input type="hidden" name="execution" value={JSON.stringify(selected)} />}
+      {!automation && selected && (
+        <input type="hidden" name="execution" value={JSON.stringify(selected)} />
+      )}
       <Popover open={modelOpen} onOpenChange={setModelOpen}>
         <PopoverTrigger
           render={
@@ -133,6 +149,18 @@ export function ModelControls({
             models={options?.models ?? []}
             selected={effective}
             loading={loading}
+            inherited={
+              automation
+                ? {
+                    label: automation.inheritedLabel,
+                    selected: automation.value === null,
+                    onSelect: () => {
+                      automation.onChange(null);
+                      setModelOpen(false);
+                    },
+                  }
+                : undefined
+            }
             onSelect={(model) => {
               choose({ provider: model.provider, model: model.id, variant: "" });
               setModelOpen(false);
@@ -159,45 +187,47 @@ export function ModelControls({
           )}
         </PopoverContent>
       </Popover>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <DropdownButton
-              type="button"
-              variant="ghost"
-              size="compact"
-              disabled={disabled || !effective || loading || !reasoningAvailable}
-              aria-label={`Reasoning effort: ${(effective?.variant ?? "") !== "" && effective ? effortLabel(effective.variant) : "Default"}`}
-            >
-              <span className="florets-control-label">
-                {(effective?.variant ?? "") !== "" && effective
-                  ? effortLabel(effective.variant)
-                  : "Default"}
-              </span>
-            </DropdownButton>
-          }
-        />
-        <DropdownMenuContent align="start" side="top" className="composer-menu w-[200px]!">
-          <DropdownMenuItem
-            onClick={() => {
-              if (effective) choose({ ...effective, variant: "" });
-            }}
-          >
-            Default{(effective?.variant ?? "") === "" && <CheckIcon className="ml-auto" />}
-          </DropdownMenuItem>
-          {current?.variants.map((variant) => (
+      {(!automation || effective) && (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <DropdownButton
+                type="button"
+                variant="ghost"
+                size="compact"
+                disabled={disabled || !effective || loading || !reasoningAvailable}
+                aria-label={`Reasoning effort: ${(effective?.variant ?? "") !== "" && effective ? effortLabel(effective.variant) : "Default"}`}
+              >
+                <span className="florets-control-label">
+                  {(effective?.variant ?? "") !== "" && effective
+                    ? effortLabel(effective.variant)
+                    : "Default"}
+                </span>
+              </DropdownButton>
+            }
+          />
+          <DropdownMenuContent align="start" side="top" className="composer-menu w-[200px]!">
             <DropdownMenuItem
-              key={variant}
               onClick={() => {
-                if (effective) choose({ ...effective, variant });
+                if (effective) choose({ ...effective, variant: "" });
               }}
             >
-              {effortLabel(variant)}
-              {effective?.variant === variant && <CheckIcon className="ml-auto" />}
+              Default{(effective?.variant ?? "") === "" && <CheckIcon className="ml-auto" />}
             </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+            {current?.variants.map((variant) => (
+              <DropdownMenuItem
+                key={variant}
+                onClick={() => {
+                  if (effective) choose({ ...effective, variant });
+                }}
+              >
+                {effortLabel(variant)}
+                {effective?.variant === variant && <CheckIcon className="ml-auto" />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </>
   );
 }
