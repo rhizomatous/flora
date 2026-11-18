@@ -7,6 +7,11 @@ const schema = z.object({
   mainDiffOpen: z.boolean().default(false),
   mainSubagentTabs: z.array(z.string()).default([]),
   diffOpen: z.boolean().default(false),
+  filesOpen: z.boolean().default(false),
+  fileRepository: z.string().default(""),
+  fileDirectory: z.string().default("."),
+  filePath: z.string().default(""),
+  fileOffset: z.number().int().nonnegative().default(0),
   view: z.string().default("overview"),
   subagentTabs: z.array(z.string()).default([]),
   width: z.number().min(1).max(99).default(40),
@@ -29,6 +34,7 @@ function read(id: string): ChatPanelState {
     // Storage may be unavailable; in-memory state still survives navigation.
   }
   if (state.view === "diffs") state.diffOpen = true;
+  if (state.view === "files") state.filesOpen = true;
   states.set(id, state);
   return state;
 }

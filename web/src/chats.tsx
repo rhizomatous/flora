@@ -528,6 +528,9 @@ export function Chats({
                       updatePanel({ open: !sideOpen });
                     }}
                     usage={detail?.usage}
+                    onFilesOpen={() => {
+                      updatePanel({ open: true, filesOpen: true, view: "files" });
+                    }}
                     diffsOpen={activeDiff}
                     onDiffsChange={(open) => {
                       updatePanel({

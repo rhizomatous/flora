@@ -51,6 +51,19 @@ func (p *Provisioner) Endpoint(ctx context.Context, id string) (provisioning.End
 	}
 	return provisioning.Endpoint{URL: p.url, Username: "opencode", Password: "test-runtime-password", ContainerID: "browser-container"}, nil
 }
+
+// Runtime reports deterministic fixture machine states without starting work.
+func (p *Provisioner) Runtime(ctx context.Context, id string) (provisioning.RuntimeState, error) {
+	c, err := p.store.Chat(ctx, id)
+	state := "unknown"
+	if c.ContainerID == "missing-browser-container" {
+		state = "missing"
+	}
+	if c.ContainerID == "workspace-stopped" {
+		state = "stopped"
+	}
+	return provisioning.RuntimeState{State: state, ObservedAt: time.Now().UTC(), CollectionError: "Fixture runtime; Docker is not connected."}, err
+}
 func (*Provisioner) BeginActivity(string)                           {}
 func (*Provisioner) EndActivity(string)                             {}
 func (*Provisioner) Stop(context.Context, string) error             { return nil }

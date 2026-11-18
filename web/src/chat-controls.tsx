@@ -152,11 +152,15 @@ export function ChatViewMenu({
   label = "Chat views",
   diffsOpen,
   onDiffsChange,
+  onFilesOpen,
+  filesOpen = false,
 }: {
   chatID?: string | undefined;
   label?: string;
   diffsOpen: boolean;
   onDiffsChange: (open: boolean) => void;
+  onFilesOpen: () => void;
+  filesOpen?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -179,7 +183,7 @@ export function ChatViewMenu({
         >
           <ListIcon />
           Overview
-          {!diffsOpen && (
+          {!diffsOpen && !filesOpen && (
             <span className="ml-auto shrink-0 whitespace-nowrap text-muted-foreground">
               Current view
             </span>
@@ -197,9 +201,10 @@ export function ChatViewMenu({
           )}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>
+        <DropdownMenuItem onClick={onFilesOpen}>
           <FilesIcon />
           Machine files
+          {filesOpen && <span className="ml-auto text-muted-foreground">Current view</span>}
         </DropdownMenuItem>
         <SubagentMenuItems />
         <DropdownMenuSeparator />
@@ -225,6 +230,7 @@ export function ChatHeaderActions({
   usage,
   diffsOpen,
   onDiffsChange,
+  onFilesOpen,
 }: {
   chat: Chat | undefined;
   sideOpen: boolean;
@@ -232,6 +238,7 @@ export function ChatHeaderActions({
   usage: Usage | undefined;
   diffsOpen: boolean;
   onDiffsChange: (open: boolean) => void;
+  onFilesOpen: () => void;
 }) {
   const [copyState, setCopyState] = useState("Copy link");
   const costUnavailable = usage?.costUSD === undefined || usage.costUSD === null;
@@ -247,7 +254,12 @@ export function ChatHeaderActions({
   }
   return (
     <>
-      <ChatViewMenu chatID={chat?.ID} diffsOpen={diffsOpen} onDiffsChange={onDiffsChange} />
+      <ChatViewMenu
+        chatID={chat?.ID}
+        diffsOpen={diffsOpen}
+        onDiffsChange={onDiffsChange}
+        onFilesOpen={onFilesOpen}
+      />
       <span className="ml-auto" />
       <Popover>
         <PopoverTrigger
