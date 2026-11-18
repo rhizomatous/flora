@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { chatSchema } from "./chat-schemas";
 import { chatStatus } from "./chat-status";
+import { isChatSeen, latestRead } from "./sidebar-status";
 
 describe("chat status presentation", () => {
   it.each([
@@ -24,9 +26,35 @@ describe("chat status presentation", () => {
       }
     },
   );
+  it("keeps failed and waiting attention filled after reading", () => {
+    for (const Status of ["failed", "waiting"] as const) {
+      expect(chatStatus({ Status, StatusReason: "Needs attention" }, true).filled).toBe(true);
+    }
+  });
   it("clears the unread marker without changing the completed status", () => {
     const chat = { Status: "idle", StatusReason: "Turn completed" } as const;
     expect(chatStatus(chat)).toMatchObject({ label: "Idle", filled: true });
     expect(chatStatus(chat, true)).toMatchObject({ label: "Idle", filled: false });
   });
+});
+
+it("retains acknowledged positions in stale feeds while newer activity remains unread", () => {
+  const chat = chatSchema.parse({
+    ID: "one",
+    ProjectID: "project",
+    Title: "Chat",
+    Status: "idle",
+    StatusReason: "Done",
+    UpdatedAt: "2026-11-18T00:00:00Z",
+    ImageDigest: "",
+    HarnessVersion: "",
+    StartingCommits: {},
+    ActivityRevision: 10,
+    LastViewedRevision: 5,
+  });
+  const read = { ...chat, LastViewedRevision: 10 };
+  expect(isChatSeen(latestRead(chat, read))).toBe(true);
+  const newer = latestRead({ ...chat, ActivityRevision: 11 }, read);
+  expect(newer.LastViewedRevision).toBe(10);
+  expect(isChatSeen(newer)).toBe(false);
 });

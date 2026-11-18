@@ -21,6 +21,8 @@ export const chatSchema = z.object({
   Title: z.string(),
   PinnedAt: z.string().optional(),
   Archived: z.boolean().optional(),
+  ActivityRevision: z.number().int().nonnegative().optional(),
+  LastViewedRevision: z.number().int().nonnegative().optional(),
   OrganizationRevision: z.number().int().nonnegative().optional(),
   Status: z.enum(["working", "waiting", "failed", "idle", "stopped"]),
   StatusReason: z.string(),
