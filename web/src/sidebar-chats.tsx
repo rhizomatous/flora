@@ -25,8 +25,9 @@ import { pinnedChats } from "./chat-organization";
 import { ChatOrganizationActions } from "./chat-organization-actions";
 import type { Chat } from "./chat-schemas";
 import { chatStatus } from "./chat-status";
+import { MarkChatsRead, UnreadDot } from "./mark-chats-read";
 import { PullCount, PullList } from "./pull-links";
-import { useSeenSidebarChats } from "./sidebar-status";
+import { isChatSeen } from "./sidebar-status";
 
 type Project = { id: string; name: string };
 
@@ -75,7 +76,10 @@ function ChatRow({
                 <span />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="florets-navigation-title">{chat.Title || "Chat"}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="florets-navigation-title">{chat.Title || "Chat"}</span>
+                  <UnreadDot seen={seen} />
+                </span>
                 <span className="florets-navigation-meta flex! flex-wrap items-center gap-x-2">
                   <span>{status.label}</span>
                   <PullCount pulls={chat.pulls?.items ?? []} />
@@ -144,7 +148,6 @@ export function SidebarChats({
   searching: boolean;
   setSearching: (value: boolean) => void;
 }) {
-  const isSeen = useSeenSidebarChats(chats, path);
   const focusSearch = useCallback((node: HTMLInputElement | null) => {
     node?.focus();
   }, []);
@@ -234,61 +237,74 @@ export function SidebarChats({
             </Button>
           </>
         )}
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button variant="ghost" size="icon-sm" aria-label="Chat list options">
-                <EllipsisIcon />
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuItem disabled>
-              <FolderIcon />
-              New folder
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                setSort(sort === "updated" ? "title" : "updated");
-              }}
-            >
-              <ListIcon />
-              Sort: {sort === "updated" ? "Updated" : "Title"}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                setCollapsed(collapsed.length === projects.length ? [] : projects.map((p) => p.id));
-              }}
-            >
-              <InboxIcon />
-              {collapsed.length === projects.length ? "Expand" : "Collapse"} all projects
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled>
-              <Settings2Icon />
-              Display and filters
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem disabled>Mark all as read</DropdownMenuItem>
-            <DropdownMenuItem
-              nativeButton={false}
-              render={
-                <a href="#chats?view=archived" onClick={close}>
-                  Archived chats
-                </a>
-              }
-            />
-            <DropdownMenuItem
-              nativeButton={false}
-              render={
-                <a href="#chats" onClick={close}>
+        <MarkChatsRead chats={chats}>
+          {(openRead, readDisabled, trigger) => (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    ref={trigger}
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Chat list options"
+                  >
+                    <EllipsisIcon />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuItem disabled>
+                  <FolderIcon />
+                  New folder
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    setSort(sort === "updated" ? "title" : "updated");
+                  }}
+                >
                   <ListIcon />
-                  View all chats
-                </a>
-              }
-            />
-          </DropdownMenuContent>
-        </DropdownMenu>
+                  Sort: {sort === "updated" ? "Updated" : "Title"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setCollapsed(
+                      collapsed.length === projects.length ? [] : projects.map((p) => p.id),
+                    );
+                  }}
+                >
+                  <InboxIcon />
+                  {collapsed.length === projects.length ? "Expand" : "Collapse"} all projects
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled>
+                  <Settings2Icon />
+                  Display and filters
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled={readDisabled} onClick={openRead}>
+                  Mark all as read
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  nativeButton={false}
+                  render={
+                    <a href="#chats?view=archived" onClick={close}>
+                      Archived chats
+                    </a>
+                  }
+                />
+                <DropdownMenuItem
+                  nativeButton={false}
+                  render={
+                    <a href="#chats" onClick={close}>
+                      <ListIcon />
+                      View all chats
+                    </a>
+                  }
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </MarkChatsRead>
       </div>
       {chats === undefined && (
         <p className="sidebar-empty px-4 py-1.5 text-xs text-muted-foreground" role="status">
@@ -309,7 +325,7 @@ export function SidebarChats({
               <ChatRow
                 key={chat.ID}
                 chat={chat}
-                seen={isSeen(chat)}
+                seen={isChatSeen(chat)}
                 path={path}
                 close={close}
                 now={now}
@@ -354,7 +370,7 @@ export function SidebarChats({
                   <ChatRow
                     key={chat.ID}
                     chat={chat}
-                    seen={isSeen(chat)}
+                    seen={isChatSeen(chat)}
                     path={path}
                     close={close}
                     now={now}

@@ -23,7 +23,10 @@ export function chatStatus(chat: Pick<Chat, "Status" | "StatusReason">, seen = f
     ["Message accepted", "Preparing checkout and setup"].includes(chat.StatusReason);
   return {
     ...appearance,
-    filled: id === "working" ? !starting : id === "failed" || (id !== "stopped" && !seen),
+    filled:
+      id === "working"
+        ? !starting
+        : id === "failed" || id === "waiting" || (id !== "stopped" && !seen),
     pulse: id === "working",
   };
 }
