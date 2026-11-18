@@ -2,6 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 
 import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  NativeSelect,
+  NativeSelectOption,
+  ListIcon,
   DropdownButton,
   DropdownMenu,
   DropdownMenuTrigger,
@@ -56,6 +64,9 @@ export function RuntimeMenu({
   disabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [duration, setDuration] = useState(14_400);
+  const trigger = useRef<HTMLButtonElement>(null);
   const [runtime, setRuntime] = useState<Runtime>();
   const [error, setError] = useState("");
   const [refreshError, setRefreshError] = useState("");
@@ -80,7 +91,7 @@ export function RuntimeMenu({
     [path],
   );
   useEffect(() => {
-    if (!open) return;
+    if (!open && !detailsOpen) return;
     const controller = new AbortController();
     const initial = setTimeout(() => {
       void refresh(controller.signal);
@@ -94,7 +105,7 @@ export function RuntimeMenu({
       controller.abort();
       clearInterval(timer);
     };
-  }, [open, refresh]);
+  }, [open, detailsOpen, refresh]);
   async function act(action: "wake" | "keep-awake" | "stop", seconds?: number) {
     const revision = ++actionRevision.current;
     setError("");
@@ -135,161 +146,240 @@ export function RuntimeMenu({
     memoryLabel =
       runtime.memoryLimit === 0 ? "Memory uncapped" : `${bytes(runtime.memoryLimit)} memory`;
   }
-  const durationLabels: Record<number, string> = {
-    1800: "30 minutes",
-    3600: "1 hour",
-    14_400: "4 hours",
-  };
+  const deadline =
+    until !== null && until !== undefined
+      ? new Date(until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+      : "";
+  let summaryLabel = "Checking machine state…";
+  if (runtime) summaryLabel = `Limits · ${cpuLabel} · ${memoryLabel.replace(" memory", "")}`;
+  else if (displayedError) summaryLabel = "Machine state unavailable";
+  function showDetails() {
+    setOpen(false);
+    setDetailsOpen(true);
+  }
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger
-        render={
-          <DropdownButton
-            variant="tertiary"
-            size="compact"
-            className="composer-up [&_[data-slot=dropdown-chevron]]:rotate-180"
-            aria-label="Chat actions"
-          >
-            <CloudIcon />
-            <span className="florets-control-label">Cloud</span>
-            <span
-              className={`size-[5px] rounded-full ${running ? "bg-green-500" : "bg-muted-foreground"}`}
-            />
-          </DropdownButton>
-        }
-      />
-      <DropdownMenuContent
-        side="top"
-        align="start"
-        className="w-80! max-w-[calc(100vw-24px)] p-1.5 text-[13px]"
-      >
-        <div className="px-2 py-2 leading-5" aria-live="polite">
-          <div className="flex items-center justify-between gap-3 font-medium">
+    <>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger
+          render={
+            <DropdownButton
+              ref={trigger}
+              variant="tertiary"
+              size="compact"
+              className="composer-up [&_[data-slot=dropdown-chevron]]:rotate-180"
+              aria-label="Chat actions"
+            >
+              <CloudIcon />
+              <span className="florets-control-label">Cloud</span>
+              <span
+                className={`size-[5px] rounded-full ${running ? "bg-green-500" : "bg-muted-foreground"}`}
+              />
+            </DropdownButton>
+          }
+        />
+        <DropdownMenuContent
+          side="top"
+          align="start"
+          className="w-72! max-w-[calc(100vw-24px)] p-1.5 text-[13px]"
+        >
+          <div className="px-1.5 pt-1 pb-1.5 leading-5" aria-live="polite">
+            <div className="flex items-center justify-between gap-3">
+              <span>Cloud machine</span>
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span
+                  className={`size-[5px] rounded-full ${running ? "bg-green-500" : "bg-muted-foreground"}`}
+                />
+                {stateLabel}
+              </span>
+            </div>
+            <p className="text-muted-foreground">{summaryLabel}</p>
+            {state === "missing" && (
+              <p className="mt-1 text-muted-foreground">Restore the saved machine to wake it.</p>
+            )}
+            {error && (
+              <p role="alert" className="mt-1 text-destructive">
+                {error}
+              </p>
+            )}
+          </div>
+          {(state === "stopped" || state === "failed") && pending !== "wake" && (
+            <DropdownMenuItem
+              disabled={disabled || !!pending}
+              closeOnClick={false}
+              onClick={() => {
+                void act("wake");
+              }}
+            >
+              <PlayIcon />
+              Wake machine
+            </DropdownMenuItem>
+          )}
+          {(running || state === "starting" || state === "unknown" || pending === "wake") && (
+            <DropdownMenuItem
+              disabled={disabled || (pending !== "" && pending !== "wake")}
+              closeOnClick={false}
+              onClick={() => {
+                if (pending === "wake") void act("stop");
+                else onStop();
+              }}
+            >
+              <SquareIcon />
+              {pending === "wake" ? "Cancel wake and stop" : "Stop machine"}
+            </DropdownMenuItem>
+          )}
+          {running && pending !== "wake" && (
+            <DropdownMenuItem
+              disabled={disabled || !!pending}
+              closeOnClick={false}
+              onClick={() => {
+                if (lease) showDetails();
+                else void act("keep-awake", 14_400);
+              }}
+            >
+              <ClockIcon />
+              {lease ? `Keep awake until ${deadline}` : "Keep awake 4h"}
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={showDetails}>
+            <ListIcon />
+            Machine details…
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent finalFocus={trigger} className="max-h-[calc(100dvh-32px)] overflow-y-auto">
+          <DialogTitle>Machine details</DialogTitle>
+          <DialogDescription className="sr-only">
+            Machine state, resource limits, and measured usage.
+          </DialogDescription>
+          <div className="flex items-center justify-between gap-3">
             <span>Cloud machine</span>
             <span className="text-muted-foreground">{stateLabel}</span>
           </div>
           {runtime && (
             <>
-              <p className="mt-1 text-xs text-muted-foreground">Configured container limits</p>
-              <p>
-                {cpuLabel} · {memoryLabel}
-              </p>
-              <p className="text-muted-foreground">Disk: no configured quota</p>
-              <div className="mt-2 border-t border-border pt-2">
-                <p className="text-xs text-muted-foreground">
-                  Measured container usage{sample ? ` · ${age(sample.sampledAt)}` : ""}
+              <section className="space-y-1" aria-label="Configured limits">
+                <h3 className="font-medium">Configured limits</h3>
+                <p className="text-muted-foreground">
+                  {cpuLabel} · {memoryLabel}
                 </p>
+                <p className="text-muted-foreground">Disk: no configured quota</p>
+              </section>
+              <section
+                className="space-y-2 border-t border-border pt-3"
+                aria-label="Measured usage"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="font-medium">Measured usage</h3>
+                  {sample && (
+                    <span className="text-xs text-muted-foreground" title={sample.sampledAt}>
+                      {age(sample.sampledAt)}
+                    </span>
+                  )}
+                </div>
                 {sample ? (
-                  <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1">
-                    <dt>CPU time (cumulative)</dt>
-                    <dd className="tabular-nums">{sample.cpuSeconds.toFixed(1)} s</dd>
-                    <dt>Memory (cgroup)</dt>
-                    <dd>{bytes(sample.memoryBytes)}</dd>
-                    <dt>Disk (writable layer)</dt>
-                    <dd>{sample.diskBytes === null ? "Unavailable" : bytes(sample.diskBytes)}</dd>
-                  </dl>
+                  <>
+                    <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1">
+                      <dt>CPU time (cumulative)</dt>
+                      <dd className="tabular-nums">{sample.cpuSeconds.toFixed(1)} s</dd>
+                      <dt>Memory (cgroup)</dt>
+                      <dd>{bytes(sample.memoryBytes)}</dd>
+                      <dt>Disk (writable layer)</dt>
+                      <dd>{sample.diskBytes === null ? "Unavailable" : bytes(sample.diskBytes)}</dd>
+                    </dl>
+                    <p className="text-xs text-muted-foreground">
+                      Disk excludes workspace and runtime mounts.
+                    </p>
+                  </>
                 ) : (
                   <p className="text-muted-foreground">
                     {running ? "Usage unavailable" : "No live usage sample"}
                   </p>
                 )}
-                {sample && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Disk excludes workspace and runtime mounts.
+                {runtime.collectionError && (
+                  <p className="text-destructive">{runtime.collectionError}</p>
+                )}
+                {state === "missing" && (
+                  <p className="text-muted-foreground">
+                    The saved machine is missing. Restore it to wake this workspace.
                   </p>
                 )}
-                <p className="mt-1 text-xs text-muted-foreground" title={runtime.observedAt}>
-                  State inspected {age(runtime.observedAt)}
-                </p>
-              </div>
-              {until !== null && until !== undefined && (
-                <p className="mt-2 flex gap-1.5 text-muted-foreground">
-                  <ClockIcon className="mt-0.5 size-4 shrink-0" />
-                  {lease
-                    ? `Keeping awake until ${new Date(until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-                    : "Keep-awake ended; stops when idle"}
-                </p>
-              )}
-              {runtime.collectionError && (
-                <p className="mt-2 text-destructive">{runtime.collectionError}</p>
-              )}
-              {state === "missing" && (
-                <p className="mt-2 text-muted-foreground">
-                  The saved container is missing. Restore it to wake this workspace.
-                </p>
+              </section>
+              {(running || until !== null) && (
+                <section className="space-y-2 border-t border-border pt-3" aria-label="Keep awake">
+                  <h3 className="font-medium">Keep awake</h3>
+                  {until !== null && (
+                    <p className="text-muted-foreground">
+                      {lease ? `Until ${deadline}` : "Ended; machine stops when idle"}
+                    </p>
+                  )}
+                  {running && (
+                    <>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <NativeSelect
+                          aria-label="Keep-awake duration"
+                          value={duration}
+                          disabled={disabled || !!pending}
+                          onChange={(event) => {
+                            setDuration(Number(event.target.value));
+                          }}
+                        >
+                          <NativeSelectOption value={1800}>30 minutes</NativeSelectOption>
+                          <NativeSelectOption value={3600}>1 hour</NativeSelectOption>
+                          <NativeSelectOption value={14_400}>4 hours</NativeSelectOption>
+                        </NativeSelect>
+                        <Button
+                          size="sm"
+                          disabled={disabled || !!pending}
+                          onClick={() => {
+                            void act("keep-awake", duration);
+                          }}
+                        >
+                          {lease ? "Update" : "Keep awake"}
+                        </Button>
+                      </div>
+                      {lease && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={disabled || !!pending}
+                          onClick={() => {
+                            void act("keep-awake", 0);
+                          }}
+                        >
+                          Cancel keep-awake
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </section>
               )}
             </>
           )}
           {displayedError && (
-            <p role="alert" className="mt-2 text-destructive">
+            <p role="alert" className="text-destructive">
               {displayedError}
             </p>
           )}
-        </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          disabled={disabled || !!pending || !state || !["stopped", "failed"].includes(state)}
-          onClick={() => {
-            void act("wake");
-          }}
-          closeOnClick={false}
-        >
-          <PlayIcon />
-          {pending === "wake" ? "Waking machine…" : "Wake machine"}
-        </DropdownMenuItem>
-        {running && (
-          <>
-            {[1800, 3600, 14_400].map((seconds) => (
-              <DropdownMenuItem
-                key={seconds}
-                disabled={disabled || !!pending}
-                closeOnClick={false}
-                onClick={() => {
-                  void act("keep-awake", seconds);
-                }}
-              >
-                <ClockIcon />
-                Keep awake {durationLabels[seconds]}
-              </DropdownMenuItem>
-            ))}
-            {lease && (
-              <DropdownMenuItem
-                disabled={disabled || !!pending}
-                closeOnClick={false}
-                onClick={() => {
-                  void act("keep-awake", 0);
-                }}
-              >
-                <ClockIcon />
-                Cancel keep-awake
-              </DropdownMenuItem>
-            )}
-          </>
-        )}
-        {(running || state === "starting" || state === "unknown" || pending === "wake") && (
-          <DropdownMenuItem
-            disabled={disabled || (pending !== "" && pending !== "wake")}
-            closeOnClick={false}
-            onClick={() => {
-              if (pending === "wake") void act("stop");
-              else onStop();
-            }}
-          >
-            <SquareIcon />
-            {pending === "wake" ? "Cancel wake and stop" : "Stop container"}
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuItem
-          disabled={!!pending}
-          closeOnClick={false}
-          onClick={() => {
-            setError("");
-            void refresh();
-          }}
-        >
-          Refresh machine state
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+            <span className="text-xs text-muted-foreground" title={runtime?.observedAt}>
+              {runtime ? `State inspected ${age(runtime.observedAt)}` : "State unavailable"}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!!pending}
+              onClick={() => {
+                setError("");
+                void refresh();
+              }}
+            >
+              Refresh
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
