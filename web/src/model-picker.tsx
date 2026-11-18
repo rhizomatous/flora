@@ -60,7 +60,7 @@ export function ModelPicker({
     <Command filter={matchModel} className="min-h-0 rounded-lg! p-0!">
       <CommandInput
         variant="plain"
-        className="h-9 text-base sm:text-sm"
+        className="h-9 text-sm"
         aria-label="Search models"
         placeholder="Search models"
       />

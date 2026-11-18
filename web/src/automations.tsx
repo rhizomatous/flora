@@ -459,12 +459,17 @@ function AutomationForm({
               </Card>
             </Section>
             <Card variant="flush" className="divide-y">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3">
-                <FieldLabel htmlFor="automation-project">Project</FieldLabel>
+              <div className="flex items-center justify-between gap-4 px-4 py-3">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <FieldLabel htmlFor="automation-project">Project</FieldLabel>
+                  <p id="project-help" className="text-sm text-muted-foreground">
+                    The project this automation works in
+                  </p>
+                </div>
                 <NativeSelect
                   id="automation-project"
                   aria-describedby="project-help"
-                  className="col-start-2 row-start-1 w-[min(14rem,52vw)] sm:row-span-2"
+                  className="max-w-[55%] shrink-0 [&_select]:field-sizing-content [&_select]:w-auto [&_select]:max-w-full"
                   aria-label="Project"
                   value={value.projectID}
                   disabled={initial.id !== ""}
@@ -482,18 +487,19 @@ function AutomationForm({
                     </option>
                   ))}
                 </NativeSelect>
-                <p
-                  id="project-help"
-                  className="col-span-2 text-sm text-muted-foreground sm:col-span-1 sm:row-start-2"
-                >
-                  The project this automation works in
-                </p>
               </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3">
-                <FieldLabel htmlFor="automation-mode">Runs in</FieldLabel>
+              <div className="flex items-center justify-between gap-4 px-4 py-3">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <FieldLabel htmlFor="automation-mode">Runs in</FieldLabel>
+                  <p id="run-mode-help" className="text-sm text-muted-foreground">
+                    {value.mode === "same"
+                      ? "Continue in the same chat"
+                      : "Start a new chat each run"}
+                  </p>
+                </div>
                 <NativeSelect
                   id="automation-mode"
-                  className="col-start-2 row-start-1 w-[min(14rem,52vw)] sm:row-span-2"
+                  className="max-w-[55%] shrink-0 [&_select]:field-sizing-content [&_select]:w-auto [&_select]:max-w-full"
                   aria-label="Runs in"
                   value={value.mode}
                   onChange={(e) => {
@@ -504,14 +510,6 @@ function AutomationForm({
                   <option value="new">A new chat each run</option>
                   <option value="same">The same chat each run</option>
                 </NativeSelect>
-                <p
-                  id="run-mode-help"
-                  className="col-span-2 text-sm text-muted-foreground sm:col-span-1 sm:row-start-2"
-                >
-                  {value.mode === "same"
-                    ? "Continue in the same chat"
-                    : "Start a new chat each run"}
-                </p>
               </div>
             </Card>
             <Section aria-labelledby="schedule-heading">
