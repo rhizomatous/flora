@@ -35,7 +35,7 @@ import { chatStatus } from "./chat-status";
 import { ContextUsagePopover } from "./context-usage";
 import { PullCount, PullList } from "./pull-links";
 import type { PullSummary } from "./pull-schemas";
-import { RuntimeMenu } from "./runtime-controls";
+import { KeepAwakeItem, RuntimeMenu } from "./runtime-controls";
 import { SubagentMenuItems } from "./subagents";
 
 /** Shows saved chat metadata and linked pull requests. */
@@ -148,16 +148,19 @@ export function ChatTitle({
 }
 
 export function ChatViewMenu({
+  chatID,
   label = "Chat views",
   diffsOpen,
   onDiffsChange,
 }: {
+  chatID?: string | undefined;
   label?: string;
   diffsOpen: boolean;
   onDiffsChange: (open: boolean) => void;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
         render={
           <Button variant="ghost" size="icon-sm" aria-label={label}>
@@ -201,6 +204,12 @@ export function ChatViewMenu({
           <TerminalIcon />
           New shell
         </DropdownMenuItem>
+        {chatID !== undefined && (
+          <>
+            <DropdownMenuSeparator />
+            <KeepAwakeItem key={chatID} id={chatID} open={open} />
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -235,7 +244,7 @@ export function ChatHeaderActions({
   }
   return (
     <>
-      <ChatViewMenu diffsOpen={diffsOpen} onDiffsChange={onDiffsChange} />
+      <ChatViewMenu chatID={chat?.ID} diffsOpen={diffsOpen} onDiffsChange={onDiffsChange} />
       <span className="ml-auto" />
       <Popover>
         <PopoverTrigger
@@ -319,6 +328,7 @@ export function ChatComposerFooter({
   return (
     <div className="composer-runtime flex items-center gap-1 px-2 pt-[3px] pb-1 text-muted-foreground">
       <RuntimeMenu
+        key={id}
         id={id}
         onStop={() => {
           onControl("stop");
