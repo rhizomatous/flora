@@ -12,7 +12,7 @@ import type { Pull } from "./pull-schemas";
 import { useChecksNow } from "./use-checks-now";
 
 const tones: Record<string, string> = {
-  success: "text-emerald-700 dark:text-emerald-400",
+  success: "text-green-700 dark:text-green-400",
   failure: "text-red-700 dark:text-red-400",
   pending: "text-amber-700 dark:text-amber-400",
 };
@@ -135,7 +135,7 @@ export function PullChecksDetails({ pull, error = "" }: { pull: Pull; error?: st
                     >
                       {content}
                       <ExternalLinkIcon
-                        className="size-3.5 shrink-0 text-muted-foreground"
+                        className="size-3.5 shrink-0 text-muted-foreground/60"
                         aria-hidden="true"
                       />
                     </a>

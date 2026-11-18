@@ -4,7 +4,7 @@ import type { Pull } from "./pull-schemas";
 
 export const pullTones = {
   neutral: "text-muted-foreground",
-  success: "text-emerald-700 dark:text-emerald-400",
+  success: "text-green-700 dark:text-green-400",
   pending: "text-amber-700 dark:text-amber-400",
   failure: "text-red-700 dark:text-red-400",
   merged: "text-violet-700 dark:text-violet-400",

@@ -1,6 +1,7 @@
 package changes
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -21,21 +22,27 @@ import (
 )
 
 type Pull struct {
-	Body          string      `json:"body,omitempty"`
-	Author        string      `json:"author,omitempty"`
-	HeadRef       string      `json:"headRef,omitempty"`
-	BaseRef       string      `json:"baseRef,omitempty"`
-	HeadSHA       string      `json:"headSHA,omitempty"`
-	HeadCheckedAt string      `json:"headCheckedAt,omitempty"`
-	Checks        *PullChecks `json:"checks,omitempty"`
-	Title         string      `json:"title,omitempty"`
-	Additions     *int        `json:"additions,omitempty"`
-	Deletions     *int        `json:"deletions,omitempty"`
-	Repository    string      `json:"repository,omitempty"`
-	URL           string      `json:"url"`
-	Number        int         `json:"number"`
-	State         string      `json:"state"`
-	Draft         bool        `json:"draft"`
+	AuthorAvatar  string         `json:"authorAvatar,omitempty"`
+	CreatedAt     string         `json:"createdAt,omitempty"`
+	Reviewers     []PullReviewer `json:"reviewers,omitempty"`
+	Labels        []string       `json:"labels,omitempty"`
+	MetadataKnown bool           `json:"metadataKnown,omitempty"`
+	Issues        *PullIssues    `json:"issues,omitempty"`
+	Body          string         `json:"body,omitempty"`
+	Author        string         `json:"author,omitempty"`
+	HeadRef       string         `json:"headRef,omitempty"`
+	BaseRef       string         `json:"baseRef,omitempty"`
+	HeadSHA       string         `json:"headSHA,omitempty"`
+	HeadCheckedAt string         `json:"headCheckedAt,omitempty"`
+	Checks        *PullChecks    `json:"checks,omitempty"`
+	Title         string         `json:"title,omitempty"`
+	Additions     *int           `json:"additions,omitempty"`
+	Deletions     *int           `json:"deletions,omitempty"`
+	Repository    string         `json:"repository,omitempty"`
+	URL           string         `json:"url"`
+	Number        int            `json:"number"`
+	State         string         `json:"state"`
+	Draft         bool           `json:"draft"`
 }
 
 // PullSummary contains saved links and their last discovery result without scan bookkeeping.
@@ -248,10 +255,28 @@ git for-each-ref --format='%(refname:short)%00%(objectname)%00%(upstream:remoten
 	return failed
 }
 
+type PullReviewer struct {
+	Name   string `json:"name"`
+	Avatar string `json:"avatar,omitempty"`
+}
+
 type remotePull struct {
+	NodeID             string `json:"node_id"`
+	CreatedAt          string `json:"created_at"`
+	RequestedReviewers []struct {
+		Login  string `json:"login"`
+		Avatar string `json:"avatar_url"`
+	} `json:"requested_reviewers"`
+	RequestedTeams []struct {
+		Name string `json:"name"`
+	} `json:"requested_teams"`
+	Labels []struct {
+		Name string `json:"name"`
+	} `json:"labels"`
 	Body string `json:"body"`
 	User struct {
-		Login string `json:"login"`
+		Login  string `json:"login"`
+		Avatar string `json:"avatar_url"`
 	} `json:"user"`
 	Base struct {
 		Ref string `json:"ref"`
@@ -375,7 +400,7 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 	// A missing unverified candidate is not an outage. Remember it for a day so
 	// the same saved message cannot reintroduce it on every scan. Known PRs that
 	// become inaccessible still retain their saved status and show a warning.
-	get := func(path string, target any) int {
+	call := func(path string, payload []byte, target any) int {
 		delayed := githubDelayed(creds.GitHubToken, time.Now())
 		if budget == 0 || blocked || ctx.Err() != nil || delayed {
 			failure()
@@ -383,10 +408,17 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 			return 0
 		}
 		budget--
-		req, e := http.NewRequestWithContext(ctx, "GET", "https://api.github.com"+path, nil)
+		method := "GET"
+		if payload != nil {
+			method = "POST"
+		}
+		req, e := http.NewRequestWithContext(ctx, method, "https://api.github.com"+path, bytes.NewReader(payload))
 		if e != nil {
 			failure()
 			return 0
+		}
+		if payload != nil {
+			req.Header.Set("Content-Type", "application/json")
 		}
 		req.Header.Set("Authorization", "Bearer "+creds.GitHubToken)
 		req.Header.Set("Accept", "application/vnd.github+json")
@@ -397,6 +429,9 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 			return 0
 		}
 		defer res.Body.Close()
+		if path == "/graphql" && res.StatusCode == 403 && res.Header.Get("X-RateLimit-Remaining") != "0" && res.Header.Get("Retry-After") == "" {
+			return 403
+		}
 		if res.StatusCode == 403 || res.StatusCode == 429 || res.StatusCode == 401 {
 			blocked = true
 		}
@@ -416,6 +451,7 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 		}
 		return 200
 	}
+	get := func(path string, target any) int { return call(path, nil, target) }
 	attempted := map[string]bool{}
 	verify := func(link string) {
 		if attempted[link] {
@@ -460,6 +496,18 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 		}
 		previous := known[link]
 		pull := Pull{Body: remote.Body, Author: remote.User.Login, HeadRef: remote.Head.Ref, BaseRef: remote.Base.Ref, Repository: strings.ToLower(match[1]), URL: link, Number: number, State: remote.State, Draft: remote.Draft, Title: remote.Title, Additions: remote.Additions, Deletions: remote.Deletions, HeadSHA: remote.Head.SHA, HeadCheckedAt: state.CheckedAt, Checks: previous.Checks}
+		pull.AuthorAvatar = githubAvatar(remote.User.Avatar)
+		pull.CreatedAt = remote.CreatedAt
+		pull.MetadataKnown = remote.RequestedReviewers != nil && remote.Labels != nil
+		for _, reviewer := range remote.RequestedReviewers {
+			pull.Reviewers = append(pull.Reviewers, PullReviewer{Name: reviewer.Login, Avatar: githubAvatar(reviewer.Avatar)})
+		}
+		for _, team := range remote.RequestedTeams {
+			pull.Reviewers = append(pull.Reviewers, PullReviewer{Name: team.Name + " (team)"})
+		}
+		for _, label := range remote.Labels {
+			pull.Labels = append(pull.Labels, label.Name)
+		}
 		if hash.MatchString(remote.Head.SHA) {
 			pull.Checks = collectPullChecks(pull, get, state.CheckedAt)
 		} else if pull.Checks != nil {
@@ -467,6 +515,7 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 			pull.HeadCheckedAt = previous.HeadCheckedAt
 			pull.Checks.Error = "PR head unavailable. Saved checks may be out of date."
 		}
+		pull.Issues = collectPullIssues(remote.NodeID, previous.Issues, state.CheckedAt, call)
 		known[link] = pull
 		delete(state.Missing, link)
 	}
