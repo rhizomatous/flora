@@ -42,6 +42,8 @@
   --color-border: var(--border);
   --color-control-background: var(--control-background);
   --color-control-hover: var(--control-hover);
+  --color-madlib-background: var(--madlib-background);
+  --color-madlib-hover: var(--madlib-hover);
   --color-control-track: var(--control-track);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
@@ -72,6 +74,8 @@
   --control-background: var(--surface-panel);
   --control-muted: #737373;
   --control-hover: #ededed;
+  --madlib-background: #e8e8e8;
+  --madlib-hover: #dedede;
   --control-track: #dedede;
   color-scheme: light;
   --radius: 0.625rem;
@@ -117,6 +121,8 @@
   --control-background: var(--surface-panel);
   --control-muted: #999;
   --control-hover: #292929;
+  --madlib-background: #292929;
+  --madlib-hover: #333333;
   --control-track: #333;
   color-scheme: dark;
   --surface-canvas: #111;

@@ -11,14 +11,31 @@ for (const width of [1440, 390]) {
     await page.getByRole("button", { name: "Hide controls", exact: true }).click();
     await page.getByRole("combobox", { name: "Schedule", exact: true }).selectOption("weekly");
     const trigger = page.getByRole("button", { name: "Days", exact: true });
-    await expect(trigger).toHaveText("Monday");
+    await expect(trigger).toHaveText("onMonday");
+    for (const control of [
+      trigger,
+      page.getByRole("combobox", { name: "Schedule", exact: true }),
+      page.getByRole("button", { name: "Time zone", exact: true }),
+      page.getByLabel("Time", { exact: true }),
+    ]) {
+      await expect(control).toHaveCSS("font-size", "14px");
+      await expect(control).toHaveCSS("height", "28px");
+    }
+    await expect(trigger.locator("svg")).toHaveCount(0);
+    const fill = await trigger.evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(fill).not.toBe(
+      await page
+        .getByLabel("Time", { exact: true })
+        .evaluate((element) => getComputedStyle(element).backgroundColor),
+    );
+
     await trigger.click();
     const friday = page.getByRole("menuitemcheckbox", { name: "Friday", exact: true });
     await friday.click();
     await expect(friday).toBeChecked();
-    await expect(trigger).toHaveText("Mon, Fri");
+    await expect(trigger).toHaveText("onMon, Fri");
     await page.getByRole("menuitemcheckbox", { name: "Wednesday", exact: true }).click();
-    await expect(trigger).toHaveText("3 days");
+    await expect(trigger).toHaveText("on3 days");
     await expect(trigger).toHaveAccessibleDescription("Monday, Wednesday, Friday");
     await friday.press("Escape");
     await expect(trigger).toBeFocused();
@@ -28,7 +45,7 @@ for (const width of [1440, 390]) {
     for (const day of ["Monday", "Wednesday", "Friday"]) {
       await page.getByRole("menuitemcheckbox", { name: day, exact: true }).click();
     }
-    await expect(trigger).toHaveText("Choose days");
+    await expect(trigger).toHaveText("onChoose days");
     await friday.press("Escape");
     await expect(
       page.getByRole("button", { name: "Create automation", exact: true }),

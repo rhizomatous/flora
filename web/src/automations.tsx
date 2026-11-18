@@ -14,7 +14,8 @@ import {
   Popover,
   PopoverTrigger,
   PopoverContent,
-  ChevronDownIcon,
+  MadlibPicker,
+  MadlibSelect,
   FieldLabel,
   EditableText,
   DropdownMenu,
@@ -101,47 +102,39 @@ function WeekdayPicker({
   else if (selected.length === 1) summary = selected.join("");
   else if (selected.length === 2) summary = selected.map((day) => day.slice(0, 3)).join(", ");
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm text-muted-foreground" aria-hidden="true">
-        on
-      </span>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={disabled}
-              aria-label="Days"
-              aria-description={selected.join(", ") || "No days selected"}
-              className="font-normal"
-            >
-              {summary}
-              <ChevronDownIcon />
-            </Button>
-          }
-        />
-        <DropdownMenuContent className="min-w-40" aria-label="Days">
-          {weekdays.map((day, index) => (
-            <DropdownMenuCheckboxItem
-              key={day}
-              checked={days.includes(index)}
-              closeOnClick={false}
-              onCheckedChange={(checked) => {
-                onChange(
-                  checked
-                    ? [...days, index].toSorted((a, b) => a - b)
-                    : days.filter((value) => value !== index),
-                );
-              }}
-            >
-              {day}
-            </DropdownMenuCheckboxItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <MadlibPicker
+            prefix="on"
+            disabled={disabled}
+            aria-label="Days"
+            aria-description={selected.join(", ") || "No days selected"}
+            className="font-normal"
+          >
+            {summary}
+          </MadlibPicker>
+        }
+      />
+      <DropdownMenuContent className="min-w-40" aria-label="Days">
+        {weekdays.map((day, index) => (
+          <DropdownMenuCheckboxItem
+            key={day}
+            checked={days.includes(index)}
+            closeOnClick={false}
+            onCheckedChange={(checked) => {
+              onChange(
+                checked
+                  ? [...days, index].toSorted((a, b) => a - b)
+                  : days.filter((value) => value !== index),
+              );
+            }}
+          >
+            {day}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -160,17 +153,14 @@ function TimeZonePicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         render={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
+          <MadlibPicker
+            prefix="in"
             disabled={disabled}
             aria-label="Time zone"
             className="max-w-full min-w-0 justify-between font-normal"
           >
-            <span className="truncate">{value}</span>
-            <ChevronDownIcon />
-          </Button>
+            {value}
+          </MadlibPicker>
         }
       />
       <PopoverContent
@@ -521,8 +511,7 @@ function AutomationForm({
                   aria-describedby="schedule-help"
                   className="flex flex-wrap items-center gap-2"
                 >
-                  <NativeSelect
-                    size="sm"
+                  <MadlibSelect
                     className="w-auto"
                     aria-label="Schedule"
                     value={frequency}
@@ -536,7 +525,7 @@ function AutomationForm({
                     <option value="daily">Daily</option>
                     <option value="weekdays">Weekdays</option>
                     <option value="weekly">Weekly</option>
-                  </NativeSelect>
+                  </MadlibSelect>
                   {frequency === "weekly" && (
                     <WeekdayPicker
                       days={days ?? []}
@@ -551,7 +540,7 @@ function AutomationForm({
                       at
                     </span>
                     <Input
-                      className="h-7 w-34"
+                      className="h-7 w-34 text-sm"
                       aria-label="Time"
                       type="time"
                       value={time}
@@ -562,9 +551,6 @@ function AutomationForm({
                     />
                   </div>
                   <div className="flex max-w-full min-w-0 items-center gap-2">
-                    <span className="text-sm text-muted-foreground" aria-hidden="true">
-                      in
-                    </span>
                     <TimeZonePicker
                       value={timeZone}
                       disabled={busy}

@@ -25,7 +25,7 @@ test("create, edit, pause, and run an automation in a dedicated chat", async ({ 
   await page.getByRole("button", { name: "Time zone", exact: true }).click();
   await page.getByRole("combobox", { name: "Search time zones" }).fill("New York");
   await page.getByRole("combobox", { name: "Search time zones" }).press("Enter");
-  await expect(page.getByRole("button", { name: "Time zone", exact: true })).toHaveText("America/New_York");
+  await expect(page.getByRole("button", { name: "Time zone", exact: true })).toHaveText("inAmerica/New_York");
   await expect(page.getByRole("textbox", { name: "Instructions", exact: true })).toHaveCSS("resize", "none");
   await expect(page.getByText(/^Next run:/)).toBeVisible();
   await assertFitsPhone(page);
