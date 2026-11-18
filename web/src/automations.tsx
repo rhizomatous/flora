@@ -292,10 +292,6 @@ function AutomationForm({
       runAfter,
     );
   }
-  let nextRunLabel = preview
-    ? `Next run: ${stamp(preview, timeZone)} · ${timeZone}`
-    : "Checking schedule…";
-  if (initial.id && !initial.enabled) nextRunLabel = "Inactive";
   return (
     <section className="mx-auto w-full max-w-3xl min-w-0 [&_input]:scroll-mt-20 [&_textarea]:scroll-mt-20">
       {topbar &&
@@ -540,7 +536,7 @@ function AutomationForm({
                       at
                     </span>
                     <Input
-                      className="h-7 w-34 text-sm"
+                      className="field-sizing-content h-7 w-auto text-sm [&::-webkit-calendar-picker-indicator]:ml-1 [&::-webkit-calendar-picker-indicator]:p-0 [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                       aria-label="Time"
                       type="time"
                       value={time}
@@ -560,9 +556,11 @@ function AutomationForm({
                     />
                   </div>
                 </div>
-                <div className="text-xs text-muted-foreground" aria-live="polite">
-                  {previewError ? <p>{previewError}</p> : <p>{nextRunLabel}</p>}
-                </div>
+                {previewError && (
+                  <p className="text-xs text-muted-foreground" role="alert">
+                    {previewError}
+                  </p>
+                )}
               </Card>
             </Section>
           </SectionStack>

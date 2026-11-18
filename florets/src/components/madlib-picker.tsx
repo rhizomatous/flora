@@ -25,7 +25,11 @@ function MadlibSelect({ className, ...props }: ComponentProps<"select">) {
   return (
     <select
       data-slot="madlib-select"
-      className={cn(pickerStyles, "appearance-none border outline-none", className)}
+      className={cn(
+        pickerStyles,
+        "field-sizing-content appearance-none border outline-none",
+        className,
+      )}
       {...props}
     />
   );

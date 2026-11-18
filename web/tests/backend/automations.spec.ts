@@ -26,11 +26,11 @@ test("create, edit, pause, and run an automation in a dedicated chat", async ({ 
   await page.getByRole("combobox", { name: "Search time zones" }).fill("New York");
   await page.getByRole("combobox", { name: "Search time zones" }).press("Enter");
   await expect(page.getByRole("button", { name: "Time zone", exact: true })).toHaveText("inAmerica/New_York");
+  await expect(page.getByRole("combobox", { name: "Search time zones" })).not.toBeVisible();
   await expect(page.getByRole("textbox", { name: "Instructions", exact: true })).toHaveCSS("resize", "none");
-  await expect(page.getByText(/^Next run:/)).toBeVisible();
   await assertFitsPhone(page);
   await page.setViewportSize({ width: 375, height: 600 });
-  await page.getByText(/^Next run:/).scrollIntoViewIfNeeded();
+  await page.getByRole("button", { name: "Time zone", exact: true }).scrollIntoViewIfNeeded();
   await expect(page.getByRole("button", { name: "Create automation", exact: true })).toBeInViewport({ ratio: 1 });
   await expect(page.getByRole("button", { name: "Cancel", exact: true })).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: testInfo.outputPath("form-phone.png"), fullPage: false, animations: "disabled" });
