@@ -99,9 +99,10 @@ function TimeZonePicker({
           <Button
             type="button"
             variant="outline"
+            size="sm"
             disabled={disabled}
             aria-label="Time zone"
-            className="w-52 min-w-0 justify-between font-normal"
+            className="max-w-full min-w-0 justify-between font-normal"
           >
             <span className="truncate">{value}</span>
             <ChevronDownIcon />
@@ -315,8 +316,8 @@ function AutomationForm({
       >
         <fieldset disabled={busy}>
           <SectionStack>
-            <Section>
-              <div className="space-y-1">
+            <Section className="gap-2">
+              <div>
                 <EditableText
                   label="Name"
                   variant="title"
@@ -330,6 +331,7 @@ function AutomationForm({
                 />
                 <EditableText
                   label="Description"
+                  className="text-sm"
                   multiline
                   value={value.description ?? ""}
                   maxLength={2000}
@@ -392,7 +394,7 @@ function AutomationForm({
                   ))}
                 </NativeSelect>
               </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3">
                 <FieldLabel htmlFor="automation-mode">Runs in</FieldLabel>
                 <NativeSelect
                   id="automation-mode"
@@ -414,26 +416,36 @@ function AutomationForm({
                   {value.mode === "same"
                     ? "Continue in the same chat."
                     : "Start a new chat each run."}
+                  {initial.mode === "same" && value.mode === "same" && initial.chatID && (
+                    <>
+                      {" "}
+                      <Link className="inline-block" href={`#chats/${initial.chatID}`}>
+                        Open chat
+                      </Link>
+                    </>
+                  )}
                 </p>
-                {initial.mode === "same" && value.mode === "same" && initial.chatID && (
-                  <Link className="col-span-2 text-sm" href={`#chats/${initial.chatID}`}>
-                    Open chat
-                  </Link>
-                )}
                 {initial.id && value.mode !== initial.mode && (
                   <p className="col-span-2 text-sm">
                     The next run will start a new chat. Previous chats stay available.
                   </p>
                 )}
               </div>
-              <div className="space-y-3 px-4 py-4">
-                <p className="text-sm font-medium">Schedule</p>
+            </Card>
+            <Section aria-labelledby="schedule-heading">
+              <SectionHeader className="mx-px px-4">
+                <Heading level={3} id="schedule-heading" className="text-sm">
+                  Schedule
+                </Heading>
+              </SectionHeader>
+              <Card variant="flush" className="gap-3 p-4">
                 <div
                   role="group"
                   aria-label="Run schedule"
-                  className="flex flex-wrap items-center gap-x-3 gap-y-2"
+                  className="flex flex-wrap items-center gap-2"
                 >
                   <NativeSelect
+                    size="sm"
                     className="w-auto"
                     aria-label="Schedule"
                     value={frequency}
@@ -453,7 +465,7 @@ function AutomationForm({
                       at
                     </span>
                     <Input
-                      className="w-34"
+                      className="h-7 w-34"
                       aria-label="Time"
                       type="time"
                       value={time}
@@ -477,9 +489,12 @@ function AutomationForm({
                   </div>
                 </div>
                 {frequency === "weekly" && (
-                  <fieldset>
-                    <legend className="mb-2 text-sm font-medium">Days</legend>
-                    <div className="flex flex-wrap gap-2">
+                  <fieldset className="flex flex-wrap items-center gap-2">
+                    <legend className="sr-only">Days</legend>
+                    <span className="text-sm text-muted-foreground" aria-hidden="true">
+                      On
+                    </span>
+                    <div className="flex flex-wrap gap-1">
                       {weekdays.map((day, index) => (
                         <Button
                           type="button"
@@ -506,8 +521,8 @@ function AutomationForm({
                 <div className="text-xs text-muted-foreground" aria-live="polite">
                   {previewError ? <p>{previewError}</p> : <p>{nextRunLabel}</p>}
                 </div>
-              </div>
-            </Card>
+              </Card>
+            </Section>
           </SectionStack>
         </fieldset>
       </form>
