@@ -110,8 +110,8 @@ test("chat creation, recovery, controls, and logout", async ({ page, context }) 
   await page.getByLabel("Follow-up", { exact: true }).fill("stop control work");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await page.getByLabel("Conversation").getByText("stop control work", { exact: true }).waitFor();
-  await page.getByRole("button", { name: "Chat actions", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Stop container", exact: true }).click();
+  await page.getByRole("button", { name: "More chat actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Stop machine", exact: true }).click();
   await page.getByRole("button", { name: "Resume", exact: true }).waitFor();
   await page.reload();
   await page.getByLabel("Follow-up", { exact: true }).fill("New explicit work after stop");

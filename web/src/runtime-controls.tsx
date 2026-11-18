@@ -7,7 +7,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuCheckboxItem,
   CloudIcon,
   PlayIcon,
   SquareIcon,
@@ -35,9 +34,9 @@ const runtimeSchema = z.object({
 });
 type Runtime = z.infer<typeof runtimeSchema>;
 const labels = {
-  stopped: "Stopped",
+  stopped: "Asleep",
   starting: "Starting",
-  running: "Running",
+  running: "Awake",
   failed: "Failed",
   missing: "Missing",
   unknown: "Unknown",
@@ -223,7 +222,7 @@ export function RuntimeMenu({
             Wake machine
           </DropdownMenuItem>
         )}
-        {(running || state === "starting" || state === "unknown" || pending === "wake") && (
+        {(state === "starting" || state === "unknown" || pending === "wake") && (
           <DropdownMenuItem
             disabled={disabled || (pending !== "" && pending !== "wake")}
             closeOnClick={false}
@@ -241,38 +240,60 @@ export function RuntimeMenu({
   );
 }
 
-/** The same checked action always starts or cancels a four-hour lease. */
+/** Each label names the lease action; the expiry is reported as machine status. */
 export function KeepAwakeItem({ id, open }: { id: string; open: boolean }) {
   const { runtime, pending, error, now, act } = useRuntime(id, open);
   const until = runtime?.keepAwakeUntil;
   const active = until !== undefined && until !== null && new Date(until).getTime() > now;
   let status = stateLabel(runtime, pending, error);
-  if (runtime?.state === "running") status = "Awake";
+  if (runtime?.state === "running") {
+    status = active
+      ? `Awake until ${new Date(until).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+      : "Awake";
+  }
   if (runtime?.state === "stopped") status = "Asleep";
   return (
     <>
-      <DropdownMenuCheckboxItem
-        checked={active}
+      <DropdownMenuItem
         disabled={!!pending || (!active && runtime?.state !== "running")}
         closeOnClick={false}
-        onCheckedChange={(checked) => {
-          void act("keep-awake", checked ? 14_400 : 0);
+        onClick={() => {
+          void act("keep-awake", active ? 0 : 14_400);
         }}
-        title={
-          active
-            ? `Until ${new Date(until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-            : undefined
-        }
       >
         <ClockIcon />
-        Keep awake 4h
-        <span className="ml-auto flex items-center gap-1.5 text-muted-foreground">
+        <span className="shrink-0">{active ? "Cancel keep-awake" : "Keep awake 4h"}</span>
+        <span className="ml-auto flex items-center gap-1.5 whitespace-nowrap text-muted-foreground">
           <span
             className={`size-[5px] rounded-full ${runtime?.state === "running" ? "bg-green-500" : "bg-muted-foreground"}`}
           />
           {status}
         </span>
-      </DropdownMenuCheckboxItem>
+      </DropdownMenuItem>
+      {error && (
+        <p role="alert" className="px-1.5 py-1 text-xs text-destructive">
+          {error}
+        </p>
+      )}
+    </>
+  );
+}
+
+/** Explicit stop remains available independently of the machine summary. */
+export function StopMachineItem({ id }: { id: string }) {
+  const { pending, error, act } = useRuntime(id, false);
+  return (
+    <>
+      <DropdownMenuItem
+        disabled={!!pending}
+        closeOnClick={false}
+        onClick={() => {
+          void act("stop");
+        }}
+      >
+        <SquareIcon />
+        {pending ? "Stopping machine…" : "Stop machine"}
+      </DropdownMenuItem>
       {error && (
         <p role="alert" className="px-1.5 py-1 text-xs text-destructive">
           {error}
