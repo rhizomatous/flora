@@ -370,7 +370,7 @@ function AutomationForm({
               <SectionHeader className="mx-px px-4">
                 <FieldLabel htmlFor="automation-instructions">Instructions</FieldLabel>
                 <p id="instructions-help" className="text-sm text-muted-foreground">
-                  What Flora should do each time this automation runs.
+                  What Flora should do each time this automation runs
                 </p>
               </SectionHeader>
               <Textarea
@@ -413,7 +413,7 @@ function AutomationForm({
                   id="project-help"
                   className="col-span-2 text-sm text-muted-foreground sm:col-span-1 sm:row-start-2"
                 >
-                  The project this automation works in.
+                  The project this automation works in
                 </p>
               </div>
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3">
@@ -452,7 +452,7 @@ function AutomationForm({
                   Schedule
                 </Heading>
                 <p id="schedule-help" className="text-sm text-muted-foreground">
-                  When to run, in the selected time zone.
+                  When to run, in the selected time zone
                 </p>
               </SectionHeader>
               <Card variant="flush" className="gap-3 p-4">
@@ -706,7 +706,7 @@ export function Automations({
           <Section aria-label="Run history">
             <SectionHeader className="mx-px px-4">
               <Heading level={2}>Run history</Heading>
-              <p className="text-sm text-muted-foreground">Recent runs and their results.</p>
+              <p className="text-sm text-muted-foreground">Recent runs and their results</p>
             </SectionHeader>
             {runs.length === 0 ? (
               <p className="mx-px px-4 text-sm text-muted-foreground">
