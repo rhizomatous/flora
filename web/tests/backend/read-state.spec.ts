@@ -42,18 +42,24 @@ test("read positions sync across tabs and sessions while a bounded bulk action l
   await expect(waitingRow.getByRole("img", { name: "Unread activity" })).toBeVisible();
   await page.bringToFront();
   await page.getByRole("button", { name: "Chat list options", exact: true }).click();
+  await page.screenshot({ path: testInfo.outputPath("read-menu-desktop.png"), animations: "disabled" });
+  const received = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  await page.route("**/api/chats/read", async (route) => {
+    received.resolve();
+    await release.promise;
+    await route.continue();
+  });
   await page.getByRole("menuitem", { name: "Mark all as read", exact: true }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("combobox", { name: "Read scope" })).toHaveValue("current");
-  await expect(dialog).toContainText("1 chat with unread activity.");
-  await page.screenshot({ path: testInfo.outputPath("read-scope-desktop.png"), animations: "disabled" });
-  // This completes the turn after the dialog captured its observed revisions.
+  await received.promise;
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // Complete the turn after the direct action captured its observed revisions.
   const reply = await context.request.post(`${backend.url}/api/chats/${waiting.ID}/questions/que_browser/reply`, { headers: { Origin: backend.url }, data: { answers: [["Yes"]] } });
   expect(reply.status()).toBe(200);
   await expect(second.getByRole("main").getByRole("link", { name: "Open chat: Review release plan", exact: true })).toContainText("Idle");
-  await dialog.getByRole("button", { name: "Mark as read", exact: true }).click();
-  await expect(dialog).toHaveCount(0);
+  release.resolve();
+  await expect.poll(async () => detailSchema.parse(await (await context.request.get(`${backend.url}/api/chats/${waiting.ID}`)).json()).chat.LastViewedRevision).toBeGreaterThan(0);
+  await page.unroute("**/api/chats/read");
   await expect(page.getByRole("button", { name: "Chat list options", exact: true })).toBeFocused();
   await expect(waitingRow.getByRole("img", { name: "Unread activity" })).toBeVisible();
   await expect(second.getByRole("main").getByRole("link", { name: "Open chat: Review release plan", exact: true }).getByRole("img", { name: "Unread activity" })).toBeVisible();
@@ -76,14 +82,14 @@ test("read positions sync across tabs and sessions while a bounded bulk action l
   await main.getByRole("textbox", { name: "Search chats", exact: true }).fill("Review release plan");
   await expect(main.getByRole("link", { name: "Open chat: Keep this update unread", exact: true })).toHaveCount(0);
 
-  // A failed request leaves the scope and observed revisions available for retry.
-  await main.getByRole("button", { name: "Mark all as read", exact: true }).click();
+  // Retry uses the same observed revisions as the failed direct action.
   await page.route("**/api/chats/read", (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Read state unavailable. Try again." }) }));
-  await dialog.getByRole("button", { name: "Mark as read", exact: true }).click();
-  await expect(dialog.getByRole("alert")).toContainText("Read state unavailable");
-  await expect(dialog.getByRole("button", { name: "Mark as read", exact: true })).toBeEnabled();
+  await main.getByRole("button", { name: "Mark all as read", exact: true }).click();
+  await expect(page.getByText("Read state unavailable. Try again.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(main.getByRole("button", { name: "Mark all as read", exact: true })).toBeEnabled();
   await page.unroute("**/api/chats/read");
-  await dialog.getByRole("button", { name: "Mark as read", exact: true }).click();
+  await page.getByRole("button", { name: "Retry", exact: true }).click();
   await expect(waitingRow.getByRole("img", { name: "Unread activity" })).toHaveCount(0);
   await expect(second.getByRole("main").getByRole("link", { name: "Open chat: Review release plan", exact: true }).getByRole("img", { name: "Unread activity" })).toHaveCount(0);
   await expect(waitingRow).toContainText("Idle");
@@ -94,13 +100,16 @@ test("read positions sync across tabs and sessions while a bounded bulk action l
   await main.getByRole("combobox", { name: "Chat collection" }).selectOption("archived");
   const archivedRow = main.getByRole("link", { name: "Open chat: Archived investigation", exact: true });
   await expect(archivedRow.getByRole("img", { name: "Unread activity" })).toBeVisible();
+  await expect.poll(async () => detailSchema.parse(await (await context.request.get(`${backend.url}/api/chats/${unmatched.ID}`)).json()).chat.Status).toBe("idle");
+  await page.getByRole("button", { name: "Dismiss completion for Archived investigation", exact: true }).click();
+  await page.getByRole("button", { name: "Dismiss completion for Keep this update unread", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: testInfo.outputPath("read-action-mobile.png"), animations: "disabled" });
   await main.getByRole("button", { name: "Mark all as read", exact: true }).click();
-  await expect(dialog.getByRole("combobox", { name: "Read scope" })).toHaveValue("visible");
-  await page.screenshot({ path: testInfo.outputPath("read-scope-mobile.png"), animations: "disabled" });
-  await dialog.getByRole("button", { name: "Mark as read", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(archivedRow.getByRole("img", { name: "Unread activity" })).toHaveCount(0);
   await expect(archivedRow).toContainText("Idle");
+  await expect(main.getByRole("button", { name: "Mark all as read", exact: true })).toBeDisabled();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   expect(errors).toEqual([]);
   await second.close();
@@ -114,7 +123,7 @@ test.describe("failed attention", () => {
     const row = page.getByRole("main").getByRole("link", { name: "Open chat: Missing container", exact: true });
     await expect(row.getByRole("img", { name: "Unread activity" })).toBeVisible();
     await page.getByRole("main").getByRole("button", { name: "Mark all as read", exact: true }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Mark as read", exact: true }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(row.getByRole("img", { name: "Unread activity" })).toHaveCount(0);
     await expect(row).toContainText("Failed");
     await expect(row.locator(".sidebar-status")).toHaveAttribute("data-tone", "failed");

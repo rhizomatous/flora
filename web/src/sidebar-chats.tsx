@@ -11,6 +11,7 @@ import {
   FolderIcon,
   ListIcon,
   Settings2Icon,
+  CheckIcon,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
@@ -25,9 +26,9 @@ import { pinnedChats } from "./chat-organization";
 import { ChatOrganizationActions } from "./chat-organization-actions";
 import type { Chat } from "./chat-schemas";
 import { chatStatus } from "./chat-status";
-import { MarkChatsRead, UnreadDot } from "./mark-chats-read";
+import { UnreadDot } from "./mark-chats-read";
 import { PullCount, PullList } from "./pull-links";
-import { isChatSeen } from "./sidebar-status";
+import { isChatSeen, useMarkChatsRead } from "./sidebar-status";
 
 type Project = { id: string; name: string };
 
@@ -189,6 +190,13 @@ export function SidebarChats({
         .toLowerCase()
         .includes(filter),
   );
+  const {
+    mark: markRead,
+    disabled: readDisabled,
+    busy: readBusy,
+  } = useMarkChatsRead(
+    chats === undefined ? undefined : [...pinned, ...groups.flatMap(({ rows }) => rows)],
+  );
   return (
     <section aria-label="Chats" className="sidebar-chats px-2 py-4">
       <div className="sidebar-section-heading flex min-h-8 items-center ps-2 pe-0 text-xs text-subtle-foreground">
@@ -237,74 +245,64 @@ export function SidebarChats({
             </Button>
           </>
         )}
-        <MarkChatsRead chats={chats}>
-          {(openRead, readDisabled, trigger) => (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    ref={trigger}
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Chat list options"
-                  >
-                    <EllipsisIcon />
-                  </Button>
-                }
-              />
-              <DropdownMenuContent align="start" className="w-56">
-                <DropdownMenuItem disabled>
-                  <FolderIcon />
-                  New folder
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => {
-                    setSort(sort === "updated" ? "title" : "updated");
-                  }}
-                >
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button variant="ghost" size="icon-sm" aria-label="Chat list options">
+                <EllipsisIcon />
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuItem disabled>
+              <FolderIcon />
+              New folder
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                setSort(sort === "updated" ? "title" : "updated");
+              }}
+            >
+              <ListIcon />
+              Sort: {sort === "updated" ? "Updated" : "Title"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                setCollapsed(collapsed.length === projects.length ? [] : projects.map((p) => p.id));
+              }}
+            >
+              <InboxIcon />
+              {collapsed.length === projects.length ? "Expand" : "Collapse"} all projects
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled>
+              <Settings2Icon />
+              Display and filters
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem disabled={readDisabled} aria-busy={readBusy} onClick={markRead}>
+              <CheckIcon />
+              Mark all as read
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              nativeButton={false}
+              render={
+                <a href="#chats?view=archived" onClick={close}>
+                  Archived chats
+                </a>
+              }
+            />
+            <DropdownMenuItem
+              nativeButton={false}
+              render={
+                <a href="#chats" onClick={close}>
                   <ListIcon />
-                  Sort: {sort === "updated" ? "Updated" : "Title"}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setCollapsed(
-                      collapsed.length === projects.length ? [] : projects.map((p) => p.id),
-                    );
-                  }}
-                >
-                  <InboxIcon />
-                  {collapsed.length === projects.length ? "Expand" : "Collapse"} all projects
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled>
-                  <Settings2Icon />
-                  Display and filters
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem disabled={readDisabled} onClick={openRead}>
-                  Mark all as read
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  nativeButton={false}
-                  render={
-                    <a href="#chats?view=archived" onClick={close}>
-                      Archived chats
-                    </a>
-                  }
-                />
-                <DropdownMenuItem
-                  nativeButton={false}
-                  render={
-                    <a href="#chats" onClick={close}>
-                      <ListIcon />
-                      View all chats
-                    </a>
-                  }
-                />
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </MarkChatsRead>
+                  View all chats
+                </a>
+              }
+            />
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       {chats === undefined && (
         <p className="sidebar-empty px-4 py-1.5 text-xs text-muted-foreground" role="status">
