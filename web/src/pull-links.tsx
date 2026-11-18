@@ -138,14 +138,14 @@ export function PullList({
                   }}
                   aria-label={`${repository} #${pull.number} ${label}${(pull.title ?? "") === "" ? "" : `: ${pull.title}`}${pull.additions !== undefined && pull.deletions !== undefined ? `, ${pull.additions} additions, ${pull.deletions} deletions` : ""}`}
                   aria-describedby={`${id}-${pull.url}`}
-                  title={`${repository} #${pull.number} · ${description}${(pull.title ?? "") === "" ? "" : ` · ${pull.title}`}`}
+                  title={`${repository} #${pull.number}, ${description}${(pull.title ?? "") === "" ? "" : `, ${pull.title}`}`}
                   target="_blank"
                   rel="noreferrer"
                   className="flex min-w-0 items-center gap-2 rounded-md p-2 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
                   data-pr-state={label.toLowerCase()}
                   data-pr-tone={tone}
                 >
-                  <Icon className={`size-4 shrink-0 ${color}`} aria-hidden="true" />
+                  <Icon className={`size-3.5 shrink-0 ${color}`} aria-hidden="true" />
                   <span className="shrink-0 font-medium">#{pull.number}</span>
                   <span className="min-w-0 flex-1 truncate text-muted-foreground">
                     {pull.title ?? repository}
@@ -206,7 +206,7 @@ export function InlinePullLink({
             className="inline-flex max-w-full cursor-pointer items-baseline gap-1 rounded-sm align-baseline font-medium text-foreground underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             aria-label={`${repository} #${pull.number} ${label}`}
             aria-describedby={id}
-            title={`${repository} #${pull.number} · ${description}${(pull.title ?? "") === "" ? "" : ` · ${pull.title}`}`}
+            title={`${repository} #${pull.number}, ${description}${(pull.title ?? "") === "" ? "" : `, ${pull.title}`}`}
             data-inline-pr={label.toLowerCase()}
             data-pr-tone={tone}
           />
@@ -217,7 +217,7 @@ export function InlinePullLink({
       </HoverCardTrigger>
       <HoverCardContent className="w-96! max-w-[calc(100vw-24px)]!" density="compact">
         <p className="text-xs text-muted-foreground">
-          {repository} #{pull.number} · {label}
+          {repository} #{pull.number}, {label}
         </p>
         <p className="mt-1 mb-2 text-sm">{pull.title}</p>
         <PullLineCounts pull={pull} />
@@ -236,11 +236,11 @@ export function PullEventCard({ pull, opened }: { pull: Pull; opened: boolean })
   return (
     <Card
       size="sm"
-      className="mt-3 rounded-xl px-4 py-3.5"
+      className="mt-2.5 gap-2 rounded-lg px-3 py-3"
       aria-label={`Pull request #${pull.number}`}
       data-pull-event={pull.url}
     >
-      <p className="text-sm text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         {opened ? "Opened" : "Pull request"} {repository}#{pull.number}
       </p>
       <a
@@ -251,10 +251,10 @@ export function PullEventCard({ pull, opened }: { pull: Pull; opened: boolean })
           openPull(event, pull, navigation);
         }}
         title={description}
-        className="flex min-w-0 items-center gap-2.5 rounded-sm text-sm focus-visible:outline-2 focus-visible:outline-ring"
+        className="flex min-w-0 items-center gap-2 rounded-sm text-[13px] leading-[18px] focus-visible:outline-2 focus-visible:outline-ring"
         data-pr-tone={tone}
       >
-        <Icon className={`size-4 shrink-0 ${color}`} aria-hidden="true" />
+        <Icon className={`size-3.5 shrink-0 ${color}`} aria-hidden="true" />
         <span className="shrink-0 text-muted-foreground">
           {repository}#{pull.number}
         </span>

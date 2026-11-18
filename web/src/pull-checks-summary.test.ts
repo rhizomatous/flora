@@ -21,7 +21,7 @@ const pull = {
 } satisfies Pull;
 test("checks summarize mixed results without claiming readiness", () => {
   expect(pullChecksSummary(pull, now)).toEqual({
-    label: "1 pending · 1 passed",
+    label: "1 pending, 1 passed",
     state: "pending",
     stale: false,
   });
@@ -31,6 +31,22 @@ test("checks summarize mixed results without claiming readiness", () => {
       now,
     ).state,
   ).toBe("neutral");
+  expect(
+    pullChecksSummary(
+      {
+        ...pull,
+        checks: {
+          ...pull.checks,
+          items: [
+            { name: "Build", state: "failure" },
+            { name: "Test", state: "success" },
+            { name: "Lint", state: "success" },
+          ],
+        },
+      },
+      now,
+    ).label,
+  ).toBe("1 failed, 2 passed");
   expect(pullChecksSummary({ ...pull, checks: { ...pull.checks, items: [] } }, now).label).toBe(
     "No checks reported",
   );
