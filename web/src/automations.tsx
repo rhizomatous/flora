@@ -24,6 +24,9 @@ import {
   NativeSelect,
   Textarea,
   Switch,
+  SectionStack,
+  Section,
+  SectionHeader,
   Toaster,
   ChevronLeftIcon,
 } from "@flora/florets";
@@ -239,7 +242,7 @@ function AutomationForm({
     : "Checking schedule…";
   if (initial.id && !initial.enabled) nextRunLabel = "Inactive";
   return (
-    <section className="mx-auto max-w-3xl [&_input]:scroll-mt-20 [&_textarea]:scroll-mt-20">
+    <section className="mx-auto w-full max-w-3xl min-w-0 [&_input]:scroll-mt-20 [&_textarea]:scroll-mt-20">
       {topbar &&
         createPortal(
           <>
@@ -310,195 +313,202 @@ function AutomationForm({
           submit();
         }}
       >
-        <fieldset disabled={busy} className="space-y-5">
-          <div className="space-y-1">
-            <EditableText
-              label="Name"
-              variant="title"
-              value={value.name}
-              onChange={(event) => {
-                change("name", event.target.value);
-              }}
-              required
-              maxLength={200}
-              placeholder="Name this automation"
-            />
-            <EditableText
-              label="Description"
-              multiline
-              value={value.description ?? ""}
-              maxLength={2000}
-              placeholder="Add a description (optional)"
-              onChange={(event) => {
-                change("description", event.target.value);
-              }}
-            />
-          </div>
-          {initial.id && (
-            <div className="mx-px flex items-center justify-between gap-3 px-4">
-              <label className="flex w-fit items-center gap-2 text-sm">
-                <Switch
-                  disabled={busy}
-                  checked={initial.enabled}
-                  onCheckedChange={toggleActive}
-                  aria-label="Active"
+        <fieldset disabled={busy}>
+          <SectionStack>
+            <Section>
+              <div className="space-y-1">
+                <EditableText
+                  label="Name"
+                  variant="title"
+                  value={value.name}
+                  onChange={(event) => {
+                    change("name", event.target.value);
+                  }}
+                  required
+                  maxLength={200}
+                  placeholder="Name this automation"
                 />
-                {initial.enabled ? "Active" : "Inactive"}
-              </label>
-            </div>
-          )}
-          <FieldLabel className="w-full flex-col items-start">
-            <span className="mx-px px-4">Instructions</span>
-            <Textarea
-              className="min-h-32 resize-none"
-              value={value.instructions}
-              onChange={(e) => {
-                change("instructions", e.target.value);
-              }}
-              required
-              placeholder="Check for outdated dependencies. Update safe minor versions, run tests, and open a draft PR if anything changes."
-            />
-          </FieldLabel>
-          <Card variant="flush" className="divide-y">
-            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-              <FieldLabel htmlFor="automation-project">Project</FieldLabel>
-              <NativeSelect
-                id="automation-project"
-                className="w-[min(14rem,52vw)]"
-                aria-label="Project"
-                value={value.projectID}
-                disabled={initial.id !== ""}
+                <EditableText
+                  label="Description"
+                  multiline
+                  value={value.description ?? ""}
+                  maxLength={2000}
+                  placeholder="Add a description (optional)"
+                  onChange={(event) => {
+                    change("description", event.target.value);
+                  }}
+                />
+              </div>
+              {initial.id && (
+                <div className="mx-px flex items-center justify-between gap-3 px-4">
+                  <label className="flex w-fit items-center gap-2 text-sm">
+                    <Switch
+                      disabled={busy}
+                      checked={initial.enabled}
+                      onCheckedChange={toggleActive}
+                      aria-label="Active"
+                    />
+                    {initial.enabled ? "Active" : "Inactive"}
+                  </label>
+                </div>
+              )}
+            </Section>
+            <Section>
+              <SectionHeader className="mx-px px-4">
+                <FieldLabel htmlFor="automation-instructions">Instructions</FieldLabel>
+              </SectionHeader>
+              <Textarea
+                id="automation-instructions"
+                className="min-h-32 resize-none"
+                value={value.instructions}
                 onChange={(e) => {
-                  change("projectID", e.target.value);
+                  change("instructions", e.target.value);
                 }}
                 required
-              >
-                <option value="" disabled>
-                  Choose a project
-                </option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3">
-              <FieldLabel htmlFor="automation-mode">Runs in</FieldLabel>
-              <NativeSelect
-                id="automation-mode"
-                className="col-start-2 row-start-1 w-[min(14rem,52vw)] sm:row-span-2"
-                aria-label="Runs in"
-                value={value.mode}
-                onChange={(e) => {
-                  change("mode", e.target.value === "same" ? "same" : "new");
-                }}
-                aria-describedby="run-mode-help"
-              >
-                <option value="new">A new chat each run</option>
-                <option value="same">The same chat each run</option>
-              </NativeSelect>
-              <p
-                id="run-mode-help"
-                className="col-span-2 text-sm text-muted-foreground sm:col-span-1 sm:row-start-2"
-              >
-                {value.mode === "same"
-                  ? "Continue in the same chat."
-                  : "Start a new chat each run."}
-              </p>
-              {initial.mode === "same" && value.mode === "same" && initial.chatID && (
-                <Link className="col-span-2 text-sm" href={`#chats/${initial.chatID}`}>
-                  Open chat
-                </Link>
-              )}
-              {initial.id && value.mode !== initial.mode && (
-                <p className="col-span-2 text-sm">
-                  The next run will start a new chat. Previous chats stay available.
-                </p>
-              )}
-            </div>
-            <div className="space-y-3 px-4 py-4">
-              <p className="text-sm font-medium">Schedule</p>
-              <div
-                role="group"
-                aria-label="Run schedule"
-                className="flex flex-wrap items-center gap-x-3 gap-y-2"
-              >
+                placeholder="Check for outdated dependencies. Update safe minor versions, run tests, and open a draft PR if anything changes."
+              />
+            </Section>
+            <Card variant="flush" className="divide-y">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                <FieldLabel htmlFor="automation-project">Project</FieldLabel>
                 <NativeSelect
-                  className="w-auto"
-                  aria-label="Schedule"
-                  value={frequency}
+                  id="automation-project"
+                  className="w-[min(14rem,52vw)]"
+                  aria-label="Project"
+                  value={value.projectID}
+                  disabled={initial.id !== ""}
                   onChange={(e) => {
-                    const next = e.target.value;
-                    if (next === "daily" || next === "weekdays" || next === "weekly") {
-                      change("frequency", next);
-                    }
+                    change("projectID", e.target.value);
                   }}
+                  required
                 >
-                  <option value="daily">Daily</option>
-                  <option value="weekdays">Weekdays</option>
-                  <option value="weekly">Weekly</option>
+                  <option value="" disabled>
+                    Choose a project
+                  </option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
                 </NativeSelect>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground" aria-hidden="true">
-                    at
-                  </span>
-                  <Input
-                    className="w-34"
-                    aria-label="Time"
-                    type="time"
-                    value={time}
+              </div>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3">
+                <FieldLabel htmlFor="automation-mode">Runs in</FieldLabel>
+                <NativeSelect
+                  id="automation-mode"
+                  className="col-start-2 row-start-1 w-[min(14rem,52vw)] sm:row-span-2"
+                  aria-label="Runs in"
+                  value={value.mode}
+                  onChange={(e) => {
+                    change("mode", e.target.value === "same" ? "same" : "new");
+                  }}
+                  aria-describedby="run-mode-help"
+                >
+                  <option value="new">A new chat each run</option>
+                  <option value="same">The same chat each run</option>
+                </NativeSelect>
+                <p
+                  id="run-mode-help"
+                  className="col-span-2 text-sm text-muted-foreground sm:col-span-1 sm:row-start-2"
+                >
+                  {value.mode === "same"
+                    ? "Continue in the same chat."
+                    : "Start a new chat each run."}
+                </p>
+                {initial.mode === "same" && value.mode === "same" && initial.chatID && (
+                  <Link className="col-span-2 text-sm" href={`#chats/${initial.chatID}`}>
+                    Open chat
+                  </Link>
+                )}
+                {initial.id && value.mode !== initial.mode && (
+                  <p className="col-span-2 text-sm">
+                    The next run will start a new chat. Previous chats stay available.
+                  </p>
+                )}
+              </div>
+              <div className="space-y-3 px-4 py-4">
+                <p className="text-sm font-medium">Schedule</p>
+                <div
+                  role="group"
+                  aria-label="Run schedule"
+                  className="flex flex-wrap items-center gap-x-3 gap-y-2"
+                >
+                  <NativeSelect
+                    className="w-auto"
+                    aria-label="Schedule"
+                    value={frequency}
                     onChange={(e) => {
-                      change("time", e.target.value);
+                      const next = e.target.value;
+                      if (next === "daily" || next === "weekdays" || next === "weekly") {
+                        change("frequency", next);
+                      }
                     }}
-                    required
-                  />
-                </div>
-                <div className="flex max-w-full min-w-0 items-center gap-2">
-                  <span className="text-sm text-muted-foreground" aria-hidden="true">
-                    in
-                  </span>
-                  <TimeZonePicker
-                    value={timeZone}
-                    disabled={busy}
-                    onChange={(zone) => {
-                      change("timeZone", zone);
-                    }}
-                  />
-                </div>
-              </div>
-              {frequency === "weekly" && (
-                <fieldset>
-                  <legend className="mb-2 text-sm font-medium">Days</legend>
-                  <div className="flex flex-wrap gap-2">
-                    {weekdays.map((day, index) => (
-                      <Button
-                        type="button"
-                        key={day}
-                        size="sm"
-                        variant={(days ?? []).includes(index) ? "default" : "outline"}
-                        aria-label={day}
-                        aria-pressed={(days ?? []).includes(index)}
-                        onClick={() => {
-                          change(
-                            "days",
-                            (days ?? []).includes(index)
-                              ? (days ?? []).filter((d) => d !== index)
-                              : [...(days ?? []), index].toSorted((a, b) => a - b),
-                          );
-                        }}
-                      >
-                        {day.slice(0, 3)}
-                      </Button>
-                    ))}
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekdays">Weekdays</option>
+                    <option value="weekly">Weekly</option>
+                  </NativeSelect>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground" aria-hidden="true">
+                      at
+                    </span>
+                    <Input
+                      className="w-34"
+                      aria-label="Time"
+                      type="time"
+                      value={time}
+                      onChange={(e) => {
+                        change("time", e.target.value);
+                      }}
+                      required
+                    />
                   </div>
-                </fieldset>
-              )}
-              <div className="text-xs text-muted-foreground" aria-live="polite">
-                {previewError ? <p>{previewError}</p> : <p>{nextRunLabel}</p>}
+                  <div className="flex max-w-full min-w-0 items-center gap-2">
+                    <span className="text-sm text-muted-foreground" aria-hidden="true">
+                      in
+                    </span>
+                    <TimeZonePicker
+                      value={timeZone}
+                      disabled={busy}
+                      onChange={(zone) => {
+                        change("timeZone", zone);
+                      }}
+                    />
+                  </div>
+                </div>
+                {frequency === "weekly" && (
+                  <fieldset>
+                    <legend className="mb-2 text-sm font-medium">Days</legend>
+                    <div className="flex flex-wrap gap-2">
+                      {weekdays.map((day, index) => (
+                        <Button
+                          type="button"
+                          key={day}
+                          size="sm"
+                          variant={(days ?? []).includes(index) ? "default" : "outline"}
+                          aria-label={day}
+                          aria-pressed={(days ?? []).includes(index)}
+                          onClick={() => {
+                            change(
+                              "days",
+                              (days ?? []).includes(index)
+                                ? (days ?? []).filter((d) => d !== index)
+                                : [...(days ?? []), index].toSorted((a, b) => a - b),
+                            );
+                          }}
+                        >
+                          {day.slice(0, 3)}
+                        </Button>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
+                <div className="text-xs text-muted-foreground" aria-live="polite">
+                  {previewError ? <p>{previewError}</p> : <p>{nextRunLabel}</p>}
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+          </SectionStack>
         </fieldset>
       </form>
     </section>
@@ -631,68 +641,72 @@ export function Automations({
         }}
       />
       {list === undefined && !error && <LoadingStatus />}
-      {list !== undefined && (isNew || item !== undefined) && (
-        <AutomationForm
-          topbar={topbar}
-          initial={item ?? blank(projects[0]?.id ?? "")}
-          projects={projects}
-          busy={busy}
-          pending={pending}
-          save={save}
-          runNow={() => {
-            if (item) void action("run", () => runAutomation(item.id, item.name));
-          }}
-          toggleActive={() => {
-            if (item) {
-              void action("active", async () => {
-                const saved = await request(automationSchema, `automations/${item.id}`, {
-                  method: "PUT",
-                  body: { ...item, latestRun: undefined, enabled: !item.enabled },
+      <SectionStack className="mx-auto w-full max-w-3xl">
+        {list !== undefined && (isNew || item !== undefined) && (
+          <AutomationForm
+            topbar={topbar}
+            initial={item ?? blank(projects[0]?.id ?? "")}
+            projects={projects}
+            busy={busy}
+            pending={pending}
+            save={save}
+            runNow={() => {
+              if (item) void action("run", () => runAutomation(item.id, item.name));
+            }}
+            toggleActive={() => {
+              if (item) {
+                void action("active", async () => {
+                  const saved = await request(automationSchema, `automations/${item.id}`, {
+                    method: "PUT",
+                    body: { ...item, latestRun: undefined, enabled: !item.enabled },
+                  });
+                  setDetail((current) => ({ automation: saved, runs: current?.runs ?? [] }));
                 });
-                setDetail((current) => ({ automation: saved, runs: current?.runs ?? [] }));
-              });
-            }
-          }}
-          cancel={() => {
-            window.location.hash = "automations";
-          }}
-        />
-      )}
-      {list !== undefined && !isNew && id !== "" && item !== undefined && (
-        <section className="mx-auto mt-10 max-w-3xl" aria-label="Run history">
-          <Heading level={2} className="mx-px px-4">
-            Run history
-          </Heading>
-          {runs.length === 0 ? (
-            <p className="mx-px mt-4 px-4 text-sm text-muted-foreground">
-              No runs yet. Wait for the schedule or choose Run now.
-            </p>
-          ) : (
-            <ol className="mt-4 divide-y rounded-lg border bg-surface-panel px-4">
-              {runs.map((run) => (
-                <li key={run.id} className="py-4">
-                  <div className="flex flex-wrap justify-between gap-2">
-                    <span className="text-sm">{stamp(run.scheduledAt, item.timeZone)}</span>
-                    <span className="text-sm capitalize">{run.status}</span>
-                  </div>
-                  {run.reason && <p className="mt-2 text-sm text-muted-foreground">{run.reason}</p>}
-                  {run.chatID && (
-                    <Link
-                      className="mt-2 inline-block text-sm"
-                      href={`#chats/${run.chatID}?run=${encodeURIComponent(run.messageID)}`}
-                    >
-                      Open chat
-                    </Link>
-                  )}
-                </li>
-              ))}
-            </ol>
-          )}
-          {runs.length === 100 && (
-            <p className="mt-3 text-xs text-muted-foreground">Showing the latest 100 runs.</p>
-          )}
-        </section>
-      )}
+              }
+            }}
+            cancel={() => {
+              window.location.hash = "automations";
+            }}
+          />
+        )}
+        {list !== undefined && !isNew && id !== "" && item !== undefined && (
+          <Section aria-label="Run history">
+            <SectionHeader className="mx-px px-4">
+              <Heading level={2}>Run history</Heading>
+            </SectionHeader>
+            {runs.length === 0 ? (
+              <p className="mx-px px-4 text-sm text-muted-foreground">
+                No runs yet. Wait for the schedule or choose Run now.
+              </p>
+            ) : (
+              <ol className="divide-y rounded-lg border bg-surface-panel px-4">
+                {runs.map((run) => (
+                  <li key={run.id} className="py-4">
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <span className="text-sm">{stamp(run.scheduledAt, item.timeZone)}</span>
+                      <span className="text-sm capitalize">{run.status}</span>
+                    </div>
+                    {run.reason && (
+                      <p className="mt-2 text-sm text-muted-foreground">{run.reason}</p>
+                    )}
+                    {run.chatID && (
+                      <Link
+                        className="mt-2 inline-block text-sm"
+                        href={`#chats/${run.chatID}?run=${encodeURIComponent(run.messageID)}`}
+                      >
+                        Open chat
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            )}
+            {runs.length === 100 && (
+              <p className="mt-3 text-xs text-muted-foreground">Showing the latest 100 runs.</p>
+            )}
+          </Section>
+        )}
+      </SectionStack>
     </>
   );
 }
