@@ -16,8 +16,8 @@ test("create, edit, pause, and run an automation in a dedicated chat", async ({ 
   await page.getByRole("textbox", { name: "Description", exact: true }).fill("Keep dependencies current.");
   await page.getByLabel("Instructions", { exact: true }).fill("Check dependencies and summarize findings.");
   await page.getByLabel("Runs in", { exact: true }).selectOption("same");
-  await expect(page.getByText("Continue in the same chat.")).toBeVisible();
-  await page.getByLabel("Schedule", { exact: true }).selectOption("weekly");
+  await expect(page.getByLabel("Runs in", { exact: true })).toHaveAccessibleDescription("Continue in the same chat");
+  await page.getByRole("combobox", { name: "Schedule", exact: true }).selectOption("weekly");
   await page.getByRole("button", { name: "Friday", exact: true }).click();
   await page.getByRole("button", { name: "Time zone", exact: true }).click();
   await page.getByRole("combobox", { name: "Search time zones" }).fill("New York");
@@ -33,7 +33,7 @@ test("create, edit, pause, and run an automation in a dedicated chat", async ({ 
   await page.screenshot({ path: testInfo.outputPath("form-phone.png"), fullPage: false, animations: "disabled" });
   await page.setViewportSize({ width: 1280, height: 1000 });
   await expect(async () => {
-    const scheduleBox = await page.getByLabel("Schedule", { exact: true }).boundingBox();
+    const scheduleBox = await page.getByRole("combobox", { name: "Schedule", exact: true }).boundingBox();
     const zoneBox = await page.getByRole("button", { name: "Time zone", exact: true }).boundingBox();
     expect(Math.abs((scheduleBox?.y ?? -100) - (zoneBox?.y ?? 100))).toBeLessThan(4);
   }).toPass();
@@ -78,7 +78,7 @@ test("create, edit, pause, and run an automation in a dedicated chat", async ({ 
   expect(secondLink?.split("?")[0]).toBe(firstLink?.split("?")[0]);
   expect(secondLink).not.toBe(firstLink);
   await page.getByLabel("Runs in", { exact: true }).selectOption("new");
-  await expect(page.getByText("The next run will start a new chat. Previous chats stay available.")).toBeVisible();
+  await expect(page.getByLabel("Runs in", { exact: true })).toHaveAccessibleDescription("Start a new chat each run");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByLabel("Runs in", { exact: true })).toHaveValue("new");
   await page.getByRole("switch", { name: "Active", exact: true }).click();
