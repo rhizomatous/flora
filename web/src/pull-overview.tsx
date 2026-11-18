@@ -48,24 +48,28 @@ export function PullOverview({
       data-pull-overview={pull.url}
     >
       <PullActions pull={pull} />
-      <div className="mx-auto w-full max-w-3xl px-5 pt-6 pb-10 sm:px-6 sm:pt-8">
+      <div className="mx-auto w-full max-w-3xl px-5 pt-4 pb-8 sm:px-6 sm:pt-5">
         <PullHeader pull={pull} heading={heading} />
-        <dl className="mt-9 grid grid-cols-[88px_minmax(0,1fr)] items-start gap-x-3 gap-y-5 text-sm">
+        <dl className="mt-7 grid grid-cols-[88px_minmax(0,1fr)] items-start gap-x-3 gap-y-4 text-[13px] leading-[18px]">
           {(pull.headRef ?? "") !== "" && (
             <>
               <dt className="flex items-center gap-2 text-muted-foreground">
-                <GitBranchIcon className="size-4" />
+                <GitBranchIcon className="size-3.5" />
                 Branch
               </dt>
               <dd className="flex min-w-0 items-center gap-2">
-                <span className="min-w-0 truncate" title={pull.headRef}>
+                <span className="min-w-0 truncate" title={`PR branch: ${pull.headRef ?? ""}`}>
                   {pull.headRef}
                 </span>
                 <ChevronRightIcon
                   className="size-3 shrink-0 text-muted-foreground"
                   aria-hidden="true"
                 />
-                <span className="max-w-20 shrink-0 truncate" title={pull.baseRef}>
+                <span className="sr-only">into</span>
+                <span
+                  className="max-w-20 shrink-0 truncate"
+                  title={`Target branch: ${pull.baseRef ?? ""}`}
+                >
                   {pull.baseRef ?? ""}
                 </span>
                 <PullLineCounts pull={pull} />
@@ -73,7 +77,7 @@ export function PullOverview({
             </>
           )}
           <dt className="flex items-center gap-2 text-muted-foreground">
-            <GitPullRequestIcon className="size-4" />
+            <GitPullRequestIcon className="size-3.5" />
             Status
           </dt>
           <dd className="flex items-center gap-2">
@@ -81,7 +85,7 @@ export function PullOverview({
             {statuses[pullStatus(pull)]}
           </dd>
           <dt className="flex items-center gap-2 text-muted-foreground">
-            <UsersIcon className="size-4" />
+            <UsersIcon className="size-3.5" />
             Reviewers
           </dt>
           <dd className="flex min-w-0 flex-wrap gap-x-3 gap-y-2">
@@ -96,7 +100,7 @@ export function PullOverview({
             )}
           </dd>
           <dt className="flex items-center gap-2 text-muted-foreground">
-            <TagIcon className="size-4" />
+            <TagIcon className="size-3.5" />
             Labels
           </dt>
           <dd className="flex min-w-0 flex-wrap gap-2">
@@ -113,14 +117,14 @@ export function PullOverview({
             )}
           </dd>
           <dt className="flex items-center gap-2 text-muted-foreground">
-            <CheckIcon className="size-4" />
+            <CheckIcon className="size-3.5" />
             Checks
           </dt>
           <dd>
             <a
               href={`#${checks}`}
               aria-describedby={`${checks}-revision`}
-              title={`Head ${pull.headSHA ?? "unavailable"}${(pull.checks?.checkedAt ?? "") === "" ? "" : ` · Saved ${new Date(pull.checks?.checkedAt ?? "").toLocaleString()}`}`}
+              title={`Head ${pull.headSHA ?? "unavailable"}${(pull.checks?.checkedAt ?? "") === "" ? "" : `, saved ${new Date(pull.checks?.checkedAt ?? "").toLocaleString()}`}`}
               onClick={(event) => {
                 event.preventDefault();
                 document
@@ -137,12 +141,12 @@ export function PullOverview({
             </span>
           </dd>
           <dt className="flex items-center gap-2 text-muted-foreground">
-            <MessageSquareIcon className="size-4" />
+            <MessageSquareIcon className="size-3.5" />
             Chat
           </dt>
           <dd className="min-w-0 wrap-anywhere">{chatTitle || chatID}</dd>
           <dt className="flex items-center gap-2 text-muted-foreground">
-            <CircleDotIcon className="size-4" />
+            <CircleDotIcon className="size-3.5" />
             Issues
           </dt>
           <dd className="min-w-0 space-y-1">
@@ -182,9 +186,9 @@ export function PullOverview({
             )}
           </dd>
         </dl>
-        <div className="mt-10">
+        <div className="mt-8">
           <details open className="group">
-            <summary className="mb-3 flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-sm text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring">
+            <summary className="mb-2 flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-sm text-[13px] leading-5 text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring">
               Description{" "}
               <ChevronRightIcon
                 className="size-3 rotate-0 group-open:rotate-90"
@@ -192,15 +196,20 @@ export function PullOverview({
               />
             </summary>
             {(pull.body ?? "") === "" ? (
-              <p className="text-sm text-muted-foreground">No description.</p>
+              <p className="text-[13px] leading-5 text-muted-foreground">No description.</p>
             ) : (
-              <div className="text-sm leading-6 wrap-anywhere" data-pull-description>
-                <Markdown mode="static">{pull.body ?? ""}</Markdown>
+              <div className="text-[13px] leading-5 wrap-anywhere" data-pull-description>
+                <Markdown
+                  mode="static"
+                  className="space-y-3! [&_h1]:text-lg [&_h2]:text-base [&_h3]:text-sm [&_h4]:text-sm"
+                >
+                  {pull.body ?? ""}
+                </Markdown>
               </div>
             )}
           </details>
         </div>
-        <div className="mt-10 scroll-mt-5" id={checks}>
+        <div className="mt-8 scroll-mt-4" id={checks}>
           <PullChecksDetails pull={pull} error={error} />
         </div>
       </div>

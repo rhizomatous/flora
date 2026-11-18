@@ -62,6 +62,10 @@ test("selected PR overview matches the compact chat and flat checks layout", asy
   });
   expect(centers.every((center) => Number.isFinite(center))).toBe(true);
   expect(Math.max(...centers) - Math.min(...centers)).toBeLessThan(1);
+  const avatar = overview.locator('header [data-slot="avatar"]');
+  await expect(avatar).toHaveAttribute("data-shape", "squircle");
+  await expect(avatar).toHaveCSS("width", "20px");
+
   if (screenshotDir !== undefined) {
     await page.screenshot({ path: `${screenshotDir}/checks-desktop.png` });
   }
@@ -280,8 +284,19 @@ test("author metadata stays aligned when the avatar replaces its fallback", asyn
     );
     await page.evaluate(() => document.fonts.ready);
     await expect(header.locator('[data-slot="avatar-fallback"]')).toBeVisible();
+    const avatarRadius = await header
+      .locator('[data-slot="avatar"]')
+      .evaluate((element) => getComputedStyle(element).borderTopLeftRadius);
+    await expect(header.locator('[data-slot="avatar-fallback"]')).toHaveCSS(
+      "border-top-left-radius",
+      avatarRadius,
+    );
     releaseAvatar(null);
     await expect(header.locator('[data-slot="avatar-image"]')).toBeVisible();
+    await expect(header.locator('[data-slot="avatar-image"]')).toHaveCSS(
+      "border-top-left-radius",
+      avatarRadius,
+    );
     const centers = await header.evaluate((element) => {
       const author = element.querySelector('a[href="https://github.com/octocat"]');
       const items = [

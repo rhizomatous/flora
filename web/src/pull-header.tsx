@@ -13,11 +13,11 @@ export function PullHeader({ pull, heading }: { pull: Pull; heading: string }) {
       <Heading
         level={2}
         id={heading}
-        className="text-2xl leading-8 font-medium tracking-tight wrap-anywhere"
+        className="text-xl leading-7 font-medium tracking-tight wrap-anywhere"
       >
         {pull.title ?? `Pull request #${pull.number}`}
       </Heading>
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-muted-foreground">
         {(pull.author ?? "") !== "" && (
           <a
             href={`https://github.com/${encodeURIComponent(pull.author ?? "")}`}
@@ -33,7 +33,7 @@ export function PullHeader({ pull, heading }: { pull: Pull; heading: string }) {
           target="_blank"
           rel="noreferrer"
           title={`${repository} #${pull.number}`}
-          className="border-l border-border pl-3 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+          className="border-l border-border pl-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
         >
           #{pull.number}
         </a>
@@ -41,7 +41,7 @@ export function PullHeader({ pull, heading }: { pull: Pull; heading: string }) {
           <time
             dateTime={pull.createdAt}
             title={new Date(pull.createdAt ?? "").toLocaleString()}
-            className="border-l border-border pl-3"
+            className="border-l border-border pl-2"
           >
             {age}
           </time>

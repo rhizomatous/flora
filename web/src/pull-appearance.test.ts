@@ -51,6 +51,6 @@ test("draft, closed, and merged PRs retain their lifecycle appearance", () => {
     });
   }
   expect(pullAppearance({ ...withChecks(["success"]), draft: true }, now).description).toBe(
-    "Draft · 1 passed",
+    "Draft: 1 passed",
   );
 });

@@ -40,7 +40,7 @@ export function PullChecksLabel({ pull, size = "sm" }: { pull: Pull; size?: "sm"
   }
   return (
     <span
-      className={`inline-flex min-w-0 items-center gap-2 ${size === "sm" ? "text-xs" : "text-sm"} text-muted-foreground`}
+      className={`inline-flex min-w-0 items-center gap-2 ${size === "sm" ? "text-xs" : "text-[13px] leading-[18px]"} text-muted-foreground`}
       data-check-state={state}
     >
       <CheckState state={state} />
@@ -60,7 +60,7 @@ export function PullChecksDetails({ pull, error = "" }: { pull: Pull; error?: st
     <section aria-label="Checks" data-pull-checks>
       {stale && (
         <div
-          className="mb-6 space-y-2 rounded-lg border border-border px-3 py-3 text-sm text-muted-foreground"
+          className="mb-5 space-y-1.5 rounded-lg border border-border px-3 py-2.5 text-[13px] leading-5 text-muted-foreground"
           role="status"
         >
           <p>{warning || "Saved checks may be out of date."}</p>
@@ -86,7 +86,7 @@ export function PullChecksDetails({ pull, error = "" }: { pull: Pull; error?: st
         </div>
       )}
       <details open className="group">
-        <summary className="mb-3 flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-sm text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring">
+        <summary className="mb-2 flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-sm text-[13px] text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring">
           Checks{" "}
           <ChevronDownIcon
             className="size-3 rotate-[-90deg] group-open:rotate-0"
@@ -94,7 +94,7 @@ export function PullChecksDetails({ pull, error = "" }: { pull: Pull; error?: st
           />
         </summary>
         {(checks?.items.length ?? 0) === 0 ? (
-          <p className="py-2 text-sm text-muted-foreground">
+          <p className="py-2 text-[13px] text-muted-foreground">
             {(checks?.checkedAt ?? "") === ""
               ? "Checks unavailable."
               : "No checks reported for this revision."}
@@ -118,7 +118,8 @@ export function PullChecksDetails({ pull, error = "" }: { pull: Pull; error?: st
                   </span>
                 </>
               );
-              const rowClass = "flex min-w-0 items-center gap-3 rounded-md py-2.5 text-sm";
+              const rowClass =
+                "flex min-w-0 items-center gap-2.5 rounded-md py-2 text-[13px] leading-[18px]";
               return (
                 <li key={item.key ?? `${item.name}-${item.url ?? ""}`}>
                   {(item.url ?? "") === "" ? (

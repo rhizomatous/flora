@@ -29,5 +29,5 @@ export function pullAppearance(pull: Pull, now = Date.now()) {
   if ((pull.checks?.sha ?? "") !== "" && pull.checks?.sha !== pull.headSHA) {
     checkLabel = `Previous head: ${checks.label}`;
   }
-  return { status, label, tone, color: pullTones[tone], description: `${label} · ${checkLabel}` };
+  return { status, label, tone, color: pullTones[tone], description: `${label}: ${checkLabel}` };
 }

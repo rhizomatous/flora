@@ -29,7 +29,7 @@ export function pullChecksSummary(pull: Pull, now = Date.now()) {
       unavailable > 0 && `${unavailable} unavailable`,
     ]
       .filter(Boolean)
-      .join(" · ");
+      .join(", ");
     state = "neutral";
     if (passed > 0) state = "success";
     if (unavailable > 0) state = "unavailable";
