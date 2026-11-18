@@ -442,6 +442,21 @@ func (s *Store) Chat(ctx context.Context, chatID string) (Chat, error) {
 // Paths creates no runtime or container. Only the caller chooses which one of
 // these directories to mount. Never mount the storage root into an agent.
 func (s *Store) Paths(ctx context.Context, chatID string) (Paths, error) {
+	p, err := s.SavedPaths(ctx, chatID)
+	if err != nil {
+		return Paths{}, err
+	}
+	for _, dir := range []string{p.Workspace, p.RuntimeState, p.Logs, p.Artifacts} {
+		if err := privateDir(dir); err != nil {
+			return Paths{}, err
+		}
+	}
+	return p, nil
+}
+
+// SavedPaths returns a chat's storage locations without recreating missing
+// directories. Read-only callers can distinguish lost storage from an empty folder.
+func (s *Store) SavedPaths(ctx context.Context, chatID string) (Paths, error) {
 	if _, err := s.Chat(ctx, chatID); err != nil {
 		return Paths{}, err
 	}
@@ -450,11 +465,6 @@ func (s *Store) Paths(ctx context.Context, chatID string) (Paths, error) {
 		return Paths{}, ErrInvalid
 	}
 	p := Paths{filepath.Join(s.root, "workspaces", chatID), filepath.Join(s.root, "runtime-state", chatID), filepath.Join(s.root, "logs", chatID), filepath.Join(s.root, "artifacts", chatID)}
-	for _, dir := range []string{p.Workspace, p.RuntimeState, p.Logs, p.Artifacts} {
-		if err := privateDir(dir); err != nil {
-			return Paths{}, err
-		}
-	}
 	return p, nil
 }
 

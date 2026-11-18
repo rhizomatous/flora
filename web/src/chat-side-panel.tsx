@@ -8,6 +8,7 @@ import {
   ListIcon,
   GitBranchIcon,
   XIcon,
+  FilesIcon,
 } from "@flora/florets";
 
 import { Changes } from "./changes";
@@ -18,6 +19,7 @@ import type { PullSummary } from "./pull-schemas";
 import { SubagentConversation } from "./subagent-conversation";
 import { SubagentPaneContext, subagentLabel, useSubagents } from "./subagent-state";
 import { SubagentList } from "./subagents";
+import { WorkspaceFiles } from "./workspace-files";
 
 export function ChatSidePanel({
   chatID,
@@ -88,6 +90,35 @@ export function ChatSidePanel({
                   </Button>
                 </div>
               )}
+              {state.filesOpen && (
+                <div className="chat-diff-tab" data-active={view === "files" || undefined}>
+                  <TabsTrigger
+                    value="files"
+                    variant="control"
+                    render={
+                      <Button variant="ghost" size="compact" className="chat-diff-tab-trigger" />
+                    }
+                  >
+                    <FilesIcon />
+                    <span className="florets-control-label">Machine files</span>
+                  </TabsTrigger>
+                  <Button
+                    variant="ghost"
+                    size="icon-compact"
+                    className="chat-diff-tab-close"
+                    aria-label="Close Machine files"
+                    onClick={(event) => {
+                      event.currentTarget
+                        .closest("aside")
+                        ?.querySelector<HTMLButtonElement>('[role="tab"]')
+                        ?.focus();
+                      update({ filesOpen: false, view: view === "files" ? "overview" : view });
+                    }}
+                  >
+                    <XIcon />
+                  </Button>
+                </div>
+              )}
               {tabs.map((agent) => (
                 <div
                   key={agent.id}
@@ -125,6 +156,11 @@ export function ChatSidePanel({
               ))}
             </TabsList>
             <ChatViewMenu
+              chatID={chatID}
+              onFilesOpen={() => {
+                update({ open: true, filesOpen: true, view: "files" });
+              }}
+              filesOpen={view === "files"}
               label="Side panel views"
               diffsOpen={view === "diffs"}
               onDiffsChange={(open) => {
@@ -166,6 +202,15 @@ export function ChatSidePanel({
               className="chat-view-panel min-h-0 min-w-0 flex-1"
             >
               <Changes chatID={chatID} onExpired={onExpired} />
+            </TabsContent>
+          )}
+          {state.filesOpen && (
+            <TabsContent
+              value="files"
+              keepMounted
+              className="chat-view-panel min-h-0 min-w-0 flex-1"
+            >
+              <WorkspaceFiles chatID={chatID} active={view === "files"} onExpired={onExpired} />
             </TabsContent>
           )}
           {tabs.map((agent) => (
