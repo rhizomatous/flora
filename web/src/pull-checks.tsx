@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
-
 import { CheckIcon, XIcon, ClockIcon, CircleDotIcon, ChevronDownIcon } from "@flora/florets";
 
 import { pullChecksSummary } from "./pull-checks-summary";
 import type { Pull } from "./pull-schemas";
+import { useChecksNow } from "./use-checks-now";
 
 const tones: Record<string, string> = {
   success: "text-emerald-700 dark:text-emerald-400",
@@ -23,15 +22,7 @@ function CheckState({ state }: { state: string }) {
   );
 }
 export function PullChecksLabel({ pull }: { pull: Pull }) {
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNow(Date.now());
-    }, 30_000);
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, []);
+  const now = useChecksNow();
   const { label, state, stale } = pullChecksSummary(pull, now);
   let prefix = "";
   if (stale && (pull.checks?.checkedAt ?? "") !== "") {

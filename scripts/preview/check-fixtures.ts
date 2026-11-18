@@ -1,15 +1,16 @@
 import type { Pull } from "../../web/src/pull-schemas.ts";
 
 /** Simulated GitHub responses for the isolated chat preview. */
-export function previewPullChecks(pull: Pull): Pull {
+export function previewPullChecks(pull: Pull, mode = "saved"): Pull {
   const savedAt = new Date().toISOString();
   const headSHA = "b7e29d4".padEnd(40, "0");
-  const previous = pull.number === 18;
+  const previous = pull.number === 18 || mode === "stale";
   const pending = pull.draft;
   const failed = pull.number === 19;
   let browserState = "success";
   if (pending) browserState = "pending";
   if (failed) browserState = "failure";
+  if (mode !== "saved" && mode !== "stale") browserState = mode;
   return {
     ...pull,
     headSHA,
