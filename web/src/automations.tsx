@@ -45,6 +45,7 @@ import {
   type Automation,
   type AutomationDetail,
 } from "./automation-schemas";
+import { ModelControls } from "./model-controls";
 import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
 import { errorMessage, isExpired, request } from "./request";
 
@@ -228,19 +229,21 @@ function AutomationForm({
     if (topbar) heading.current?.focus();
   }, [topbar]);
   const { frequency, days, time, timeZone } = value;
-  const dirty = (
-    [
-      "name",
-      "description",
-      "instructions",
-      "projectID",
-      "mode",
-      "frequency",
-      "days",
-      "time",
-      "timeZone",
-    ] as const
-  ).some((key) => JSON.stringify(value[key]) !== JSON.stringify(initial[key]));
+  const dirty =
+    (
+      [
+        "name",
+        "description",
+        "instructions",
+        "projectID",
+        "mode",
+        "frequency",
+        "days",
+        "time",
+        "timeZone",
+      ] as const
+    ).some((key) => JSON.stringify(value[key]) !== JSON.stringify(initial[key])) ||
+    JSON.stringify(value.execution ?? null) !== JSON.stringify(initial.execution ?? null);
   let runLabel = dirty ? "Save and run" : "Run now";
   if (pending === "run") runLabel = "Starting…";
   const saveLabel = initial.id ? "Save" : "Create automation";
@@ -423,17 +426,37 @@ function AutomationForm({
                   What Flora should do each time this automation runs
                 </p>
               </SectionHeader>
-              <Textarea
-                id="automation-instructions"
-                aria-describedby="instructions-help"
-                className="min-h-32 resize-none"
-                value={value.instructions}
-                onChange={(e) => {
-                  change("instructions", e.target.value);
-                }}
-                required
-                placeholder="Check for outdated dependencies. Update safe minor versions, run tests, and open a draft PR if anything changes."
-              />
+              <Card variant="flush">
+                <Textarea
+                  id="automation-instructions"
+                  aria-describedby="instructions-help"
+                  className="min-h-32 resize-none border-0 bg-transparent"
+                  value={value.instructions}
+                  onChange={(e) => {
+                    change("instructions", e.target.value);
+                  }}
+                  required
+                  placeholder="Check for outdated dependencies. Update safe minor versions, run tests, and open a draft PR if anything changes."
+                />
+                <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
+                  <ModelControls
+                    scope={
+                      value.mode === "same" && initial.chatID
+                        ? `chat:${initial.chatID}`
+                        : "automation"
+                    }
+                    disabled={busy}
+                    automation={{
+                      value: value.execution ?? null,
+                      inheritedLabel:
+                        value.mode === "same" ? "Chat's current model" : "Default model",
+                      onChange: (execution) => {
+                        change("execution", execution);
+                      },
+                    }}
+                  />
+                </div>
+              </Card>
             </Section>
             <Card variant="flush" className="divide-y">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3">

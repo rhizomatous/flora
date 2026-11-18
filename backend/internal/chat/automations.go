@@ -93,7 +93,7 @@ func (s *Service) StartAutomation(ctx context.Context, id, requestID string, at 
 	ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
 	defer cancel()
 	chatID := a.ChatID
-	// Standing chats retain their last accepted model and reasoning selection.
+	// Without an override, standing chats retain their last accepted selection.
 	if a.Mode == "same" && chatID != "" {
 		c, readErr := s.Store.Chat(ctx, chatID)
 		if readErr != nil {
@@ -104,13 +104,13 @@ func (s *Service) StartAutomation(ctx context.Context, id, requestID string, at 
 			r.ChatID = chatID
 			return r, s.Store.SetAutomationRun(ctx, r.ID, r.Status, r.Reason, chatID)
 		} else {
-			_, err = s.Submit(ctx, chatID, r.ID, a.Instructions)
+			_, err = s.SubmitWithExecution(ctx, chatID, r.ID, a.Instructions, a.Execution)
 		}
 	} else {
 		if s.provisioner == nil {
 			err = errors.New("chat runtime is not configured")
 		} else {
-			// Each new chat snapshots the installation default model.
+			// New chats use the installation default unless the automation overrides it.
 			image, harness := s.provisioner.Identity()
 			var c storage.Chat
 			c, err = s.Store.CreateChatRequest(ctx, a.ProjectID, a.Name, image, harness, r.ID, a.Instructions)
@@ -119,7 +119,7 @@ func (s *Service) StartAutomation(ctx context.Context, id, requestID string, at 
 				err = s.Store.BindAutomationChat(ctx, a, chatID)
 			}
 			if err == nil {
-				_, err = s.Submit(ctx, chatID, r.ID, a.Instructions)
+				_, err = s.SubmitWithExecution(ctx, chatID, r.ID, a.Instructions, a.Execution)
 			}
 		}
 	}
@@ -149,4 +149,13 @@ func (s *Service) StartAutomation(ctx context.Context, id, requestID string, at 
 		}
 	}
 	return r, storage.ErrNotFound
+}
+
+// ValidateAutomationExecution checks a saved override against available models and reasoning variants.
+// Runs validate again at admission so unavailable choices cannot silently fall back.
+func (s *Service) ValidateAutomationExecution(ctx context.Context, selected *storage.Execution, chatIDs ...string) error {
+	if selected == nil {
+		return nil
+	}
+	return s.validateExecution(ctx, *selected, nil, chatIDs...)
 }

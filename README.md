@@ -71,8 +71,9 @@ New-chat discovery uses a short-lived instance of the pinned image without a
 checkout or setup script, and caches its metadata. Running chats use their own
 runtime. Discovery creates no sessions and requests no inference. A selection
 applies when the next message is accepted, and cannot change an active turn. Chats
-retain their last accepted selection. New-chat automations use the installation
-default; same-chat automations retain that chat's selection.
+retain their last accepted selection. Automations can save a model and reasoning
+override in their Instructions panel. Without an override, new-chat automations
+use the installation default and same-chat automations retain that chat's selection.
 
 HTTP responses expose non-secret settings and whether each key is saved, never key values.
 Credentials are stored in the private SQLite database, not encrypted separately.
