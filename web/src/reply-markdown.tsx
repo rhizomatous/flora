@@ -38,6 +38,7 @@ export function ReplyMarkdown({ children }: { children: string }) {
       {pulls.length > 0 && (
         <Card size="sm" className="mt-3 rounded-lg p-2" aria-label="Pull request details">
           <PullList
+            checks="none"
             summary={{
               items: pulls,
               error: summary?.error ?? "",

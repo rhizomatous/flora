@@ -160,6 +160,14 @@ export function chatAt(scenario: (typeof demoScenarios)[number], frame: Frame, f
 /** The dev server owns only in-memory playback. Every API request is handled here, never proxied to a real installation. */
 export function chatPreview(): Plugin {
   const scenarios = structuredClone(demoScenarios);
+  const checkModes = new Map<string, string>();
+  function currentChat(scenario: (typeof demoScenarios)[number], frame: Frame, finished: boolean) {
+    const chat = chatAt(scenario, frame, finished);
+    chat.pulls.items = chat.pulls.items.map((pull) =>
+      previewPullChecks(pull, checkModes.get(scenario.id)),
+    );
+    return chat;
+  }
   const playback = new Map(
     scenarios.map((scenario) => [
       scenario.id,
@@ -238,6 +246,20 @@ export function chatPreview(): Plugin {
   });
   const handler = (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     const url = new URL(req.url ?? "/", "http://localhost");
+    if (url.pathname === "/__preview/checks" && (req.method === "POST" || req.method === "GET")) {
+      const chat = url.searchParams.get("chat") ?? "";
+      const state = url.searchParams.get("state") ?? "saved";
+      if (
+        !scenarios.some((scenario) => scenario.id === chat) ||
+        !["saved", "pending", "success", "failure", "stale"].includes(state)
+      ) {
+        json(res, { error: "Unknown preview chat or check state." }, 400);
+        return;
+      }
+      if (req.method === "POST") checkModes.set(chat, state);
+      json(res, { chat, state: checkModes.get(chat) ?? "saved" });
+      return;
+    }
     if (url.pathname === "/__preview/control" && req.method === "POST") {
       const action = url.searchParams.get("action");
       const id = url.searchParams.get("chat") ?? "working";
@@ -327,7 +349,7 @@ export function chatPreview(): Plugin {
         chats: scenarios.map((s) => {
           const i = index(s.id);
           const state = present(playback.get(s.id));
-          return chatAt(s, present(state.frames[i]), i === s.frames.length - 1);
+          return currentChat(s, present(state.frames[i]), i === s.frames.length - 1);
         }),
         completions: [],
         cursor: 0,
@@ -347,7 +369,7 @@ export function chatPreview(): Plugin {
     const endpoint = match?.[2];
     if (endpoint === undefined) {
       json(res, {
-        chat: chatAt(scenario, frame, i === scenario.frames.length - 1),
+        chat: currentChat(scenario, frame, i === scenario.frames.length - 1),
         messages: messages(frame, id),
         subagents: subagentSnapshots(frame).map(({ agent }) => agent),
         continuationBlockedReason: "",

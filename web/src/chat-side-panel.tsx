@@ -155,7 +155,7 @@ export function ChatSidePanel({
                   className="overview-section-caret size-3 text-muted-foreground opacity-60"
                 />
               </summary>
-              <PullList summary={pulls} />
+              <PullList summary={pulls} checks="details" />
             </details>
             <SubagentList />
           </TabsContent>

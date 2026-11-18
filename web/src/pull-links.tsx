@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 import {
   HoverCard,
@@ -10,34 +10,34 @@ import {
   GitPullRequestIcon,
 } from "@flora/florets";
 
-import { pullStatus } from "./pull";
-import { PullChecksDetails } from "./pull-checks";
+import { pullAppearance } from "./pull-appearance";
+import { PullChecksDetails, PullChecksLabel } from "./pull-checks";
 import type { Pull, PullSummary } from "./pull-schemas";
+import { useChecksNow } from "./use-checks-now";
 
-const appearances = {
-  open: {
-    label: "Open",
-    Icon: GitPullRequestIcon,
-    color: "text-emerald-700 dark:text-emerald-400",
-  },
-  draft: { label: "Draft", Icon: GitPullRequestDraftIcon, color: "text-muted-foreground" },
-  merged: { label: "Merged", Icon: GitMergeIcon, color: "text-violet-700 dark:text-violet-400" },
-  closed: {
-    label: "Closed",
-    Icon: GitPullRequestClosedIcon,
-    color: "text-red-700 dark:text-red-400",
-  },
-  unknown: { label: "Unknown", Icon: GitPullRequestIcon, color: "text-muted-foreground" },
+const icons = {
+  open: GitPullRequestIcon,
+  draft: GitPullRequestDraftIcon,
+  merged: GitMergeIcon,
+  closed: GitPullRequestClosedIcon,
+  unknown: GitPullRequestIcon,
 };
 
-function appearance(pull: { state: string; draft: boolean }) {
-  return appearances[pullStatus(pull)];
+function appearance(pull: Pull, now: number) {
+  const result = pullAppearance(pull, now);
+  return { ...result, Icon: icons[result.status] };
 }
 
 export function PullStatusIcon({ pull }: { pull: Pull }) {
-  const { Icon, label, color } = appearance(pull);
+  const { Icon, color, description, tone } = appearance(pull, useChecksNow());
   return (
-    <span role="img" aria-label={label} title={label} className={color}>
+    <span
+      role="img"
+      aria-label={description}
+      title={description}
+      className={color}
+      data-pr-tone={tone}
+    >
       <Icon className="size-4 shrink-0" aria-hidden="true" />
     </span>
   );
@@ -62,28 +62,56 @@ export function PullLineCounts({ pull }: { pull: Pull }) {
 }
 
 export function PullCount({ pulls }: { pulls: Pull[] }) {
+  const id = useId();
+  const now = useChecksNow();
+  const groups = new Map<string, Pull[]>();
+  for (const pull of pulls) {
+    const { status, tone } = appearance(pull, now);
+    const key = `${status}:${tone}`;
+    groups.set(key, [...(groups.get(key) ?? []), pull]);
+  }
   return (
     <span className="inline-flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-      {Object.values(appearances).map(({ label, Icon, color }) => {
-        const count = pulls.filter((pull) => appearance(pull).label === label).length;
-        return count > 0 ? (
-          <span
-            key={label}
-            role="img"
-            className={`inline-flex items-center gap-1 text-xs ${color}`}
-            aria-label={`${count} ${label.toLowerCase()} pull ${count === 1 ? "request" : "requests"}`}
-            title={`${count} ${label.toLowerCase()} pull ${count === 1 ? "request" : "requests"}`}
-          >
-            <Icon className="size-3.5 shrink-0" aria-hidden="true" />
-            <span aria-hidden="true">{count}</span>
+      {[...groups].map(([key, group]) => {
+        const [first] = group;
+        if (first === undefined) return null;
+        const { label, Icon, color, tone } = appearance(first, now);
+        const count = group.length;
+        const description = group
+          .map((pull) => `#${pull.number}: ${appearance(pull, now).description}`)
+          .join("; ");
+        return (
+          <span key={key} className="contents">
+            <span
+              role="img"
+              className={`inline-flex items-center gap-1 text-xs ${color}`}
+              data-pr-tone={tone}
+              aria-label={`${count} ${label.toLowerCase()} pull ${count === 1 ? "request" : "requests"}`}
+              aria-describedby={`${id}-${key}`}
+              title={description}
+            >
+              <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+              <span aria-hidden="true">{count}</span>
+            </span>
+            <span className="sr-only" id={`${id}-${key}`}>
+              {description}
+            </span>
           </span>
-        ) : null;
+        );
       })}
     </span>
   );
 }
 
-export function PullList({ summary }: { summary: PullSummary | undefined }) {
+export function PullList({
+  summary,
+  checks = "summary",
+}: {
+  summary: PullSummary | undefined;
+  checks?: "none" | "summary" | "details";
+}) {
+  const id = useId();
+  const now = useChecksNow();
   const pulls = summary?.items ?? [];
   const error = summary?.error ?? "";
   let emptyMessage = "No linked pull requests yet.";
@@ -94,18 +122,20 @@ export function PullList({ summary }: { summary: PullSummary | undefined }) {
       {pulls.length > 0 ? (
         <ul aria-label="Linked pull requests" className="space-y-2">
           {pulls.map((pull) => {
-            const { Icon, color, label } = appearance(pull);
+            const { Icon, color, label, description, tone } = appearance(pull, now);
             const repository = pull.repository ?? pull.url.split("/").slice(3, 5).join("/");
             return (
               <li key={pull.url}>
                 <a
                   href={pull.url}
                   aria-label={`${repository} #${pull.number} ${label}${(pull.title ?? "") === "" ? "" : `: ${pull.title}`}${pull.additions !== undefined && pull.deletions !== undefined ? `, ${pull.additions} additions, ${pull.deletions} deletions` : ""}`}
-                  title={`${repository} #${pull.number} · ${label}${(pull.title ?? "") === "" ? "" : ` · ${pull.title}`}`}
+                  aria-describedby={`${id}-${pull.url}`}
+                  title={`${repository} #${pull.number} · ${description}${(pull.title ?? "") === "" ? "" : ` · ${pull.title}`}`}
                   target="_blank"
                   rel="noreferrer"
                   className="flex min-w-0 items-center gap-2 rounded-md p-2 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
                   data-pr-state={label.toLowerCase()}
+                  data-pr-tone={tone}
                 >
                   <Icon className={`size-4 shrink-0 ${color}`} aria-hidden="true" />
                   <span className="shrink-0 font-medium">#{pull.number}</span>
@@ -114,9 +144,18 @@ export function PullList({ summary }: { summary: PullSummary | undefined }) {
                   </span>
                   <PullLineCounts pull={pull} />
                 </a>
-                <div className="px-2 pb-1">
-                  <PullChecksDetails pull={pull} />
-                </div>
+                <span className="sr-only" id={`${id}-${pull.url}`}>
+                  {description}
+                </span>
+                {checks !== "none" && (
+                  <div className="px-2 pb-1">
+                    {checks === "details" ? (
+                      <PullChecksDetails pull={pull} />
+                    ) : (
+                      <PullChecksLabel pull={pull} />
+                    )}
+                  </div>
+                )}
               </li>
             );
           })}
@@ -142,10 +181,14 @@ export function InlinePullLink({
   href: string;
   children: ReactNode;
 }) {
-  const { Icon, color, label } = appearance(pull);
+  const id = useId();
+  const { Icon, color, label, description, tone } = appearance(pull, useChecksNow());
   const repository = pull.repository ?? pull.url.split("/").slice(3, 5).join("/");
   return (
     <HoverCard>
+      <span className="sr-only" id={id}>
+        {description}
+      </span>
       <HoverCardTrigger
         render={
           <a
@@ -154,8 +197,10 @@ export function InlinePullLink({
             rel="noreferrer"
             className="inline-flex max-w-full cursor-pointer items-baseline gap-1 rounded-sm align-baseline font-medium text-foreground underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             aria-label={`${repository} #${pull.number} ${label}`}
-            title={`${repository} #${pull.number} · ${label}${(pull.title ?? "") === "" ? "" : ` · ${pull.title}`}`}
+            aria-describedby={id}
+            title={`${repository} #${pull.number} · ${description}${(pull.title ?? "") === "" ? "" : ` · ${pull.title}`}`}
             data-inline-pr={label.toLowerCase()}
+            data-pr-tone={tone}
           />
         }
       >
@@ -168,7 +213,7 @@ export function InlinePullLink({
         </p>
         <p className="mt-1 mb-2 text-sm">{pull.title}</p>
         <PullLineCounts pull={pull} />
-        <PullChecksDetails pull={pull} />
+        <PullChecksLabel pull={pull} />
       </HoverCardContent>
     </HoverCard>
   );
