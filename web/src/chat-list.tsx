@@ -97,13 +97,7 @@ export function ChatList({
       onQueryChange={setQuery}
       actions={
         <>
-          <MarkChatsRead chats={list} visible={visible}>
-            {(open, disabled, trigger) => (
-              <Button ref={trigger} variant="ghost" size="sm" disabled={disabled} onClick={open}>
-                Mark all as read
-              </Button>
-            )}
-          </MarkChatsRead>
+          <MarkChatsRead chats={list === undefined ? undefined : visible} />
           <Button
             variant="ghost"
             size="icon-sm"

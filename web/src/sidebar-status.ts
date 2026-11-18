@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import type { Chat } from "./chat-schemas";
-import { request } from "./request";
+import { errorMessage, request } from "./request";
 
 export const readEvent = "flora:chats-read";
 export const viewedSchema = z.object({
@@ -78,4 +79,39 @@ export function useMarkViewed(chat: Chat | undefined) {
     };
   }, [id, revision, saved]);
   return error !== undefined && error.chatID === id && saved < (revision ?? 0) ? error.message : "";
+}
+
+/** The caller supplies the current view, including search, project, and archive filters. */
+export function useMarkChatsRead(chats: Chat[] | undefined) {
+  const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const unread = chats?.filter((chat) => !isChatSeen(chat)) ?? [];
+  async function save(observed: Chat[]) {
+    if (pending.current || observed.length === 0) return;
+    pending.current = true;
+    setBusy(true);
+    try {
+      await markChatsRead(observed);
+    } catch (cause) {
+      toast.error(errorMessage(cause, "Could not save read state. Try again."), {
+        toasterId: "chat-organization",
+        action: {
+          label: "Retry",
+          onClick: () => {
+            void save(observed);
+          },
+        },
+      });
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
+  }
+  return {
+    mark: () => {
+      void save(unread);
+    },
+    disabled: busy || unread.length === 0,
+    busy,
+  };
 }
