@@ -66,7 +66,7 @@ test("discovery failure leaves the default usable and keeps the draft", async ({
   await page.getByText("Saved response 1", { exact: true }).waitFor();
 });
 
-test("search matches model IDs and providers, and grouping preserves the query", async ({ page }) => {
+test("search matches model IDs and providers in an always-grouped picker", async ({ page }) => {
   await logIn(page);
   await page.goto("/#chats/new");
   await page.getByRole("button", { name: /^Model:/ }).click();
@@ -82,17 +82,13 @@ test("search matches model IDs and providers, and grouping preserves the query",
   await expect(page.getByRole("option")).toHaveCount(1);
   await expect(sonnet).toContainText("$3 / $15");
   await expect(sonnet).toHaveAttribute("aria-description", "Input $3, output $15 per million tokens, USD.");
-  await expect(page.getByText("Input / output · USD per 1M tokens", { exact: true })).toBeVisible();
-  const grouping = page.getByRole("button", { name: "Group models by provider", exact: true });
-  await grouping.click();
-  await expect(grouping).toHaveAttribute("aria-pressed", "false");
-  await expect(search).toBeFocused();
-  await expect(search).toHaveValue("claude-sonnet-4-6");
-  await expect(sonnet).toBeVisible();
+  await expect(page.getByText("Input / output · USD per 1M tokens", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Group models by provider", exact: true })).toHaveCount(0);
+  await expect(page.getByText("Anthropic", { exact: true })).toBeVisible();
   await search.press("Escape");
   await expect(search).toHaveCount(0);
   await page.getByRole("button", { name: /^Model:/ }).click();
-  await expect(grouping).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByText("Anthropic", { exact: true })).toBeVisible();
   await expect(search).toHaveValue("");
   await search.fill("missing model");
   await expect(page.getByText("No models found.", { exact: true })).toBeVisible();
