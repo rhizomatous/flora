@@ -9,7 +9,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  FlowerIcon,
   Spinner,
   Popover,
   PopoverTrigger,
@@ -23,6 +22,7 @@ import {
 
 import type { AttachmentPolicy } from "./attachments";
 import { executionSchema, type Execution } from "./chat-schemas";
+import { ModelIcon } from "./model-icon";
 import { errorMessage, request } from "./request";
 
 const modelOptionSchema = z.object({
@@ -127,7 +127,7 @@ export function ModelControls({
               aria-label={`Model: ${label}`}
               className="composer-model max-w-[min(220px,42vw)] min-w-0"
             >
-              <FlowerIcon />
+              <ModelIcon provider={effective?.provider} model={effective?.model} />
               <span className="florets-control-label truncate">{label}</span>
             </DropdownButton>
           }
@@ -161,6 +161,7 @@ export function ModelControls({
                       setModelOpen(false);
                     }}
                   >
+                    <ModelIcon provider={model.provider} model={model.id} />
                     <span className="min-w-0 flex-1 truncate">{model.name}</span>
                     {effective?.model === model.id && <CheckIcon />}
                   </CommandItem>
