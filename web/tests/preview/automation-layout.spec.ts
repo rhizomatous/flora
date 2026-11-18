@@ -17,7 +17,7 @@ for (const width of [1440, 390]) {
       if (width >= 768) {
         await expect(main).toHaveCSS("border-top-left-radius", "14px");
         const border = await page
-          .getByRole("textbox", { name: "Name", exact: true })
+          .getByRole("textbox", { name: "Instructions", exact: true })
           .evaluate((element) => getComputedStyle(element).borderTopColor);
         expect(await main.evaluate((element) => getComputedStyle(element).boxShadow)).toContain(
           border,

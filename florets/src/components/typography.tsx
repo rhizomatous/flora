@@ -1,26 +1,17 @@
 import type { ComponentProps } from "react";
 
+import { headingStyles } from "../lib/typography";
 import { cn } from "../lib/utils";
 
-const headingLevels = {
-  1: { tag: "h1", className: "text-2xl leading-8 tracking-tight" },
-  2: { tag: "h2", className: "text-lg leading-7" },
-  3: { tag: "h3", className: "text-base leading-6" },
-  4: { tag: "h4", className: "text-sm leading-5" },
-  5: { tag: "h5", className: "text-sm leading-5" },
-  6: { tag: "h6", className: "text-xs leading-4" },
-} as const;
+const headingTags = { 1: "h1", 2: "h2", 3: "h3", 4: "h4", 5: "h5", 6: "h6" } as const;
 
-export type HeadingProps = ComponentProps<"h1"> & { level: keyof typeof headingLevels };
+export type HeadingProps = ComponentProps<"h1"> & { level: keyof typeof headingTags };
 
 /** Renders the requested heading level with its default type scale and no outer spacing. */
 export function Heading({ level, className, children, ...props }: HeadingProps) {
-  const { tag: Tag, className: typography } = headingLevels[level];
+  const Tag = headingTags[level];
   return (
-    <Tag
-      className={cn("font-semibold text-foreground outline-none", typography, className)}
-      {...props}
-    >
+    <Tag className={cn(headingStyles({ level }), "outline-none", className)} {...props}>
       {children}
     </Tag>
   );
