@@ -142,3 +142,5 @@ export {
 export { Diff } from "./components/diff";
 
 export { FileTypeIcon } from "./components/file-type-icon";
+
+export { MadlibPicker, MadlibSelect } from "./components/madlib-picker";

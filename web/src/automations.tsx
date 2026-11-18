@@ -14,9 +14,14 @@ import {
   Popover,
   PopoverTrigger,
   PopoverContent,
-  ChevronDownIcon,
+  MadlibPicker,
+  MadlibSelect,
   FieldLabel,
   EditableText,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   Heading,
   Input,
   Link,
@@ -81,6 +86,58 @@ function blank(projectID: string): Automation {
   };
 }
 
+function WeekdayPicker({
+  days,
+  disabled,
+  onChange,
+}: {
+  days: number[];
+  disabled: boolean;
+  onChange: (days: number[]) => void;
+}) {
+  const selected = weekdays.filter((_, index) => days.includes(index));
+  let summary = `${selected.length} days`;
+  if (selected.length === 0) summary = "Choose days";
+  else if (selected.length === 7) summary = "Every day";
+  else if (selected.length === 1) summary = selected.join("");
+  else if (selected.length === 2) summary = selected.map((day) => day.slice(0, 3)).join(", ");
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <MadlibPicker
+            prefix="on"
+            disabled={disabled}
+            aria-label="Days"
+            aria-description={selected.join(", ") || "No days selected"}
+            className="font-normal"
+          >
+            {summary}
+          </MadlibPicker>
+        }
+      />
+      <DropdownMenuContent className="min-w-40" aria-label="Days">
+        {weekdays.map((day, index) => (
+          <DropdownMenuCheckboxItem
+            key={day}
+            checked={days.includes(index)}
+            closeOnClick={false}
+            onCheckedChange={(checked) => {
+              onChange(
+                checked
+                  ? [...days, index].toSorted((a, b) => a - b)
+                  : days.filter((value) => value !== index),
+              );
+            }}
+          >
+            {day}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function TimeZonePicker({
   value,
   onChange,
@@ -96,17 +153,14 @@ function TimeZonePicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         render={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
+          <MadlibPicker
+            prefix="in"
             disabled={disabled}
             aria-label="Time zone"
             className="max-w-full min-w-0 justify-between font-normal"
           >
-            <span className="truncate">{value}</span>
-            <ChevronDownIcon />
-          </Button>
+            {value}
+          </MadlibPicker>
         }
       />
       <PopoverContent
@@ -238,10 +292,6 @@ function AutomationForm({
       runAfter,
     );
   }
-  let nextRunLabel = preview
-    ? `Next run: ${stamp(preview, timeZone)} · ${timeZone}`
-    : "Checking schedule…";
-  if (initial.id && !initial.enabled) nextRunLabel = "Inactive";
   return (
     <section className="mx-auto w-full max-w-3xl min-w-0 [&_input]:scroll-mt-20 [&_textarea]:scroll-mt-20">
       {topbar &&
@@ -457,8 +507,7 @@ function AutomationForm({
                   aria-describedby="schedule-help"
                   className="flex flex-wrap items-center gap-2"
                 >
-                  <NativeSelect
-                    size="sm"
+                  <MadlibSelect
                     className="w-auto"
                     aria-label="Schedule"
                     value={frequency}
@@ -472,13 +521,22 @@ function AutomationForm({
                     <option value="daily">Daily</option>
                     <option value="weekdays">Weekdays</option>
                     <option value="weekly">Weekly</option>
-                  </NativeSelect>
+                  </MadlibSelect>
+                  {frequency === "weekly" && (
+                    <WeekdayPicker
+                      days={days ?? []}
+                      disabled={busy}
+                      onChange={(selected) => {
+                        change("days", selected);
+                      }}
+                    />
+                  )}
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground" aria-hidden="true">
                       at
                     </span>
                     <Input
-                      className="h-7 w-34"
+                      className="field-sizing-content h-7 w-auto text-sm [&::-webkit-calendar-picker-indicator]:ml-1 [&::-webkit-calendar-picker-indicator]:p-0 [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                       aria-label="Time"
                       type="time"
                       value={time}
@@ -489,9 +547,6 @@ function AutomationForm({
                     />
                   </div>
                   <div className="flex max-w-full min-w-0 items-center gap-2">
-                    <span className="text-sm text-muted-foreground" aria-hidden="true">
-                      in
-                    </span>
                     <TimeZonePicker
                       value={timeZone}
                       disabled={busy}
@@ -501,39 +556,11 @@ function AutomationForm({
                     />
                   </div>
                 </div>
-                {frequency === "weekly" && (
-                  <fieldset className="flex flex-wrap items-center gap-2">
-                    <legend className="sr-only">Days</legend>
-                    <span className="text-sm text-muted-foreground" aria-hidden="true">
-                      On
-                    </span>
-                    <div className="flex flex-wrap gap-1">
-                      {weekdays.map((day, index) => (
-                        <Button
-                          type="button"
-                          key={day}
-                          size="sm"
-                          variant={(days ?? []).includes(index) ? "default" : "outline"}
-                          aria-label={day}
-                          aria-pressed={(days ?? []).includes(index)}
-                          onClick={() => {
-                            change(
-                              "days",
-                              (days ?? []).includes(index)
-                                ? (days ?? []).filter((d) => d !== index)
-                                : [...(days ?? []), index].toSorted((a, b) => a - b),
-                            );
-                          }}
-                        >
-                          {day.slice(0, 3)}
-                        </Button>
-                      ))}
-                    </div>
-                  </fieldset>
+                {previewError && (
+                  <p className="text-xs text-muted-foreground" role="alert">
+                    {previewError}
+                  </p>
                 )}
-                <div className="text-xs text-muted-foreground" aria-live="polite">
-                  {previewError ? <p>{previewError}</p> : <p>{nextRunLabel}</p>}
-                </div>
               </Card>
             </Section>
           </SectionStack>
