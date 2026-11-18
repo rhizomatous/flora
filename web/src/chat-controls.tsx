@@ -35,7 +35,7 @@ import { chatStatus } from "./chat-status";
 import { ContextUsagePopover } from "./context-usage";
 import { PullCount, PullList } from "./pull-links";
 import type { PullSummary } from "./pull-schemas";
-import { KeepAwakeItem, RuntimeMenu } from "./runtime-controls";
+import { KeepAwakeItem, RuntimeMenu, StopMachineItem } from "./runtime-controls";
 import { SubagentMenuItems } from "./subagents";
 
 /** Shows saved chat metadata and linked pull requests. */
@@ -168,7 +168,10 @@ export function ChatViewMenu({
           </Button>
         }
       />
-      <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-24px)]">
+      <DropdownMenuContent
+        align="start"
+        className={`${chatID === undefined ? "w-64" : "w-80"} max-w-[calc(100vw-24px)]`}
+      >
         <DropdownMenuItem
           onClick={() => {
             onDiffsChange(false);
@@ -304,6 +307,7 @@ export function ChatHeaderActions({
           <CopyIcon />
           {copyState}
         </DropdownMenuItem>
+        {chat && <StopMachineItem key={chat.ID} id={chat.ID} />}
         <DropdownMenuSeparator />
       </ChatOrganizationActions>
       {!sideOpen && <SidePanelToggle open={false} onClick={onSideToggle} />}
