@@ -1,50 +1,194 @@
-import { useEffect, useRef, useState } from "react";
-import { z } from "zod";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import {
   Button,
-  NativeSelect,
-  Item,
-  ItemContent,
-  ItemTitle,
-  ItemActions,
-  ListGroup,
+  Input,
+  CloudIcon,
   FolderIcon,
-  FilesIcon,
-  ChevronLeftIcon,
+  FileTypeIcon,
+  ChevronRightIcon,
+  SearchIcon,
   RefreshCwIcon,
-  ArrowDownIcon,
+  XIcon,
 } from "@flora/florets";
 
-import { useChatPanelState } from "./chat-panel-state";
-import { chatSchema } from "./chat-schemas";
-import { ListPage, ListFilters } from "./list-page";
-import { request, errorMessage, isExpired, RequestError } from "./request";
+import { useChatPanelState, workspaceFileView } from "./chat-panel-state";
 import { RuntimeMenu } from "./runtime-controls";
-import { useRuntime } from "./runtime-state";
+import {
+  listingSchema,
+  repositoriesSchema,
+  useWorkspaceResource,
+  workspaceURL,
+} from "./workspace-data";
+import { WorkspaceSearch } from "./workspace-search";
 
-const repositorySchema = z.object({ name: z.string(), role: z.string() });
-const repositoriesSchema = z.object({ repositories: z.array(repositorySchema) });
-const entrySchema = z.object({ name: z.string(), kind: z.string() });
-const listingSchema = z.object({
-  entries: z.array(entrySchema),
-  truncated: z.boolean(),
-  nextOffset: z.number(),
-});
-const previewSchema = z.object({
-  size: z.number(),
-  version: z.string(),
-  kind: z.string(),
-  text: z.string(),
-  truncated: z.boolean(),
-  downloadable: z.boolean(),
-});
-const size = (bytes: number) =>
-  bytes < 1024
-    ? `${bytes} B`
-    : `${(bytes / 1024).toLocaleString(undefined, { maximumFractionDigits: 1 })} KiB`;
+type TreeProps = {
+  chatID: string;
+  repository: string;
+  directory: string;
+  active: boolean;
+  revision: number;
+  onExpired: () => void;
+};
 
-/** Browses persisted workspace files. Only navigation is saved in panel state. */
+function DirectoryEntries({
+  chatID,
+  repository,
+  directory,
+  active,
+  revision,
+  onExpired,
+}: TreeProps) {
+  const [state, update] = useChatPanelState(chatID);
+  const [offset, setOffset] = useState(0);
+  const location = workspaceURL(chatID, { repository, path: directory }, { revision, offset });
+  const { data: listing, error } = useWorkspaceResource(listingSchema, location, {
+    active,
+    onExpired,
+  });
+  const visible = listing?.entries;
+  return (
+    <>
+      {error && (
+        <li role="alert" className="px-3 py-2 text-sm text-destructive">
+          {error}
+        </li>
+      )}
+      {!listing && !error && (
+        <li role="status" className="px-3 py-2 text-sm text-muted-foreground">
+          Loading files…
+        </li>
+      )}
+      {visible?.map((entry) => {
+        const path = directory === "." ? entry.name : `${directory}/${entry.name}`;
+        const file = { repository, path };
+        const key = workspaceFileView(file);
+        const expanded = state.workspaceExpanded.includes(key);
+        const folder = entry.kind === "directory";
+        const unsupported = entry.kind === "unsupported" || entry.kind === "symlink";
+        return (
+          <li key={entry.name} data-workspace-node>
+            <button
+              type="button"
+              className="workspace-tree-row"
+              aria-expanded={folder ? expanded : undefined}
+              disabled={unsupported}
+              title={path}
+              onClick={() => {
+                if (folder) {
+                  update({
+                    workspaceExpanded: expanded
+                      ? state.workspaceExpanded.filter((value) => value !== key)
+                      : [...state.workspaceExpanded, key],
+                  });
+                } else {
+                  update({
+                    workspaceTabs: state.workspaceTabs.some((tab) => workspaceFileView(tab) === key)
+                      ? state.workspaceTabs
+                      : [...state.workspaceTabs, file],
+                    mainView: key,
+                  });
+                }
+              }}
+            >
+              <span className="workspace-tree-caret">
+                {folder && <ChevronRightIcon className={expanded ? "rotate-90" : ""} />}
+              </span>
+              {folder ? (
+                <FolderIcon className="size-4 shrink-0 text-muted-foreground" />
+              ) : (
+                <FileTypeIcon path={entry.name} />
+              )}
+              <span className="min-w-0 truncate">{entry.name}</span>
+              {unsupported && (
+                <span className="ml-auto pl-2 text-xs text-muted-foreground">
+                  {entry.kind === "symlink" ? "Symlink" : "Unsupported"}
+                </span>
+              )}
+            </button>
+            {folder && expanded && (
+              <ul className="workspace-tree-children">
+                <DirectoryEntries
+                  chatID={chatID}
+                  repository={repository}
+                  directory={path}
+                  active={active}
+                  revision={revision}
+                  onExpired={onExpired}
+                />
+              </ul>
+            )}
+          </li>
+        );
+      })}
+      {listing?.entries.length === 0 && (
+        <li className="px-3 py-2 text-sm text-muted-foreground">This folder is empty.</li>
+      )}
+      {(offset > 0 || listing?.truncated === true) && (
+        <li className="flex items-center gap-2 px-5 py-2">
+          <Button
+            variant="ghost"
+            size="compact"
+            disabled={offset === 0}
+            onClick={() => {
+              setOffset(Math.max(0, offset - 500));
+            }}
+          >
+            Previous page
+          </Button>
+          <Button
+            variant="ghost"
+            size="compact"
+            disabled={listing?.truncated !== true}
+            onClick={() => {
+              if (listing) setOffset(listing.nextOffset);
+            }}
+          >
+            Next page
+          </Button>
+        </li>
+      )}
+    </>
+  );
+}
+
+/** Native disclosure buttons keep nested folders reachable without moving the canvas. */
+function treeKeys(event: KeyboardEvent<HTMLElement>) {
+  const { target } = event;
+  if (!(target instanceof HTMLButtonElement)) return;
+  const buttons = [
+    ...event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
+  ];
+  const index = buttons.indexOf(target);
+  let next: HTMLButtonElement | undefined;
+  if (event.key === "ArrowDown") next = buttons[index + 1];
+  if (event.key === "ArrowUp") next = buttons[index - 1];
+  if (event.key === "Home") next = buttons[0];
+  if (event.key === "End") next = buttons.at(-1);
+  if (event.key === "ArrowRight" && target.getAttribute("aria-expanded") === "false") {
+    event.preventDefault();
+    target.click();
+  }
+  if (event.key === "ArrowRight" && target.getAttribute("aria-expanded") === "true") {
+    next =
+      target.parentElement?.querySelector<HTMLButtonElement>(":scope > ul button:not(:disabled)") ??
+      undefined;
+  }
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    if (target.getAttribute("aria-expanded") === "true") target.click();
+    else {
+      next =
+        target.closest("ul")?.parentElement?.querySelector<HTMLButtonElement>(":scope > button") ??
+        undefined;
+    }
+  }
+  if (next) {
+    event.preventDefault();
+    next.focus();
+  }
+}
+
 export function WorkspaceFiles({
   chatID,
   active,
@@ -55,426 +199,153 @@ export function WorkspaceFiles({
   onExpired: () => void;
 }) {
   const [state, update] = useChatPanelState(chatID);
-  const {
-    fileRepository: repository,
-    fileDirectory: directory,
-    filePath: file,
-    fileOffset: offset,
-  } = state;
-  const [repositories, setRepositories] = useState<
-    z.infer<typeof repositoriesSchema>["repositories"]
-  >([]);
-  const [listingData, setListingData] = useState<{
-    location: string;
-    value: z.infer<typeof listingSchema>;
-  }>();
-  const [previewData, setPreviewData] = useState<{
-    location: string;
-    value: z.infer<typeof previewSchema>;
-  }>();
-  const [error, setError] = useState("");
-  const [repositoriesLoading, setRepositoriesLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("all");
   const [revision, setRevision] = useState(0);
-  const [downloading, setDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState("");
-  const heading = useRef<HTMLHeadingElement>(null);
-  const { runtime } = useRuntime(chatID, active);
-  const base = `chats/${encodeURIComponent(chatID)}/workspace`;
-  const repositoryURL = `${base}?refresh=${revision}`;
+  const input = useRef<HTMLInputElement>(null);
+  const url = `chats/${encodeURIComponent(chatID)}/workspace?revision=${revision}`;
+  const { data, error } = useWorkspaceResource(repositoriesSchema, url, { active, onExpired });
   useEffect(() => {
-    const controller = new AbortController();
-    async function load() {
-      try {
-        const value = await request(repositoriesSchema, repositoryURL, {
-          signal: controller.signal,
-        });
-        if (!controller.signal.aborted) setRepositories(value.repositories);
-      } catch (e) {
-        if (!controller.signal.aborted) {
-          setError(errorMessage(e, "Could not load repositories."));
-          if (isExpired(e)) onExpired();
-        }
-      } finally {
-        if (!controller.signal.aborted) setRepositoriesLoading(false);
+    if (!active) return;
+    function key(event: globalThis.KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        input.current?.focus();
       }
     }
-    void load();
+    document.addEventListener("keydown", key);
     return () => {
-      controller.abort();
+      document.removeEventListener("keydown", key);
     };
-  }, [repositoryURL, onExpired]);
-  const selectedRepository = repository === "" ? (repositories[0]?.name ?? "") : repository;
-  const requestLocation = `${base}?${new URLSearchParams({ repository: selectedRepository, path: file || directory, revision: String(revision), offset: String(offset) })}`;
-  const listing = listingData?.location === requestLocation ? listingData.value : undefined;
-  const preview = previewData?.location === requestLocation ? previewData.value : undefined;
-  useEffect(() => {
-    if (!selectedRepository || !active) return;
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      void load();
-    }, 0);
-    async function load() {
-      setError("");
-      setListingData(undefined);
-      setPreviewData(undefined);
-      setDownloadError("");
-      try {
-        if (file) {
-          const value = await request(previewSchema, `${requestLocation}&action=preview`, {
-            signal: controller.signal,
-          });
-          if (!controller.signal.aborted) setPreviewData({ location: requestLocation, value });
-        } else {
-          const value = await request(listingSchema, requestLocation, {
-            signal: controller.signal,
-          });
-          if (!controller.signal.aborted) setListingData({ location: requestLocation, value });
-        }
-      } catch (e) {
-        if (!controller.signal.aborted) {
-          setError(errorMessage(e, "Could not read workspace files."));
-          if (isExpired(e)) onExpired();
-        }
-      }
-    }
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [selectedRepository, file, requestLocation, active, onExpired]);
-  useEffect(() => {
-    if (file && active) heading.current?.focus();
-  }, [file, active]);
-  const refresh = () => {
-    setRevision((value) => value + 1);
-  };
-  function back() {
-    update(
-      file
-        ? { filePath: "" }
-        : { fileDirectory: directory.split("/").slice(0, -1).join("/") || ".", fileOffset: 0 },
-    );
-    setQuery("");
-  }
-  async function download() {
-    if (!preview || downloading) return;
-    setDownloading(true);
-    setDownloadError("");
-    try {
-      const response = await fetch(
-        `/api/${requestLocation}&action=download&version=${encodeURIComponent(preview.version)}`,
-        { credentials: "same-origin" },
-      );
-      if (!response.ok) {
-        if (response.status === 401) onExpired();
-        const diagnostic = z.object({ error: z.string() }).safeParse(await response.json());
-        throw new RequestError(
-          diagnostic.success ? diagnostic.data.error : "Download failed. Refresh and try again.",
-          response.status,
-        );
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = file.split("/").at(-1) ?? "download";
-      link.click();
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-      }, 1000);
-    } catch (e) {
-      setDownloadError(errorMessage(e, "Download failed. Refresh and try again."));
-    } finally {
-      setDownloading(false);
-    }
-  }
-  async function stop() {
-    try {
-      await request(chatSchema, `chats/${encodeURIComponent(chatID)}/stop`, {
-        method: "POST",
-        body: {},
-      });
-      refresh();
-    } catch (e) {
-      setError(errorMessage(e, "Could not stop machine."));
-      if (isExpired(e)) onExpired();
-    }
-  }
-  const unavailable =
-    runtime?.state === "stopped" || runtime?.state === "missing" || runtime?.state === "failed";
-  const status = (
-    <div className="flex items-center justify-between gap-2 border-b px-3 py-2 text-xs text-muted-foreground">
-      <span>
-        {unavailable
-          ? `Machine ${runtime.state === "stopped" ? "asleep" : runtime.state}. Reading saved workspace.`
-          : "Saved workspace"}
-      </span>
-      <RuntimeMenu
-        id={chatID}
-        disabled={false}
-        onStop={() => {
-          void stop();
-        }}
-      />
-    </div>
-  );
-  const repositoryControl = (
-    <NativeSelect
-      aria-label="Workspace repository"
-      value={selectedRepository}
-      onChange={(event) => {
-        update({
-          fileRepository: event.target.value,
-          fileDirectory: ".",
-          filePath: "",
-          fileOffset: 0,
-        });
-        setQuery("");
-      }}
-      className="w-full min-w-0"
+  }, [active]);
+  return (
+    <section
+      aria-label="Workspace files"
+      className="flex h-full min-h-0 min-w-0 flex-col bg-surface-canvas"
     >
-      {repositories.length === 0 && (
-        <option value="">
-          {repositoriesLoading ? "Loading repositories…" : "No repositories"}
-        </option>
-      )}
-      {repositories.map((r) => (
-        <option key={r.name} value={r.name}>
-          {r.name}
-          {r.role === "extra" ? " (extra)" : ""}
-        </option>
-      ))}
-    </NativeSelect>
-  );
-  const tools = (
-    <div className="flex shrink-0 items-center gap-1">
-      {(file || directory !== ".") && (
+      <div className="workspace-search flex min-h-11 shrink-0 items-center gap-2 border-b px-4">
+        <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+        <Input
+          ref={input}
+          value={query}
+          aria-label="Search workspace files"
+          placeholder="Search files…"
+          className="h-10 rounded-none border-0 bg-transparent! px-0 text-sm shadow-none focus-visible:ring-0"
+          onChange={(event) => {
+            setQuery(event.target.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setQuery("");
+              document
+                .querySelector<HTMLButtonElement>('.chat-main-pane [data-workspace-view="files"]')
+                ?.focus();
+            }
+          }}
+        />
+        {query !== "" && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Clear file search"
+            onClick={() => {
+              setQuery("");
+              input.current?.focus();
+            }}
+          >
+            <XIcon />
+          </Button>
+        )}
+        <kbd className="hidden shrink-0 rounded-sm bg-surface-panel px-1 text-xs text-muted-foreground sm:inline">
+          {navigator.userAgent.includes("Mac") ? "⌘ P" : "Ctrl P"}
+        </kbd>
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label={file ? "Back to folder" : "Parent folder"}
-          onClick={back}
+          aria-label="Refresh files"
+          title="Refresh files"
+          onClick={() => {
+            setRevision((value) => value + 1);
+          }}
         >
-          <ChevronLeftIcon />
+          <RefreshCwIcon />
         </Button>
-      )}
-      <Button variant="ghost" size="icon-sm" aria-label="Refresh files" onClick={refresh}>
-        <RefreshCwIcon />
-      </Button>
-    </div>
-  );
-  const loadingLabel = file ? "preview" : "files";
-  let message = null;
-  if (error) {
-    message = (
-      <p role="alert" className="p-4 text-sm text-destructive">
-        {error}
-      </p>
-    );
-  } else if (repositoriesLoading || (selectedRepository && !(file ? preview : listing))) {
-    message = (
-      <p role="status" className="p-4 text-sm text-muted-foreground">
-        Loading {repositoriesLoading ? "repositories" : loadingLabel}…
-      </p>
-    );
-  }
-  return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col">
-      {status}
-      {file ? (
-        <>
-          <div className="flex items-center gap-2 border-b px-3 py-2">
-            {tools}
-            <h2 ref={heading} tabIndex={-1} className="min-w-0 flex-1 text-sm wrap-anywhere">
-              {file.split("/").at(-1)}
-            </h2>
-            <Button
-              variant="secondary"
-              size="compact"
-              disabled={preview?.downloadable !== true || downloading}
-              onClick={() => {
-                void download();
-              }}
-            >
-              <ArrowDownIcon />
-              {downloading ? "Downloading…" : "Download"}
-            </Button>
-          </div>
-          <div className="border-b px-4 py-2 text-xs wrap-anywhere text-muted-foreground">
-            {selectedRepository} / {file}
-            {preview && ` · ${size(preview.size)}`}
-          </div>
-          {downloadError && (
-            <p role="alert" className="px-4 py-2 text-sm text-destructive">
-              {downloadError}
-            </p>
-          )}
-          {message}
-          {preview && (
-            <>
-              {!preview.downloadable && (
-                <p role="status" className="border-b px-4 py-2 text-xs text-muted-foreground">
-                  This file exceeds the 64 MiB download limit.
-                </p>
-              )}
-              {preview.truncated && preview.kind === "text" && (
-                <p role="status" className="border-b px-4 py-2 text-xs text-muted-foreground">
-                  {preview.downloadable
-                    ? "Showing the first 256 KiB. Download for the full file."
-                    : "Showing the first 256 KiB."}
-                </p>
-              )}
-              {preview.kind === "binary" ? (
-                <p className="p-6 text-sm text-muted-foreground">
-                  Preview unavailable for binary or non-UTF-8 files.
-                </p>
-              ) : (
-                <pre
-                  tabIndex={0}
-                  aria-label="File contents"
-                  className="min-h-0 flex-1 overflow-auto p-4 font-mono text-xs leading-6 select-text"
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-3 sm:px-5">
+        <div className="mb-2 flex min-h-8 items-center gap-2 text-sm">
+          <CloudIcon className="size-4 text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate">Workspace</span>
+          <RuntimeMenu id={chatID} disabled={false} status active={active} />
+        </div>
+        {error && (
+          <p role="alert" className="p-3 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        {!data && !error && (
+          <p role="status" className="p-3 text-sm text-muted-foreground">
+            Loading repositories…
+          </p>
+        )}
+        {data?.repositories.length === 0 && (
+          <p className="p-3 text-sm text-muted-foreground">No repositories in this workspace.</p>
+        )}
+        {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Delegates arrow keys from the nested native disclosure buttons. */}
+        <nav hidden={query.trim() !== ""} aria-label="Workspace file tree" onKeyDown={treeKeys}>
+          {data?.repositories.map((repository) => {
+            const root = workspaceFileView({ repository: repository.name, path: "." });
+            const collapsed = state.workspaceExpanded.includes(`collapsed:${root}`);
+            return (
+              <section key={repository.name} aria-label={repository.name} className="mb-3">
+                <button
+                  type="button"
+                  className="workspace-tree-row font-medium"
+                  aria-expanded={!collapsed}
+                  onClick={() => {
+                    update({
+                      workspaceExpanded: collapsed
+                        ? state.workspaceExpanded.filter((value) => value !== `collapsed:${root}`)
+                        : [...state.workspaceExpanded, `collapsed:${root}`],
+                    });
+                  }}
                 >
-                  {preview.text || "Empty file"}
-                </pre>
-              )}
-            </>
-          )}
-        </>
-      ) : (
-        <ListPage
-          title="Machine files"
-          query={query}
-          onQueryChange={setQuery}
-          searchLabel="Find in folder"
-          searchPlaceholder="Find in this page…"
-          closeSearchLabel="Close file search"
-          actions={tools}
-          filters={
-            <ListFilters
-              label="File filters"
-              options={[
-                { id: "all", label: "All files", count: listing?.entries.length ?? 0 },
-                {
-                  id: "folders",
-                  label: "Folders",
-                  count: listing?.entries.filter((e) => e.kind === "directory").length ?? 0,
-                },
-              ]}
-              value={filter}
-              onChange={setFilter}
-            >
-              {repositoryControl}
-              <p className="mt-2 text-xs wrap-anywhere text-muted-foreground">
-                /{directory === "." ? "" : directory}
-              </p>
-            </ListFilters>
-          }
-        >
-          {message}
-          {!error && !repositoriesLoading && repositories.length === 0 && (
-            <p className="p-3 text-sm text-muted-foreground">No repositories in this workspace.</p>
-          )}
-          {listing && (
-            <ListGroup label="Files" listLabel="Workspace files" count={listing.entries.length}>
-              {listing.entries
-                .filter(
-                  (entry) =>
-                    (filter === "all" || entry.kind === "directory") &&
-                    entry.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
-                )
-                .map((entry) => (
-                  <Item key={entry.name} size="list">
-                    <ItemContent>
-                      <ItemTitle>
-                        <button
-                          type="button"
-                          className="flex w-full min-w-0 items-center gap-2 rounded-sm py-1 text-left focus-visible:outline-2 focus-visible:outline-ring disabled:text-muted-foreground"
-                          disabled={entry.kind === "unsupported" || entry.kind === "symlink"}
-                          onClick={() => {
-                            const next =
-                              directory === "." ? entry.name : `${directory}/${entry.name}`;
-                            update(
-                              entry.kind === "directory"
-                                ? {
-                                    fileRepository: selectedRepository,
-                                    fileDirectory: next,
-                                    fileOffset: 0,
-                                  }
-                                : { fileRepository: selectedRepository, filePath: next },
-                            );
-                            setQuery("");
-                          }}
-                        >
-                          {entry.kind === "directory" ? (
-                            <FolderIcon className="size-4 shrink-0 text-muted-foreground" />
-                          ) : (
-                            <FilesIcon className="size-4 shrink-0 text-muted-foreground" />
-                          )}
-                          <span className="truncate" title={entry.name}>
-                            {entry.name}
-                          </span>
-                        </button>
-                      </ItemTitle>
-                    </ItemContent>
-                    {entry.kind !== "file" && entry.kind !== "directory" && (
-                      <ItemActions>
-                        <span className="text-xs text-muted-foreground">
-                          {entry.kind === "symlink" ? "Symlink" : "Unsupported"}
-                        </span>
-                      </ItemActions>
-                    )}
-                  </Item>
-                ))}
-              {listing.entries.length === 0 && (
-                <p className="p-3 text-sm text-muted-foreground">This folder is empty.</p>
-              )}
-              {listing.entries.length > 0 &&
-                !listing.entries.some(
-                  (entry) =>
-                    (filter === "all" || entry.kind === "directory") &&
-                    entry.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
-                ) && (
-                  <p className="p-3 text-sm text-muted-foreground">
-                    No matching files in this folder.
-                  </p>
+                  <span className="workspace-tree-caret">
+                    <ChevronRightIcon className={collapsed ? "" : "rotate-90"} />
+                  </span>
+                  <FolderIcon className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{repository.name}</span>
+                  {repository.role === "extra" && (
+                    <span className="ml-1 text-xs text-muted-foreground">extra</span>
+                  )}
+                </button>
+                {!collapsed && (
+                  <ul className="workspace-tree-root">
+                    <DirectoryEntries
+                      key={`${repository.name}:${revision}`}
+                      chatID={chatID}
+                      repository={repository.name}
+                      directory="."
+                      active={active && query.trim() === ""}
+                      revision={revision}
+                      onExpired={onExpired}
+                    />
+                  </ul>
                 )}
-            </ListGroup>
-          )}
-          {listing?.truncated === true && (
-            <p role="status" className="p-3 text-xs text-muted-foreground">
-              Showing entries {offset + 1} to {offset + 500}. Search covers this page.
-            </p>
-          )}
-          {(offset > 0 || listing?.truncated === true) && (
-            <div className="flex items-center justify-between gap-2 pt-3">
-              <Button
-                variant="secondary"
-                size="compact"
-                disabled={offset === 0 || !listing}
-                onClick={() => {
-                  update({ fileOffset: Math.max(0, offset - 500) });
-                  setQuery("");
-                }}
-              >
-                Previous page
-              </Button>
-              <Button
-                variant="secondary"
-                size="compact"
-                disabled={listing?.truncated !== true}
-                onClick={() => {
-                  if (listing) update({ fileOffset: listing.nextOffset });
-                  setQuery("");
-                }}
-              >
-                Next page
-              </Button>
-            </div>
-          )}
-        </ListPage>
-      )}
-    </div>
+              </section>
+            );
+          })}
+        </nav>
+        {query.trim() !== "" &&
+          data?.repositories.map((repository) => (
+            <WorkspaceSearch
+              key={repository.name}
+              chatID={chatID}
+              repository={repository.name}
+              query={query.trim()}
+              active={active}
+              onExpired={onExpired}
+            />
+          ))}
+      </div>
+    </section>
   );
 }

@@ -9,6 +9,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/rhizomatous/flora/backend/internal/storage"
 	"github.com/rhizomatous/flora/backend/internal/workspace"
@@ -82,6 +83,18 @@ func (a *api) workspaceRoutes(mux *http.ServeMux) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		switch r.URL.Query().Get("action") {
+		case "search":
+			query := r.URL.Query().Get("query")
+			if len(query) > 200 || !utf8.ValidString(query) {
+				failure(w, 400, "Search must be valid text within 200 bytes.")
+				return
+			}
+			results, err := workspace.Search(r.Context(), root, query)
+			if err != nil {
+				workspaceError(w, err)
+				return
+			}
+			jsonResponse(w, 200, results)
 		case "preview", "download":
 			download := r.URL.Query().Get("action") == "download"
 			expected := r.URL.Query().Get("version")

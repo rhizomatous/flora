@@ -36,13 +36,17 @@ export function RuntimeMenu({
   id,
   onStop,
   disabled,
+  status = false,
+  active = false,
 }: {
   id: string;
-  onStop: () => void;
+  onStop?: () => void;
+  status?: boolean;
+  active?: boolean;
   disabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const { runtime, pending, error, now, act } = useRuntime(id, open);
+  const { runtime, pending, error, now, act } = useRuntime(id, open || active);
   const state = runtime?.state;
   const running = state === "running";
   const sample = runtime?.usage;
@@ -69,13 +73,14 @@ export function RuntimeMenu({
             variant="tertiary"
             size="compact"
             className="composer-up [&_[data-slot=dropdown-chevron]]:rotate-180"
-            aria-label="Chat actions"
+            aria-label={status ? "Workspace machine" : "Chat actions"}
           >
-            <CloudIcon />
-            <span className="florets-control-label">Cloud</span>
+            {!status && <CloudIcon />}
+            {!status && <span className="florets-control-label">Cloud</span>}
             <span
               className={`size-[5px] rounded-full ${running ? "bg-green-500" : "bg-muted-foreground"}`}
             />
+            {status && <span>{stateLabel(runtime, pending, error)}</span>}
           </DropdownButton>
         }
       />
@@ -147,7 +152,8 @@ export function RuntimeMenu({
             closeOnClick={false}
             onClick={() => {
               if (pending === "wake") void act("stop");
-              else onStop();
+              else if (onStop) onStop();
+              else void act("stop");
             }}
           >
             <SquareIcon />
