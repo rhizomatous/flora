@@ -102,7 +102,7 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/provider":
-			fmt.Fprint(w, `{"connected":["anthropic"],"all":[{"id":"anthropic","models":{"model":{"name":"Installation default","capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}},"claude-sonnet-4-6":{"name":"Claude Sonnet 4.6","variants":{"low":{},"medium":{},"high":{},"max":{}},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}},"claude-haiku-4-5":{"name":"Claude Haiku 4.5","capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}}}}]}`)
+			fmt.Fprint(w, `{"connected":["anthropic"],"all":[{"id":"anthropic","models":{"model":{"name":"Installation default","capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}},"claude-sonnet-4-6":{"name":"Claude Sonnet 4.6","cost":{"input":3,"output":15},"variants":{"low":{},"medium":{},"high":{},"max":{}},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}},"claude-haiku-4-5":{"name":"Claude Haiku 4.5","cost":{"input":1,"output":5},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}}}}]}`)
 		case "/config":
 			fmt.Fprint(w, `{"model":"anthropic/model"}`)
 		case "/session":

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -15,12 +16,14 @@ import (
 )
 
 type ModelOption struct {
-	Provider string   `json:"provider"`
-	ID       string   `json:"id"`
-	Name     string   `json:"name"`
-	Variants []string `json:"variants"`
-	Image    bool     `json:"image"`
-	PDF      bool     `json:"pdf"`
+	Provider    string   `json:"provider"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Variants    []string `json:"variants"`
+	Image       bool     `json:"image"`
+	PDF         bool     `json:"pdf"`
+	InputPrice  *float64 `json:"inputPrice"`
+	OutputPrice *float64 `json:"outputPrice"`
 }
 type ModelOptions struct {
 	Default storage.Execution `json:"default"`
@@ -40,8 +43,12 @@ type runtimeProviders struct {
 	All []struct {
 		ID     string `json:"id"`
 		Models map[string]struct {
-			Name         string                     `json:"name"`
-			Status       string                     `json:"status"`
+			Name   string `json:"name"`
+			Status string `json:"status"`
+			Cost   struct {
+				Input  *float64 `json:"input"`
+				Output *float64 `json:"output"`
+			} `json:"cost"`
 			Variants     map[string]json.RawMessage `json:"variants"`
 			Capabilities struct {
 				ToolCall bool `json:"toolcall"`
@@ -156,7 +163,7 @@ func providerOptions(providers runtimeProviders, fallback ModelOptions) ModelOpt
 			if name == "" {
 				name = id
 			}
-			result.Models = append(result.Models, ModelOption{Provider: p.ID, ID: id, Name: name, Variants: variants, Image: m.Capabilities.Input.Image, PDF: m.Capabilities.Input.PDF})
+			result.Models = append(result.Models, ModelOption{Provider: p.ID, ID: id, Name: name, Variants: variants, Image: m.Capabilities.Input.Image, PDF: m.Capabilities.Input.PDF, InputPrice: validModelRate(m.Cost.Input), OutputPrice: validModelRate(m.Cost.Output)})
 		}
 	}
 	if len(result.Models) == 0 {
@@ -223,4 +230,13 @@ func validateRuntimeExecution(ctx context.Context, rt *runtime, selected storage
 		}
 	}
 	return unavailable
+}
+
+// Runtime cost fields are USD per million tokens. Preserve absent prices as
+// unknown; a reported zero is a valid rate and is not an inference estimate.
+func validModelRate(value *float64) *float64 {
+	if value == nil || *value < 0 || math.IsInf(*value, 0) || math.IsNaN(*value) {
+		return nil
+	}
+	return value
 }
