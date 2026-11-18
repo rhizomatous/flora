@@ -71,7 +71,7 @@ export function ChatSidePanel({
               {pullTabs.map((pull) => (
                 <div
                   key={pull.url}
-                  className="chat-diff-tab chat-subagent-tab"
+                  className="chat-diff-tab chat-pull-tab"
                   data-active={view === `pull:${pull.url}` || undefined}
                 >
                   <TabsTrigger

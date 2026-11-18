@@ -17,7 +17,23 @@ const pullChecksSchema = z.object({
   error: z.string().optional(),
 });
 
+const reviewerSchema = z.object({ name: z.string(), avatar: z.string().optional() });
+const issueSchema = z.object({ number: z.number(), title: z.string(), url: z.string() });
+const issuesSchema = z.object({
+  items: z
+    .array(issueSchema)
+    .nullable()
+    .transform((items) => items ?? []),
+  checkedAt: z.string().optional(),
+  error: z.string().optional(),
+});
 export const pullSchema = z.object({
+  authorAvatar: z.string().optional(),
+  createdAt: z.string().optional(),
+  reviewers: z.array(reviewerSchema).nullable().optional(),
+  labels: z.array(z.string()).nullable().optional(),
+  metadataKnown: z.boolean().optional(),
+  issues: issuesSchema.optional(),
   body: z.string().optional(),
   author: z.string().optional(),
   headRef: z.string().optional(),

@@ -2,6 +2,7 @@ import { test, expect } from "./fixtures.ts";
 
 test("selected PR overview matches the compact chat and flat checks layout", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   const screenshotDir = process.env.FLORA_SCREENSHOT_DIR;
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
   await page.setViewportSize({ width: 1440, height: 1050 });
@@ -36,6 +37,34 @@ test("selected PR overview matches the compact chat and flat checks layout", asy
     "https://github.com/rhizomatous/flora/actions",
   );
   await expect(overview.getByRole("status")).toHaveCount(0);
+  await expect(overview.locator("time")).toHaveText(/\d+m ago/);
+  await expect(overview.getByRole("link", { name: "Add reviewers on GitHub" })).toHaveAttribute(
+    "href",
+    "https://github.com/example/fieldnotes/pull/19",
+  );
+  await expect(overview.getByRole("link", { name: "Add labels on GitHub" })).toBeVisible();
+  await expect(overview.getByText("No issues", { exact: true })).toBeVisible();
+  await expect(overview.getByRole("link", { name: "View PR diff on GitHub" })).toHaveAttribute(
+    "href",
+    "https://github.com/example/fieldnotes/pull/19/files",
+  );
+  await expect(overview.getByRole("link", { name: "Merge on GitHub" })).toHaveAttribute(
+    "target",
+    "_blank",
+  );
+
+  await overview.getByRole("button", { name: "PR actions", exact: true }).click();
+  const menu = page.getByRole("menu");
+  await expect(
+    menu.getByRole("menuitem", { name: "Edit reviewers on GitHub", exact: true }),
+  ).toHaveAttribute("href", "https://github.com/example/fieldnotes/pull/19");
+  await menu.getByRole("menuitem", { name: "Copy PR link", exact: true }).click();
+  await expect(menu.getByRole("menuitem", { name: "PR link copied", exact: true })).toBeVisible();
+  if (screenshotDir !== undefined) {
+    await page.screenshot({ path: `${screenshotDir}/checks-actions.png` });
+  }
+  await page.keyboard.press("Escape");
+  await expect(page.locator('[data-slot="dropdown-menu-content"]')).toHaveCount(0);
   if (screenshotDir !== undefined) {
     await page.screenshot({ path: `${screenshotDir}/checks-desktop.png` });
   }
@@ -63,6 +92,13 @@ test("selected PR overview matches the compact chat and flat checks layout", asy
   );
   await expect(previous.getByText(/Saved checks for previous head/)).toBeVisible();
   await expect(previous.getByText(/GitHub rate limit reached/)).toBeVisible();
+  await expect(previous.getByText("bug", { exact: true })).toBeVisible();
+  await expect(previous.getByRole("link", { name: /#115 Show GitHub PR checks/ })).toHaveAttribute(
+    "href",
+    "https://github.com/rhizomatous/flora/issues/115",
+  );
+  await expect(previous.getByRole("link", { name: "Merge on GitHub" })).toHaveCount(0);
+
   await expect(side.getByRole("tab", { name: "PR #19", exact: true })).toBeVisible();
   if (screenshotDir !== undefined) {
     await page.screenshot({ path: `${screenshotDir}/checks-stale.png` });

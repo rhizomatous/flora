@@ -1,5 +1,7 @@
 import type { Pull } from "../../web/src/pull-schemas.ts";
 
+const openedAt = new Date(Date.now() - 6 * 60_000).toISOString();
+
 /** Simulated GitHub responses for the isolated chat preview. */
 export function previewPullChecks(pull: Pull, mode = "saved"): Pull {
   const savedAt = new Date().toISOString();
@@ -13,7 +15,29 @@ export function previewPullChecks(pull: Pull, mode = "saved"): Pull {
   if (mode !== "saved" && mode !== "stale") browserState = mode;
   return {
     ...pull,
-    author: "flora",
+    author: "octocat",
+    authorAvatar: "https://avatars.githubusercontent.com/u/583231?v=4",
+    createdAt: openedAt,
+    metadataKnown: true,
+    reviewers:
+      pull.number === 18
+        ? [{ name: "octocat", avatar: "https://avatars.githubusercontent.com/u/583231?v=4" }]
+        : [],
+    labels: pull.number === 18 ? ["bug", "compatibility"] : [],
+    issues: {
+      items:
+        pull.number === 18
+          ? [
+              {
+                number: 115,
+                title: "Show GitHub PR checks and expanded PR details",
+                url: "https://github.com/rhizomatous/flora/issues/115",
+              },
+            ]
+          : [],
+      checkedAt: savedAt,
+      error: "",
+    },
     headRef:
       (
         {
