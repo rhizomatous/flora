@@ -21,7 +21,7 @@ func TestPullChecksHeadRefreshAndRetention(t *testing.T) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/pulls/7"):
 			sha := head
-			return reply(200, fmt.Sprintf(`{"number":7,"state":"open","html_url":"https://github.com/example/core/pull/7","head":{"sha":%q}}`, sha)), nil
+			return reply(200, fmt.Sprintf(`{"number":7,"state":"open","html_url":"https://github.com/example/core/pull/7","body":"Keep notes stable.","user":{"login":"flora"},"base":{"ref":"main"},"head":{"ref":"fix/pagination","sha":%q}}`, sha)), nil
 		case strings.HasSuffix(r.URL.Path, "/check-runs"):
 			if !strings.Contains(r.URL.Path, head) {
 				t.Fatal("checks not requested by exact SHA")
@@ -45,6 +45,9 @@ func TestPullChecksHeadRefreshAndRetention(t *testing.T) {
 			t.Fatalf("unsafe status: %+v", item)
 		}
 	}
+	if pull.Body != "Keep notes stable." || pull.Author != "flora" || pull.HeadRef != "fix/pagination" || pull.BaseRef != "main" {
+		t.Fatalf("PR overview metadata missing: %+v", pull)
+	}
 	saved := pull.Checks.CheckedAt
 	// A new head with unavailable checks retains the old revision, never relabels it.
 	head = strings.Repeat("b", 40)
@@ -60,7 +63,7 @@ func TestPullChecksHeadRefreshAndRetention(t *testing.T) {
 	expirePulls(t, s, c)
 	s.verifyPulls(ctx, c, client)
 	pull = s.ReadPulls(ctx, c.ID).Items[0]
-	if pull.HeadSHA != head || pull.Checks.CheckedAt != saved || !strings.Contains(pull.Checks.Error, "head could not be verified") {
+	if pull.Body != "Keep notes stable." || pull.HeadRef != "fix/pagination" || pull.HeadSHA != head || pull.Checks.CheckedAt != saved || !strings.Contains(pull.Checks.Error, "head could not be verified") {
 		t.Fatalf("verification failure lost data: %+v", pull)
 	}
 }

@@ -104,7 +104,7 @@ function ChatRow({
           {((chat.pulls?.items.length ?? 0) > 0 || (chat.pulls?.error ?? "") !== "") && (
             <div className="mt-3 border-t border-border pt-2">
               <p className="mb-1 text-xs text-muted-foreground">Pull requests</p>
-              <PullList summary={chat.pulls} />
+              <PullList summary={chat.pulls} chatID={chat.ID} />
             </div>
           )}
           {(chat.subagents?.length ?? 0) > 0 && (

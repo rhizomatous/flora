@@ -21,6 +21,10 @@ import (
 )
 
 type Pull struct {
+	Body          string      `json:"body,omitempty"`
+	Author        string      `json:"author,omitempty"`
+	HeadRef       string      `json:"headRef,omitempty"`
+	BaseRef       string      `json:"baseRef,omitempty"`
 	HeadSHA       string      `json:"headSHA,omitempty"`
 	HeadCheckedAt string      `json:"headCheckedAt,omitempty"`
 	Checks        *PullChecks `json:"checks,omitempty"`
@@ -245,6 +249,13 @@ git for-each-ref --format='%(refname:short)%00%(objectname)%00%(upstream:remoten
 }
 
 type remotePull struct {
+	Body string `json:"body"`
+	User struct {
+		Login string `json:"login"`
+	} `json:"user"`
+	Base struct {
+		Ref string `json:"ref"`
+	} `json:"base"`
 	Title     string `json:"title"`
 	Additions *int   `json:"additions"`
 	Deletions *int   `json:"deletions"`
@@ -448,7 +459,7 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 			remote.State = "merged"
 		}
 		previous := known[link]
-		pull := Pull{Repository: strings.ToLower(match[1]), URL: link, Number: number, State: remote.State, Draft: remote.Draft, Title: remote.Title, Additions: remote.Additions, Deletions: remote.Deletions, HeadSHA: remote.Head.SHA, HeadCheckedAt: state.CheckedAt, Checks: previous.Checks}
+		pull := Pull{Body: remote.Body, Author: remote.User.Login, HeadRef: remote.Head.Ref, BaseRef: remote.Base.Ref, Repository: strings.ToLower(match[1]), URL: link, Number: number, State: remote.State, Draft: remote.Draft, Title: remote.Title, Additions: remote.Additions, Deletions: remote.Deletions, HeadSHA: remote.Head.SHA, HeadCheckedAt: state.CheckedAt, Checks: previous.Checks}
 		if hash.MatchString(remote.Head.SHA) {
 			pull.Checks = collectPullChecks(pull, get, state.CheckedAt)
 		} else if pull.Checks != nil {
