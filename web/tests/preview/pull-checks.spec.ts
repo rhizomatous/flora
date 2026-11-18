@@ -262,7 +262,7 @@ test("PR descriptions render Markdown headings, lists, links, code, and tables",
 });
 
 test("author metadata stays aligned when the avatar replaces its fallback", async ({ page }) => {
-  const { promise: avatarReady, resolve: releaseAvatar } = Promise.withResolvers<undefined>();
+  const { promise: avatarReady, resolve: releaseAvatar } = Promise.withResolvers<null>();
   await page.route("https://avatars.githubusercontent.com/**", async (route) => {
     await avatarReady;
     await route.fulfill({
@@ -280,7 +280,7 @@ test("author metadata stays aligned when the avatar replaces its fallback", asyn
     );
     await page.evaluate(() => document.fonts.ready);
     await expect(header.locator('[data-slot="avatar-fallback"]')).toBeVisible();
-    releaseAvatar(undefined);
+    releaseAvatar(null);
     await expect(header.locator('[data-slot="avatar-image"]')).toBeVisible();
     const centers = await header.evaluate((element) => {
       const author = element.querySelector('a[href="https://github.com/octocat"]');
@@ -299,6 +299,6 @@ test("author metadata stays aligned when the avatar replaces its fallback", asyn
     expect(centers.every((center) => Number.isFinite(center))).toBe(true);
     expect(Math.max(...centers) - Math.min(...centers)).toBeLessThan(1);
   } finally {
-    releaseAvatar(undefined);
+    releaseAvatar(null);
   }
 });
