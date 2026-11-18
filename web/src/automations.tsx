@@ -27,7 +27,11 @@ import {
   Link,
   LoadingStatus,
   NativeSelect,
-  Textarea,
+  TextareaPanel,
+  TextareaPanelInput,
+  TextareaPanelFooter,
+  SettingsGroup,
+  SettingsRow,
   Switch,
   SectionStack,
   Section,
@@ -420,17 +424,16 @@ function AutomationForm({
               )}
             </Section>
             <Section>
-              <SectionHeader className="mx-px px-4">
+              <SectionHeader inset>
                 <FieldLabel htmlFor="automation-instructions">Instructions</FieldLabel>
                 <p id="instructions-help" className="text-sm text-muted-foreground">
                   What Flora should do each time this automation runs
                 </p>
               </SectionHeader>
-              <Card variant="flush">
-                <Textarea
+              <TextareaPanel>
+                <TextareaPanelInput
                   id="automation-instructions"
                   aria-describedby="instructions-help"
-                  className="min-h-32 resize-none border-0 bg-transparent"
                   value={value.instructions}
                   onChange={(e) => {
                     change("instructions", e.target.value);
@@ -438,7 +441,7 @@ function AutomationForm({
                   required
                   placeholder="Check for outdated dependencies. Update safe minor versions, run tests, and open a draft PR if anything changes."
                 />
-                <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
+                <TextareaPanelFooter>
                   <ModelControls
                     scope={
                       value.mode === "same" && initial.chatID
@@ -455,21 +458,20 @@ function AutomationForm({
                       },
                     }}
                   />
-                </div>
-              </Card>
+                </TextareaPanelFooter>
+              </TextareaPanel>
             </Section>
-            <Card variant="flush" className="divide-y">
-              <div className="flex items-center justify-between gap-4 px-4 py-3">
-                <div className="min-w-0 flex-1 space-y-1">
-                  <FieldLabel htmlFor="automation-project">Project</FieldLabel>
-                  <p id="project-help" className="text-sm text-muted-foreground">
-                    The project this automation works in
-                  </p>
-                </div>
+            <SettingsGroup>
+              <SettingsRow
+                label="Project"
+                htmlFor="automation-project"
+                descriptionId="project-help"
+                description="The project this automation works in"
+              >
                 <NativeSelect
                   id="automation-project"
                   aria-describedby="project-help"
-                  className="max-w-[55%] shrink-0 [&_select]:field-sizing-content [&_select]:w-auto [&_select]:max-w-full"
+                  width="content"
                   aria-label="Project"
                   value={value.projectID}
                   disabled={initial.id !== ""}
@@ -487,19 +489,18 @@ function AutomationForm({
                     </option>
                   ))}
                 </NativeSelect>
-              </div>
-              <div className="flex items-center justify-between gap-4 px-4 py-3">
-                <div className="min-w-0 flex-1 space-y-1">
-                  <FieldLabel htmlFor="automation-mode">Runs in</FieldLabel>
-                  <p id="run-mode-help" className="text-sm text-muted-foreground">
-                    {value.mode === "same"
-                      ? "Continue in the same chat"
-                      : "Start a new chat each run"}
-                  </p>
-                </div>
+              </SettingsRow>
+              <SettingsRow
+                label="Runs in"
+                htmlFor="automation-mode"
+                descriptionId="run-mode-help"
+                description={
+                  value.mode === "same" ? "Continue in the same chat" : "Start a new chat each run"
+                }
+              >
                 <NativeSelect
                   id="automation-mode"
-                  className="max-w-[55%] shrink-0 [&_select]:field-sizing-content [&_select]:w-auto [&_select]:max-w-full"
+                  width="content"
                   aria-label="Runs in"
                   value={value.mode}
                   onChange={(e) => {
@@ -510,10 +511,10 @@ function AutomationForm({
                   <option value="new">A new chat each run</option>
                   <option value="same">The same chat each run</option>
                 </NativeSelect>
-              </div>
-            </Card>
+              </SettingsRow>
+            </SettingsGroup>
             <Section aria-labelledby="schedule-heading">
-              <SectionHeader className="mx-px px-4">
+              <SectionHeader inset>
                 <Heading level={3} id="schedule-heading" className="text-sm">
                   Schedule
                 </Heading>
@@ -747,7 +748,7 @@ export function Automations({
         )}
         {list !== undefined && !isNew && id !== "" && item !== undefined && (
           <Section aria-label="Run history">
-            <SectionHeader className="mx-px px-4">
+            <SectionHeader inset>
               <Heading level={2}>Run history</Heading>
               <p className="text-sm text-muted-foreground">Recent runs and their results</p>
             </SectionHeader>

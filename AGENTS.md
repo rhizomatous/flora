@@ -23,6 +23,8 @@ Keep UI copy direct and focused on the action. Do not add preemptive caveats, im
 
 For collection screens, inspect `web/src/chat-list.tsx` and `web/src/pull-requests-page.tsx` before introducing a layout. Reuse `ListPage` and `ListFilters` for the header, search, and filters. Use Florets `ListGroup` for collapsible sections and `Item size="list"` for rows, with `ItemContent`, `ItemTitle`, and `ItemActions`. Match their responsive behavior and interactions.
 
+For settings and detail screens, use Florets section, settings-row, and textarea-panel components. Refer to the [settings composition example](florets/docs/src/examples/upstream/settings-group.tsx) and [Automations](web/src/automations.tsx). Verify narrow and wide layouts, including long labels, keyboard focus, and scrolling.
+
 ### Git
 
 - Before starting new work, fetch `origin/main` and create the worktree and branch from it.
