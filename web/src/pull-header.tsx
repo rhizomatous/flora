@@ -23,7 +23,7 @@ export function PullHeader({ pull, heading }: { pull: Pull; heading: string }) {
             href={`https://github.com/${encodeURIComponent(pull.author ?? "")}`}
             target="_blank"
             rel="noreferrer"
-            className="min-w-0 rounded-sm text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+            className="inline-flex min-w-0 items-center rounded-sm text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
           >
             <PullPerson name={pull.author ?? ""} avatar={pull.authorAvatar} />
           </a>
