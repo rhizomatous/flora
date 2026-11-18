@@ -60,6 +60,44 @@ try {
     await page.keyboard.press("Escape");
   }
 
+  for (const theme of ["dark", "light"]) {
+    await page.goto(`${base}example.html?component=editable-text&theme=${theme}`, {
+      waitUntil: "domcontentloaded",
+    });
+    const title = page.getByRole("textbox", { name: "Title", exact: true });
+    await expect(title).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await title.focus();
+    await expect(title).toHaveCSS("border-top-color", "rgba(0, 0, 0, 0)");
+    await expect(title).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(title).toHaveCSS("font-weight", "500");
+    await title.fill("A new title");
+    await title.press("Tab");
+    const description = page.getByRole("textbox", { name: "Description", exact: true });
+    await expect(description).toBeFocused();
+    await description.fill("First line\nSecond line");
+    await expect(description).toHaveValue("First line\nSecond line");
+    await expect(page.getByRole("textbox", { name: "Disabled title", exact: true })).toBeDisabled();
+    await page.goto(`${base}example.html?component=textarea&theme=${theme}`, {
+      waitUntil: "domcontentloaded",
+    });
+    const textarea = page.getByRole("region", { name: "Basic", exact: true }).getByRole("textbox");
+    await textarea.waitFor({ state: "visible" });
+    const border = await textarea.evaluate((element) => getComputedStyle(element).borderTopColor);
+    await textarea.focus();
+    await expect(textarea).toHaveCSS("border-top-color", border);
+    await expect(textarea).toHaveCSS("box-shadow", "none");
+    await expect(textarea).toHaveCSS("padding-top", "16px");
+    await page.goto(`${base}example.html?component=input-group&theme=${theme}`, {
+      waitUntil: "domcontentloaded",
+    });
+    const group = page
+      .locator('[data-slot="input-group"]')
+      .filter({ has: page.locator("textarea") })
+      .first();
+    await group.locator("textarea").focus();
+    await expect(group).toHaveCSS("box-shadow", "none");
+  }
+
   const files = await readdir(new URL("../florets/docs/src/examples/upstream/", import.meta.url));
   for (const file of files.filter((name) => name.endsWith(".tsx"))) {
     await openExample(file.slice(0, -4));

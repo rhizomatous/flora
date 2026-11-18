@@ -16,6 +16,7 @@ import {
   PopoverContent,
   ChevronDownIcon,
   FieldLabel,
+  EditableText,
   Heading,
   Input,
   Link,
@@ -253,7 +254,7 @@ function AutomationForm({
                 </Link>
                 <Link
                   href="#automations"
-                  className="hidden text-base font-semibold text-foreground no-underline sm:inline"
+                  className="hidden text-base font-medium text-foreground no-underline sm:inline"
                 >
                   Automations
                 </Link>
@@ -310,21 +311,21 @@ function AutomationForm({
         }}
       >
         <fieldset disabled={busy} className="space-y-5">
-          <FieldLabel className="w-full flex-col items-start">
-            Name
-            <Input
+          <div className="space-y-1">
+            <EditableText
+              label="Name"
+              variant="title"
               value={value.name}
-              onChange={(e) => {
-                change("name", e.target.value);
+              onChange={(event) => {
+                change("name", event.target.value);
               }}
               required
               maxLength={200}
-              placeholder="Weekly dependency check"
+              placeholder="Name this automation"
             />
-          </FieldLabel>
-          <FieldLabel className="w-full flex-col items-start">
-            <span className="sr-only">Description</span>
-            <Input
+            <EditableText
+              label="Description"
+              multiline
               value={value.description ?? ""}
               maxLength={2000}
               placeholder="Add a description (optional)"
@@ -332,9 +333,9 @@ function AutomationForm({
                 change("description", event.target.value);
               }}
             />
-          </FieldLabel>
+          </div>
           {initial.id && (
-            <div className="flex items-center justify-between gap-3">
+            <div className="mx-px flex items-center justify-between gap-3 px-4">
               <label className="flex w-fit items-center gap-2 text-sm">
                 <Switch
                   disabled={busy}
@@ -347,7 +348,7 @@ function AutomationForm({
             </div>
           )}
           <FieldLabel className="w-full flex-col items-start">
-            Instructions
+            <span className="mx-px px-4">Instructions</span>
             <Textarea
               className="min-h-32 resize-none"
               value={value.instructions}
@@ -659,9 +660,11 @@ export function Automations({
       )}
       {list !== undefined && !isNew && id !== "" && item !== undefined && (
         <section className="mx-auto mt-10 max-w-3xl" aria-label="Run history">
-          <Heading level={2}>Run history</Heading>
+          <Heading level={2} className="mx-px px-4">
+            Run history
+          </Heading>
           {runs.length === 0 ? (
-            <p className="mt-4 text-sm text-muted-foreground">
+            <p className="mx-px mt-4 px-4 text-sm text-muted-foreground">
               No runs yet. Wait for the schedule or choose Run now.
             </p>
           ) : (
