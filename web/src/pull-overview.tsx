@@ -6,11 +6,9 @@ import {
   CheckIcon,
   MessageSquareIcon,
   GitPullRequestIcon,
-  ExternalLinkIcon,
   UsersIcon,
   TagIcon,
   CircleDotIcon,
-  PlusIcon,
 } from "@flora/florets";
 import { Markdown } from "@flora/florets/ai";
 
@@ -92,17 +90,9 @@ export function PullOverview({
                 <PullPerson key={reviewer.name} name={reviewer.name} avatar={reviewer.avatar} />
               ))
             ) : (
-              <a
-                href={pull.url}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Add reviewers on GitHub"
-                className="inline-flex items-center gap-1.5 rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-              >
-                <PlusIcon className="size-4" />
-                {pull.metadataKnown === true ? "Add reviewers" : "View reviewers"}
-                <ExternalLinkIcon className="size-3 text-muted-foreground/60" />
-              </a>
+              <span className="text-muted-foreground">
+                {pull.metadataKnown === true ? "No review requests" : "Unavailable"}
+              </span>
             )}
           </dd>
           <dt className="flex items-center gap-2 text-muted-foreground">
@@ -117,17 +107,9 @@ export function PullOverview({
                 </span>
               ))
             ) : (
-              <a
-                href={pull.url}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Add labels on GitHub"
-                className="inline-flex items-center gap-1.5 rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-              >
-                <PlusIcon className="size-4" />
-                {pull.metadataKnown === true ? "Add labels" : "View labels"}
-                <ExternalLinkIcon className="size-3 text-muted-foreground/60" />
-              </a>
+              <span className="text-muted-foreground">
+                {pull.metadataKnown === true ? "No labels" : "Unavailable"}
+              </span>
             )}
           </dd>
           <dt className="flex items-center gap-2 text-muted-foreground">
@@ -212,8 +194,8 @@ export function PullOverview({
             {(pull.body ?? "") === "" ? (
               <p className="text-sm text-muted-foreground">No description.</p>
             ) : (
-              <div className="text-sm leading-6 wrap-anywhere">
-                <Markdown>{pull.body ?? ""}</Markdown>
+              <div className="text-sm leading-6 wrap-anywhere" data-pull-description>
+                <Markdown mode="static">{pull.body ?? ""}</Markdown>
               </div>
             )}
           </details>

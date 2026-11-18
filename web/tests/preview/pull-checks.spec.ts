@@ -2,7 +2,6 @@ import { test, expect } from "./fixtures.ts";
 
 test("selected PR overview matches the compact chat and flat checks layout", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   const screenshotDir = process.env.FLORA_SCREENSHOT_DIR;
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
   await page.setViewportSize({ width: 1440, height: 1050 });
@@ -38,33 +37,31 @@ test("selected PR overview matches the compact chat and flat checks layout", asy
   );
   await expect(overview.getByRole("status")).toHaveCount(0);
   await expect(overview.locator("time")).toHaveText(/\d+m ago/);
-  await expect(overview.getByRole("link", { name: "Add reviewers on GitHub" })).toHaveAttribute(
-    "href",
-    "https://github.com/example/fieldnotes/pull/19",
-  );
-  await expect(overview.getByRole("link", { name: "Add labels on GitHub" })).toBeVisible();
+  await expect(overview.getByText("No review requests", { exact: true })).toBeVisible();
+  await expect(overview.getByText("No labels", { exact: true })).toBeVisible();
   await expect(overview.getByText("No issues", { exact: true })).toBeVisible();
-  await expect(overview.getByRole("link", { name: "View PR diff on GitHub" })).toHaveAttribute(
-    "href",
-    "https://github.com/example/fieldnotes/pull/19/files",
-  );
-  await expect(overview.getByRole("link", { name: "Merge on GitHub" })).toHaveAttribute(
-    "target",
-    "_blank",
-  );
-
-  await overview.getByRole("button", { name: "PR actions", exact: true }).click();
-  const menu = page.getByRole("menu");
-  await expect(
-    menu.getByRole("menuitem", { name: "Edit reviewers on GitHub", exact: true }),
-  ).toHaveAttribute("href", "https://github.com/example/fieldnotes/pull/19");
-  await menu.getByRole("menuitem", { name: "Copy PR link", exact: true }).click();
-  await expect(menu.getByRole("menuitem", { name: "PR link copied", exact: true })).toBeVisible();
-  if (screenshotDir !== undefined) {
-    await page.screenshot({ path: `${screenshotDir}/checks-actions.png` });
-  }
-  await page.keyboard.press("Escape");
-  await expect(page.locator('[data-slot="dropdown-menu-content"]')).toHaveCount(0);
+  const github = overview.getByRole("link", { name: "Open PR #19 on GitHub", exact: true });
+  await expect(github).toHaveAttribute("href", "https://github.com/example/fieldnotes/pull/19");
+  await expect(github).toHaveAttribute("target", "_blank");
+  await expect(overview.getByRole("button", { name: "PR actions" })).toHaveCount(0);
+  const tabBox = await side.getByRole("tab", { name: "PR #19", exact: true }).boundingBox();
+  const githubBox = await github.boundingBox();
+  expect(githubBox?.height).toBe(tabBox?.height);
+  const centers = await overview.locator("header").evaluate((header) => {
+    const author = header.querySelector('a[href="https://github.com/octocat"]');
+    const elements = [
+      author?.querySelector('[data-slot="avatar"]'),
+      author?.querySelector("span.truncate"),
+      header.querySelector("a[title]"),
+      header.querySelector("time"),
+    ];
+    return elements.map((element) => {
+      const box = element?.getBoundingClientRect();
+      return box === undefined ? Number.NaN : box.y + box.height / 2;
+    });
+  });
+  expect(centers.every((center) => Number.isFinite(center))).toBe(true);
+  expect(Math.max(...centers) - Math.min(...centers)).toBeLessThan(1);
   if (screenshotDir !== undefined) {
     await page.screenshot({ path: `${screenshotDir}/checks-desktop.png` });
   }
@@ -201,4 +198,64 @@ test("PR collection rows open the selected PR beside its chat", async ({ page })
     "true",
   );
   await expect(side.getByRole("heading", { name: "Stabilize notes pagination" })).toBeVisible();
+});
+
+test("PR descriptions render Markdown headings, lists, links, code, and tables", async ({
+  page,
+}) => {
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  const markdown = [
+    "## Summary",
+    "Keep **notes** stable using `cursor`.",
+    "",
+    "- Preserve existing cursors",
+    "- [Read the documentation](https://example.com/docs)",
+    "",
+    "```go",
+    "func nextCursor(id string) string { return id }",
+    "```",
+    "",
+    "| Check | Result |",
+    "| --- | --- |",
+    "| Pagination | Passed |",
+  ].join("\n");
+  await page.route("**/api/notifications*", async (route) => {
+    const response = await route.fetch();
+    const text = await response.text();
+    const body = text.replaceAll(
+      /"body":"(?:[^"\\]|\\.)*"/g,
+      () => `"body":${JSON.stringify(markdown)}`,
+    );
+    await route.fulfill({ response, body });
+  });
+  await page.goto(`${base}/#chats/pagination`);
+  await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+  await page.locator('[data-inline-pr="open"]').click();
+  const description = page.locator(
+    '[data-pull-overview="https://github.com/example/fieldnotes/pull/19"] [data-pull-description]',
+  );
+  await expect(description.getByRole("heading", { name: "Summary", exact: true })).toBeVisible();
+  await expect(description.locator('[data-streamdown="strong"]')).toHaveText("notes");
+  await expect(description.locator("code").first()).toHaveText("cursor");
+  await expect(description.getByRole("listitem")).toHaveCount(2);
+  await description.getByRole("button", { name: "Read the documentation" }).click();
+  const linkPrompt = page.locator('[data-streamdown="link-safety-modal"]');
+  await expect(linkPrompt).toContainText("https://example.com/docs");
+  await page.context().route("https://example.com/docs", async (route) => {
+    await route.fulfill({ contentType: "text/html", body: "Documentation" });
+  });
+  const popupPromise = page.waitForEvent("popup");
+  await linkPrompt.getByRole("button", { name: "Open link", exact: true }).click();
+  const popup = await popupPromise;
+  await expect(popup).toHaveURL("https://example.com/docs");
+  await popup.close();
+  await expect(description.getByRole("table")).toContainText("Pagination");
+  await expect(description.locator('[data-slot="code-block"]')).toContainText("func nextCursor");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+  await description.scrollIntoViewIfNeeded();
+  const screenshotDir = process.env.FLORA_SCREENSHOT_DIR;
+  if (screenshotDir !== undefined) {
+    await page.screenshot({ path: `${screenshotDir}/checks-markdown.png` });
+  }
 });
