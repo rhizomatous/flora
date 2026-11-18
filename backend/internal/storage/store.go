@@ -218,6 +218,7 @@ const (
 )
 
 type Chat struct {
+	Execution                                           Execution
 	PinnedAt                                            string
 	Archived                                            bool
 	OrganizationRevision                                int64
@@ -322,19 +323,23 @@ func (s *Store) UpdateProject(ctx context.Context, projectID, name string, c Con
 }
 
 func (s *Store) CreateChat(ctx context.Context, projectID, title, imageDigest, harnessVersion string) (Chat, error) {
-	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, "", "", nil)
+	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, "", "", nil, nil)
 }
 
 // CreateChatRequest reserves a creation identity with the immutable first input.
 // A retry returns the same chat even if project settings have since changed.
 func (s *Store) CreateChatRequest(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, attachments ...string) (Chat, error) {
+	return s.CreateChatRequestWithExecution(ctx, projectID, title, imageDigest, harnessVersion, requestID, text, nil, attachments...)
+}
+
+func (s *Store) CreateChatRequestWithExecution(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, selection *Execution, attachments ...string) (Chat, error) {
 	if requestID == "" || len(requestID) > 200 || (strings.TrimSpace(text) == "" && len(attachments) == 0) || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
 		return Chat{}, ErrInvalid
 	}
-	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, requestID, text, attachments)
+	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, requestID, text, attachments, selection)
 }
 
-func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, attachments []string) (Chat, error) {
+func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, attachments []string, selection *Execution) (Chat, error) {
 	imageName, digest, pinned := strings.Cut(imageDigest, "@sha256:")
 	if title == "" || imageName == "" || !pinned || !hexHash(digest, 64) || harnessVersion == "" {
 		return Chat{}, ErrInvalid
@@ -342,12 +347,12 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 	chatID := id()
 	err := s.write(ctx, func(tx *sql.Tx) error {
 		if requestID != "" {
-			var savedTitle, savedText, savedAttachments string
-			err := tx.QueryRowContext(ctx, "SELECT chat_id,title,text,attachments FROM chat_requests WHERE project_id=? AND request_id=?", projectID, requestID).Scan(&chatID, &savedTitle, &savedText, &savedAttachments)
+			var savedTitle, savedText, savedAttachments, savedSelection string
+			err := tx.QueryRowContext(ctx, "SELECT chat_id,title,text,attachments,selection FROM chat_requests WHERE project_id=? AND request_id=?", projectID, requestID).Scan(&chatID, &savedTitle, &savedText, &savedAttachments, &savedSelection)
 			if err == nil {
 				var savedIDs []string
 				_ = json.Unmarshal([]byte(savedAttachments), &savedIDs)
-				if title != savedTitle || text != savedText || !sameAttachmentIDs(savedIDs, attachments) {
+				if savedSelection != selectionJSON(selection) || title != savedTitle || text != savedText || !sameAttachmentIDs(savedIDs, attachments) {
 					return ErrConflict
 				}
 				return nil
@@ -377,8 +382,12 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 			return err
 		}
 		config = string(encoded)
+		execution, err := resolveExecution(ctx, tx, "", selection)
+		if err != nil {
+			return err
+		}
 		stamp := now()
-		_, err = tx.ExecContext(ctx, `INSERT INTO chats (id,project_id,title,config,image_digest,harness_version,status,status_reason,created_at,updated_at) VALUES (?,?,?,?,?,?,'stopped','Not started',?,?)`, chatID, projectID, title, config, imageDigest, harnessVersion, stamp, stamp)
+		_, err = tx.ExecContext(ctx, `INSERT INTO chats (id,project_id,title,config,image_digest,harness_version,execution,status,status_reason,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'stopped','Not started',?,?)`, chatID, projectID, title, config, imageDigest, harnessVersion, selectionJSON(&execution), stamp, stamp)
 		if err != nil {
 			return err
 		}
@@ -387,7 +396,7 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 				return err
 			}
 			encodedAttachments, _ := json.Marshal(append([]string{}, attachments...))
-			if _, err := tx.ExecContext(ctx, "INSERT INTO chat_requests(project_id,request_id,chat_id,title,text,attachments) VALUES (?,?,?,?,?,?)", projectID, requestID, chatID, title, text, string(encodedAttachments)); err != nil {
+			if _, err := tx.ExecContext(ctx, "INSERT INTO chat_requests(project_id,request_id,chat_id,title,text,attachments,selection) VALUES (?,?,?,?,?,?,?)", projectID, requestID, chatID, title, text, string(encodedAttachments), selectionJSON(selection)); err != nil {
 				return err
 			}
 		}
@@ -401,13 +410,14 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 
 func (s *Store) Chat(ctx context.Context, chatID string) (Chat, error) {
 	var c Chat
-	var config string
+	var config, execution string
 	// Read the row and starting commits in one snapshot.
 	err := s.write(ctx, func(tx *sql.Tx) error {
-		err := tx.QueryRowContext(ctx, `SELECT id,project_id,title,config,image_digest,harness_version,coalesce(container_id,''),coalesce(session_id,''),status,status_reason,coalesce(active_message_id,''),created_at,updated_at,pinned_at,archived,organization_revision FROM chats WHERE id=?`, chatID).Scan(&c.ID, &c.ProjectID, &c.Title, &config, &c.ImageDigest, &c.HarnessVersion, &c.ContainerID, &c.SessionID, &c.Status, &c.StatusReason, &c.ActiveMessageID, &c.CreatedAt, &c.UpdatedAt, &c.PinnedAt, &c.Archived, &c.OrganizationRevision)
+		err := tx.QueryRowContext(ctx, `SELECT id,project_id,title,config,image_digest,harness_version,coalesce(container_id,''),coalesce(session_id,''),status,status_reason,coalesce(active_message_id,''),created_at,updated_at,pinned_at,archived,organization_revision,execution FROM chats WHERE id=?`, chatID).Scan(&c.ID, &c.ProjectID, &c.Title, &config, &c.ImageDigest, &c.HarnessVersion, &c.ContainerID, &c.SessionID, &c.Status, &c.StatusReason, &c.ActiveMessageID, &c.CreatedAt, &c.UpdatedAt, &c.PinnedAt, &c.Archived, &c.OrganizationRevision, &execution)
 		if err != nil {
 			return found(err)
 		}
+		_ = json.Unmarshal([]byte(execution), &c.Execution)
 		if err := json.Unmarshal([]byte(config), &c.Configuration); err != nil {
 			return err
 		}

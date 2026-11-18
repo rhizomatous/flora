@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
-	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -22,6 +21,7 @@ import (
 
 type Provisioner interface {
 	Identity() (string, string)
+	ModelMetadata(context.Context, storage.Credentials) (json.RawMessage, error)
 	Start(context.Context, string) (provisioning.Endpoint, error)
 	Endpoint(context.Context, string) (provisioning.Endpoint, error)
 	BeginActivity(string)
@@ -29,8 +29,7 @@ type Provisioner interface {
 }
 
 type Service struct {
-	ModelCatalogClient      *http.Client
-	attachmentCapabilities  capabilityCache
+	models                  modelCache
 	AutomationBeforeStop    func(context.Context, string) error
 	Store                   *storage.Store
 	provisioner             Provisioner
@@ -53,6 +52,10 @@ func New(ctx context.Context, store *storage.Store, p Provisioner) *Service {
 }
 
 func (s *Service) Create(ctx context.Context, project, title, requestID, text string, attachments ...string) (storage.Chat, error) {
+	return s.CreateWithExecution(ctx, project, title, requestID, text, nil, attachments...)
+}
+
+func (s *Service) CreateWithExecution(ctx context.Context, project, title, requestID, text string, selection *storage.Execution, attachments ...string) (storage.Chat, error) {
 	if s.provisioner == nil {
 		return storage.Chat{}, errors.New("chat runtime is not configured")
 	}
@@ -61,18 +64,23 @@ func (s *Service) Create(ctx context.Context, project, title, requestID, text st
 	}
 	_, reservedErr := s.Store.ChatRequest(ctx, project, requestID)
 	if errors.Is(reservedErr, storage.ErrNotFound) {
-		if err := s.checkAttachments(ctx, project, attachments); err != nil {
+		if selection != nil {
+			if err := s.validateExecution(ctx, *selection, attachments); err != nil {
+				return storage.Chat{}, err
+			}
+		}
+		if err := s.checkSelectedAttachments(ctx, project, selection, attachments); err != nil {
 			return storage.Chat{}, err
 		}
 	} else if reservedErr != nil {
 		return storage.Chat{}, reservedErr
 	}
 	image, harness := s.provisioner.Identity()
-	c, err := s.Store.CreateChatRequest(ctx, project, title, image, harness, requestID, text, attachments...)
+	c, err := s.Store.CreateChatRequestWithExecution(ctx, project, title, image, harness, requestID, text, selection, attachments...)
 	if err != nil {
 		return c, err
 	}
-	_, err = s.Submit(ctx, c.ID, requestID, text, attachments...)
+	_, err = s.SubmitWithExecution(ctx, c.ID, requestID, text, selection, attachments...)
 	if err != nil {
 		return c, err
 	}
@@ -80,6 +88,10 @@ func (s *Service) Create(ctx context.Context, project, title, requestID, text st
 }
 
 func (s *Service) Submit(ctx context.Context, chatID, requestID, text string, attachments ...string) (storage.Acceptance, error) {
+	return s.SubmitWithExecution(ctx, chatID, requestID, text, nil, attachments...)
+}
+
+func (s *Service) SubmitWithExecution(ctx context.Context, chatID, requestID, text string, selection *storage.Execution, attachments ...string) (storage.Acceptance, error) {
 	unlock := s.lockOperation(chatID)
 	defer unlock()
 	if s.provisioner == nil {
@@ -90,11 +102,23 @@ func (s *Service) Submit(ctx context.Context, chatID, requestID, text string, at
 		return storage.Acceptance{}, err
 	}
 	if _, err := s.Store.MessageRequest(ctx, chatID, requestID); err == nil {
-		return s.Store.AcceptMessage(ctx, chatID, requestID, text, attachments...)
+		return s.Store.AcceptMessageWithExecution(ctx, chatID, requestID, text, selection, attachments...)
 	} else if !errors.Is(err, storage.ErrNotFound) {
 		return storage.Acceptance{}, err
 	}
-	if err := s.checkAttachments(ctx, c.ProjectID, attachments); err != nil {
+	if c.ActiveMessageID != "" || c.Status == storage.Working || c.Status == storage.Waiting {
+		return storage.Acceptance{}, storage.ErrActive
+	}
+	effective := c.Execution
+	if selection != nil {
+		effective = *selection
+	}
+	if effective.Model != "" {
+		if err := s.validateExecution(ctx, effective, attachments, chatID); err != nil {
+			return storage.Acceptance{}, err
+		}
+	}
+	if err := s.checkSelectedAttachments(ctx, c.ProjectID, &effective, attachments, chatID); err != nil {
 		return storage.Acceptance{}, err
 	}
 	if c.ActiveMessageID == "" {
@@ -105,7 +129,7 @@ func (s *Service) Submit(ctx context.Context, chatID, requestID, text string, at
 			return storage.Acceptance{}, &ControlError{Reason: reason}
 		}
 	}
-	a, err := s.Store.AcceptMessage(ctx, chatID, requestID, text, attachments...)
+	a, err := s.Store.AcceptMessageWithExecution(ctx, chatID, requestID, text, selection, attachments...)
 	if err != nil || a.Duplicate {
 		return a, err
 	}
@@ -244,8 +268,23 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 		fail("OpenCode configuration or session failed. No message was delivered.")
 		return
 	}
+	execution := storage.MessageExecution(message)
+	if execution.Model == "" {
+		execution = storage.Execution{Provider: credentials.Provider, Model: credentials.Model}
+	}
+	if execution.Model != credentials.Model || execution.Variant != "" {
+		checkCtx, checkCancel := context.WithTimeout(ctx, 10*time.Second)
+		checkErr := validateRuntimeExecution(checkCtx, rt, execution)
+		checkCancel()
+		if checkErr != nil {
+			fail("The selected model or reasoning effort is unavailable in this runtime. No message was delivered. Choose another configuration and send again.")
+			return
+		}
+	}
+	selectedCredentials := credentials
+	selectedCredentials.Provider, selectedCredentials.Model = execution.Provider, execution.Model
 	partsCtx, partsCancel := context.WithTimeout(ctx, 15*time.Second)
-	parts, partsErr := s.runtimeParts(partsCtx, rt, message, credentials)
+	parts, partsErr := s.runtimeParts(partsCtx, rt, message, selectedCredentials)
 	partsCancel()
 	if partsErr != nil {
 		fail("Attachments could not be delivered, or the runtime model does not support their content. No message was delivered.")
@@ -357,8 +396,9 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 		defer close(promptDone)
 		var response runtimeMessage
 		err := rt.call(promptCtx, "POST", sessionPath(c.SessionID)+"/message", map[string]any{
-			"model":  map[string]string{"providerID": credentials.Provider, "modelID": credentials.Model},
-			"system": SystemPrompt, "parts": parts,
+			"model":   map[string]string{"providerID": execution.Provider, "modelID": execution.Model},
+			"variant": execution.Variant,
+			"system":  SystemPrompt, "parts": parts,
 		}, &response)
 		if err == nil && (response.Info.ID == "" || response.Info.Role != "assistant") {
 			err = errors.New("runtime completion response was incomplete")

@@ -2,6 +2,7 @@ package provisioning
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -402,4 +403,90 @@ func TestProvisioningDocker(t *testing.T) {
 			active, waiting = waiting, active
 		}
 	})
+}
+
+// TestModelMetadataDocker reads the real runtime's provider metadata with a
+// placeholder API key. No session is created and no inference is requested.
+func TestModelMetadataDocker(t *testing.T) {
+	image := os.Getenv("FLORA_PROVISIONING_TEST_IMAGE")
+	if image == "" {
+		t.Skip("set FLORA_PROVISIONING_TEST_IMAGE to a locally built agent image")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	engine, err := docker.New("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer engine.Close()
+	if err := engine.Ping(ctx); err != nil {
+		t.Skipf("docker unavailable: %v", err)
+	}
+	img, err := engine.ImageInspect(ctx, image)
+	if err != nil {
+		t.Fatal(err)
+	}
+	network, err := engine.NetworkInspect(ctx, "bridge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := storage.Open(ctx, filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	observer := &metadataDockerEngine{Engine: engine}
+	m, err := New(observer, store, Config{NetworkID: network.ID, BrokerGateway: network.Gateways[0], ImageRef: image, ImageDigest: testDigest, ImageID: img.ID, HarnessVersion: "1.2.27"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		for _, id := range observer.ids {
+			_ = engine.ContainerRemove(context.Background(), id, true)
+		}
+	}()
+	raw, err := m.ModelMetadata(ctx, storage.Credentials{Provider: "anthropic", Model: "claude-sonnet-4-6", ProviderKey: "metadata-only-placeholder"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var catalog struct {
+		Connected []string `json:"connected"`
+		All       []struct {
+			ID     string `json:"id"`
+			Models map[string]struct {
+				Variants map[string]any `json:"variants"`
+			} `json:"models"`
+		} `json:"all"`
+	}
+	if json.Unmarshal(raw, &catalog) != nil || len(catalog.Connected) != 1 || catalog.Connected[0] != "anthropic" {
+		t.Fatal("missing connected provider metadata")
+	}
+	found := false
+	for _, p := range catalog.All {
+		if p.ID == "anthropic" {
+			_, found = p.Models["claude-sonnet-4-6"].Variants["high"]
+		}
+	}
+	if !found {
+		t.Fatal("runtime did not report the model's reasoning variant")
+	}
+	for _, id := range observer.ids {
+		if _, err := engine.ContainerInspect(ctx, id); !docker.IsNotFound(err) {
+			t.Fatal("metadata container was not removed")
+		}
+	}
+	t.Log("Pinned OpenCode returned model-specific reasoning metadata and removed its disposable container without inference")
+}
+
+type metadataDockerEngine struct {
+	Engine
+	ids []string
+}
+
+func (e *metadataDockerEngine) ContainerCreate(ctx context.Context, spec docker.ContainerSpec) (string, error) {
+	id, err := e.Engine.ContainerCreate(ctx, spec)
+	if err == nil {
+		e.ids = append(e.ids, id)
+	}
+	return id, err
 }

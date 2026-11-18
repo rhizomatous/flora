@@ -20,6 +20,7 @@ import (
 const testImage = "flora@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 type testProvisioner struct {
+	metadata   func(context.Context, storage.Credentials) (json.RawMessage, error)
 	store      *storage.Store
 	url        string
 	starts     atomic.Int32
@@ -619,4 +620,11 @@ func TestRuntimeStreamGapRetainsFinalHistory(t *testing.T) {
 	if err != nil || len(messages) != 2 || f.prompts.Load() != 1 {
 		t.Fatal("lost history or resent message after gap")
 	}
+}
+
+func (p *testProvisioner) ModelMetadata(ctx context.Context, c storage.Credentials) (json.RawMessage, error) {
+	if p.metadata != nil {
+		return p.metadata(ctx, c)
+	}
+	return json.RawMessage(`{"connected":["anthropic"],"all":[{"id":"anthropic","models":{"model":{"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}}}}]}`), nil
 }
