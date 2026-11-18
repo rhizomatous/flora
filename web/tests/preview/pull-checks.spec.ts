@@ -260,3 +260,45 @@ test("PR descriptions render Markdown headings, lists, links, code, and tables",
     await page.screenshot({ path: `${screenshotDir}/checks-markdown.png` });
   }
 });
+
+test("author metadata stays aligned when the avatar replaces its fallback", async ({ page }) => {
+  const { promise: avatarReady, resolve: releaseAvatar } = Promise.withResolvers<undefined>();
+  await page.route("https://avatars.githubusercontent.com/**", async (route) => {
+    await avatarReady;
+    await route.fulfill({
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="12" fill="#ddd"/></svg>',
+    });
+  });
+  try {
+    const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+    await page.goto(`${base}/#chats/pagination`);
+    await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+    await page.locator('[data-inline-pr="open"]').click();
+    const header = page.locator(
+      '[data-pull-overview="https://github.com/example/fieldnotes/pull/19"] header',
+    );
+    await page.evaluate(() => document.fonts.ready);
+    await expect(header.locator('[data-slot="avatar-fallback"]')).toBeVisible();
+    releaseAvatar(undefined);
+    await expect(header.locator('[data-slot="avatar-image"]')).toBeVisible();
+    const centers = await header.evaluate((element) => {
+      const author = element.querySelector('a[href="https://github.com/octocat"]');
+      const items = [
+        author,
+        author?.querySelector('[data-slot="avatar-image"]'),
+        author?.querySelector("span.truncate"),
+        element.querySelector("a[title]"),
+        element.querySelector("time"),
+      ];
+      return items.map((item) => {
+        const box = item?.getBoundingClientRect();
+        return box === undefined ? Number.NaN : box.y + box.height / 2;
+      });
+    });
+    expect(centers.every((center) => Number.isFinite(center))).toBe(true);
+    expect(Math.max(...centers) - Math.min(...centers)).toBeLessThan(1);
+  } finally {
+    releaseAvatar(undefined);
+  }
+});
