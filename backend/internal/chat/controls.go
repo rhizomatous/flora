@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/rhizomatous/flora/backend/internal/provisioning"
 	"github.com/rhizomatous/flora/backend/internal/redaction"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
@@ -95,21 +96,25 @@ func (s *Service) Interrupt(ctx context.Context, chatID string) error {
 // Stop keeps the existing container and both persistent mounts. Only a confirmed
 // Docker stop releases admission; an uncertain stop remains blocked for retry.
 func (s *Service) Stop(ctx context.Context, chatID string) error {
+	if cancel, ok := s.wakes.Load(chatID); ok {
+		cancel.(context.CancelFunc)()
+	}
 	return s.control(ctx, chatID, true, false)
 }
 
 // EnforceTimeouts uses the same cancellation and admission ordering as an
 // explicit stop. Question waits are excluded by the provisioner's active clock.
 func (s *Service) EnforceTimeouts(ctx context.Context) error {
+	leaseErr := s.enforceLeases(ctx)
 	p, ok := s.provisioner.(interface{ ActivityExpired(string) bool })
 	if !ok {
-		return nil
+		return leaseErr
 	}
 	chats, err := s.Store.Chats(ctx)
 	if err != nil {
 		return err
 	}
-	var failures []error
+	failures := []error{leaseErr}
 	for _, c := range chats {
 		if p.ActivityExpired(c.ContainerID) {
 			if err := s.control(ctx, c.ID, true, true); err != nil {
@@ -147,7 +152,36 @@ func (s *Service) controlObserved(_ context.Context, observed storage.Chat, stop
 	if len(onlyIdle) > 0 && onlyIdle[0] && (c.Status != storage.Idle || c.ActiveMessageID != "" || c.UpdatedAt != observed.UpdatedAt) {
 		return storage.ErrStale
 	}
-	if c.Status == storage.Stopped || (!stop && c.ActiveMessageID == "" && c.Status == storage.Idle) {
+	if len(onlyIdle) > 0 && onlyIdle[0] {
+		until, err := s.Store.RuntimeLease(ctx, chatID)
+		if err != nil {
+			return err
+		}
+		if until.After(time.Now()) {
+			return storage.ErrStale
+		}
+	}
+	if stop {
+		if err := s.Store.SetRuntimeLease(ctx, chatID, time.Time{}); err != nil {
+			return err
+		}
+	}
+	if stop && c.Status == storage.Stopped {
+		p, ok := s.provisioner.(interface {
+			Runtime(context.Context, string) (provisioning.RuntimeState, error)
+		})
+		if !ok {
+			return nil
+		}
+		r, err := p.Runtime(ctx, chatID)
+		if err != nil {
+			return err
+		}
+		if r.State == "stopped" || r.State == "missing" || r.State == "failed" {
+			return nil
+		}
+	}
+	if !stop && (c.Status == storage.Stopped || (c.ActiveMessageID == "" && c.Status == storage.Idle)) {
 		return nil
 	}
 	if c.ActiveMessageID != observed.ActiveMessageID && !(stop && c.ActiveMessageID == "" && c.Status == storage.Idle) {

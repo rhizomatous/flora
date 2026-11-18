@@ -28,6 +28,26 @@ func TestAutomationReleasesCompletedChatAndResumes(t *testing.T) {
 	}
 	f.release <- false
 	waitStatus(t, s, r.ChatID, storage.Idle)
+	// A live lease defers cleanup, including saving the completed workspace.
+	until := time.Now().Add(time.Hour)
+	if err := s.Store.SetRuntimeLease(ctx, r.ChatID, until); err != nil {
+		t.Fatal(err)
+	}
+	saved := false
+	s.AutomationBeforeStop = func(context.Context, string) error { saved = true; return nil }
+	if err := s.TickAutomations(ctx, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if saved {
+		t.Fatal("automation cleanup ignored keep-awake")
+	}
+	if err := s.Store.SetRuntimeLease(ctx, r.ChatID, time.Now().Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.enforceLeases(ctx); err != nil {
+		t.Fatal(err)
+	}
+	waitStatus(t, s, r.ChatID, storage.Idle)
 	// A failed diff capture must retain the container for a later attempt.
 	s.AutomationBeforeStop = func(context.Context, string) error { return errors.New("capture failed") }
 	if err := s.TickAutomations(ctx, time.Now()); err != nil {

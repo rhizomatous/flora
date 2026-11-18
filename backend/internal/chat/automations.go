@@ -48,13 +48,23 @@ func (s *Service) TickAutomations(ctx context.Context, at time.Time) error {
 			}
 		}
 		if latest == r.MessageID && c.Status == storage.Idle && c.ActiveMessageID == "" {
+			until, err := s.Store.RuntimeLease(ctx, c.ID)
+			if err != nil {
+				return err
+			}
+			if until.After(at) {
+				continue
+			}
 			if s.AutomationBeforeStop != nil {
 				if err := s.AutomationBeforeStop(ctx, c.ID); err != nil {
 					slog.Error("Automation changes could not be saved before stopping", "error", err)
 					continue
 				}
 			}
-			if err := s.controlObserved(ctx, c, true, false, true); err != nil && !errors.Is(err, storage.ErrStale) {
+			if err := s.controlObserved(ctx, c, true, false, true); err != nil {
+				if errors.Is(err, storage.ErrStale) {
+					continue
+				}
 				return err
 			}
 		}

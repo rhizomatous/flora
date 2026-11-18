@@ -7,9 +7,6 @@ import {
   HoverCardContent,
   FlowerIcon,
   Button,
-  PlayIcon,
-  SquareIcon,
-  DropdownButton,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
@@ -25,7 +22,6 @@ import {
   GitPullRequestIcon,
   PlusIcon,
   TerminalIcon,
-  ClockIcon,
   PanelRightIcon,
   ExternalLinkIcon,
   CopyIcon,
@@ -39,6 +35,7 @@ import { chatStatus } from "./chat-status";
 import { ContextUsagePopover } from "./context-usage";
 import { PullCount, PullList } from "./pull-links";
 import type { PullSummary } from "./pull-schemas";
+import { KeepAwakeItem, RuntimeMenu, StopMachineItem } from "./runtime-controls";
 import { SubagentMenuItems } from "./subagents";
 
 /** Shows saved chat metadata and linked pull requests. */
@@ -151,16 +148,19 @@ export function ChatTitle({
 }
 
 export function ChatViewMenu({
+  chatID,
   label = "Chat views",
   diffsOpen,
   onDiffsChange,
 }: {
+  chatID?: string | undefined;
   label?: string;
   diffsOpen: boolean;
   onDiffsChange: (open: boolean) => void;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
         render={
           <Button variant="ghost" size="icon-sm" aria-label={label}>
@@ -168,7 +168,10 @@ export function ChatViewMenu({
           </Button>
         }
       />
-      <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-24px)]">
+      <DropdownMenuContent
+        align="start"
+        className={`${chatID === undefined ? "w-64" : "w-80"} max-w-[calc(100vw-24px)]`}
+      >
         <DropdownMenuItem
           onClick={() => {
             onDiffsChange(false);
@@ -204,11 +207,12 @@ export function ChatViewMenu({
           <TerminalIcon />
           New shell
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>
-          <ClockIcon />
-          Keep awake 4h
-        </DropdownMenuItem>
+        {chatID !== undefined && (
+          <>
+            <DropdownMenuSeparator />
+            <KeepAwakeItem key={chatID} id={chatID} open={open} />
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -243,7 +247,7 @@ export function ChatHeaderActions({
   }
   return (
     <>
-      <ChatViewMenu diffsOpen={diffsOpen} onDiffsChange={onDiffsChange} />
+      <ChatViewMenu chatID={chat?.ID} diffsOpen={diffsOpen} onDiffsChange={onDiffsChange} />
       <span className="ml-auto" />
       <Popover>
         <PopoverTrigger
@@ -303,6 +307,7 @@ export function ChatHeaderActions({
           <CopyIcon />
           {copyState}
         </DropdownMenuItem>
+        {chat && <StopMachineItem key={chat.ID} id={chat.ID} />}
         <DropdownMenuSeparator />
       </ChatOrganizationActions>
       {!sideOpen && <SidePanelToggle open={false} onClick={onSideToggle} />}
@@ -312,12 +317,12 @@ export function ChatHeaderActions({
 
 /** Runtime actions use saved chat state; context uses the latest reported model call. */
 export function ChatComposerFooter({
+  id,
   contextUsage,
   busy,
-  blocked,
-  stopped,
   onControl,
 }: {
+  id: string;
   contextUsage: ContextUsage | undefined;
   busy: boolean;
   blocked: boolean;
@@ -326,61 +331,14 @@ export function ChatComposerFooter({
 }) {
   return (
     <div className="composer-runtime flex items-center gap-1 px-2 pt-[3px] pb-1 text-muted-foreground">
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <DropdownButton
-              variant="tertiary"
-              size="compact"
-              className="composer-up [&_[data-slot=dropdown-chevron]]:rotate-180"
-              aria-label="Chat actions"
-            >
-              <CloudIcon />
-              <span className="florets-control-label">Cloud</span>
-              <span className="runtime-dot size-[5px] rounded-full bg-muted-foreground" />
-            </DropdownButton>
-          }
-        />
-        <DropdownMenuContent
-          side="top"
-          align="start"
-          className="cloud-menu w-72! max-w-[calc(100vw-24px)] p-1.5 text-[13px]"
-        >
-          <div className="cloud-machine-summary px-1.5 pt-[5px] pb-1.5 leading-5">
-            <div className="cloud-machine-heading flex items-center justify-between gap-3">
-              <span>Cloud machine</span>
-              <span className="cloud-machine-status flex items-center gap-1.5 text-muted-foreground">
-                <span className="runtime-dot size-[5px] rounded-full bg-muted-foreground" />
-                Unknown
-              </span>
-            </div>
-            <p
-              className="cloud-machine-specs text-muted-foreground"
-              aria-label="CPU, memory, and disk details unavailable"
-            >
-              CPU — · Memory — · Disk —
-            </p>
-          </div>
-          <DropdownMenuItem disabled>
-            <PlayIcon />
-            Wake machine
-          </DropdownMenuItem>
-          {!blocked && !stopped && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                disabled={busy}
-                onClick={() => {
-                  onControl("stop");
-                }}
-              >
-                <SquareIcon />
-                Stop container
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <RuntimeMenu
+        key={id}
+        id={id}
+        onStop={() => {
+          onControl("stop");
+        }}
+        disabled={busy}
+      />
       <ContextUsagePopover usage={contextUsage} />
     </div>
   );

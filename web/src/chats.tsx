@@ -887,6 +887,7 @@ function FollowUpComposer({
         }
       />
       <ChatComposerFooter
+        id={id}
         contextUsage={contextUsage}
         busy={busy}
         blocked={blocked}

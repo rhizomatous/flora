@@ -326,6 +326,15 @@ func (m *Manager) Identity() (imageDigest, harnessVersion string) {
 // its GitHub credential. Callers must quiesce git/gh work before calling Start;
 // use Endpoint to locate a running container without changing its credentials.
 func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
+	return m.start(ctx, chatID, false)
+}
+
+// Wake refuses creation even if a saved container disappears during admission.
+func (m *Manager) Wake(ctx context.Context, chatID string) (Endpoint, error) {
+	return m.start(ctx, chatID, true)
+}
+
+func (m *Manager) start(ctx context.Context, chatID string, existingOnly bool) (Endpoint, error) {
 	unlock, err := m.store.LockContainer(ctx, chatID)
 	if err != nil {
 		return Endpoint{}, err
@@ -379,6 +388,9 @@ func (m *Manager) Start(ctx context.Context, chatID string) (Endpoint, error) {
 			}
 			containerID = info.ID
 		case docker.IsNotFound(err):
+			if existingOnly {
+				return Endpoint{}, &ExecutionEndedError{Reason: "The saved container is missing", Missing: true}
+			}
 			password, err := docker.NewPassword()
 			if err != nil {
 				return Endpoint{}, err
