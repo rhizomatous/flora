@@ -64,3 +64,26 @@ test("page and collection headings use the shared medium weight", async ({ page 
     });
   }
 });
+
+test("editable controls keep their text size across viewport widths", async ({ page }) => {
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`${base}/#automations/accessibility`);
+    await expect(page.getByLabel("Instructions", { exact: true })).toHaveCSS("font-size", "14px");
+    await expect(page.getByLabel("Time", { exact: true })).toHaveCSS("font-size", "14px");
+    for (const [route, label] of [
+      ["chats/new", "Message"],
+      ["chats/working", "Follow-up"],
+    ] as const) {
+      await page.goto(`${base}/#${route}`);
+      await expect(page.getByLabel(label, { exact: true })).toHaveCSS("font-size", "14px");
+    }
+    await page.goto(`${base}/#chats/new`);
+    await page.getByRole("button", { name: /^Model:/ }).click();
+    await expect(page.getByRole("combobox", { name: "Search models" })).toHaveCSS(
+      "font-size",
+      "14px",
+    );
+    await page.keyboard.press("Escape");
+  }
+});

@@ -86,7 +86,6 @@
   }
   .composer-textarea {
     padding: 14px;
-    font-size: 16px;
     min-height: 106px;
   }
   .composer-bottom-bar {
@@ -135,11 +134,6 @@
 .follow-up-composer .composer-bottom-bar > .composer-model .florets-control-label {
   overflow: hidden;
   text-overflow: ellipsis;
-}
-@media (max-width: 560px) {
-  .follow-up-composer .composer-textarea {
-    font-size: 16px;
-  }
 }
 
 .composer-attachments {
