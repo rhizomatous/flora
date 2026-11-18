@@ -1,14 +1,10 @@
 import { z } from "zod";
 
 import { automationRunSchema } from "./automation-schemas";
+import { executionSchema } from "./execution-schema";
 import { pullSummarySchema } from "./pull-schemas";
 
-export const executionSchema = z.object({
-  provider: z.string(),
-  model: z.string(),
-  variant: z.string(),
-});
-export type Execution = z.infer<typeof executionSchema>;
+export { executionSchema, type Execution } from "./execution-schema";
 
 const subagentSummarySchema = z.object({
   id: z.string(),
