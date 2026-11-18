@@ -6,6 +6,7 @@ import { createServer } from "vite";
 import { test } from "vitest";
 
 import { detailSchema, subagentDetailSchema } from "../../web/src/chat-schemas.ts";
+import { modelOptionSchema } from "../../web/src/model-options.ts";
 import { captured } from "./captured.ts";
 import { projects as fixtureProjects, stories, scenarios } from "./scenarios.ts";
 import {
@@ -102,6 +103,20 @@ test("preview serves isolated fixtures and replays saved events with resumable I
       const unrelated = await fetch(`${base}/api/chats/completed/subagents/${agent.id}`);
       assert.equal(unrelated.status, 404);
     }
+    const modelsResponse = await fetch(`${base}/api/models?chat=completed`);
+    assert.equal(modelsResponse.status, 200);
+    const models: unknown = await modelsResponse.json();
+    assert.ok(
+      typeof models === "object" &&
+        models !== null &&
+        "models" in models &&
+        Array.isArray(models.models),
+    );
+    const model = modelOptionSchema.parse(models.models[0]);
+    assert.equal(model.id, "claude-sonnet-4-6");
+    assert.deepEqual(model.variants, ["low", "medium", "high", "max"]);
+    const missingModels = await fetch(`${base}/api/models?chat=missing`);
+    assert.equal(missingModels.status, 404);
     const projectResponse = await fetch(`${base}/api/projects`);
     assert.deepEqual(await projectResponse.json(), fixtureProjects);
     for (const project of fixtureProjects) {
