@@ -369,9 +369,13 @@ function AutomationForm({
             <Section>
               <SectionHeader className="mx-px px-4">
                 <FieldLabel htmlFor="automation-instructions">Instructions</FieldLabel>
+                <p id="instructions-help" className="text-sm text-muted-foreground">
+                  What Flora should do each time this automation runs.
+                </p>
               </SectionHeader>
               <Textarea
                 id="automation-instructions"
+                aria-describedby="instructions-help"
                 className="min-h-32 resize-none"
                 value={value.instructions}
                 onChange={(e) => {
@@ -382,11 +386,12 @@ function AutomationForm({
               />
             </Section>
             <Card variant="flush" className="divide-y">
-              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3">
                 <FieldLabel htmlFor="automation-project">Project</FieldLabel>
                 <NativeSelect
                   id="automation-project"
-                  className="w-[min(14rem,52vw)]"
+                  aria-describedby="project-help"
+                  className="col-start-2 row-start-1 w-[min(14rem,52vw)] sm:row-span-2"
                   aria-label="Project"
                   value={value.projectID}
                   disabled={initial.id !== ""}
@@ -404,6 +409,12 @@ function AutomationForm({
                     </option>
                   ))}
                 </NativeSelect>
+                <p
+                  id="project-help"
+                  className="col-span-2 text-sm text-muted-foreground sm:col-span-1 sm:row-start-2"
+                >
+                  The project this automation works in.
+                </p>
               </div>
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3">
                 <FieldLabel htmlFor="automation-mode">Runs in</FieldLabel>
@@ -440,11 +451,15 @@ function AutomationForm({
                 <Heading level={3} id="schedule-heading" className="text-sm">
                   Schedule
                 </Heading>
+                <p id="schedule-help" className="text-sm text-muted-foreground">
+                  When to run, in the selected time zone.
+                </p>
               </SectionHeader>
               <Card variant="flush" className="gap-3 p-4">
                 <div
                   role="group"
                   aria-label="Run schedule"
+                  aria-describedby="schedule-help"
                   className="flex flex-wrap items-center gap-2"
                 >
                   <NativeSelect
@@ -691,6 +706,7 @@ export function Automations({
           <Section aria-label="Run history">
             <SectionHeader className="mx-px px-4">
               <Heading level={2}>Run history</Heading>
+              <p className="text-sm text-muted-foreground">Recent runs and their results.</p>
             </SectionHeader>
             {runs.length === 0 ? (
               <p className="mx-px px-4 text-sm text-muted-foreground">
