@@ -9,30 +9,18 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Spinner,
   Popover,
   PopoverTrigger,
   PopoverContent,
-  Command,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandItem,
 } from "@flora/florets";
 
 import type { AttachmentPolicy } from "./attachments";
 import { executionSchema, type Execution } from "./chat-schemas";
 import { ModelIcon } from "./model-icon";
+import { modelOptionSchema } from "./model-options";
+import { ModelPicker } from "./model-picker";
 import { errorMessage, request } from "./request";
 
-const modelOptionSchema = z.object({
-  provider: z.string(),
-  id: z.string(),
-  name: z.string(),
-  variants: z.array(z.string()),
-  image: z.boolean(),
-  pdf: z.boolean(),
-});
 const modelsSchema = z.object({
   default: executionSchema,
   models: z.array(modelOptionSchema),
@@ -138,40 +126,18 @@ export function ModelControls({
         <PopoverContent
           align="start"
           side="top"
-          className="composer-menu w-[300px]! max-w-[calc(100vw-24px)] gap-0 p-0!"
+          className="composer-menu max-h-(--available-height) w-[440px]! max-w-[calc(100vw-24px)]! gap-0 overflow-hidden p-0! transition-none"
           aria-label="Choose model"
         >
-          <Command>
-            <CommandInput aria-label="Search models" placeholder="Search models" />
-            {loading ? (
-              <div
-                className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground"
-                role="status"
-              >
-                <Spinner />
-                Loading models…
-              </div>
-            ) : (
-              <CommandList className="max-h-64">
-                <CommandEmpty>No models found.</CommandEmpty>
-                {options?.models.map((model) => (
-                  <CommandItem
-                    key={model.id}
-                    value={model.id}
-                    keywords={[model.name]}
-                    onSelect={() => {
-                      choose({ provider: model.provider, model: model.id, variant: "" });
-                      setModelOpen(false);
-                    }}
-                  >
-                    <ModelIcon provider={model.provider} model={model.id} />
-                    <span className="min-w-0 flex-1 truncate">{model.name}</span>
-                    {effective?.model === model.id && <CheckIcon />}
-                  </CommandItem>
-                ))}
-              </CommandList>
-            )}
-          </Command>
+          <ModelPicker
+            models={options?.models ?? []}
+            selected={effective}
+            loading={loading}
+            onSelect={(model) => {
+              choose({ provider: model.provider, model: model.id, variant: "" });
+              setModelOpen(false);
+            }}
+          />
           {error && (
             <div className="border-t border-border px-3 py-2">
               <p className="text-xs text-muted-foreground" role="status">

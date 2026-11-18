@@ -256,3 +256,31 @@ func TestRunningChatUsesItsOwnModels(t *testing.T) {
 		t.Fatal("new chats adopted a running chat's private model")
 	}
 }
+
+func TestRuntimeModelRatesPreserveZeroAndMissing(t *testing.T) {
+	var providers runtimeProviders
+	raw := `{"connected":["anthropic"],"all":[{"id":"anthropic","models":{"priced":{"cost":{"input":0,"output":0.1},"capabilities":{"toolcall":true}},"unknown":{"capabilities":{"toolcall":true}},"invalid":{"cost":{"input":-1,"output":2},"capabilities":{"toolcall":true}}}}]}`
+	if err := json.Unmarshal([]byte(raw), &providers); err != nil {
+		t.Fatal(err)
+	}
+	options := providerOptions(providers, ModelOptions{Default: storage.Execution{Provider: "anthropic", Model: "priced"}, Error: "Unavailable"})
+	if options.Error != "" || len(options.Models) != 3 {
+		t.Fatal(options)
+	}
+	for _, m := range options.Models {
+		switch m.ID {
+		case "priced":
+			if m.InputPrice == nil || *m.InputPrice != 0 || m.OutputPrice == nil || *m.OutputPrice != 0.1 {
+				t.Fatal("reported rates changed", m)
+			}
+		case "unknown":
+			if m.InputPrice != nil || m.OutputPrice != nil {
+				t.Fatal("missing rate became zero", m)
+			}
+		case "invalid":
+			if m.InputPrice != nil {
+				t.Fatal("negative rate exposed", m)
+			}
+		}
+	}
+}
