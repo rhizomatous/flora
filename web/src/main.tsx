@@ -215,8 +215,9 @@ function App() {
   const automationEditor = ready && path.startsWith("automations/");
   let contentLayout = "mx-auto w-full max-w-6xl p-4 sm:p-8";
   if (pullsPage || chatsPage || automationsPage) contentLayout = "flex min-h-0 flex-1 flex-col";
-  else if (automationEditor) contentLayout = "min-h-0 flex-1 overflow-y-auto p-4 sm:p-8";
-  else if (conversation) contentLayout = "flex min-h-0 flex-1 flex-col px-4 pb-2 sm:px-8";
+  else if (automationEditor) {
+    contentLayout = "min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-8";
+  } else if (conversation) contentLayout = "flex min-h-0 flex-1 flex-col px-4 pb-2 sm:px-8";
   const frameLayout =
     conversation || pullsPage || chatsPage || automationsPage || automationEditor
       ? "h-dvh min-h-0 min-w-0 overflow-hidden md:h-[calc(100dvh-1rem)]"
