@@ -436,8 +436,8 @@ function AutomationForm({
                   className="col-span-2 text-sm text-muted-foreground sm:col-span-1 sm:row-start-2"
                 >
                   {value.mode === "same"
-                    ? "Continue in the same chat."
-                    : "Start a new chat each run."}
+                    ? "Continue in the same chat"
+                    : "Start a new chat each run"}
                 </p>
                 {initial.id && value.mode !== initial.mode && (
                   <p className="col-span-2 text-sm">
