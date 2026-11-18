@@ -22,11 +22,15 @@ function Section({ className, ...props }: ComponentProps<"section">) {
   );
 }
 
-function SectionHeader({ className, ...props }: ComponentProps<"div">) {
+function SectionHeader({
+  className,
+  inset = false,
+  ...props
+}: ComponentProps<"div"> & { inset?: boolean }) {
   return (
     <div
       data-slot="section-header"
-      className={cn("flex min-w-0 flex-col gap-2", className)}
+      className={cn("flex min-w-0 flex-col gap-2", inset && "mx-px px-4", className)}
       {...props}
     />
   );
