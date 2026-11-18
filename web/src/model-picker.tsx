@@ -41,7 +41,9 @@ export function ModelPicker({
   selected,
   loading,
   onSelect,
+  inherited,
 }: {
+  inherited?: { label: string; selected: boolean; onSelect: () => void } | undefined;
   models: ModelOption[];
   selected: Execution | undefined;
   loading: boolean;
@@ -73,6 +75,17 @@ export function ModelPicker({
       ) : (
         <CommandList className="max-h-[min(360px,calc(var(--available-height)-44px))] scroll-py-2">
           <CommandEmpty>No models found.</CommandEmpty>
+          {inherited && (
+            <CommandGroup className="border-b border-border p-1!">
+              <CommandItem
+                value={inherited.label}
+                data-checked={inherited.selected}
+                onSelect={inherited.onSelect}
+              >
+                {inherited.label}
+              </CommandItem>
+            </CommandGroup>
+          )}
           {[...groups.entries()]
             .toSorted(([a], [b]) => a.localeCompare(b))
             .map(([provider, entries]) => (

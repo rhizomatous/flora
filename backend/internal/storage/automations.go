@@ -11,14 +11,15 @@ import (
 )
 
 type AutomationConfig struct {
-	Description  string `json:"description"`
-	Name         string `json:"name"`
-	Instructions string `json:"instructions"`
-	Mode         string `json:"mode"`
-	Frequency    string `json:"frequency"`
-	Days         []int  `json:"days"`
-	Time         string `json:"time"`
-	TimeZone     string `json:"timeZone"`
+	Execution    *Execution `json:"execution,omitempty"`
+	Description  string     `json:"description"`
+	Name         string     `json:"name"`
+	Instructions string     `json:"instructions"`
+	Mode         string     `json:"mode"`
+	Frequency    string     `json:"frequency"`
+	Days         []int      `json:"days"`
+	Time         string     `json:"time"`
+	TimeZone     string     `json:"timeZone"`
 }
 type Automation struct {
 	AutomationConfig
@@ -41,6 +42,9 @@ type AutomationRun struct {
 }
 
 func (c AutomationConfig) Validate() error {
+	if c.Execution != nil && !c.Execution.Valid() {
+		return ErrInvalid
+	}
 	if len(c.Description) > 2000 || !utf8.ValidString(c.Description) {
 		return ErrInvalid
 	}

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { executionSchema } from "./execution-schema";
+
 export const automationRunSchema = z.object({
   id: z.string(),
   automationID: z.string(),
@@ -15,6 +17,7 @@ export const automationSchema = z.object({
   projectID: z.string(),
   name: z.string(),
   instructions: z.string(),
+  execution: executionSchema.nullable().optional(),
   description: z.string().max(2000).optional(),
   mode: z.enum(["new", "same"]),
   frequency: z.enum(["daily", "weekdays", "weekly"]),

@@ -3,6 +3,9 @@ package chat
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
+	"net/http"
 	"testing"
 	"time"
 
@@ -119,4 +122,83 @@ func TestScheduledAutomationStartsOnce(t *testing.T) {
 	}
 	f.release <- false
 	waitStatus(t, s, runs[0].ChatID, storage.Idle)
+}
+
+// Overrides must reach the same acceptance path for scheduled and manual runs.
+func TestAutomationExecutionOverrides(t *testing.T) {
+	for _, mode := range []string{"new", "same"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newFixture(t)
+			s, _, project := testService(t, f)
+			ctx := context.Background()
+			s.provisioner.(*testProvisioner).metadata = (&attachmentCatalogTransport{status: 200, body: testModelCatalog}).read
+			original := f.server.Config.Handler
+			f.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/provider" {
+					io.WriteString(w, testModelCatalog)
+					return
+				}
+				original.ServeHTTP(w, r)
+			})
+			selected := storage.Execution{Provider: "anthropic", Model: "claude-sonnet-4-6", Variant: "high"}
+			if err := s.ValidateAutomationExecution(ctx, &selected); err != nil {
+				t.Fatal(err)
+			}
+			invalid := selected
+			invalid.Variant = "unsupported"
+			if err := s.ValidateAutomationExecution(ctx, &invalid); err == nil {
+				t.Fatal("unsupported reasoning accepted")
+			}
+			at := time.Now()
+			a, err := s.Store.SaveAutomation(ctx, storage.Automation{ProjectID: project.ID, Enabled: true, AutomationConfig: storage.AutomationConfig{
+				Name: "Selected model", Instructions: "Check", Mode: mode, Frequency: "daily", Time: "09:00", TimeZone: "UTC", Execution: &selected,
+			}}, at)
+			if err != nil {
+				t.Fatal(err)
+			}
+			a, err = s.Store.Automation(ctx, a.ID)
+			if err != nil || a.Execution == nil || *a.Execution != selected {
+				t.Fatalf("saved selection: %+v %v", a, err)
+			}
+			firstChat := ""
+			for _, scheduled := range []bool{false, true} {
+				if scheduled {
+					selected.Variant = "low"
+					a.Execution = &selected
+					a, err = s.Store.SaveAutomation(ctx, a, at)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				due, _ := time.Parse(time.RFC3339, a.NextRun)
+				r, err := s.StartAutomation(ctx, a.ID, fmt.Sprint(scheduled), due, scheduled)
+				if err != nil || r.Status == "failed" {
+					t.Fatalf("start: %+v %v", r, err)
+				}
+				awaitPrompt(t, f)
+				f.release <- false
+				waitStatus(t, s, r.ChatID, storage.Idle)
+				messages, err := s.Store.Messages(ctx, r.ChatID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				matched := false
+				for _, m := range messages {
+					if m.ID == r.MessageID {
+						matched = true
+						if storage.MessageExecution(m) != selected {
+							t.Fatal("override lost", m)
+						}
+					}
+				}
+				if !matched {
+					t.Fatal("missing accepted turn")
+				}
+				if firstChat != "" && (mode == "same") != (firstChat == r.ChatID) {
+					t.Fatal("wrong run destination")
+				}
+				firstChat = r.ChatID
+			}
+		})
+	}
 }
