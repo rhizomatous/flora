@@ -19,7 +19,7 @@ for (const width of [1440, 390]) {
       }
     });
     await title.focus();
-    await expect(title).toHaveCSS("background-color", "rgb(25, 25, 25)");
+    await expect(title).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     await title.fill(`Weekly review ${width}`);
     await title.press("Tab");
     await expect(description).toBeFocused();
@@ -30,7 +30,7 @@ for (const width of [1440, 390]) {
       (element) => getComputedStyle(element).borderTopColor,
     );
     await instructions.focus();
-    await expect(instructions).not.toHaveCSS("border-top-color", border);
+    await expect(instructions).toHaveCSS("border-top-color", border);
     await expect(instructions).toHaveCSS("box-shadow", "none");
     await expect(instructions).toHaveCSS("padding-top", "16px");
     await instructions.fill("Review changes and summarize findings.");

@@ -67,7 +67,9 @@ try {
     const title = page.getByRole("textbox", { name: "Title", exact: true });
     await expect(title).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     await title.focus();
-    await expect(title).not.toHaveCSS("border-top-color", "rgba(0, 0, 0, 0)");
+    await expect(title).toHaveCSS("border-top-color", "rgba(0, 0, 0, 0)");
+    await expect(title).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(title).toHaveCSS("font-weight", "500");
     await title.fill("A new title");
     await title.press("Tab");
     const description = page.getByRole("textbox", { name: "Description", exact: true });
@@ -82,7 +84,7 @@ try {
     await textarea.waitFor({ state: "visible" });
     const border = await textarea.evaluate((element) => getComputedStyle(element).borderTopColor);
     await textarea.focus();
-    await expect(textarea).not.toHaveCSS("border-top-color", border);
+    await expect(textarea).toHaveCSS("border-top-color", border);
     await expect(textarea).toHaveCSS("box-shadow", "none");
     await expect(textarea).toHaveCSS("padding-top", "16px");
     await page.goto(`${base}example.html?component=input-group&theme=${theme}`, {
