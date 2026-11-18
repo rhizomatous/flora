@@ -2,10 +2,9 @@ package chat
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
-	"io"
-	"net/http"
 	"slices"
 	"sort"
 	"strings"
@@ -29,126 +28,150 @@ type ModelOptions struct {
 	Error   string            `json:"error"`
 }
 type modelCache struct {
-	mu      sync.Mutex
-	expires time.Time
-	value   ModelOptions
+	mu       sync.Mutex
+	expires  time.Time
+	value    ModelOptions
+	identity [32]byte
 }
 
-// Models exposes only the installed provider, whose key is available in every
-// container. Discovery never calls inference or returns provider credentials.
-func (s *Service) Models(ctx context.Context) ModelOptions {
+// runtimeProviders contains only public metadata. Keys and provider options never
+// enter the browser response or the model cache.
+type runtimeProviders struct {
+	All []struct {
+		ID     string `json:"id"`
+		Models map[string]struct {
+			Name         string                     `json:"name"`
+			Status       string                     `json:"status"`
+			Variants     map[string]json.RawMessage `json:"variants"`
+			Capabilities struct {
+				ToolCall bool `json:"toolcall"`
+				Input    struct {
+					Image bool `json:"image"`
+					PDF   bool `json:"pdf"`
+				} `json:"input"`
+			} `json:"capabilities"`
+		} `json:"models"`
+	} `json:"all"`
+	Connected []string `json:"connected"`
+}
+
+// Models reads the owning runtime for a running chat. New and stopped chats use
+// cached metadata from a disposable instance of the installed, pinned runtime.
+// Discovery never creates a session or submits a prompt.
+func (s *Service) Models(ctx context.Context, chatIDs ...string) ModelOptions {
 	credentials, err := s.Store.Credentials(ctx)
 	if err != nil {
 		return ModelOptions{Models: []ModelOption{}, Error: "Configure a model provider in installation settings."}
 	}
 	fallback := ModelOptions{Default: storage.Execution{Provider: credentials.Provider, Model: credentials.Model}, Models: []ModelOption{{Provider: credentials.Provider, ID: credentials.Model, Name: credentials.Model, Variants: []string{}}}, Error: "Model discovery is unavailable. You can use the installation default or retry."}
+	if s.provisioner == nil {
+		return fallback
+	}
+	lookup, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if len(chatIDs) > 0 && chatIDs[0] != "" {
+		c, err := s.Store.Chat(lookup, chatIDs[0])
+		if err != nil {
+			return fallback
+		}
+		if c.ContainerID != "" && c.Status != storage.Stopped {
+			endpoint, err := s.provisioner.Endpoint(lookup, c.ID)
+			if err != nil {
+				return fallback
+			}
+			rt := newRuntime(endpoint)
+			defer rt.client.CloseIdleConnections()
+			var providers runtimeProviders
+			if rt.call(lookup, "GET", "/provider", nil, &providers) != nil {
+				return fallback
+			}
+			return providerOptions(providers, fallback)
+		}
+		image, version := s.provisioner.Identity()
+		if c.ImageDigest != image || c.HarnessVersion != version {
+			return fallback
+		}
+	}
+	// A changed credential or pinned runtime must not reuse an older discovery.
+	image, version := s.provisioner.Identity()
+	identity := sha256.Sum256([]byte(credentials.Provider + "\x00" + credentials.Model + "\x00" + credentials.ProviderKey + "\x00" + image + "\x00" + version))
 	s.models.mu.Lock()
 	defer s.models.mu.Unlock()
-	if time.Now().Before(s.models.expires) && s.models.value.Default == fallback.Default {
+	if time.Now().Before(s.models.expires) && s.models.identity == identity {
 		return s.models.value
 	}
-	lookup, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(lookup, "GET", "https://models.dev/api.json", nil)
-	client := s.ModelCatalogClient
-	if client == nil {
-		client = &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	}
-	response, err := client.Do(req)
+	raw, err := s.provisioner.ModelMetadata(lookup, credentials)
 	if err != nil {
 		return fallback
 	}
-	defer response.Body.Close()
-	if response.StatusCode != 200 {
+	var providers runtimeProviders
+	if json.Unmarshal(raw, &providers) != nil {
 		return fallback
 	}
-	var catalog map[string]struct {
-		Models map[string]struct {
-			Name       string `json:"name"`
-			Reasoning  bool   `json:"reasoning"`
-			ToolCall   bool   `json:"tool_call"`
-			Status     string `json:"status"`
-			Release    string `json:"release_date"`
-			Modalities struct {
-				Input []string `json:"input"`
-			} `json:"modalities"`
-		} `json:"models"`
+	result := providerOptions(providers, fallback)
+	if result.Error == "" {
+		s.models.value, s.models.expires, s.models.identity = result, time.Now().Add(5*time.Minute), identity
 	}
-	if json.NewDecoder(io.LimitReader(response.Body, 32<<20)).Decode(&catalog) != nil {
+	return result
+}
+
+func providerOptions(providers runtimeProviders, fallback ModelOptions) ModelOptions {
+	if !slices.Contains(providers.Connected, fallback.Default.Provider) {
 		return fallback
 	}
 	result := ModelOptions{Default: fallback.Default, Models: []ModelOption{}}
-	for id, m := range catalog[credentials.Provider].Models {
-		if !(storage.Execution{Provider: credentials.Provider, Model: id}).Valid() {
+	for _, p := range providers.All {
+		if p.ID != fallback.Default.Provider {
 			continue
 		}
-		if (!m.ToolCall || m.Status == "deprecated") && id != credentials.Model {
-			continue
+		for id, m := range p.Models {
+			if !(storage.Execution{Provider: p.ID, Model: id}).Valid() || !m.Capabilities.ToolCall || m.Status == "deprecated" {
+				continue
+			}
+			variants := []string{}
+			for name, raw := range m.Variants {
+				var variant struct {
+					Disabled bool `json:"disabled"`
+				}
+				if json.Unmarshal(raw, &variant) == nil && !variant.Disabled && (storage.Execution{Provider: p.ID, Model: id, Variant: name}).Valid() {
+					variants = append(variants, name)
+				}
+			}
+			// Keep familiar effort order, while preserving arbitrary runtime variant names.
+			order := []string{"none", "minimal", "low", "medium", "high", "xhigh", "max"}
+			sort.Slice(variants, func(i, j int) bool {
+				a, b := slices.Index(order, variants[i]), slices.Index(order, variants[j])
+				if a < 0 {
+					a = len(order)
+				}
+				if b < 0 {
+					b = len(order)
+				}
+				if a == b {
+					return variants[i] < variants[j]
+				}
+				return a < b
+			})
+			name := m.Name
+			if name == "" {
+				name = id
+			}
+			result.Models = append(result.Models, ModelOption{Provider: p.ID, ID: id, Name: name, Variants: variants, Image: m.Capabilities.Input.Image, PDF: m.Capabilities.Input.PDF})
 		}
-		name := m.Name
-		if name == "" {
-			name = id
-		}
-		result.Models = append(result.Models, ModelOption{Provider: credentials.Provider, ID: id, Name: name, Variants: modelVariants(credentials.Provider, id, m.Reasoning, m.Release), Image: slices.Contains(m.Modalities.Input, "image"), PDF: slices.Contains(m.Modalities.Input, "pdf")})
 	}
 	if len(result.Models) == 0 {
 		return fallback
 	}
-	if !slices.ContainsFunc(result.Models, func(m ModelOption) bool { return m.ID == credentials.Model }) {
-		result.Models = append(result.Models, fallback.Models[0])
-	}
-	sort.Slice(result.Models, func(i, j int) bool { return result.Models[i].Name < result.Models[j].Name })
-	s.models.value, s.models.expires = result, time.Now().Add(5*time.Minute)
+	sort.Slice(result.Models, func(i, j int) bool {
+		if result.Models[i].Name == result.Models[j].Name {
+			return result.Models[i].ID < result.Models[j].ID
+		}
+		return result.Models[i].Name < result.Models[j].Name
+	})
 	return result
 }
 
-// Variant names match ProviderTransform.variants in OpenCode 1.2.27. The owning
-// runtime rechecks custom choices before delivery because its catalog may differ.
-func modelVariants(provider, id string, reasoning bool, release string) []string {
-	if !reasoning {
-		return []string{}
-	}
-	id = strings.ToLower(id)
-	switch provider {
-	case "anthropic":
-		if strings.Contains(id, "opus-4-6") || strings.Contains(id, "sonnet-4-6") || strings.Contains(id, "opus-4.6") || strings.Contains(id, "sonnet-4.6") {
-			return []string{"low", "medium", "high", "max"}
-		}
-		return []string{"high", "max"}
-	case "google":
-		if strings.Contains(id, "2.5") {
-			return []string{"high", "max"}
-		}
-		if strings.Contains(id, "3.1") {
-			return []string{"low", "medium", "high"}
-		}
-		return []string{"low", "high"}
-	case "openai":
-		if id == "gpt-5-pro" {
-			return []string{}
-		}
-		efforts := []string{"low", "medium", "high"}
-		if strings.Contains(id, "codex") {
-			if strings.Contains(id, "5.2") || strings.Contains(id, "5.3") {
-				efforts = append(efforts, "xhigh")
-			}
-			return efforts
-		}
-		if strings.Contains(id, "gpt-5-") || id == "gpt-5" {
-			efforts = append([]string{"minimal"}, efforts...)
-		}
-		if release >= "2025-11-13" {
-			efforts = append([]string{"none"}, efforts...)
-		}
-		if release >= "2025-12-04" {
-			efforts = append(efforts, "xhigh")
-		}
-		return efforts
-	}
-	return []string{}
-}
-
-func (s *Service) validateExecution(ctx context.Context, selected storage.Execution, attachments []string) error {
+func (s *Service) validateExecution(ctx context.Context, selected storage.Execution, attachments []string, chatIDs ...string) error {
 	credentials, err := s.Store.Credentials(ctx)
 	if err != nil {
 		return &ControlError{Reason: "Configure a model provider in installation settings."}
@@ -159,7 +182,7 @@ func (s *Service) validateExecution(ctx context.Context, selected storage.Execut
 	if selected.Model == credentials.Model && selected.Variant == "" {
 		return nil
 	}
-	options := s.Models(ctx)
+	options := s.Models(ctx, chatIDs...)
 	if options.Error != "" {
 		return &ControlError{Reason: options.Error}
 	}
@@ -185,28 +208,19 @@ func (s *Service) validateExecution(ctx context.Context, selected storage.Execut
 }
 
 func validateRuntimeExecution(ctx context.Context, rt *runtime, selected storage.Execution) error {
-	var providers struct {
-		All []struct {
-			ID     string `json:"id"`
-			Models map[string]struct {
-				Variants map[string]json.RawMessage `json:"variants"`
-			} `json:"models"`
-		} `json:"all"`
-	}
+	var providers runtimeProviders
 	if err := rt.call(ctx, "GET", "/provider", nil, &providers); err != nil {
 		return err
 	}
-	for _, p := range providers.All {
-		if p.ID == selected.Provider {
-			if m, ok := p.Models[selected.Model]; ok {
-				if selected.Variant == "" {
-					return nil
-				}
-				if _, ok := m.Variants[selected.Variant]; ok {
-					return nil
-				}
-			}
+	unavailable := errors.New("selected model or reasoning effort is unavailable in this runtime")
+	options := providerOptions(providers, ModelOptions{Default: selected, Error: unavailable.Error()})
+	if options.Error != "" {
+		return unavailable
+	}
+	for _, m := range options.Models {
+		if m.ID == selected.Model && (selected.Variant == "" || slices.Contains(m.Variants, selected.Variant)) {
+			return nil
 		}
 	}
-	return errors.New("selected model or reasoning effort is unavailable in this runtime")
+	return unavailable
 }

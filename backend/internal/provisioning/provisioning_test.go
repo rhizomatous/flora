@@ -1086,3 +1086,10 @@ func TestEndpointRecovery(t *testing.T) {
 		t.Fatal("stopped container has no endpoint")
 	}
 }
+
+func (f *fakeEngine) ContainerRemove(_ context.Context, id string, _ bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.containers, id)
+	return nil
+}

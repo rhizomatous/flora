@@ -14,29 +14,24 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
-const testModelCatalog = `{"anthropic":{"models":{"model":{"tool_call":true},"claude-sonnet-4-6":{"name":"Sonnet","tool_call":true,"reasoning":true},"claude-haiku-4-5":{"name":"Haiku","tool_call":true},"no-tools":{"tool_call":false}}},"openai":{"models":{"gpt-5":{"tool_call":true,"reasoning":true}}}}`
+const testModelCatalog = `{"connected":["anthropic"],"all":[{"id":"anthropic","key":"provider_SECRET","options":{"apiKey":"provider_SECRET"},"models":{"model":{"capabilities":{"toolcall":true}},"claude-sonnet-4-6":{"name":"Sonnet","variants":{"low":{},"medium":{},"high":{},"careful":{},"disabled":{"disabled":true}},"capabilities":{"toolcall":true}},"claude-haiku-4-5":{"name":"Haiku","capabilities":{"toolcall":true}},"no-tools":{"capabilities":{"toolcall":false}}}},{"id":"openai","models":{"gpt-5":{"capabilities":{"toolcall":true}}}}]}`
 
-func TestModelSpecificVariants(t *testing.T) {
-	for _, tc := range []struct {
-		provider, id, release string
-		reasoning             bool
-		want                  []string
-	}{
-		{"anthropic", "claude-sonnet-4-6", "", true, []string{"low", "medium", "high", "max"}},
-		{"anthropic", "claude-sonnet-4-5", "", true, []string{"high", "max"}},
-		{"anthropic", "claude-haiku-4-5", "", false, []string{}},
-		{"openai", "gpt-5-pro", "2025-10-01", true, []string{}},
-		{"openai", "gpt-5.2-codex", "2026-01-01", true, []string{"low", "medium", "high", "xhigh"}},
-		{"openai", "gpt-5", "2025-08-07", true, []string{"minimal", "low", "medium", "high"}},
-		{"openai", "gpt-5.2", "2025-12-11", true, []string{"none", "low", "medium", "high", "xhigh"}},
-		{"google", "gemini-2.5-pro", "", true, []string{"high", "max"}},
-		{"google", "gemini-3.1-pro", "", true, []string{"low", "medium", "high"}},
-	} {
-		t.Run(tc.id, func(t *testing.T) {
-			if got := modelVariants(tc.provider, tc.id, tc.reasoning, tc.release); !reflect.DeepEqual(got, tc.want) {
-				t.Fatal(got)
-			}
-		})
+func TestRuntimeMetadataPreservesVariantsAndFiltersModels(t *testing.T) {
+	f := newFixture(t)
+	s, _, _ := testService(t, f)
+	s.provisioner.(*testProvisioner).metadata = (&attachmentCatalogTransport{status: 200, body: testModelCatalog}).read
+	options := s.Models(context.Background())
+	if options.Error != "" || len(options.Models) != 3 {
+		t.Fatal(options)
+	}
+	for _, m := range options.Models {
+		if m.ID == "claude-sonnet-4-6" && !reflect.DeepEqual(m.Variants, []string{"low", "medium", "high", "careful"}) {
+			t.Fatal(m)
+		}
+	}
+	raw, _ := json.Marshal(options)
+	if bytes.Contains(raw, []byte("provider_SECRET")) {
+		t.Fatal("metadata exposed credentials")
 	}
 }
 
@@ -45,7 +40,7 @@ func TestModelAdmissionDiscoveryAndDelivery(t *testing.T) {
 	s, _, project := testService(t, f)
 	ctx := context.Background()
 	catalog := &attachmentCatalogTransport{status: 503}
-	s.ModelCatalogClient = &http.Client{Transport: catalog}
+	s.provisioner.(*testProvisioner).metadata = catalog.read
 	if options := s.Models(ctx); options.Error == "" || len(options.Models) != 1 {
 		t.Fatal(options)
 	}
@@ -71,7 +66,7 @@ func TestModelAdmissionDiscoveryAndDelivery(t *testing.T) {
 	prompts := make(chan storage.Execution, 4)
 	f.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/provider" {
-			io.WriteString(w, `{"all":[{"id":"anthropic","models":{"claude-sonnet-4-6":{"variants":{"low":{},"high":{}}}}}]}`)
+			io.WriteString(w, `{"connected":["anthropic"],"all":[{"id":"anthropic","models":{"claude-sonnet-4-6":{"variants":{"low":{},"high":{}},"capabilities":{"toolcall":true}}}}]}`)
 			return
 		}
 		if r.Method == "POST" && r.URL.Path == "/session/ses_one/message" {
@@ -134,11 +129,11 @@ func TestAutomationExecutionPolicy(t *testing.T) {
 	f := newFixture(t)
 	s, _, project := testService(t, f)
 	ctx := context.Background()
-	s.ModelCatalogClient = &http.Client{Transport: &attachmentCatalogTransport{status: 200, body: testModelCatalog}}
+	s.provisioner.(*testProvisioner).metadata = (&attachmentCatalogTransport{status: 200, body: testModelCatalog}).read
 	original := f.server.Config.Handler
 	f.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/provider" {
-			io.WriteString(w, `{"all":[{"id":"anthropic","models":{"claude-sonnet-4-6":{"variants":{"high":{}}}}}]}`)
+			io.WriteString(w, `{"connected":["anthropic"],"all":[{"id":"anthropic","models":{"claude-sonnet-4-6":{"variants":{"high":{}},"capabilities":{"toolcall":true}}}}]}`)
 			return
 		}
 		original.ServeHTTP(w, r)
@@ -188,5 +183,76 @@ func TestAutomationExecutionPolicy(t *testing.T) {
 	freshMessages, _ := s.Store.Messages(ctx, fresh.ChatID)
 	if storage.MessageExecution(freshMessages[0]).Model != "model" {
 		t.Fatal(freshMessages)
+	}
+}
+
+func TestDiscoveryCacheTracksCredentialsAndFailures(t *testing.T) {
+	f := newFixture(t)
+	s, _, _ := testService(t, f)
+	ctx := context.Background()
+	metadata := &attachmentCatalogTransport{status: 200, body: testModelCatalog}
+	s.provisioner.(*testProvisioner).metadata = metadata.read
+	if s.Models(ctx).Error != "" || s.Models(ctx).Error != "" || metadata.calls != 1 {
+		t.Fatal("successful metadata was not cached")
+	}
+	credentials, _ := s.Store.Credentials(ctx)
+	credentials.ProviderKey = "rotated-provider-key"
+	if err := s.Store.SaveCredentials(ctx, credentials); err != nil {
+		t.Fatal(err)
+	}
+	if s.Models(ctx).Error != "" || metadata.calls != 2 {
+		t.Fatal("key rotation reused old metadata")
+	}
+	s.models.expires = time.Time{}
+	metadata.status = 503
+	if s.Models(ctx).Error == "" {
+		t.Fatal("failed discovery appeared successful")
+	}
+	metadata.status = 200
+	metadata.body = `{"connected":[],"all":[]}`
+	if s.Models(ctx).Error == "" {
+		t.Fatal("disconnected provider exposed model choices")
+	}
+	metadata.body = testModelCatalog
+	if s.Models(ctx).Error != "" || metadata.calls != 5 {
+		t.Fatal("failed discovery prevented retry")
+	}
+}
+
+func TestRunningChatUsesItsOwnModels(t *testing.T) {
+	f := newFixture(t)
+	s, p, project := testService(t, f)
+	ctx := context.Background()
+	metadata := &attachmentCatalogTransport{status: 200, body: testModelCatalog}
+	p.metadata = metadata.read
+	_ = s.Models(ctx)
+	original := f.server.Config.Handler
+	f.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/provider" {
+			io.WriteString(w, `{"connected":["anthropic"],"all":[{"id":"anthropic","models":{"runtime-only-model":{"name":"Runtime model","variants":{"careful":{}},"capabilities":{"toolcall":true,"input":{"image":true}}}}}]}`)
+			return
+		}
+		original.ServeHTTP(w, r)
+	})
+	c, err := s.Store.CreateChat(ctx, project.ID, "Existing", testImage, "1.2.27")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Store.BindRuntime(ctx, c.ID, "container", "ses_one"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Store.Transition(ctx, c.ID, "", storage.Idle, "Ready"); err != nil {
+		t.Fatal(err)
+	}
+	options := s.Models(ctx, c.ID)
+	if options.Error != "" || len(options.Models) != 1 || options.Models[0].ID != "runtime-only-model" || !options.Models[0].Image || !reflect.DeepEqual(options.Models[0].Variants, []string{"careful"}) || metadata.calls != 1 || p.starts.Load() != 0 {
+		t.Fatal(options, "running chat did not use its own runtime")
+	}
+	selected := storage.Execution{Provider: "anthropic", Model: "runtime-only-model", Variant: "careful"}
+	if err := s.validateExecution(ctx, selected, nil, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.validateExecution(ctx, selected, nil); err == nil {
+		t.Fatal("new chats adopted a running chat's private model")
 	}
 }

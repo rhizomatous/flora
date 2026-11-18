@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
-	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -22,6 +21,7 @@ import (
 
 type Provisioner interface {
 	Identity() (string, string)
+	ModelMetadata(context.Context, storage.Credentials) (json.RawMessage, error)
 	Start(context.Context, string) (provisioning.Endpoint, error)
 	Endpoint(context.Context, string) (provisioning.Endpoint, error)
 	BeginActivity(string)
@@ -30,8 +30,6 @@ type Provisioner interface {
 
 type Service struct {
 	models                  modelCache
-	ModelCatalogClient      *http.Client
-	attachmentCapabilities  capabilityCache
 	AutomationBeforeStop    func(context.Context, string) error
 	Store                   *storage.Store
 	provisioner             Provisioner
@@ -115,27 +113,11 @@ func (s *Service) SubmitWithExecution(ctx context.Context, chatID, requestID, te
 		effective = *selection
 	}
 	if effective.Model != "" {
-		if err := s.validateExecution(ctx, effective, attachments); err != nil {
+		if err := s.validateExecution(ctx, effective, attachments, chatID); err != nil {
 			return storage.Acceptance{}, err
 		}
 	}
-	if c.SessionID != "" && effective.Model != "" {
-		credentials, credentialErr := s.Store.Credentials(ctx)
-		if credentialErr == nil && (effective.Model != credentials.Model || effective.Variant != "") {
-			endpoint, endpointErr := s.provisioner.Endpoint(ctx, chatID)
-			if endpointErr == nil {
-				checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-				rt := newRuntime(endpoint)
-				checkErr := validateRuntimeExecution(checkCtx, rt, effective)
-				rt.client.CloseIdleConnections()
-				cancel()
-				if checkErr != nil {
-					return storage.Acceptance{}, &ControlError{Reason: "The selected model or reasoning effort is unavailable in this runtime. Choose another configuration or retry."}
-				}
-			}
-		}
-	}
-	if err := s.checkSelectedAttachments(ctx, c.ProjectID, &effective, attachments); err != nil {
+	if err := s.checkSelectedAttachments(ctx, c.ProjectID, &effective, attachments, chatID); err != nil {
 		return storage.Acceptance{}, err
 	}
 	if c.ActiveMessageID == "" {

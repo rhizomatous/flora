@@ -69,11 +69,14 @@ export function ModelControls({
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [modelOpen, setModelOpen] = useState(false);
+  const discoveryPath = scope.startsWith("chat:")
+    ? `models?chat=${encodeURIComponent(scope.slice(5))}`
+    : "models";
   useEffect(() => {
     const controller = new AbortController();
     async function load() {
       try {
-        const result = await request(modelsSchema, "models", { signal: controller.signal });
+        const result = await request(modelsSchema, discoveryPath, { signal: controller.signal });
         setOptions(result);
         setError(result.error);
       } catch (e) {
@@ -87,7 +90,7 @@ export function ModelControls({
       controller.abort();
     };
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Retrying starts a fresh discovery request.
-  }, [attempt]);
+  }, [attempt, discoveryPath]);
   const effective =
     selected ?? (saved?.model !== undefined && saved.model !== "" ? saved : options?.default);
   const current = options?.models.find((model) => model.id === effective?.model);

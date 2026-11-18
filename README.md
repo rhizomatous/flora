@@ -65,7 +65,11 @@ the provider's model metadata endpoint. This initial account check does not
 validate repository permissions. The provider and installation default model
 are fixed on first save; keys can be replaced later. Blank keys keep saved values.
 
-Choose a model and its supported reasoning effort in the chat composer. A selection
+Choose a model and its supported reasoning effort in the chat composer. OpenCode
+supplies the available models, reasoning variants, and attachment capabilities.
+New-chat discovery uses a short-lived instance of the pinned image without a
+checkout or setup script, and caches its metadata. Running chats use their own
+runtime. Discovery creates no sessions and requests no inference. A selection
 applies when the next message is accepted, and cannot change an active turn. Chats
 retain their last accepted selection. New-chat automations use the installation
 default; same-chat automations retain that chat's selection.
