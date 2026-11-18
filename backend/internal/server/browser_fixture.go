@@ -144,6 +144,43 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 					return nil, err
 				}
 				files := map[string]string{
+					".gitignore":                  "node_modules/\nresult\n.env\n",
+					".github/workflows/check.yml": "name: Checks\non: [push, pull_request]\njobs:\n  check:\n    runs-on: ubuntu-latest\n",
+					"README.md":                   "# Flora workspace\n\nA small development workspace for testing file navigation.\n",
+					"flake.nix": `# Development tools for the workspace.
+{
+  description = "Flora development environment";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
+
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = import nixpkgs { inherit system; };
+
+        # Keep command-line tools in one place.
+        tools = with pkgs; [
+          git
+          go
+          nodejs_24
+          ripgrep
+        ];
+      in {
+        devShells.default = pkgs.mkShell {
+          packages = tools;
+
+          shellHook = ''
+            echo "Workspace ready"
+          '';
+        };
+
+        formatter = pkgs.nixfmt;
+      });
+}
+`,
 					"README.txt":        "Workspace preview fixture\nRepository: " + repo.Name + "\n\nBrowse files, open src, and download a file.\n",
 					"package.json":      "{\n  \"name\": \"" + repo.Name + "\",\n  \"private\": true\n}\n",
 					"src/navigation.ts": "export const views = [\n  \"Overview\",\n  \"Diffs\",\n  \"Machine files\",\n];\n\nexport function label(index: number) {\n  return views[index] ?? \"Overview\";\n}\n",
@@ -152,6 +189,9 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 					"empty.txt":         "",
 				}
 				for name, body := range files {
+					if err = os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0700); err != nil {
+						return nil, err
+					}
 					if err = os.WriteFile(filepath.Join(root, name), []byte(body), 0600); err != nil {
 						return nil, err
 					}

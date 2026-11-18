@@ -231,6 +231,7 @@ export function ChatHeaderActions({
   diffsOpen,
   onDiffsChange,
   onFilesOpen,
+  filesOpen,
 }: {
   chat: Chat | undefined;
   sideOpen: boolean;
@@ -239,6 +240,7 @@ export function ChatHeaderActions({
   diffsOpen: boolean;
   onDiffsChange: (open: boolean) => void;
   onFilesOpen: () => void;
+  filesOpen: boolean;
 }) {
   const [copyState, setCopyState] = useState("Copy link");
   const costUnavailable = usage?.costUSD === undefined || usage.costUSD === null;
@@ -259,6 +261,7 @@ export function ChatHeaderActions({
         diffsOpen={diffsOpen}
         onDiffsChange={onDiffsChange}
         onFilesOpen={onFilesOpen}
+        filesOpen={filesOpen}
       />
       <span className="ml-auto" />
       <Popover>

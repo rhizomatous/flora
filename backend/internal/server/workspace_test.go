@@ -58,7 +58,7 @@ func TestWorkspaceAuthenticatedPersistedAccess(t *testing.T) {
 			h.ServeHTTP(w, r)
 			return w
 		}
-		for _, query := range []string{"", "?repository=first%2Fapp", "?repository=first%2Fapp&path=same.txt&action=preview", "?repository=first%2Fapp&path=same.txt&action=download&version=old"} {
+		for _, query := range []string{"", "?repository=first%2Fapp", "?repository=first%2Fapp&action=search&query=same", "?repository=first%2Fapp&path=same.txt&action=preview", "?repository=first%2Fapp&path=same.txt&action=download&version=old"} {
 			if w := call(query, ""); w.Code != 401 {
 				t.Fatalf("unauthenticated %d", w.Code)
 			}
@@ -68,6 +68,11 @@ func TestWorkspaceAuthenticatedPersistedAccess(t *testing.T) {
 		}
 		for _, repo := range configuration.Repositories {
 			q := "?repository=" + url.QueryEscape(repo.Name) + "&path=same.txt"
+			search := call("?repository="+url.QueryEscape(repo.Name)+"&action=search&query=same", token)
+			var matches workspace.SearchResults
+			if search.Code != 200 || json.Unmarshal(search.Body.Bytes(), &matches) != nil || len(matches.Paths) != 1 || matches.Paths[0] != "same.txt" {
+				t.Fatal(search.Body.String())
+			}
 			w := call(q+"&action=preview", token)
 			var preview workspace.Preview
 			if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &preview) != nil || preview.Text != repo.Name {

@@ -3,6 +3,7 @@ import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 
 // Add the languages you need. Each one loads the first time it is used.
 const languages = {
+  nix: () => import("shiki/langs/nix.mjs"),
   go: () => import("shiki/langs/go.mjs"),
   rust: () => import("shiki/langs/rust.mjs"),
   dockerfile: () => import("shiki/langs/dockerfile.mjs"),
