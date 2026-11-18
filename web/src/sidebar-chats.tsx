@@ -11,6 +11,7 @@ import {
   FolderIcon,
   ListIcon,
   Settings2Icon,
+  CheckIcon,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
@@ -25,8 +26,9 @@ import { pinnedChats } from "./chat-organization";
 import { ChatOrganizationActions } from "./chat-organization-actions";
 import type { Chat } from "./chat-schemas";
 import { chatStatus } from "./chat-status";
+import { UnreadDot } from "./mark-chats-read";
 import { PullCount, PullList } from "./pull-links";
-import { useSeenSidebarChats } from "./sidebar-status";
+import { isChatSeen, useMarkChatsRead } from "./sidebar-status";
 
 type Project = { id: string; name: string };
 
@@ -75,7 +77,10 @@ function ChatRow({
                 <span />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="florets-navigation-title">{chat.Title || "Chat"}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="florets-navigation-title">{chat.Title || "Chat"}</span>
+                  <UnreadDot seen={seen} />
+                </span>
                 <span className="florets-navigation-meta flex! flex-wrap items-center gap-x-2">
                   <span>{status.label}</span>
                   <PullCount pulls={chat.pulls?.items ?? []} />
@@ -144,7 +149,6 @@ export function SidebarChats({
   searching: boolean;
   setSearching: (value: boolean) => void;
 }) {
-  const isSeen = useSeenSidebarChats(chats, path);
   const focusSearch = useCallback((node: HTMLInputElement | null) => {
     node?.focus();
   }, []);
@@ -185,6 +189,13 @@ export function SidebarChats({
       `${chat.Title} ${chat.ID} ${projects.find((project) => project.id === chat.ProjectID)?.name ?? ""}`
         .toLowerCase()
         .includes(filter),
+  );
+  const {
+    mark: markRead,
+    disabled: readDisabled,
+    busy: readBusy,
+  } = useMarkChatsRead(
+    chats === undefined ? undefined : [...pinned, ...groups.flatMap(({ rows }) => rows)],
   );
   return (
     <section aria-label="Chats" className="sidebar-chats px-2 py-4">
@@ -269,7 +280,10 @@ export function SidebarChats({
               Display and filters
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem disabled>Mark all as read</DropdownMenuItem>
+            <DropdownMenuItem disabled={readDisabled} aria-busy={readBusy} onClick={markRead}>
+              <CheckIcon />
+              Mark all as read
+            </DropdownMenuItem>
             <DropdownMenuItem
               nativeButton={false}
               render={
@@ -309,7 +323,7 @@ export function SidebarChats({
               <ChatRow
                 key={chat.ID}
                 chat={chat}
-                seen={isSeen(chat)}
+                seen={isChatSeen(chat)}
                 path={path}
                 close={close}
                 now={now}
@@ -354,7 +368,7 @@ export function SidebarChats({
                   <ChatRow
                     key={chat.ID}
                     chat={chat}
-                    seen={isSeen(chat)}
+                    seen={isChatSeen(chat)}
                     path={path}
                     close={close}
                     now={now}
