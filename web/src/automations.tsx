@@ -439,11 +439,6 @@ function AutomationForm({
                     ? "Continue in the same chat"
                     : "Start a new chat each run"}
                 </p>
-                {initial.id && value.mode !== initial.mode && (
-                  <p className="col-span-2 text-sm">
-                    The next run will start a new chat. Previous chats stay available.
-                  </p>
-                )}
               </div>
             </Card>
             <Section aria-labelledby="schedule-heading">
