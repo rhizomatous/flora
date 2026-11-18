@@ -44,6 +44,7 @@ type Service struct {
 	questionPollInterval    time.Duration
 	questionPollTimeout     time.Duration
 	operations              sync.Map
+	wakes                   sync.Map
 	jobs                    map[string]*turnJob
 }
 

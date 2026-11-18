@@ -16,13 +16,17 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/agentfiles"
 	"github.com/rhizomatous/flora/backend/internal/changes"
 	"github.com/rhizomatous/flora/backend/internal/chat"
+	"github.com/rhizomatous/flora/backend/internal/provisioning"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
 func chatError(w http.ResponseWriter, err error) {
+	var capacity *provisioning.CapacityError
 	var control *chat.ControlError
 	var attachment *storage.AttachmentError
 	switch {
+	case errors.As(err, &capacity):
+		failure(w, 409, capacity.Error())
 	case errors.As(err, &attachment):
 		failure(w, 400, attachment.Reason)
 	case errors.As(err, &control):
@@ -120,14 +124,49 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 		}
 		jsonResponse(w, 200, map[string]any{"chats": a.chatViews(r.Context(), chats), "completions": events, "cursor": cursor})
 	})
-	for _, action := range []string{"interrupt", "stop"} {
+	mux.HandleFunc("GET /api/chats/{id}/runtime", func(w http.ResponseWriter, r *http.Request) {
+		if a.chats == nil {
+			failure(w, 503, "Chat runtime is not configured.")
+			return
+		}
+		state, err := a.chats.Runtime(r.Context(), r.PathValue("id"))
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		jsonResponse(w, 200, state)
+	})
+	mux.HandleFunc("POST /api/chats/{id}/keep-awake", func(w http.ResponseWriter, r *http.Request) {
+		if a.chats == nil {
+			failure(w, 503, "Chat runtime is not configured.")
+			return
+		}
+		var body struct {
+			Seconds *int `json:"seconds"`
+		}
+		if !decodeLimit(w, r, &body, 1024) {
+			return
+		}
+		if body.Seconds == nil || (*body.Seconds != 0 && *body.Seconds != 1800 && *body.Seconds != 3600 && *body.Seconds != 14400) {
+			failure(w, 400, "Choose a keep-awake duration.")
+			return
+		}
+		if err := a.chats.KeepAwake(r.Context(), r.PathValue("id"), *body.Seconds); err != nil {
+			chatError(w, err)
+			return
+		}
+		jsonResponse(w, 200, map[string]bool{"ok": true})
+	})
+	for _, action := range []string{"interrupt", "stop", "wake"} {
 		mux.HandleFunc("POST /api/chats/{id}/"+action, func(w http.ResponseWriter, r *http.Request) {
 			if a.chats == nil {
 				failure(w, 503, "Chat runtime is not configured.")
 				return
 			}
 			var err error
-			if action == "stop" {
+			if action == "wake" {
+				err = a.chats.Wake(r.Context(), r.PathValue("id"))
+			} else if action == "stop" {
 				err = a.chats.Stop(r.Context(), r.PathValue("id"))
 			} else {
 				err = a.chats.Interrupt(r.Context(), r.PathValue("id"))
