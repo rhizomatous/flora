@@ -51,6 +51,8 @@ const descriptions: Record<string, string> = {
   resizable: "Divide a layout into panels that users can resize.",
   "scroll-area": "Display overflowing content with styled scrollbars.",
   select: "Choose a value from a popup list of options.",
+  section:
+    "Group detail-page content with consistent spacing between sections, headings, and fields.",
   separator: "Visually separate groups of related content.",
   sheet: "Open a dialog panel along an edge of the viewport.",
   sidebar: "Build application navigation with grouped items and collapsible sections.",
@@ -82,7 +84,11 @@ const importNames: Record<string, string> = {
   sonner: "Toaster",
 };
 
-export const componentDocs = [...upstream, { name: "editable-text", url: "", examples: 4 }]
+export const componentDocs = [
+  ...upstream,
+  { name: "editable-text", url: "", examples: 4 },
+  { name: "section", url: "", examples: 1 },
+]
   .map(({ name, url, examples }) => ({
     id: name,
     title:
