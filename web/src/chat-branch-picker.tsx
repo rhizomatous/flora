@@ -128,6 +128,7 @@ export function ChatBranchPicker({
               key={active.name}
               projectID={projectID}
               repository={active}
+              single={single !== undefined}
               selected={overrides[active.name]}
               onChange={(branch) => {
                 change(active.name, branch);
@@ -203,7 +204,7 @@ export function ChatBranchPicker({
               )}
             </div>
           )}
-          {count > 0 && (
+          {count > 0 && single === undefined && (
             <Button
               type="button"
               variant="tertiary"
@@ -232,13 +233,19 @@ function focusSearch(input: HTMLInputElement | null) {
   input?.focus();
 }
 
+function focusBranchList(element: HTMLDivElement | null) {
+  element?.focus();
+}
+
 function RepositoryBranches({
+  single,
   projectID,
   repository,
   selected,
   onChange,
   onBack,
 }: {
+  single: boolean;
   projectID: string;
   repository: Repository;
   selected: string | undefined;
@@ -281,68 +288,92 @@ function RepositoryBranches({
   }, [projectID, repository.name, page, revision]);
   return (
     <div>
-      <div className="flex min-w-0 items-center gap-2 border-b border-border px-3 py-2.5">
-        {onBack && (
-          <Button
-            type="button"
-            variant="tertiary"
-            size="icon-sm"
-            aria-label="All repositories"
-            onClick={onBack}
-          >
-            <ChevronLeftIcon />
-          </Button>
+      {!single && (
+        <div className="flex min-w-0 items-center gap-2 border-b border-border px-3 py-2.5">
+          {onBack && (
+            <Button
+              type="button"
+              variant="tertiary"
+              size="icon-sm"
+              aria-label="All repositories"
+              onClick={onBack}
+            >
+              <ChevronLeftIcon />
+            </Button>
+          )}
+          <span className="truncate text-sm font-medium">{repository.name}</span>
+        </div>
+      )}
+      <Command
+        ref={single ? focusBranchList : undefined}
+        tabIndex={single ? 0 : undefined}
+        {...(single ? { defaultValue: selected ?? repository.baseBranch } : {})}
+      >
+        {!single && (
+          <CommandInput
+            ref={focusSearch}
+            aria-label="Search branches"
+            placeholder="Search branches…"
+          />
         )}
-        <span className="truncate text-sm font-medium">{repository.name}</span>
-      </div>
-      <Command>
-        <CommandInput
-          ref={focusSearch}
-          aria-label="Search branches"
-          placeholder="Search branches…"
-        />
         <CommandList aria-label={`Branches for ${repository.name}`}>
-          <CommandGroup>
+          <CommandGroup className={single ? "p-0" : undefined}>
             <CommandItem
-              value={`Project default ${repository.baseBranch}`}
-              data-checked={selected === undefined}
+              value={single ? repository.baseBranch : `Project default ${repository.baseBranch}`}
+              data-checked={
+                selected === undefined || (single && selected === repository.baseBranch)
+              }
               onSelect={() => {
                 onChange();
               }}
             >
               <GitBranchIcon />
-              <span className="min-w-0 flex-1 truncate">
-                Project default{" "}
-                <span className="text-muted-foreground">· {repository.baseBranch}</span>
-              </span>
+              {single ? (
+                <>
+                  <span className="min-w-0 flex-1 truncate">{repository.baseBranch}</span>
+                  <span className="text-muted-foreground">Default</span>
+                </>
+              ) : (
+                <span className="min-w-0 flex-1 truncate">
+                  Project default{" "}
+                  <span className="text-muted-foreground">· {repository.baseBranch}</span>
+                </span>
+              )}
             </CommandItem>
           </CommandGroup>
-          <CommandGroup heading="Branches">
-            {selected !== undefined && !branches.includes(selected) && (
-              <CommandItem
-                value={selected}
-                data-checked
-                onSelect={() => {
-                  onChange(selected);
-                }}
-              >
-                <GitBranchIcon />
-                <span className="min-w-0 flex-1 truncate">{selected}</span>
-              </CommandItem>
-            )}
-            {branches.map((branch) => (
-              <CommandItem
-                key={branch}
-                value={branch}
-                data-checked={selected === branch}
-                onSelect={() => {
-                  onChange(branch);
-                }}
-              >
-                <GitBranchIcon />
-                <span className="min-w-0 flex-1 truncate">{branch}</span>
-              </CommandItem>
-            ))}
+          <CommandGroup
+            className={single ? "p-0" : undefined}
+            heading={single ? undefined : "Branches"}
+          >
+            {selected !== undefined &&
+              (!single || selected !== repository.baseBranch) &&
+              !branches.includes(selected) && (
+                <CommandItem
+                  value={selected}
+                  data-checked
+                  onSelect={() => {
+                    onChange(selected);
+                  }}
+                >
+                  <GitBranchIcon />
+                  <span className="min-w-0 flex-1 truncate">{selected}</span>
+                </CommandItem>
+              )}
+            {branches
+              .filter((branch) => !single || branch !== repository.baseBranch)
+              .map((branch) => (
+                <CommandItem
+                  key={branch}
+                  value={branch}
+                  data-checked={selected === branch}
+                  onSelect={() => {
+                    onChange(branch);
+                  }}
+                >
+                  <GitBranchIcon />
+                  <span className="min-w-0 flex-1 truncate">{branch}</span>
+                </CommandItem>
+              ))}
           </CommandGroup>
           {!loading && !error && <CommandEmpty>No matching branches.</CommandEmpty>}
         </CommandList>

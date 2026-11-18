@@ -15,9 +15,11 @@ test("branch overrides keep drafts, defaults, and creation retries", async ({ pa
   await draft.fill("Fix the release branch regression");
   const trigger = page.getByRole("button", { name: /^Base branches:/ });
   await trigger.click();
-  await expect(page.getByRole("combobox", { name: "Search branches" })).toBeFocused();
-  await page.getByRole("combobox", { name: "Search branches" }).fill("deleted");
-  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("combobox", { name: "Search branches" })).toHaveCount(0);
+  await expect(page.getByText("rhizomatous/flora", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("option", { name: "main Default", exact: true })).toHaveCount(1);
+  await page.getByRole("option", { name: "deleted", exact: true }).waitFor();
+  await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await expect(trigger).toHaveAccessibleName("Base branches: deleted");
   await expect(trigger).toBeFocused();
@@ -35,11 +37,13 @@ test("branch overrides keep drafts, defaults, and creation retries", async ({ pa
   await expect(page.getByRole("option", { name: "deleted", exact: true })).toBeVisible();
   await page.request.post(`${backend.url}/__fixture/github?unavailable=false`);
   await page.getByRole("button", { name: "Try again", exact: true }).click();
-  await page.getByRole("combobox", { name: "Search branches" }).fill("does-not-exist");
-  await expect(page.getByText("No matching branches.", { exact: true })).toBeVisible();
-  await page.getByRole("combobox", { name: "Search branches" }).fill("release/stable");
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("Enter");
+  await page.getByRole("option", { name: "release/stable", exact: true }).click();
+  await trigger.click();
+  await page.getByRole("option", { name: "main Default", exact: true }).click();
+  await expect(trigger).toHaveAccessibleName("Base branches: main");
+  assert.equal(await page.locator('input[name="branches"]').inputValue(), "{}");
+  await trigger.click();
+  await page.getByRole("option", { name: "release/stable", exact: true }).click();
   await expect(trigger).toHaveAccessibleName("Base branches: release/stable");
 
   await page.getByRole("button", { name: "Project: Flora", exact: true }).click();
@@ -101,7 +105,7 @@ test("branch overrides keep drafts, defaults, and creation retries", async ({ pa
   assert.deepEqual(errors, []);
 });
 
-test("branch pages remain searchable and loading failures can retry", async ({ page, backend }) => {
+test("branch pages load and loading failures can retry", async ({ page, backend }) => {
   await logIn(page);
   await page.goto(`${backend.url}/#chats/new`);
   await page.getByRole("button", { name: "Project: Flora workspace", exact: true }).click();
@@ -129,7 +133,7 @@ test("branch pages remain searchable and loading failures can retry", async ({ p
   await expect(page.getByRole("option", { name: "feature/first", exact: true })).toBeVisible();
   secondPageFails = false;
   await page.getByRole("button", { name: "Try again", exact: true }).click();
-  await page.getByRole("combobox", { name: "Search branches", exact: true }).fill("second-page");
+
   await page.getByRole("option", { name: "release/second-page", exact: true }).click();
   await expect(trigger).toHaveAccessibleName("Base branches: release/second-page");
 });
