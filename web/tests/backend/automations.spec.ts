@@ -18,7 +18,10 @@ test("create, edit, pause, and run an automation in a dedicated chat", async ({ 
   await page.getByLabel("Runs in", { exact: true }).selectOption("same");
   await expect(page.getByLabel("Runs in", { exact: true })).toHaveAccessibleDescription("Continue in the same chat");
   await page.getByRole("combobox", { name: "Schedule", exact: true }).selectOption("weekly");
-  await page.getByRole("button", { name: "Friday", exact: true }).click();
+  await page.getByRole("button", { name: "Days", exact: true }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Friday", exact: true }).click();
+  await expect(page.getByRole("menuitemcheckbox", { name: "Friday", exact: true })).toBeChecked();
+  await page.getByRole("menuitemcheckbox", { name: "Friday", exact: true }).press("Escape");
   await page.getByRole("button", { name: "Time zone", exact: true }).click();
   await page.getByRole("combobox", { name: "Search time zones" }).fill("New York");
   await page.getByRole("combobox", { name: "Search time zones" }).press("Enter");
@@ -42,7 +45,7 @@ test("create, edit, pause, and run an automation in a dedicated chat", async ({ 
   await expect(page.getByRole("heading", { name: "Weekly dependency check", exact: true })).toBeVisible();
   await expect(topbar.getByRole("heading", { name: "Weekly dependency check", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Friday", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Days", exact: true })).toHaveAccessibleDescription(/Friday/);
   await page.getByRole("switch", { name: "Active", exact: true }).click();
   await expect(page.getByRole("switch", { name: "Active", exact: true })).not.toBeChecked();
   await page.getByRole("textbox", { name: "Instructions", exact: true }).fill("Review dependencies and summarize findings.");

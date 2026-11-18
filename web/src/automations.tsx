@@ -17,6 +17,10 @@ import {
   ChevronDownIcon,
   FieldLabel,
   EditableText,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   Heading,
   Input,
   Link,
@@ -79,6 +83,66 @@ function blank(projectID: string): Automation {
     chatID: "",
     revision: 0,
   };
+}
+
+function WeekdayPicker({
+  days,
+  disabled,
+  onChange,
+}: {
+  days: number[];
+  disabled: boolean;
+  onChange: (days: number[]) => void;
+}) {
+  const selected = weekdays.filter((_, index) => days.includes(index));
+  let summary = `${selected.length} days`;
+  if (selected.length === 0) summary = "Choose days";
+  else if (selected.length === 7) summary = "Every day";
+  else if (selected.length === 1) summary = selected.join("");
+  else if (selected.length === 2) summary = selected.map((day) => day.slice(0, 3)).join(", ");
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-muted-foreground" aria-hidden="true">
+        on
+      </span>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={disabled}
+              aria-label="Days"
+              aria-description={selected.join(", ") || "No days selected"}
+              className="font-normal"
+            >
+              {summary}
+              <ChevronDownIcon />
+            </Button>
+          }
+        />
+        <DropdownMenuContent className="min-w-40" aria-label="Days">
+          {weekdays.map((day, index) => (
+            <DropdownMenuCheckboxItem
+              key={day}
+              checked={days.includes(index)}
+              closeOnClick={false}
+              onCheckedChange={(checked) => {
+                onChange(
+                  checked
+                    ? [...days, index].toSorted((a, b) => a - b)
+                    : days.filter((value) => value !== index),
+                );
+              }}
+            >
+              {day}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
 }
 
 function TimeZonePicker({
@@ -473,6 +537,15 @@ function AutomationForm({
                     <option value="weekdays">Weekdays</option>
                     <option value="weekly">Weekly</option>
                   </NativeSelect>
+                  {frequency === "weekly" && (
+                    <WeekdayPicker
+                      days={days ?? []}
+                      disabled={busy}
+                      onChange={(selected) => {
+                        change("days", selected);
+                      }}
+                    />
+                  )}
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground" aria-hidden="true">
                       at
@@ -501,36 +574,6 @@ function AutomationForm({
                     />
                   </div>
                 </div>
-                {frequency === "weekly" && (
-                  <fieldset className="flex flex-wrap items-center gap-2">
-                    <legend className="sr-only">Days</legend>
-                    <span className="text-sm text-muted-foreground" aria-hidden="true">
-                      On
-                    </span>
-                    <div className="flex flex-wrap gap-1">
-                      {weekdays.map((day, index) => (
-                        <Button
-                          type="button"
-                          key={day}
-                          size="sm"
-                          variant={(days ?? []).includes(index) ? "default" : "outline"}
-                          aria-label={day}
-                          aria-pressed={(days ?? []).includes(index)}
-                          onClick={() => {
-                            change(
-                              "days",
-                              (days ?? []).includes(index)
-                                ? (days ?? []).filter((d) => d !== index)
-                                : [...(days ?? []), index].toSorted((a, b) => a - b),
-                            );
-                          }}
-                        >
-                          {day.slice(0, 3)}
-                        </Button>
-                      ))}
-                    </div>
-                  </fieldset>
-                )}
                 <div className="text-xs text-muted-foreground" aria-live="polite">
                   {previewError ? <p>{previewError}</p> : <p>{nextRunLabel}</p>}
                 </div>
