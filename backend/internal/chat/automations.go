@@ -93,6 +93,7 @@ func (s *Service) StartAutomation(ctx context.Context, id, requestID string, at 
 	ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
 	defer cancel()
 	chatID := a.ChatID
+	// Standing chats retain their last accepted model and reasoning selection.
 	if a.Mode == "same" && chatID != "" {
 		c, readErr := s.Store.Chat(ctx, chatID)
 		if readErr != nil {
@@ -109,6 +110,7 @@ func (s *Service) StartAutomation(ctx context.Context, id, requestID string, at 
 		if s.provisioner == nil {
 			err = errors.New("chat runtime is not configured")
 		} else {
+			// Each new chat snapshots the installation default model.
 			image, harness := s.provisioner.Identity()
 			var c storage.Chat
 			c, err = s.Store.CreateChatRequest(ctx, a.ProjectID, a.Name, image, harness, r.ID, a.Instructions)

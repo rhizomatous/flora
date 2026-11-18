@@ -102,7 +102,7 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/provider":
-			fmt.Fprint(w, `{"all":[{"id":"anthropic","models":{"model":{"capabilities":{"input":{"image":true,"pdf":true}}}}}]}`)
+			fmt.Fprint(w, `{"connected":["anthropic"],"all":[{"id":"anthropic","models":{"model":{"name":"Installation default","capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}},"claude-sonnet-4-6":{"name":"Claude Sonnet 4.6","cost":{"input":3,"output":15},"variants":{"low":{},"medium":{},"high":{},"max":{}},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}},"claude-haiku-4-5":{"name":"Claude Haiku 4.5","cost":{"input":1,"output":5},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}}}}]}`)
 		case "/config":
 			fmt.Fprint(w, `{"model":"anthropic/model"}`)
 		case "/session":
@@ -151,7 +151,12 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 				return
 			}
 			var input struct {
-				Parts []struct {
+				Model struct {
+					Provider string `json:"providerID"`
+					ID       string `json:"modelID"`
+				} `json:"model"`
+				Variant string `json:"variant"`
+				Parts   []struct {
 					Type     string `json:"type"`
 					Text     string `json:"text"`
 					Filename string `json:"filename,omitempty"`
@@ -190,7 +195,7 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 				return
 			case <-time.After(750 * time.Millisecond):
 			}
-			response := json.RawMessage(fmt.Sprintf(`{"info":{"id":"assistant_%d","parentID":"user_%d","role":"assistant","providerID":"anthropic","modelID":"model"},"parts":[{"type":"text","text":"Saved response %d"},{"type":"tool","tool":"bash","state":{"status":"completed","input":{"command":"pwd"},"output":"/workspace\nprovider-test-secret"}}]}`, n, n, n))
+			response := json.RawMessage(fmt.Sprintf(`{"info":{"id":"assistant_%d","parentID":"user_%d","role":"assistant","providerID":"anthropic","modelID":%q},"parts":[{"type":"text","text":"Saved response %d"},{"type":"tool","tool":"bash","state":{"status":"completed","input":{"command":"pwd"},"output":"/workspace\nprovider-test-secret"}}]}`, n, n, input.Model.ID, n))
 			mu.Lock()
 			history = append(history, response)
 			mu.Unlock()
@@ -200,14 +205,22 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 		}
 	}))
 	svc := chat.New(ctx, store, &Provisioner{store, runtime.URL})
-	svc.ModelCatalogClient = &http.Client{Transport: catalogTransport{}}
+
 	success = true
 	return &Fixture{Store: store, Service: svc, Auth: authentication, Token: token, Project: project, Close: func() { cancel(); runtime.Close(); store.Close() }}, nil
 }
 
-// The browser fixture checks capabilities without contacting a live catalog.
-type catalogTransport struct{}
-
-func (catalogTransport) RoundTrip(*http.Request) (*http.Response, error) {
-	return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"anthropic":{"models":{"model":{"modalities":{"input":["text","image","pdf"]}}}}}`)), Header: make(http.Header)}, nil
+func (p *Provisioner) ModelMetadata(ctx context.Context, _ storage.Credentials) (json.RawMessage, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", p.url+"/provider", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.SetBasicAuth("opencode", "test-runtime-password")
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	raw, err := io.ReadAll(response.Body)
+	return json.RawMessage(raw), err
 }

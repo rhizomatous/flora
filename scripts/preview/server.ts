@@ -280,6 +280,30 @@ export function chatPreview(): Plugin {
       json(res, { authenticated: true, setupRequired: false });
       return;
     }
+    if (url.pathname === "/api/models") {
+      const chatID = url.searchParams.get("chat");
+      if (chatID !== null && !scenarios.some((scenario) => scenario.id === chatID)) {
+        json(res, { error: "Unknown preview chat." }, 404);
+        return;
+      }
+      json(res, {
+        default: { provider: "anthropic", model: "claude-sonnet-4-6", variant: "" },
+        models: [
+          {
+            provider: "anthropic",
+            id: "claude-sonnet-4-6",
+            name: "Claude Sonnet 4.6",
+            variants: ["low", "medium", "high", "max"],
+            image: true,
+            pdf: true,
+            inputPrice: 3,
+            outputPrice: 15,
+          },
+        ],
+        error: "",
+      });
+      return;
+    }
     if (url.pathname === "/api/settings") {
       json(res, {
         provider: "anthropic",

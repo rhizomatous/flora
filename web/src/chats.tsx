@@ -279,9 +279,11 @@ export function Chats({
     const chatTitle =
       // oxlint-disable-next-line typescript/no-misused-spread -- Bound code points to stay below the UTF-8 byte limit without splitting surrogate pairs.
       [...(message.trim().replaceAll(/\s+/gu, " ") || "Attached files")].slice(0, 45).join("");
+    const rawExecution = text(fields, "execution");
+    const execution = rawExecution ? (JSON.parse(rawExecution) as unknown) : undefined;
     const input = isNew
-      ? { title: chatTitle, text: message, attachments }
-      : { text: message, attachments };
+      ? { title: chatTitle, text: message, attachments, execution }
+      : { text: message, attachments, execution };
     const scope = isNew ? `project:${project}` : `chat:${id}`;
     try {
       const requestID = identity(scope, input);
@@ -299,8 +301,7 @@ export function Chats({
         await request(acceptanceSchema, `${chatPath}/messages`, {
           method: "POST",
           body: {
-            text: message,
-            attachments,
+            ...input,
             requestID,
           },
         });
@@ -793,6 +794,7 @@ function ChatDetail({
             </MessageScrollerButton>
           </ChatReviewStrip>
           <FollowUpComposer
+            execution={detail.chat.Execution}
             projectID={detail.chat.ProjectID}
             contextUsage={detail.contextUsage}
             key={id}
@@ -827,6 +829,7 @@ function readDraft(id: string) {
 }
 
 function FollowUpComposer({
+  execution,
   projectID,
   contextUsage,
   id,
@@ -837,6 +840,7 @@ function FollowUpComposer({
   onSend,
   onControl,
 }: {
+  execution: Detail["chat"]["Execution"];
   contextUsage: Detail["contextUsage"];
   id: string;
   projectID: string;
@@ -866,6 +870,8 @@ function FollowUpComposer({
       }}
     >
       <Composer
+        execution={execution}
+        activeTurn={activeTurn}
         id="follow-up-message"
         projectID={projectID}
         draftScope={`chat:${id}`}

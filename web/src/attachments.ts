@@ -14,6 +14,7 @@ export const attachmentSchema = z.object({
 export type UploadedAttachment = z.infer<typeof attachmentSchema>;
 const policySchema = z.object({ image: z.boolean(), pdf: z.boolean(), reason: z.string() });
 type Policy = z.infer<typeof policySchema>;
+export type AttachmentPolicy = Policy;
 const draftSchema = attachmentSchema.extend({
   state: z.enum(["uploading", "done", "error"]),
   error: z.string().optional(),
@@ -50,7 +51,7 @@ function unsupported(item: DraftAttachment, policy: Policy | undefined) {
 }
 
 /** Completed uploads survive reloads. Interrupted uploads require the original file to retry. */
-export function useAttachments(scope: string, project: string) {
+export function useAttachments(scope: string, project: string, modelPolicy?: Policy) {
   const [items, setItems] = useState<DraftAttachment[]>(() => readAttachments(scope));
   const current = useRef(items);
   const [policy, setPolicy] = useState<Policy>();
@@ -66,9 +67,12 @@ export function useAttachments(scope: string, project: string) {
     },
     [scope],
   );
+  const policyPath = scope.startsWith("chat:")
+    ? `attachments/policy?chat=${encodeURIComponent(scope.slice(5))}`
+    : "attachments/policy";
   const checkPolicy = useCallback(async () => {
     try {
-      const next = await request(policySchema, "attachments/policy");
+      const next = await request(policySchema, policyPath);
       if (mounted.current) setPolicy(next);
     } catch {
       if (mounted.current) {
@@ -79,7 +83,7 @@ export function useAttachments(scope: string, project: string) {
         });
       }
     }
-  }, []);
+  }, [policyPath]);
   useEffect(() => {
     mounted.current = true;
     const saved = current.current;
@@ -234,7 +238,9 @@ export function useAttachments(scope: string, project: string) {
     files.current.clear();
     setError("");
   }
-  const ready = items.every((item) => item.state === "done" && unsupported(item, policy) === "");
+  const ready = items.every(
+    (item) => item.state === "done" && unsupported(item, modelPolicy ?? policy) === "",
+  );
   return {
     items,
     add,
@@ -245,7 +251,7 @@ export function useAttachments(scope: string, project: string) {
     retry: upload,
     checkPolicy,
     canRetry: (id: string) => files.current.has(id),
-    issue: (item: DraftAttachment) => item.error ?? unsupported(item, policy),
+    issue: (item: DraftAttachment) => item.error ?? unsupported(item, modelPolicy ?? policy),
   };
 }
 

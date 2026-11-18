@@ -185,6 +185,12 @@ func (c *Client) ImagePull(ctx context.Context, ref string) error {
 // ContainerSpec contains only the settings Flora supplies. The daemon keeps
 // privileged mode off and uses its default capabilities.
 type ContainerSpec struct {
+	// Optional process overrides let metadata instances bypass checkout and setup.
+	Entrypoint []string
+	Command    []string
+	User       string
+	WorkingDir string
+	AutoRemove bool
 	NetworkID  string
 	ExtraHosts []string
 	Name       string
@@ -201,9 +207,10 @@ type ContainerSpec struct {
 }
 
 func (c *Client) ContainerCreate(ctx context.Context, spec ContainerSpec) (string, error) {
-	config := &container.Config{Image: spec.Image, Env: spec.Env, Labels: spec.Labels}
+	config := &container.Config{Image: spec.Image, Env: spec.Env, Labels: spec.Labels, Entrypoint: spec.Entrypoint, Cmd: spec.Command, User: spec.User, WorkingDir: spec.WorkingDir}
 	host := &container.HostConfig{
 		NetworkMode: container.NetworkMode(spec.NetworkID),
+		AutoRemove:  spec.AutoRemove,
 		ExtraHosts:  spec.ExtraHosts,
 		Binds:       spec.Binds,
 		Resources:   container.Resources{NanoCPUs: spec.NanoCPUs, Memory: spec.MemoryBytes, PidsLimit: &spec.PidsLimit},

@@ -112,7 +112,7 @@ test("chat drafts, activity, and responsive layout", async ({ page }) => {
   assert.deepEqual(errors, []);
 });
 
-test("shared composer stays compact and exposes honest placeholders", async ({ page }) => {
+test("shared composer stays compact and preserves drafts", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(message.text());
@@ -130,12 +130,12 @@ test("shared composer stays compact and exposes honest placeholders", async ({ p
     const send = await page
       .getByRole("button", { name: "Send message", exact: true })
       .boundingBox();
-    for (const name of ["Model", "Reasoning effort", "Chat actions"]) {
+    for (const name of [/^Model:/, /^Reasoning effort:/, "Chat actions"]) {
       const offsets = await page.getByRole("button", { name, exact: true }).evaluate((button) => {
         const label = button.querySelector(".florets-control-label")?.getBoundingClientRect();
         if (!label) throw new Error("Missing composer label");
         const center = label.y + label.height / 2;
-        return [...button.querySelectorAll(":scope > svg, :scope > .composer-model-mark")].map(
+        return [...button.querySelectorAll(':scope > svg, :scope > [aria-hidden="true"]')].map(
           (icon) => {
             const rect = icon.getBoundingClientRect();
             return Math.abs(rect.y + rect.height / 2 - center);

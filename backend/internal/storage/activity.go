@@ -31,6 +31,10 @@ type Activity struct {
 // chat has active work. Callers must submit only new acceptances to the runtime
 // and reconcile uncertain delivery without automatically resending the message.
 func (s *Store) AcceptMessage(ctx context.Context, chatID, requestID, text string, attachments ...string) (Acceptance, error) {
+	return s.AcceptMessageWithExecution(ctx, chatID, requestID, text, nil, attachments...)
+}
+
+func (s *Store) AcceptMessageWithExecution(ctx context.Context, chatID, requestID, text string, selection *Execution, attachments ...string) (Acceptance, error) {
 	if requestID == "" || len(requestID) > 200 || (strings.TrimSpace(text) == "" && len(attachments) == 0) || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
 		return Acceptance{}, ErrInvalid
 	}
@@ -38,7 +42,11 @@ func (s *Store) AcceptMessage(ctx context.Context, chatID, requestID, text strin
 	err := s.write(ctx, func(tx *sql.Tx) error {
 		m, err := scanMessage(tx.QueryRowContext(ctx, messageSelect+" WHERE chat_id=? AND request_id=?", chatID, requestID))
 		if err == nil {
-			if m.Text != text || !sameAttachmentIDs(attachmentIDs(m.Payload), attachments) {
+			var saved struct {
+				Selection *Execution `json:"selection"`
+			}
+			_ = json.Unmarshal(m.Payload, &saved)
+			if selectionJSON(saved.Selection) != selectionJSON(selection) || m.Text != text || !sameAttachmentIDs(attachmentIDs(m.Payload), attachments) {
 				return ErrConflict
 			}
 			a = Acceptance{Message: m, Duplicate: true}
@@ -62,6 +70,10 @@ func (s *Store) AcceptMessage(ctx context.Context, chatID, requestID, text strin
 		if active != "" || status == Working || status == Waiting {
 			return ErrActive
 		}
+		execution, err := resolveExecution(ctx, tx, chatID, selection)
+		if err != nil {
+			return err
+		}
 		m = Message{ID: id(), ChatID: chatID, RequestID: requestID, Role: "user", Text: text, CreatedAt: now(), Payload: json.RawMessage(`{}`)}
 		var project string
 		if err := tx.QueryRowContext(ctx, "SELECT project_id FROM chats WHERE id=?", chatID).Scan(&project); err != nil {
@@ -80,6 +92,17 @@ func (s *Store) AcceptMessage(ctx context.Context, chatID, requestID, text strin
 			if _, err := tx.ExecContext(ctx, "UPDATE messages SET payload=? WHERE id=?", string(m.Payload), m.ID); err != nil {
 				return err
 			}
+		}
+		var payloadFields map[string]json.RawMessage
+		_ = json.Unmarshal(m.Payload, &payloadFields)
+		payloadFields["execution"] = json.RawMessage(selectionJSON(&execution))
+		payloadFields["selection"] = json.RawMessage(selectionJSON(selection))
+		m.Payload, _ = json.Marshal(payloadFields)
+		if _, err := tx.ExecContext(ctx, "UPDATE messages SET payload=? WHERE id=?", string(m.Payload), m.ID); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, "UPDATE chats SET execution=? WHERE id=?", selectionJSON(&execution), chatID); err != nil {
+			return err
 		}
 		if _, err := tx.ExecContext(ctx, "UPDATE chats SET status='working',status_reason='Message accepted',active_message_id=?,updated_at=? WHERE id=?", m.ID, m.CreatedAt, chatID); err != nil {
 			return err

@@ -3,6 +3,13 @@ import { z } from "zod";
 import { automationRunSchema } from "./automation-schemas";
 import { pullSummarySchema } from "./pull-schemas";
 
+export const executionSchema = z.object({
+  provider: z.string(),
+  model: z.string(),
+  variant: z.string(),
+});
+export type Execution = z.infer<typeof executionSchema>;
+
 const subagentSummarySchema = z.object({
   id: z.string(),
   number: z.number().int().positive(),
@@ -10,6 +17,7 @@ const subagentSummarySchema = z.object({
 });
 
 export const chatSchema = z.object({
+  Execution: executionSchema.optional(),
   pulls: pullSummarySchema.optional(),
   subagents: z.array(subagentSummarySchema).optional(),
   ID: z.string(),

@@ -90,6 +90,20 @@ func (a *api) chatViews(ctx context.Context, chats []storage.Chat) []chatView {
 
 func (a *api) chatRoutes(mux *http.ServeMux) {
 	store := a.settings.Store
+	mux.HandleFunc("GET /api/models", func(w http.ResponseWriter, r *http.Request) {
+		if a.chats == nil {
+			failure(w, 503, "Chat runtime is not configured.")
+			return
+		}
+		id := r.URL.Query().Get("chat")
+		if id != "" {
+			if _, err := store.Chat(r.Context(), id); err != nil {
+				chatError(w, err)
+				return
+			}
+		}
+		jsonResponse(w, 200, a.chats.Models(r.Context(), id))
+	})
 	mux.HandleFunc("PATCH /api/chats/{id}", func(w http.ResponseWriter, r *http.Request) {
 		var in storage.ChatOrganization
 		if !decodeChat(w, r, &in) {
@@ -225,15 +239,16 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			return
 		}
 		var in struct {
-			Title       string   `json:"title"`
-			RequestID   string   `json:"requestID"`
-			Text        string   `json:"text"`
-			Attachments []string `json:"attachments"`
+			Execution   *storage.Execution `json:"execution"`
+			Title       string             `json:"title"`
+			RequestID   string             `json:"requestID"`
+			Text        string             `json:"text"`
+			Attachments []string           `json:"attachments"`
 		}
 		if !decodeChat(w, r, &in) {
 			return
 		}
-		c, err := a.chats.Create(r.Context(), r.PathValue("id"), in.Title, in.RequestID, in.Text, in.Attachments...)
+		c, err := a.chats.CreateWithExecution(r.Context(), r.PathValue("id"), in.Title, in.RequestID, in.Text, in.Execution, in.Attachments...)
 		if err != nil {
 			chatError(w, err)
 			return
@@ -295,14 +310,15 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			return
 		}
 		var in struct {
-			RequestID   string   `json:"requestID"`
-			Text        string   `json:"text"`
-			Attachments []string `json:"attachments"`
+			Execution   *storage.Execution `json:"execution"`
+			RequestID   string             `json:"requestID"`
+			Text        string             `json:"text"`
+			Attachments []string           `json:"attachments"`
 		}
 		if !decodeChat(w, r, &in) {
 			return
 		}
-		accepted, err := a.chats.Submit(r.Context(), r.PathValue("id"), in.RequestID, in.Text, in.Attachments...)
+		accepted, err := a.chats.SubmitWithExecution(r.Context(), r.PathValue("id"), in.RequestID, in.Text, in.Execution, in.Attachments...)
 		if err != nil {
 			chatError(w, err)
 			return
