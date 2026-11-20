@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -118,54 +119,14 @@ func (s *Service) Validate(ctx context.Context, in Input) (Input, error) {
 			return in, invalid(name + ": Enter a valid Git branch name.")
 		}
 	}
-	c, err := s.Store.Credentials(ctx)
-	if errors.Is(err, storage.ErrNotFound) || (err == nil && c.GitHubToken == "") {
-		return in, invalid("Save a GitHub token in installation settings before connecting a project.")
-	}
-	if err != nil {
-		return in, err
-	}
-	client := *s.Client
-	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	for i := range in.Configuration.Repositories {
 		r := &in.Configuration.Repositories[i]
 		name := r.Name
-		get := func(endpoint string, branch bool, out any) error {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/repos/"+name+endpoint, nil)
-			if err != nil {
-				return invalid("Unable to prepare GitHub repository validation.")
-			}
-			req.Header.Set("Authorization", "Bearer "+c.GitHubToken)
-			req.Header.Set("Accept", "application/vnd.github+json")
-			req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-			res, err := client.Do(req)
-			if err != nil {
-				return invalid("Cannot reach GitHub. Check the host network and try again.")
-			}
-			defer res.Body.Close()
-			switch res.StatusCode {
-			case 200:
-				if out != nil && json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(out) != nil {
-					return invalid("GitHub returned an invalid repository response. Try again.")
-				}
-				return nil
-			case 401:
-				return invalid("GitHub rejected the saved token. Check its value and expiry in installation settings.")
-			case 403:
-				return invalid("GitHub denied access or rate limited the request. Check token permissions and try again later.")
-			case 404:
-				if branch {
-					return invalid("Base branch was not found. Check the branch name and repository access.")
-				}
-				return invalid("Repository was not found or the saved token cannot access it. Check the repository and token's selected repositories.")
-			default:
-				return invalid("GitHub validation is unavailable. Try again later.")
-			}
-		}
+
 		var repo struct {
 			DefaultBranch string `json:"default_branch"`
 		}
-		if err := get("", false, &repo); err != nil {
+		if err := s.githubGet(ctx, name, "", false, &repo); err != nil {
 			return in, invalid(name + ": " + err.Error())
 		}
 		if r.BaseBranch == "" {
@@ -174,9 +135,134 @@ func (s *Service) Validate(ctx context.Context, in Input) (Input, error) {
 		if !validBranch(r.BaseBranch) {
 			return in, invalid(name + ": Repository has no usable default branch. Create a branch on GitHub first.")
 		}
-		if err := get("/branches/"+url.PathEscape(r.BaseBranch), true, nil); err != nil {
+		if err := s.githubGet(ctx, name, "/branches/"+url.PathEscape(r.BaseBranch), true, nil); err != nil {
 			return in, invalid(name + ": " + err.Error())
 		}
 	}
 	return in, nil
+}
+
+// githubGet keeps credentials on the fixed GitHub host and returns only local error messages.
+func (s *Service) githubGet(ctx context.Context, name, endpoint string, branch bool, out any) error {
+	c, err := s.Store.Credentials(ctx)
+	if errors.Is(err, storage.ErrNotFound) || (err == nil && c.GitHubToken == "") {
+		return invalid("Save a GitHub token in installation settings before connecting a project.")
+	}
+	if err != nil {
+		return err
+	}
+	client := *s.Client
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/repos/"+name+endpoint, nil)
+	if err != nil {
+		return invalid("Unable to prepare GitHub repository validation.")
+	}
+	req.Header.Set("Authorization", "Bearer "+c.GitHubToken)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	res, err := client.Do(req)
+	if err != nil {
+		return invalid("Cannot reach GitHub. Check the host network and try again.")
+	}
+	defer res.Body.Close()
+	switch res.StatusCode {
+	case 200:
+		if out != nil && json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(out) != nil {
+			return invalid("GitHub returned an invalid repository response. Try again.")
+		}
+		return nil
+	case 401:
+		return invalid("GitHub rejected the saved token. Check its value and expiry in installation settings.")
+	case 403:
+		return invalid("GitHub denied access or rate limited the request. Check token permissions and try again later.")
+	case 404:
+		if branch {
+			return invalid("Base branch was not found. Check the branch name and repository access.")
+		}
+		return invalid("Repository was not found or the saved token cannot access it. Check the repository and token's selected repositories.")
+	default:
+		return invalid("GitHub validation is unavailable. Try again later.")
+	}
+}
+
+// ValidateBranches checks every effective starting branch before a new chat is
+// reserved. Checkout records the commit it actually resolves, which may move later.
+func (s *Service) ValidateBranches(ctx context.Context, projectID string, branches map[string]string) error {
+	p, err := s.Store.Project(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	known := map[string]bool{}
+	for _, r := range p.Configuration.Repositories {
+		known[r.Name] = true
+	}
+	for name, branch := range branches {
+		if !known[name] {
+			return invalid("Choose a repository configured in this project.")
+		}
+		if !validBranch(branch) {
+			return invalid(name + ": Enter a valid Git branch name.")
+		}
+	}
+	for _, repo := range p.Configuration.Repositories {
+		branch := repo.BaseBranch
+		if selected, ok := branches[repo.Name]; ok {
+			branch = selected
+		}
+		name := repo.Name
+		if !validBranch(branch) {
+			return invalid(name + ": Enter a valid Git branch name.")
+		}
+		if err := s.githubGet(ctx, name, "/branches/"+url.PathEscape(branch), true, nil); err != nil {
+			return invalid(name + ": " + err.Error())
+		}
+	}
+	return nil
+}
+
+type BranchPage struct {
+	Branches []string `json:"branches"`
+	NextPage int      `json:"nextPage"`
+}
+
+// Branches reads one bounded GitHub page for a configured repository. Clients
+// request subsequent pages explicitly; upstream pagination URLs are never followed.
+func (s *Service) Branches(ctx context.Context, projectID, name string, page int) (BranchPage, error) {
+	result := BranchPage{Branches: []string{}}
+	p, err := s.Store.Project(ctx, projectID)
+	if err != nil {
+		return result, err
+	}
+	known := false
+	for _, r := range p.Configuration.Repositories {
+		if r.Name == name {
+			known = true
+		}
+	}
+	if !known {
+		return result, invalid("Choose a repository configured in this project.")
+	}
+	if page < 1 || page > 10000 {
+		return result, invalid("Invalid branch page.")
+	}
+	var rows []struct {
+		Name string `json:"name"`
+	}
+	if err := s.githubGet(ctx, name, fmt.Sprintf("/branches?per_page=100&page=%d", page), false, &rows); err != nil {
+		return result, invalid(name + ": " + err.Error())
+	}
+	if rows == nil || len(rows) > 100 {
+		return result, invalid("GitHub returned an invalid branch response. Try again.")
+	}
+	for _, row := range rows {
+		if !validBranch(row.Name) {
+			return result, invalid("GitHub returned an invalid branch response. Try again.")
+		}
+		result.Branches = append(result.Branches, row.Name)
+	}
+	if len(rows) == 100 {
+		result.NextPage = page + 1
+	}
+	return result, nil
 }
