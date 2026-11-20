@@ -20,6 +20,7 @@ export const chatSchema = z.object({
   ProjectID: z.string(),
   Title: z.string(),
   PinnedAt: z.string().optional(),
+  FolderID: z.string().optional(),
   Archived: z.boolean().optional(),
   ActivityRevision: z.number().int().nonnegative().optional(),
   LastViewedRevision: z.number().int().nonnegative().optional(),

@@ -18,10 +18,12 @@ import {
   PencilIcon,
   ArchiveIcon,
   EllipsisIcon,
+  FolderIcon,
 } from "@flora/florets";
 
 import { publishOrganization } from "./chat-organization";
 import { chatSchema, detailSchema, type Chat } from "./chat-schemas";
+import { useFolders } from "./folder-state";
 import { errorMessage, request, RequestError } from "./request";
 
 const dialogCopy = {
@@ -40,6 +42,7 @@ export function ChatOrganizationActions({
   quick?: boolean;
   children?: ReactNode;
 }) {
+  const { openFolder } = useFolders();
   const [dialog, setDialog] = useState<"rename" | "error" | null>(null);
   const [title, setTitle] = useState("");
   const [revision, setRevision] = useState(0);
@@ -164,6 +167,14 @@ export function ChatOrganizationActions({
           >
             <PencilIcon />
             Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => {
+              if (chat) openFolder({ chat, finalFocus: trigger });
+            }}
+          >
+            <FolderIcon />
+            Move to folder
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem

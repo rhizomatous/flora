@@ -60,6 +60,7 @@ func (s *Store) LinkRuntimeMessage(ctx context.Context, chatID, messageID, runti
 // the pin, but leaves execution, messages, and automation links untouched. Runtime
 // status and history updates never write these fields or the user-owned title.
 type ChatOrganization struct {
+	FolderID *string `json:"folderID"`
 	Title    *string `json:"title"`
 	Pinned   *bool   `json:"pinned"`
 	Archived *bool   `json:"archived"`
@@ -67,7 +68,7 @@ type ChatOrganization struct {
 }
 
 func (s *Store) OrganizeChat(ctx context.Context, chatID string, in ChatOrganization) (Chat, error) {
-	if in.Revision == nil || *in.Revision < 0 || (in.Title == nil && in.Pinned == nil && in.Archived == nil) {
+	if in.Revision == nil || *in.Revision < 0 || (in.Title == nil && in.Pinned == nil && in.Archived == nil && in.FolderID == nil) {
 		return Chat{}, ErrInvalid
 	}
 	if in.Title != nil && (!utf8.ValidString(*in.Title) || strings.TrimSpace(*in.Title) == "" || len(*in.Title) > 200) {
@@ -82,6 +83,17 @@ func (s *Store) OrganizeChat(ctx context.Context, chatID string, in ChatOrganiza
 		}
 		if revision != *in.Revision {
 			return ErrStale
+		}
+		if in.FolderID != nil {
+			if *in.FolderID != "" {
+				var exists int
+				if err := tx.QueryRowContext(ctx, "SELECT 1 FROM chat_folders WHERE id=?", *in.FolderID).Scan(&exists); err != nil {
+					return found(err)
+				}
+			}
+			if _, err := tx.ExecContext(ctx, "UPDATE chats SET folder_id=nullif(?, '') WHERE id=?", *in.FolderID, chatID); err != nil {
+				return err
+			}
 		}
 		if in.Title != nil {
 			title = strings.TrimSpace(*in.Title)

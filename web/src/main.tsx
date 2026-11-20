@@ -18,6 +18,7 @@ import {
 
 import { statusSchema, authenticatedSchema, type Status } from "./auth-schemas";
 import { Automations } from "./automations";
+import { FolderProvider } from "./chat-folders";
 import { Chats } from "./chats";
 import { Installation } from "./installation";
 import { useNotifications } from "./notifications";
@@ -224,7 +225,7 @@ function App() {
       : "min-w-0";
   const Content = ready ? SidebarInset : "main";
 
-  return (
+  const layout = (
     <Layout className={ready ? "min-h-svh" : "mx-auto min-h-svh max-w-4xl px-6 py-10 sm:px-10"}>
       {ready && <Toaster id="chat-organization" position="bottom-right" closeButton />}
       {ready ? (
@@ -332,6 +333,7 @@ function App() {
       </Content>
     </Layout>
   );
+  return <FolderProvider enabled={ready}>{layout}</FolderProvider>;
 }
 
 const root = document.querySelector("#root");
