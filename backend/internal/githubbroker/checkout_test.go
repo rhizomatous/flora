@@ -234,3 +234,46 @@ func TestCheckoutCoreCountsAndExtraMaterialization(t *testing.T) {
 		})
 	}
 }
+
+func TestOverriddenBranchCheckoutKeepsResolvedBaseOnRetry(t *testing.T) {
+	store, original, broker := fixture(t)
+	ctx := context.Background()
+	chat, err := store.CreateChatRequestWithBranches(ctx, original.ProjectID, "Release", original.ImageDigest, original.HarnessVersion, "release", "Fix", nil, map[string]string{"octo/demo": "release/stable"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := store.Project(ctx, original.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project.Configuration.Repositories[0].BaseBranch = "next"
+	if err := store.UpdateProject(ctx, project.ID, project.Name, project.Configuration); err != nil {
+		t.Fatal(err)
+	}
+	access := &Access{broker: broker, cfg: CheckoutConfig{Host: "github.internal"}}
+	sha := strings.Repeat("c", 40)
+	run := func(script string) (string, error) {
+		if !strings.Contains(script, "'refs/heads/release/stable'") || !strings.Contains(script, "'+refs/heads/release/stable:refs/remotes/origin/release/stable'") || strings.Contains(script, "refs/heads/next") {
+			t.Fatal("checkout did not use the frozen override", script)
+		}
+		return sha, nil
+	}
+	if err := access.checkoutOne(ctx, chat, chat.Configuration.Repositories[0], run); err != nil {
+		t.Fatal(err)
+	}
+	chat, err = store.Chat(ctx, chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if chat.StartingCommits["octo/demo"] != sha || chat.Configuration.Repositories[0].BaseBranch != "release/stable" {
+		t.Fatal(chat)
+	}
+	if err := access.checkoutOne(ctx, chat, chat.Configuration.Repositories[0], func(script string) (string, error) {
+		if strings.Contains(script, "fetch") || strings.Contains(script, "clone") || strings.Contains(script, "checkout -B") || !strings.Contains(script, sha) {
+			t.Fatal("retry would replace established work", script)
+		}
+		return sha, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}

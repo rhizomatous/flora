@@ -202,3 +202,71 @@ func TestAutomationExecutionOverrides(t *testing.T) {
 		})
 	}
 }
+
+func TestAutomationsKeepProjectDefaultsSeparateFromChatBranches(t *testing.T) {
+	for _, mode := range []string{"same", "new"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newFixture(t)
+			service, provisioner, project := testService(t, f)
+			ctx := context.Background()
+			image, harness := provisioner.Identity()
+			manual, err := service.Store.CreateChatRequestWithBranches(ctx, project.ID, "Release", image, harness, "manual", "Fix", nil, map[string]string{"core": "release/stable"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			automation, err := service.Store.SaveAutomation(ctx, storage.Automation{ProjectID: project.ID, Enabled: true, AutomationConfig: storage.AutomationConfig{Name: "Daily", Instructions: "Check", Mode: mode, Frequency: "daily", Time: "09:00", TimeZone: "UTC"}}, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			due, err := time.Parse(time.RFC3339, automation.NextRun)
+			if err != nil {
+				t.Fatal(err)
+			}
+			first, err := service.StartAutomation(ctx, automation.ID, "", due, true)
+			if err != nil || first.ChatID == "" {
+				t.Fatal(first, err)
+			}
+			awaitPrompt(t, f)
+			f.release <- false
+			chat := waitStatus(t, service, first.ChatID, storage.Idle)
+			if chat.Configuration.Repositories[0].BaseBranch != "main" {
+				t.Fatal("automation inherited manual override", chat.Configuration)
+			}
+			project.Configuration.Repositories[0].BaseBranch = "next"
+			if err := service.Store.UpdateProject(ctx, project.ID, project.Name, project.Configuration); err != nil {
+				t.Fatal(err)
+			}
+			automation, err = service.Store.Automation(ctx, automation.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			due, err = time.Parse(time.RFC3339, automation.NextRun)
+			if err != nil {
+				t.Fatal(err)
+			}
+			second, err := service.StartAutomation(ctx, automation.ID, "", due, true)
+			if err != nil || second.ChatID == "" {
+				t.Fatal(second, err)
+			}
+			awaitPrompt(t, f)
+			f.release <- false
+			chat = waitStatus(t, service, second.ChatID, storage.Idle)
+			want := "main"
+			if mode == "new" {
+				want = "next"
+				if first.ChatID == second.ChatID {
+					t.Fatal("new run reused its chat")
+				}
+			} else if first.ChatID != second.ChatID {
+				t.Fatal("standing run replaced its chat")
+			}
+			if chat.Configuration.Repositories[0].BaseBranch != want {
+				t.Fatal(chat.Configuration)
+			}
+			manual, err = service.Store.Chat(ctx, manual.ID)
+			if err != nil || manual.Configuration.Repositories[0].BaseBranch != "release/stable" {
+				t.Fatal(manual, err)
+			}
+		})
+	}
+}

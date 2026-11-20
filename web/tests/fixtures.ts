@@ -14,6 +14,7 @@ type WorkerFixtures = { backendBinary: string };
 type Fixtures = {
   scenario:
     | "workspace"
+    | "branches"
     | "models"
     | "chat"
     | "changes"
