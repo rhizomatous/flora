@@ -4,6 +4,10 @@ import { z } from "zod";
 import { chatSchema, detailSchema, feedSchema, type Chat } from "../../src/chat-schemas";
 import { test, expect } from "./fixtures.ts";
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: "wait" });
+});
+
 const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
 const changeSchema = z.object({
   revision: z.number(),

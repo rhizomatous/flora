@@ -85,18 +85,22 @@ func TestCaptureSharesDeadlineAndFileLimitAcrossRepositories(t *testing.T) {
 		t.Fatal("oversized capture replaced saved review")
 	}
 	calls = 0
+	canceled, cancel := context.WithCancel(ctx)
+	defer cancel()
 	s.Engine = captureExecutor(func(ctx context.Context, _ io.Reader, _ io.Writer) (int, error) {
 		calls++
-		<-ctx.Done()
+		// Cancel after storage setup so runner speed cannot decide whether execution begins.
+		cancel()
+		if !errors.Is(ctx.Err(), context.Canceled) {
+			t.Error("capture did not propagate cancellation to the executor")
+		}
 		return 1, ctx.Err()
 	})
-	short, cancel := context.WithTimeout(ctx, 10*time.Millisecond)
-	defer cancel()
-	if err := s.Refresh(short, c.ID); err == nil || calls != 1 {
-		t.Fatalf("deadline did not stop collection: %d %v", calls, err)
+	if err := s.Refresh(canceled, c.ID); err == nil || calls != 1 {
+		t.Fatalf("cancellation did not stop collection: %d %v", calls, err)
 	}
 	saved, err = s.Read(ctx, c.ID, false)
 	if err != nil || saved.Snapshot.ID != id || !saved.Stale {
-		t.Fatal("expired capture replaced saved review")
+		t.Fatal("canceled capture replaced saved review")
 	}
 }
