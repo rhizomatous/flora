@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { Button, TabsContent, TabsTrigger, FilesIcon, FileTypeIcon, XIcon } from "@flora/florets";
 
 import { useChatPanelState, workspaceFileView } from "./chat-panel-state";
+import { ShellTabs, ShellPanels } from "./shells";
 import { WorkspaceFiles } from "./workspace-files";
 import { WorkspacePreview } from "./workspace-preview";
 
@@ -34,6 +35,7 @@ export function WorkspaceTabs({ chatID }: { chatID: string }) {
   }, [state.mainView]);
   return (
     <>
+      <ShellTabs chatID={chatID} />
       {state.filesOpen && (
         <div
           className="chat-diff-tab workspace-tab"
@@ -122,6 +124,7 @@ export function WorkspacePanels({ chatID, onExpired }: { chatID: string; onExpir
   const [state] = useChatPanelState(chatID);
   return (
     <>
+      <ShellPanels chatID={chatID} onExpired={onExpired} />
       {state.filesOpen && (
         <TabsContent
           value="files"

@@ -22,7 +22,6 @@ import {
   GitPullRequestIcon,
   ChevronDownIcon,
   PlusIcon,
-  TerminalIcon,
   PanelRightIcon,
   ExternalLinkIcon,
   CopyIcon,
@@ -37,6 +36,8 @@ import { ContextUsagePopover } from "./context-usage";
 import { PullCount, PullList } from "./pull-links";
 import type { PullSummary } from "./pull-schemas";
 import { KeepAwakeItem, RuntimeMenu, StopMachineItem } from "./runtime-controls";
+import { ShellMenuItems } from "./shells";
+// oxlint-disable-next-line import/max-dependencies -- The view menu composes the chat panels and machine controls.
 import { SubagentMenuItems } from "./subagents";
 
 /** Shows saved chat metadata and linked pull requests. */
@@ -155,6 +156,7 @@ export function ChatViewMenu({
   onDiffsChange,
   onFilesOpen,
   filesOpen = false,
+  overviewActive = !diffsOpen && !filesOpen,
 }: {
   chatID?: string | undefined;
   label?: string;
@@ -162,6 +164,7 @@ export function ChatViewMenu({
   onDiffsChange: (open: boolean) => void;
   onFilesOpen: () => void;
   filesOpen?: boolean;
+  overviewActive?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -184,7 +187,7 @@ export function ChatViewMenu({
         >
           <ListIcon />
           Overview
-          {!diffsOpen && !filesOpen && (
+          {overviewActive && (
             <span className="ml-auto shrink-0 whitespace-nowrap text-muted-foreground">
               Current view
             </span>
@@ -209,10 +212,15 @@ export function ChatViewMenu({
         </DropdownMenuItem>
         <SubagentMenuItems />
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>
-          <TerminalIcon />
-          New shell
-        </DropdownMenuItem>
+        {chatID !== undefined && (
+          <ShellMenuItems
+            chatID={chatID}
+            open={open}
+            onSelect={() => {
+              setOpen(false);
+            }}
+          />
+        )}
         {chatID !== undefined && (
           <>
             <DropdownMenuSeparator />
@@ -233,6 +241,7 @@ export function ChatHeaderActions({
   onDiffsChange,
   onFilesOpen,
   filesOpen,
+  overviewActive,
 }: {
   chat: Chat | undefined;
   sideOpen: boolean;
@@ -242,6 +251,7 @@ export function ChatHeaderActions({
   onDiffsChange: (open: boolean) => void;
   onFilesOpen: () => void;
   filesOpen: boolean;
+  overviewActive: boolean;
 }) {
   const [copyState, setCopyState] = useState("Copy link");
   const costUnavailable = usage?.costUSD === undefined || usage.costUSD === null;
@@ -263,6 +273,7 @@ export function ChatHeaderActions({
         onDiffsChange={onDiffsChange}
         onFilesOpen={onFilesOpen}
         filesOpen={filesOpen}
+        overviewActive={overviewActive}
       />
       <span className="ml-auto" />
       <Popover>

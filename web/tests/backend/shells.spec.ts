@@ -1,0 +1,78 @@
+import { test, expect } from "../fixtures.ts";
+import { logIn, assertFitsPhone, pageErrors } from "../helpers.ts";
+
+test.use({ scenario: "shells" });
+test.skip(!process.env.FLORA_SHELL_PREVIEW_IMAGE, "Requires a locally built agent image and Docker");
+
+test("real shell reconnect, resize, exit and tab navigation", async ({ page, backend }) => {
+  const errors = pageErrors(page);
+  await logIn(page);
+  await page.goto(`${backend.url}/#chats/${backend.chatID}`);
+  const draft = page.getByLabel("Follow-up", { exact: true });
+  await draft.fill("Keep my draft while I inspect the workspace");
+  await page.getByRole("button", { name: "Chat views", exact: true }).click();
+  await page.getByRole("menuitem", { name: "New shell", exact: true }).click();
+  const terminal = page.getByRole("region", { name: "Shell 1 terminal", exact: true });
+  await expect(terminal.getByRole("status")).toHaveText("Connected");
+  const input = page.getByLabel("Shell 1 terminal input", { exact: true });
+  await input.pressSequentially("export CHECK=preserved; printf 'ready:%s\\n' $$");
+  await input.press("Enter");
+  await expect(terminal.locator(".xterm-accessibility")).toContainText("ready:");
+  await terminal.getByRole("button", { name: "Reconnect", exact: true }).click();
+  await expect(terminal.getByRole("status")).toHaveText("Connected");
+  await input.pressSequentially("printf 'reconnected:%s\\n' \"$CHECK\"");
+  await input.press("Enter");
+  await expect(terminal.locator(".xterm-accessibility")).toContainText("reconnected:preserved");
+  await input.press("Shift+Escape");
+  await expect(page.getByRole("tab", { name: "Shell 1", exact: true })).toBeFocused();
+  await page.getByRole("tab", { name: "Explore the workspace", exact: true }).click();
+  await expect(draft).toHaveValue("Keep my draft while I inspect the workspace");
+  await page.getByRole("tab", { name: "Shell 1", exact: true }).click();
+  await assertFitsPhone(page);
+  await input.pressSequentially("clear; stty size; cat hello.txt");
+  await input.press("Enter");
+  await expect(terminal.locator(".xterm-accessibility")).toContainText("Welcome to an isolated Flora shell.");
+  await page.reload();
+  await expect(terminal.getByRole("status")).toHaveText("Connected");
+  await input.pressSequentially("exit");
+  await input.press("Enter");
+  await expect(terminal.getByRole("status")).toHaveText("Shell ended");
+  await expect(terminal.getByRole("button", { name: "Reconnect", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Close Shell 1", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "Shell 1", exact: true })).toHaveCount(0);
+  await expect(draft).toHaveValue("Keep my draft while I inspect the workspace");
+  expect(errors).toEqual([]);
+});
+
+test("machine stop and wake keep old shells ended and never replace the container", async ({ page, backend }) => {
+  await logIn(page);
+  await page.goto(`${backend.url}/#chats/${backend.chatID}`);
+  await expect(page.getByRole("button", { name: "Chat views", exact: true })).toBeVisible();
+  const readChat = () => page.evaluate(async id => {
+    const response = await fetch(`/api/chats/${id}`);
+    if (!response.ok) throw new Error(`Chat read failed: ${response.status}`);
+    return response.json();
+  }, backend.chatID);
+  const before = await readChat();
+  await page.getByRole("button", { name: "Chat views", exact: true }).click();
+  await page.getByRole("menuitem", { name: "New shell", exact: true }).click();
+  const terminal = page.getByRole("region", { name: "Shell 1 terminal", exact: true });
+  await expect(terminal.getByRole("status")).toHaveText("Connected");
+  await page.getByRole("button", { name: "More chat actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Stop machine", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(terminal.getByRole("status")).toHaveText("Shell ended");
+  await page.getByRole("tab", { name: "Explore the workspace", exact: true }).click();
+  await page.getByRole("button", { name: "Chat actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Wake machine", exact: true }).click();
+  await expect(page.getByText("Awake", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("tab", { name: "Shell 1", exact: true }).click();
+  await expect(terminal.getByRole("status")).toHaveText("Shell ended");
+  const after = await readChat();
+  expect(after.chat.ContainerID).toBe(before.chat.ContainerID);
+  await page.goto(`${backend.url}/#chats/${backend.otherChatID}`);
+  await page.getByRole("button", { name: "Chat views", exact: true }).click();
+  await page.getByRole("menuitem", { name: "New shell", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Missing containers must be restored");
+});
