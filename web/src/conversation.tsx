@@ -20,6 +20,8 @@ import {
 
 import { AttachmentPreview } from "./attachment-preview";
 import { type Message, type Part, toolDisplayInputSchema } from "./chat-schemas";
+import { PullEventCard } from "./pull-links";
+import type { Pull } from "./pull-schemas";
 import { subagentSession } from "./subagent-state";
 import { SubagentLink } from "./subagents";
 import { formatDuration, isFailedPart, isLivePart, workTiming, type WorkStep } from "./transcript";
@@ -40,9 +42,11 @@ function ReplyText({ children }: { children: string }) {
 export function ConversationMessage({
   message: m,
   delegated = false,
+  pullEvents,
 }: {
   message: Message;
   delegated?: boolean;
+  pullEvents?: { pull: Pull; opened: boolean }[] | undefined;
 }) {
   const parts = m.Payload.parts.filter(
     (part) => part.type !== "step-start" && part.type !== "step-finish",
@@ -81,6 +85,9 @@ export function ConversationMessage({
               )}
             </BubbleContent>
           </Bubble>
+          {pullEvents?.map(({ pull, opened }) => (
+            <PullEventCard key={pull.url} pull={pull} opened={opened} />
+          ))}
           {failure !== null && (
             <Alert variant="destructive" role="alert">
               <pre className="text-sm break-words whitespace-pre-wrap">
