@@ -6,7 +6,6 @@ import {
   PopoverTrigger,
   PopoverContent,
   CheckIcon,
-  GitBranchIcon,
   InboxIcon,
   KeyRoundIcon,
   PlusIcon,
@@ -15,6 +14,7 @@ import {
   SlidersHorizontalIcon,
 } from "@flora/florets";
 
+import { ChatBranchPicker } from "./chat-branch-picker";
 import { Composer, PlaceholderMenu } from "./composer";
 
 export type ComposerProject = { id: string; name: string };
@@ -24,12 +24,14 @@ export function NewChatComposer({
   projects,
   selectedProject,
   onProjectChange,
+  onBranchesChange,
   busy,
   onSend,
 }: {
   projects: ComposerProject[];
   selectedProject: ComposerProject | undefined;
   onProjectChange: (id: string) => void;
+  onBranchesChange: () => void;
   busy: boolean;
   onSend: (event: SubmitEvent<HTMLFormElement>) => void;
 }) {
@@ -133,14 +135,11 @@ export function NewChatComposer({
           </PopoverContent>
         </Popover>
         <div className="composer-branch ml-auto shrink-0">
-          <PlaceholderMenu
-            variant="tertiary"
-            label="Base branch"
-            items={[{ label: "Project default branch", icon: <GitBranchIcon /> }]}
-          >
-            <GitBranchIcon />
-            <span className="florets-control-label">Default</span>
-          </PlaceholderMenu>
+          <ChatBranchPicker
+            projectID={selectedProject?.id ?? ""}
+            disabled={busy}
+            onChange={onBranchesChange}
+          />
         </div>
       </div>
       <Composer

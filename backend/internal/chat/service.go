@@ -56,6 +56,12 @@ func (s *Service) Create(ctx context.Context, project, title, requestID, text st
 }
 
 func (s *Service) CreateWithExecution(ctx context.Context, project, title, requestID, text string, selection *storage.Execution, attachments ...string) (storage.Chat, error) {
+	return s.CreateWithBranches(ctx, project, title, requestID, text, selection, nil, attachments...)
+}
+
+// CreateWithBranches expects GitHub access and effective branches to be validated
+// before the first reservation. Retries use their saved input without revalidation.
+func (s *Service) CreateWithBranches(ctx context.Context, project, title, requestID, text string, selection *storage.Execution, branches map[string]string, attachments ...string) (storage.Chat, error) {
 	if s.provisioner == nil {
 		return storage.Chat{}, errors.New("chat runtime is not configured")
 	}
@@ -76,7 +82,7 @@ func (s *Service) CreateWithExecution(ctx context.Context, project, title, reque
 		return storage.Chat{}, reservedErr
 	}
 	image, harness := s.provisioner.Identity()
-	c, err := s.Store.CreateChatRequestWithExecution(ctx, project, title, image, harness, requestID, text, selection, attachments...)
+	c, err := s.Store.CreateChatRequestWithBranches(ctx, project, title, image, harness, requestID, text, selection, branches, attachments...)
 	if err != nil {
 		return c, err
 	}

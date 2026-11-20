@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/rhizomatous/flora/backend/internal/projects"
 	"github.com/rhizomatous/flora/backend/internal/storage"
@@ -21,6 +22,24 @@ func projectError(w http.ResponseWriter, err error) {
 }
 
 func (a *api) projectRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/projects/{id}/branches", func(w http.ResponseWriter, r *http.Request) {
+		page := 1
+		var err error
+		if raw := r.URL.Query().Get("page"); raw != "" {
+			page, err = strconv.Atoi(raw)
+		}
+		if err != nil {
+			failure(w, 400, "Invalid branch page.")
+			return
+		}
+		branches, err := a.projects.Branches(r.Context(), r.PathValue("id"), r.URL.Query().Get("repository"), page)
+		if err != nil {
+			projectError(w, err)
+			return
+		}
+		jsonResponse(w, 200, branches)
+	})
+
 	mux.HandleFunc("GET /api/projects", func(w http.ResponseWriter, r *http.Request) {
 		list, err := a.projects.Store.Projects(r.Context())
 		if err != nil {
