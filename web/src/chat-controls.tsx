@@ -203,7 +203,7 @@ export function ChatViewMenu({
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onFilesOpen}>
           <FilesIcon />
-          Machine files
+          Files
           {filesOpen && <span className="ml-auto text-muted-foreground">Current view</span>}
         </DropdownMenuItem>
         <SubagentMenuItems />
