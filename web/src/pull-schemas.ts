@@ -1,6 +1,46 @@
 import { z } from "zod";
 
+const pullCheckSchema = z.object({
+  key: z.string().optional(),
+  name: z.string(),
+  state: z.string(),
+  url: z.string().optional(),
+});
+const pullChecksSchema = z.object({
+  sha: z.string().optional(),
+  items: z
+    .array(pullCheckSchema)
+    .nullable()
+    .transform((items) => items ?? []),
+  checkedAt: z.string().optional(),
+  attemptedAt: z.string().optional(),
+  error: z.string().optional(),
+});
+
+const reviewerSchema = z.object({ name: z.string(), avatar: z.string().optional() });
+const issueSchema = z.object({ number: z.number(), title: z.string(), url: z.string() });
+const issuesSchema = z.object({
+  items: z
+    .array(issueSchema)
+    .nullable()
+    .transform((items) => items ?? []),
+  checkedAt: z.string().optional(),
+  error: z.string().optional(),
+});
 export const pullSchema = z.object({
+  authorAvatar: z.string().optional(),
+  createdAt: z.string().optional(),
+  reviewers: z.array(reviewerSchema).nullable().optional(),
+  labels: z.array(z.string()).nullable().optional(),
+  metadataKnown: z.boolean().optional(),
+  issues: issuesSchema.optional(),
+  body: z.string().optional(),
+  author: z.string().optional(),
+  headRef: z.string().optional(),
+  baseRef: z.string().optional(),
+  headSHA: z.string().optional(),
+  headCheckedAt: z.string().optional(),
+  checks: pullChecksSchema.optional(),
   title: z.string().optional(),
   additions: z.number().optional(),
   deletions: z.number().optional(),

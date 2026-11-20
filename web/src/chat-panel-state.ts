@@ -10,6 +10,7 @@ const schema = z.object({
   view: z.string().default("overview"),
   subagentTabs: z.array(z.string()).default([]),
   width: z.number().min(1).max(99).default(40),
+  pullTabs: z.array(z.string()).default([]),
   pullsOpen: z.boolean().default(true),
 });
 export type ChatPanelState = z.infer<typeof schema>;
