@@ -173,6 +173,21 @@ export function ChatSidePanel({
               ))}
             </TabsList>
             <ChatViewMenu
+              chatID={chatID}
+              onFilesOpen={() => {
+                update({
+                  open: state.open && !window.matchMedia("(max-width: 900px)").matches,
+                  filesOpen: true,
+                  mainView: "files",
+                });
+                requestAnimationFrame(() => {
+                  document
+                    .querySelector<HTMLButtonElement>(
+                      '.chat-main-pane [data-workspace-view="files"]',
+                    )
+                    ?.focus();
+                });
+              }}
               label="Side panel views"
               diffsOpen={view === "diffs"}
               onDiffsChange={(open) => {

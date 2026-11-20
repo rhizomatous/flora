@@ -26,6 +26,7 @@ func New(assets fs.FS, authentication *auth.Service, credentials *settings.Servi
 	api.chatRoutes(mux)
 	api.attachmentRoutes(mux)
 	api.changesRoutes(mux)
+	api.workspaceRoutes(mux)
 	api.usageRoutes(mux)
 	api.automationRoutes(mux)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {

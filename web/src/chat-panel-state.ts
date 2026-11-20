@@ -1,12 +1,20 @@
 import { useSyncExternalStore } from "react";
 import { z } from "zod";
 
+const workspaceTabSchema = z.object({ repository: z.string(), path: z.string() });
 const schema = z.object({
   open: z.boolean().default(false),
   mainView: z.string().default("chat"),
   mainDiffOpen: z.boolean().default(false),
   mainSubagentTabs: z.array(z.string()).default([]),
   diffOpen: z.boolean().default(false),
+  filesOpen: z.boolean().default(false),
+  workspaceTabs: z.array(workspaceTabSchema).default([]),
+  workspaceExpanded: z.array(z.string()).default([]),
+  fileRepository: z.string().default(""),
+  fileDirectory: z.string().default("."),
+  filePath: z.string().default(""),
+  fileOffset: z.number().int().nonnegative().default(0),
   view: z.string().default("overview"),
   subagentTabs: z.array(z.string()).default([]),
   width: z.number().min(1).max(99).default(40),
@@ -30,8 +38,26 @@ function read(id: string): ChatPanelState {
     // Storage may be unavailable; in-memory state still survives navigation.
   }
   if (state.view === "diffs") state.diffOpen = true;
+  if (state.view === "files") {
+    state.filesOpen = true;
+    state.mainView = "files";
+    state.view = "overview";
+    state.open = false;
+    if (state.filePath !== "" && state.fileRepository !== "") {
+      const file = { repository: state.fileRepository, path: state.filePath };
+      if (!state.workspaceTabs.some((tab) => workspaceFileView(tab) === workspaceFileView(file))) {
+        state.workspaceTabs.push(file);
+      }
+      state.mainView = workspaceFileView(file);
+      state.filePath = "";
+    }
+  }
   states.set(id, state);
   return state;
+}
+
+export function workspaceFileView(file: { repository: string; path: string }) {
+  return `file:${JSON.stringify([file.repository, file.path])}`;
 }
 
 function subscribe(listener: () => void) {

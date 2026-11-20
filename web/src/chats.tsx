@@ -66,6 +66,7 @@ import { SubagentConversation } from "./subagent-conversation";
 import { SubagentsContext, subagentLabel } from "./subagent-state";
 import { buildTranscript } from "./transcript";
 import { text } from "./ui";
+import { WorkspaceTabs, WorkspacePanels } from "./workspace-tabs";
 
 const requestKey = (scope: string) => `flora-request:${scope}`;
 
@@ -389,7 +390,8 @@ export function Chats({
   const sideOpen = existingChat && panelState.open;
   const agents = detail?.chat.ID === id ? detail.subagents : [];
   const mainAgents = agents.filter((agent) => panelState.mainSubagentTabs.includes(agent.id));
-  const mainTabbed = panelState.mainDiffOpen || mainAgents.length > 0;
+  const workspaceTabbed = panelState.filesOpen || panelState.workspaceTabs.length > 0;
+  const mainTabbed = panelState.mainDiffOpen || workspaceTabbed || mainAgents.length > 0;
   const activeDiff = panelState.mainView === "diffs";
   function selectMain(view: string) {
     updatePanel({ mainView: view });
@@ -444,7 +446,7 @@ export function Chats({
                 {mainTabbed && (
                   <TabsList
                     aria-label="Chat views"
-                    className="chat-view-tabs h-auto! min-w-0 shrink justify-start gap-1 bg-transparent p-0"
+                    className={`chat-view-tabs h-auto! min-w-0 shrink justify-start gap-1 bg-transparent p-0 ${workspaceTabbed ? "[&_.chat-title]:max-w-56 [&_.chat-title]:shrink-0" : ""}`}
                   >
                     <ChatTitle
                       title={title()}
@@ -453,6 +455,7 @@ export function Chats({
                       tabbed
                       active={panelState.mainView === "chat"}
                     />
+                    <WorkspaceTabs chatID={id} />
                     {panelState.mainDiffOpen && (
                       <div className="chat-diff-tab" data-active={activeDiff || undefined}>
                         <TabsTrigger
@@ -542,6 +545,21 @@ export function Chats({
                       updatePanel({ open: !sideOpen });
                     }}
                     usage={detail?.usage}
+                    onFilesOpen={() => {
+                      updatePanel({
+                        open: panelState.open && !window.matchMedia("(max-width: 900px)").matches,
+                        filesOpen: true,
+                        mainView: "files",
+                      });
+                      requestAnimationFrame(() => {
+                        document
+                          .querySelector<HTMLButtonElement>(
+                            '.chat-main-pane [data-workspace-view="files"]',
+                          )
+                          ?.focus();
+                      });
+                    }}
+                    filesOpen={panelState.mainView === "files"}
                     diffsOpen={activeDiff}
                     onDiffsChange={(open) => {
                       updatePanel({
@@ -648,6 +666,7 @@ export function Chats({
                       </ChatDetail>
                     </div>
                   </TabsContent>
+                  <WorkspacePanels chatID={id} onExpired={onExpired} />
                   {panelState.mainDiffOpen && (
                     <TabsContent
                       value="diffs"

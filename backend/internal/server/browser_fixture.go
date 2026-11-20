@@ -39,7 +39,7 @@ func (f browserTransport) RoundTrip(r *http.Request) (*http.Response, error) { r
 // This code is compiled only into the fixture executable.
 func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	switch scenario {
-	case "models", "chat", "changes", "enrollment", "notifications", "projects", "settings", "branches":
+	case "models", "chat", "changes", "enrollment", "notifications", "projects", "settings", "workspace", "branches":
 	default:
 		return nil, fmt.Errorf("unknown browser scenario %q", scenario)
 	}
@@ -115,6 +115,104 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		}
 		instance.ChatID = c.ID
 	}
+	if scenario == "workspace" {
+		project, createErr := store.CreateProject(ctx, "Workspace preview", storage.Configuration{Repositories: []storage.Repository{
+			{Name: "flora/web", URL: "https://github.com/flora/web", BaseBranch: "main", Role: "core"},
+			{Name: "flora/api", URL: "https://github.com/flora/api", BaseBranch: "main", Role: "core"},
+		}})
+		if createErr != nil {
+			return nil, createErr
+		}
+		for _, multi := range []bool{true, false} {
+			p := project
+			if !multi {
+				p = fixture.Project
+			}
+			c, createErr := store.CreateChat(ctx, p.ID, "Explore workspace files", "flora@sha256:"+strings.Repeat("a", 64), "1.2.27")
+			if createErr != nil {
+				return nil, createErr
+			}
+			binding := "workspace-stopped"
+			if multi {
+				binding = "missing-browser-container"
+				instance.ChatID = c.ID
+			} else {
+				instance.OtherChatID = c.ID
+			}
+			if err = store.BindRuntime(ctx, c.ID, binding, ""); err != nil {
+				return nil, err
+			}
+			paths, pathErr := store.Paths(ctx, c.ID)
+			if pathErr != nil {
+				return nil, pathErr
+			}
+			for _, repo := range c.Configuration.Repositories {
+				root := filepath.Join(paths.Workspace, strings.TrimPrefix(storage.RepositoryPath(c.Configuration, repo), "/workspace"))
+				if err = os.MkdirAll(filepath.Join(root, "src"), 0700); err != nil {
+					return nil, err
+				}
+				if err = os.MkdirAll(filepath.Join(root, "empty"), 0700); err != nil {
+					return nil, err
+				}
+				files := map[string]string{
+					".gitignore":                  "node_modules/\nresult\n.env\n",
+					".github/workflows/check.yml": "name: Checks\non: [push, pull_request]\njobs:\n  check:\n    runs-on: ubuntu-latest\n",
+					"README.md":                   "# Flora workspace\n\nA small development workspace for testing file navigation.\n",
+					"flake.nix": `# Development tools for the workspace.
+{
+  description = "Flora development environment";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
+
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = import nixpkgs { inherit system; };
+
+        # Keep command-line tools in one place.
+        tools = with pkgs; [
+          git
+          go
+          nodejs_24
+          ripgrep
+        ];
+      in {
+        devShells.default = pkgs.mkShell {
+          packages = tools;
+
+          shellHook = ''
+            echo "Workspace ready"
+          '';
+        };
+
+        formatter = pkgs.nixfmt;
+      });
+}
+`,
+					"README.txt":        "Workspace preview fixture\nRepository: " + repo.Name + "\n\nBrowse files, open src, and download a file.\n",
+					"package.json":      "{\n  \"name\": \"" + repo.Name + "\",\n  \"private\": true\n}\n",
+					"src/navigation.ts": "export const views = [\n  \"Overview\",\n  \"Diffs\",\n  \"Files\",\n];\n\nexport function label(index: number) {\n  return views[index] ?? \"Overview\";\n}\n",
+					"large.log":         strings.Repeat("Workspace checks passed. All services ready.\n", 20000),
+					"picture.bin":       string([]byte{0, 1, 2, 3}),
+					"empty.txt":         "",
+				}
+				for name, body := range files {
+					if err = os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0700); err != nil {
+						return nil, err
+					}
+					if err = os.WriteFile(filepath.Join(root, name), []byte(body), 0600); err != nil {
+						return nil, err
+					}
+				}
+				if err = os.Symlink("/etc/passwd", filepath.Join(root, "outside-link")); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
 	if scenario == "notifications" {
 		image, harness := (&testfixture.Provisioner{}).Identity()
 		other, createErr := store.CreateChat(ctx, fixture.Project.ID, "Other conversation", image, harness)
@@ -166,7 +264,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}
 	srv := httptest.NewUnstartedServer(nil)
 	origin := "https://" + srv.Listener.Addr().String()
-	if scenario == "models" || scenario == "branches" {
+	if scenario == "models" || scenario == "workspace" || scenario == "branches" {
 		origin = "http://" + srv.Listener.Addr().String()
 		if scenario == "branches" {
 			origin = strings.Replace(origin, "127.0.0.1", "localhost", 1)
@@ -247,7 +345,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}
 	mux.Handle("/", app)
 	srv.Config.Handler = mux
-	if scenario == "models" || scenario == "branches" {
+	if scenario == "models" || scenario == "workspace" || scenario == "branches" {
 		srv.Start()
 	} else {
 		srv.StartTLS()
