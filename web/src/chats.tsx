@@ -390,11 +390,8 @@ export function Chats({
   const sideOpen = existingChat && panelState.open;
   const agents = detail?.chat.ID === id ? detail.subagents : [];
   const mainAgents = agents.filter((agent) => panelState.mainSubagentTabs.includes(agent.id));
-  const mainTabbed =
-    panelState.mainDiffOpen ||
-    panelState.filesOpen ||
-    panelState.workspaceTabs.length > 0 ||
-    mainAgents.length > 0;
+  const workspaceTabbed = panelState.filesOpen || panelState.workspaceTabs.length > 0;
+  const mainTabbed = panelState.mainDiffOpen || workspaceTabbed || mainAgents.length > 0;
   const activeDiff = panelState.mainView === "diffs";
   function selectMain(view: string) {
     updatePanel({ mainView: view });
@@ -449,7 +446,7 @@ export function Chats({
                 {mainTabbed && (
                   <TabsList
                     aria-label="Chat views"
-                    className="chat-view-tabs h-auto! min-w-0 shrink justify-start gap-1 bg-transparent p-0 [&_.chat-title]:max-w-56 [&_.chat-title]:shrink-0"
+                    className={`chat-view-tabs h-auto! min-w-0 shrink justify-start gap-1 bg-transparent p-0 ${workspaceTabbed ? "[&_.chat-title]:max-w-56 [&_.chat-title]:shrink-0" : ""}`}
                   >
                     <ChatTitle
                       title={title()}
