@@ -209,3 +209,9 @@ details[open] > .overview-section-heading .overview-section-caret {
   padding-inline: 4px;
   scroll-padding-inline: 4px;
 }
+@media (hover: hover) and (pointer: fine) {
+  .chat-pull-tab:focus-within:not(:hover) .chat-diff-tab-close:not(:focus-visible) {
+    opacity: 0;
+    pointer-events: none;
+  }
+}

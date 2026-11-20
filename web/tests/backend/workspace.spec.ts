@@ -10,7 +10,8 @@ test("canvas file tabs preserve repository identity and read without a runtime o
   const errors = pageErrors(page);
   const mutations: string[] = [];
   page.on("request", r => {
-    if (r.method() !== "GET" && /\/api\/chats\//.test(r.url())) mutations.push(r.url());
+    const path = new URL(r.url()).pathname;
+    if (r.method() !== "GET" && path.startsWith("/api/chats/") && path !== "/api/chats/read") mutations.push(r.url());
   });
   await logIn(page);
   await page.goto(`${backend.url}/#chats/${backend.chatID}`);

@@ -1,0 +1,14 @@
+import { useEffect, useState } from "react";
+
+export function useChecksNow() {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 30_000);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
+  return now;
+}

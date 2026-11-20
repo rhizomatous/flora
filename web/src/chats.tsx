@@ -58,8 +58,10 @@ import { Composer } from "./composer";
 import { ConversationMessage, WorkSummary } from "./conversation";
 import { NewChatComposer } from "./new-chat-composer";
 import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
+import { pullEvents } from "./pull-events";
 import { QuestionForm } from "./question";
 import { errorMessage, isExpired, request } from "./request";
+import { useMarkViewed } from "./sidebar-status";
 import { SubagentConversation } from "./subagent-conversation";
 import { SubagentsContext, subagentLabel } from "./subagent-state";
 import { buildTranscript } from "./transcript";
@@ -123,6 +125,7 @@ export function Chats({
   const submitting = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const id = path.startsWith("chats/") ? (path.slice(6).split("?")[0] ?? "") : "";
+  const readError = useMarkViewed(detail?.chat.ID === id ? detail.chat : undefined);
   const isNew = id === "new" || id.startsWith("new?");
   const projectID = new URLSearchParams(path.split("?")[1]).get("project") ?? "";
   const [selectedProjectID, setSelectedProjectID] = useState(() => {
@@ -570,9 +573,9 @@ export function Chats({
                   </a>
                 </div>
               )}
-              {error !== "" && (
+              {(error !== "" || readError !== "") && (
                 <Alert role="alert" className="mt-6">
-                  {error}
+                  {error || readError}
                 </Alert>
               )}
               {isNew && projects === undefined && error === "" && (
@@ -688,6 +691,7 @@ export function Chats({
               <ChatSidePanel
                 key={id}
                 chatID={id}
+                chatTitle={title()}
                 pulls={pulls}
                 onExpired={onExpired}
                 onClose={() => {
@@ -736,6 +740,7 @@ function ChatDetail({
   const stopped = chat.Status === "stopped";
   const blocked = detail.continuationBlockedReason !== "";
   const rows = buildTranscript(detail.messages, chat.Status);
+  const events = pullEvents(detail.messages, pulls?.items ?? []);
   const visibleActivity = rows.some((row) => row.kind === "work" && row.active);
 
   return (
@@ -778,7 +783,10 @@ function ChatDetail({
                   {row.kind === "work" ? (
                     <WorkSummary steps={row.steps} active={row.active} failed={row.failed} />
                   ) : (
-                    <ConversationMessage message={row.message} />
+                    <ConversationMessage
+                      message={row.message}
+                      pullEvents={events.get(row.message.ID)}
+                    />
                   )}
                 </MessageScrollerItem>
               ))}
