@@ -52,13 +52,15 @@ func TestChatBranchesFreezeAndRetry(t *testing.T) {
 	}
 }
 
-func TestBranchMigrationPreservesOldCreationIdentity(t *testing.T) {
+func TestBranchMigrationPreservesCreationIdentityAndReadState(t *testing.T) {
 	root := t.TempDir()
 	s := openTest(t, root)
 	p, _ := fixture(t, s)
 	c, err := s.CreateChatRequest(ctx, p.ID, "Legacy", image, "1", "old", "Prompt")
 	must(t, err)
-	_, err = s.db.Exec(`ALTER TABLE chat_requests DROP COLUMN branches; PRAGMA user_version=16`)
+	_, err = s.MarkChatsRead(ctx, []ViewedRevision{{c.ID, c.ActivityRevision}})
+	must(t, err)
+	_, err = s.db.Exec(`ALTER TABLE chat_requests DROP COLUMN branches; PRAGMA user_version=17`)
 	must(t, err)
 	must(t, s.Close())
 	s = openTest(t, root)
@@ -66,5 +68,8 @@ func TestBranchMigrationPreservesOldCreationIdentity(t *testing.T) {
 	must(t, err)
 	if retry.ID != c.ID {
 		t.Fatal("migration lost old retry identity")
+	}
+	if retry.LastViewedRevision != c.ActivityRevision {
+		t.Fatal("migration lost the saved read position")
 	}
 }

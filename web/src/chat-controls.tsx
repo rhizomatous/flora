@@ -20,6 +20,7 @@ import {
   CloudIcon,
   GitBranchIcon,
   GitPullRequestIcon,
+  ChevronDownIcon,
   PlusIcon,
   TerminalIcon,
   PanelRightIcon,
@@ -140,7 +141,7 @@ export function ChatTitle({
           <PullCount pulls={pulls?.items ?? []} />
         </div>
         <div className="mt-2 border-t border-border pt-2">
-          <PullList summary={pulls} />
+          <PullList summary={pulls} chatID={chat?.ID} />
         </div>
       </HoverCardContent>
     </HoverCard>
@@ -351,26 +352,42 @@ export function ChatReviewStrip({
   children: ReactNode;
   pulls: PullSummary | undefined;
 }) {
+  const [open, setOpen] = useState(false);
   const count = pulls?.items.length ?? 0;
   return (
     <div className="composer-review flex flex-col items-center gap-1.5 pb-1.5">
       <div className="composer-accessories flex min-h-7 items-center justify-center gap-1.5">
         {children}
-        <Popover>
+        <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger
             render={
               <Button
                 variant="secondary"
                 size="sm"
-                className="composer-accessory h-7 gap-1.5 border border-border px-2.5 text-xs [&_svg]:size-[13px]!"
+                className="composer-accessory group h-7 gap-1.5 border border-border px-2.5 text-xs [&_svg]:size-[13px]!"
                 aria-label={`Linked pull requests${pulls ? ` (${count})` : ""}`}
               >
                 {count > 0 ? <PullCount pulls={pulls?.items ?? []} /> : <GitPullRequestIcon />}
-                <span>Linked PRs</span>
+                <ChevronDownIcon
+                  className="rotate-180 text-muted-foreground group-aria-expanded:rotate-0"
+                  aria-hidden="true"
+                />
               </Button>
             }
           />
           <PopoverContent
+            onClickCapture={(event) => {
+              if (
+                event.target instanceof Element &&
+                event.target.closest("a[data-pr-state]") &&
+                !event.metaKey &&
+                !event.ctrlKey &&
+                !event.shiftKey &&
+                !event.altKey
+              ) {
+                setOpen(false);
+              }
+            }}
             side="top"
             align="center"
             density="compact"

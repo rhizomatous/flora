@@ -1,3 +1,4 @@
+/* oxlint-disable import/max-dependencies -- Collection rows use shared read and organization controls. */
 import { useEffect, useState } from "react";
 
 import {
@@ -21,9 +22,10 @@ import { ChatOrganizationActions } from "./chat-organization-actions";
 import type { Chat } from "./chat-schemas";
 import { chatStatus, chatStatuses } from "./chat-status";
 import { ListPage, ListFilters, ListEmpty } from "./list-page";
+import { MarkChatsRead, UnreadDot } from "./mark-chats-read";
 import type { ProjectSummary } from "./project-schemas";
 import { PullCount } from "./pull-links";
-import { useSeenSidebarChats } from "./sidebar-status";
+import { isChatSeen } from "./sidebar-status";
 
 const filters = [{ id: "all", label: "All chats" }, ...chatStatuses] as const;
 type Filter = (typeof filters)[number]["id"];
@@ -57,7 +59,6 @@ export function ChatList({
   const [query, setQuery] = useState("");
   const [project, setProject] = useState("");
   const [now, setNow] = useState(Date.now);
-  const isSeen = useSeenSidebarChats(list, "chats");
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNow(Date.now());
@@ -95,15 +96,18 @@ export function ChatList({
       query={query}
       onQueryChange={setQuery}
       actions={
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          nativeButton={false}
-          render={<a href="#chats/new" aria-label="New chat" />}
-          aria-label="New chat"
-        >
-          <PlusIcon />
-        </Button>
+        <>
+          <MarkChatsRead chats={list === undefined ? undefined : visible} />
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            nativeButton={false}
+            render={<a href="#chats/new" aria-label="New chat" />}
+            aria-label="New chat"
+          >
+            <PlusIcon />
+          </Button>
+        </>
       }
       filters={
         <ListFilters
@@ -190,7 +194,7 @@ export function ChatList({
           return (
             <ListGroup key={id} label={name} count={chats.length} listLabel={`${name} chats`}>
               {chats.map((chat) => {
-                const status = chatStatus(chat, isSeen(chat));
+                const status = chatStatus(chat, isChatSeen(chat));
                 return (
                   <li key={chat.ID} className="flex min-w-0 items-center gap-1">
                     <Tooltip>
@@ -220,11 +224,12 @@ export function ChatList({
                           <span />
                         </span>
                         <ItemContent>
-                          <ItemTitle>
+                          <ItemTitle className="group-data-[size=list]/item:flex">
                             {(chat.PinnedAt ?? "") !== "" && (
                               <PinIcon className="size-3 shrink-0 text-muted-foreground" />
                             )}
-                            {chat.Title || "Untitled chat"}
+                            <span className="truncate">{chat.Title || "Untitled chat"}</span>
+                            <UnreadDot seen={isChatSeen(chat)} />
                           </ItemTitle>
                           <span className="shrink-0 text-xs text-muted-foreground sm:w-20">
                             {status.label}

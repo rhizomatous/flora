@@ -13,7 +13,8 @@ import {
 import { Changes } from "./changes";
 import { ChatViewMenu, SidePanelToggle } from "./chat-controls";
 import { useChatPanelState } from "./chat-panel-state";
-import { PullList } from "./pull-links";
+import { PullList, PullStatusIcon } from "./pull-links";
+import { PullOverview } from "./pull-overview";
 import type { PullSummary } from "./pull-schemas";
 import { SubagentConversation } from "./subagent-conversation";
 import { SubagentPaneContext, subagentLabel, useSubagents } from "./subagent-state";
@@ -24,14 +25,21 @@ export function ChatSidePanel({
   pulls,
   onExpired,
   onClose,
+  chatTitle,
 }: {
   chatID: string;
+  chatTitle: string;
   pulls: PullSummary | undefined;
   onExpired: () => void;
   onClose: () => void;
 }) {
   const [state, update] = useChatPanelState(chatID);
-  const { diffOpen, view } = state;
+  const { diffOpen } = state;
+  const pullTabs = (pulls?.items ?? []).filter((pull) => state.pullTabs.includes(pull.url));
+  const view =
+    state.view.startsWith("pull:") && !pullTabs.some((pull) => `pull:${pull.url}` === state.view)
+      ? "overview"
+      : state.view;
   const { agents } = useSubagents();
   const tabs = agents.filter((agent) => state.subagentTabs.includes(agent.id));
   return (
@@ -45,6 +53,7 @@ export function ChatSidePanel({
           className="min-h-0 flex-1 gap-0"
         >
           <div className="florets-topbar flex shrink-0 items-center gap-1 border-b px-3">
+            <span className="sidebar-toggle-space min-[901px]:hidden" aria-hidden="true" />
             <TabsList
               aria-label="Side panel tabs"
               className="chat-view-tabs h-auto! min-w-0 justify-start gap-1 bg-transparent p-0"
@@ -59,6 +68,45 @@ export function ChatSidePanel({
                 <ListIcon />
                 <span className="florets-control-label">Overview</span>
               </TabsTrigger>
+              {pullTabs.map((pull) => (
+                <div
+                  key={pull.url}
+                  className="chat-diff-tab chat-pull-tab"
+                  data-active={view === `pull:${pull.url}` || undefined}
+                >
+                  <TabsTrigger
+                    value={`pull:${pull.url}`}
+                    variant="control"
+                    render={
+                      <Button variant="ghost" size="compact" className="chat-diff-tab-trigger" />
+                    }
+                    data-pull-url={pull.url}
+                    aria-label={`PR #${pull.number}`}
+                    title={pull.repository}
+                  >
+                    <PullStatusIcon pull={pull} />
+                    <span>#{pull.number}</span>
+                  </TabsTrigger>
+                  <Button
+                    variant="ghost"
+                    size="icon-compact"
+                    className="chat-diff-tab-close"
+                    aria-label={`Close PR #${pull.number}`}
+                    onClick={(event) => {
+                      event.currentTarget
+                        .closest("aside")
+                        ?.querySelector<HTMLButtonElement>('[role="tab"]')
+                        ?.focus();
+                      update({
+                        pullTabs: state.pullTabs.filter((url) => url !== pull.url),
+                        view: view === `pull:${pull.url}` ? "overview" : view,
+                      });
+                    }}
+                  >
+                    <XIcon />
+                  </Button>
+                </div>
+              ))}
               {diffOpen && (
                 <div className="chat-diff-tab" data-active={view === "diffs" || undefined}>
                   <TabsTrigger
@@ -155,10 +203,25 @@ export function ChatSidePanel({
                   className="overview-section-caret size-3 text-muted-foreground opacity-60"
                 />
               </summary>
-              <PullList summary={pulls} />
+              <PullList summary={pulls} chatID={chatID} />
             </details>
             <SubagentList />
           </TabsContent>
+          {pullTabs.map((pull) => (
+            <TabsContent
+              key={pull.url}
+              value={`pull:${pull.url}`}
+              keepMounted
+              className="chat-view-panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+            >
+              <PullOverview
+                pull={pull}
+                chatID={chatID}
+                chatTitle={chatTitle}
+                error={pulls?.error ?? ""}
+              />
+            </TabsContent>
+          ))}
           {diffOpen && (
             <TabsContent
               value="diffs"

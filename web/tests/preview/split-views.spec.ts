@@ -22,7 +22,7 @@ test("side panel keeps chat drafts, resizes, and hosts independent diff tabs", a
     "true",
   );
   await expect(side.getByRole("list", { name: "Linked pull requests" })).toBeVisible();
-  const section = side.locator("summary");
+  const section = side.locator("summary").first();
   await section.click();
   await expect(side.getByRole("list", { name: "Linked pull requests" })).toBeHidden();
   await section.click();
@@ -84,7 +84,7 @@ test("panel preferences survive closing, chat navigation, and reload", async ({ 
   await page.getByRole("button", { name: "Open side panel" }).click();
   await expect(rail).toBeHidden();
   const side = page.getByRole("complementary", { name: "Side panel" });
-  await side.locator("summary").click();
+  await side.locator("summary").first().click();
   const handle = page.getByRole("separator", { name: "Resize side panel" });
   await handle.focus();
   await page.keyboard.press("ArrowLeft");
@@ -112,6 +112,7 @@ test("panel preferences survive closing, chat navigation, and reload", async ({ 
     "true",
   );
   await page.reload();
+  await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await expect(side.getByRole("tab", { name: "Diffs", exact: true })).toHaveAttribute(
     "aria-selected",
     "true",

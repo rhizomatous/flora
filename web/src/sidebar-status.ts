@@ -1,41 +1,117 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { z } from "zod";
 
 import type { Chat } from "./chat-schemas";
+import { errorMessage, request } from "./request";
 
-function revision(chat: Chat) {
-  return JSON.stringify([chat.Status, chat.StatusReason, chat.UpdatedAt]);
+export const readEvent = "flora:chats-read";
+export const viewedSchema = z.object({
+  chatID: z.string(),
+  revision: z.number().int().nonnegative(),
+});
+type Viewed = z.infer<typeof viewedSchema>;
+
+export async function markChatsRead(chats: Chat[]) {
+  // Capture all bounds before sending the first batch. Later feed updates must
+  // never extend the scope of an action already in progress.
+  const observed = chats.map((chat) => ({ chatID: chat.ID, revision: chat.ActivityRevision ?? 0 }));
+  for (let offset = 0; offset < observed.length; offset += 1000) {
+    // oxlint-disable-next-line no-await-in-loop -- Bound each request and preserve completed batches if a later one fails.
+    const saved = await request(viewedSchema.array(), "chats/read", {
+      method: "POST",
+      body: { observed: observed.slice(offset, offset + 1000) },
+    });
+    window.dispatchEvent(new CustomEvent(readEvent, { detail: saved }));
+  }
 }
 
-/** Records the attention state viewed in this tab; a later status update becomes unread again. */
-export function useSeenSidebarChats(chats: Chat[] | undefined, path: string) {
-  const [seen, setSeen] = useState<Record<string, string>>({});
-  const current = chats?.find((chat) => path === `chats/${chat.ID}`);
-  const id = current?.ID;
-  const version = current && revision(current);
+/** Retains an acknowledged position when an older feed request arrives late. */
+export function latestRead(incoming: Chat, saved?: Chat): Chat {
+  return {
+    ...incoming,
+    LastViewedRevision: Math.max(incoming.LastViewedRevision ?? 0, saved?.LastViewedRevision ?? 0),
+  };
+}
+
+export function isChatSeen(chat: Chat) {
+  return (chat.LastViewedRevision ?? 0) >= (chat.ActivityRevision ?? 0);
+}
+
+/** A visible, successfully loaded conversation acknowledges only its delivered revision. */
+export function useMarkViewed(chat: Chat | undefined) {
+  const id = chat?.ID;
+  const revision = chat?.ActivityRevision;
+  const saved = chat?.LastViewedRevision ?? 0;
+  const [error, setError] = useState<{ chatID: string; message: string }>();
   useEffect(() => {
-    if (id === undefined || version === undefined) return;
-    const markSeen = () => {
-      if (document.visibilityState !== "visible") return;
+    if (id === undefined || id === "" || revision === undefined || saved >= revision) return;
+    let active = true;
+    let pending = false;
+    let done = false;
+    const mark = async () => {
+      if (document.visibilityState !== "visible" || pending || done) return;
+      pending = true;
       try {
-        sessionStorage.setItem(`flora-seen:${id}`, version);
+        const result = await request(viewedSchema.array(), "chats/read", {
+          method: "POST",
+          body: { observed: [{ chatID: id, revision }] },
+        });
+        window.dispatchEvent(new CustomEvent<Viewed[]>(readEvent, { detail: result }));
+        done = true;
+        if (active) setError(undefined);
       } catch {
-        // Keep the current tab's in-memory state when browser storage is unavailable.
+        if (active) setError({ chatID: id, message: "Could not save read state. Retrying…" });
+      } finally {
+        pending = false;
       }
-      setSeen((previous) => (previous[id] === version ? previous : { ...previous, [id]: version }));
     };
-    markSeen();
-    document.addEventListener("visibilitychange", markSeen);
+    void mark();
+    const visible = () => {
+      void mark();
+    };
+    document.addEventListener("visibilitychange", visible);
+    const timer = setInterval(visible, 3000);
     return () => {
-      document.removeEventListener("visibilitychange", markSeen);
+      active = false;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", visible);
     };
-  }, [id, version]);
-  return (chat: Chat) => {
-    const value = revision(chat);
-    if (seen[chat.ID] === value) return true;
+  }, [id, revision, saved]);
+  return error !== undefined && error.chatID === id && saved < (revision ?? 0) ? error.message : "";
+}
+
+/** The caller supplies the current view, including search, project, and archive filters. */
+export function useMarkChatsRead(chats: Chat[] | undefined) {
+  const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const unread = chats?.filter((chat) => !isChatSeen(chat)) ?? [];
+  async function save(observed: Chat[]) {
+    if (pending.current || observed.length === 0) return;
+    pending.current = true;
+    setBusy(true);
     try {
-      return sessionStorage.getItem(`flora-seen:${chat.ID}`) === value;
-    } catch {
-      return false;
+      await markChatsRead(observed);
+    } catch (cause) {
+      toast.error(errorMessage(cause, "Could not save read state. Try again."), {
+        toasterId: "chat-organization",
+        action: {
+          label: "Retry",
+          onClick: () => {
+            void save(observed);
+          },
+        },
+      });
+    } finally {
+      pending.current = false;
+      setBusy(false);
     }
+  }
+  return {
+    mark: () => {
+      void save(unread);
+    },
+    disabled: busy || unread.length === 0,
+    busy,
   };
 }
