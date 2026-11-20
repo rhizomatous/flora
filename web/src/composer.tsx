@@ -29,6 +29,7 @@ import {
   type AttachmentPolicy,
 } from "./attachments";
 import type { Execution } from "./chat-schemas";
+import { ContextPicker, type ContextPickerHandle } from "./context-picker";
 import { ModelControls } from "./model-controls";
 
 export function PlaceholderMenu({
@@ -117,10 +118,19 @@ export function Composer({
 }) {
   const [modelPolicy, setModelPolicy] = useState<AttachmentPolicy>();
   const attachments = useAttachments(draftScope ?? id, projectID ?? "", modelPolicy);
+  const context = useRef<ContextPickerHandle>(null);
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  const [referenceCount, setReferenceCount] = useState(0);
+  const [contextActive, setContextActive] = useState<{
+    open: boolean;
+    listID: string;
+    activeID: string | undefined;
+  }>({ open: false, listID: "", activeID: undefined });
+  const composing = useRef(false);
   const picker = useRef<HTMLInputElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
-  const hasInput = message.trim() !== "" || attachments.items.length > 0;
+  const hasInput = message.trim() !== "" || attachments.items.length > 0 || referenceCount > 0;
   const ready = canSend && attachments.ready && hasInput;
   useEffect(() => {
     const form = root.current?.closest("form");
@@ -161,7 +171,7 @@ export function Composer({
   return (
     <InputGroup
       ref={root}
-      className={`composer-box ${dragging ? "ring-2 ring-ring" : ""}`}
+      className={`composer-box relative ${dragging ? "ring-2 ring-ring" : ""}`}
       onDragOver={(event) => {
         if (!disabled && event.dataTransfer.types.includes("Files")) {
           event.preventDefault();
@@ -212,22 +222,56 @@ export function Composer({
         {label}
       </FieldLabel>
       <InputGroupTextarea
+        ref={textarea}
         id={id}
         name="text"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-haspopup="listbox"
+        aria-expanded={contextActive.open}
+        aria-controls={contextActive.open ? contextActive.listID : undefined}
+        aria-activedescendant={contextActive.open ? contextActive.activeID : undefined}
         className="composer-textarea"
         rows={1}
         placeholder="Ask anything, / for commands, @ for context"
         value={message}
         onChange={(event) => {
           onChange(event.target.value);
+          if (
+            !composing.current &&
+            !(event.nativeEvent instanceof InputEvent && event.nativeEvent.isComposing)
+          ) {
+            context.current?.detect(event.target.value, event.target.selectionStart);
+          }
+        }}
+        onCompositionStart={() => {
+          composing.current = true;
+          context.current?.close();
+        }}
+        onCompositionEnd={(event) => {
+          composing.current = false;
+          context.current?.detect(event.currentTarget.value, event.currentTarget.selectionStart);
         }}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+          if (composing.current || event.nativeEvent.isComposing) return;
+          if (context.current?.keydown(event) === true) return;
+          if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
             if (ready) event.currentTarget.form?.requestSubmit();
           }
         }}
         disabled={disabled}
+      />
+      <ContextPicker
+        key={draftScope ?? id}
+        ref={context}
+        scope={draftScope ?? id}
+        projectID={projectID ?? ""}
+        textarea={textarea}
+        onText={onChange}
+        disabled={disabled}
+        onCount={setReferenceCount}
+        onActive={setContextActive}
       />
       {attachments.items.length > 0 && (
         <div
@@ -323,15 +367,30 @@ export function Composer({
               <span className="florets-control-label">Upload attachment</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem disabled>
+            <DropdownMenuItem
+              disabled={projectID === undefined || projectID === ""}
+              onClick={() => {
+                context.current?.open("chat");
+              }}
+            >
               <MessageSquareIcon />
-              Threads
+              Chats
             </DropdownMenuItem>
-            <DropdownMenuItem disabled>
+            <DropdownMenuItem
+              disabled={projectID === undefined || projectID === ""}
+              onClick={() => {
+                context.current?.open("pr");
+              }}
+            >
               <GitPullRequestIcon />
               Pull requests
             </DropdownMenuItem>
-            <DropdownMenuItem disabled>
+            <DropdownMenuItem
+              disabled={projectID === undefined || projectID === ""}
+              onClick={() => {
+                context.current?.open("file");
+              }}
+            >
               <FilesIcon />
               Files
             </DropdownMenuItem>

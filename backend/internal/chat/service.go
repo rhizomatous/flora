@@ -62,6 +62,9 @@ func (s *Service) CreateWithExecution(ctx context.Context, project, title, reque
 // CreateWithBranches expects GitHub access and effective branches to be validated
 // before the first reservation. Retries use their saved input without revalidation.
 func (s *Service) CreateWithBranches(ctx context.Context, project, title, requestID, text string, selection *storage.Execution, branches map[string]string, attachments ...string) (storage.Chat, error) {
+	return s.CreateWithContext(ctx, project, title, requestID, text, selection, branches, nil, attachments...)
+}
+func (s *Service) CreateWithContext(ctx context.Context, project, title, requestID, text string, selection *storage.Execution, branches map[string]string, references []string, attachments ...string) (storage.Chat, error) {
 	if s.provisioner == nil {
 		return storage.Chat{}, errors.New("chat runtime is not configured")
 	}
@@ -82,11 +85,11 @@ func (s *Service) CreateWithBranches(ctx context.Context, project, title, reques
 		return storage.Chat{}, reservedErr
 	}
 	image, harness := s.provisioner.Identity()
-	c, err := s.Store.CreateChatRequestWithBranches(ctx, project, title, image, harness, requestID, text, selection, branches, attachments...)
+	c, err := s.Store.CreateChatRequestWithContext(ctx, project, title, image, harness, requestID, text, selection, branches, references, attachments...)
 	if err != nil {
 		return c, err
 	}
-	_, err = s.SubmitWithExecution(ctx, c.ID, requestID, text, selection, attachments...)
+	_, err = s.SubmitWithContext(ctx, c.ID, requestID, text, selection, references, attachments...)
 	if err != nil {
 		return c, err
 	}
@@ -98,6 +101,9 @@ func (s *Service) Submit(ctx context.Context, chatID, requestID, text string, at
 }
 
 func (s *Service) SubmitWithExecution(ctx context.Context, chatID, requestID, text string, selection *storage.Execution, attachments ...string) (storage.Acceptance, error) {
+	return s.SubmitWithContext(ctx, chatID, requestID, text, selection, nil, attachments...)
+}
+func (s *Service) SubmitWithContext(ctx context.Context, chatID, requestID, text string, selection *storage.Execution, references []string, attachments ...string) (storage.Acceptance, error) {
 	unlock := s.lockOperation(chatID)
 	defer unlock()
 	if s.provisioner == nil {
@@ -108,7 +114,7 @@ func (s *Service) SubmitWithExecution(ctx context.Context, chatID, requestID, te
 		return storage.Acceptance{}, err
 	}
 	if _, err := s.Store.MessageRequest(ctx, chatID, requestID); err == nil {
-		return s.Store.AcceptMessageWithExecution(ctx, chatID, requestID, text, selection, attachments...)
+		return s.Store.AcceptMessageWithContext(ctx, chatID, requestID, text, selection, references, attachments...)
 	} else if !errors.Is(err, storage.ErrNotFound) {
 		return storage.Acceptance{}, err
 	}
@@ -135,7 +141,7 @@ func (s *Service) SubmitWithExecution(ctx context.Context, chatID, requestID, te
 			return storage.Acceptance{}, &ControlError{Reason: reason}
 		}
 	}
-	a, err := s.Store.AcceptMessageWithExecution(ctx, chatID, requestID, text, selection, attachments...)
+	a, err := s.Store.AcceptMessageWithContext(ctx, chatID, requestID, text, selection, references, attachments...)
 	if err != nil || a.Duplicate {
 		return a, err
 	}
@@ -598,9 +604,13 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 			if saved.ID == messageID {
 				acceptedText = saved.Text
 				var payload struct {
-					Attachments []storage.Attachment `json:"attachments"`
+					Attachments []storage.Attachment       `json:"attachments"`
+					References  []storage.ContextReference `json:"references"`
 				}
 				_ = json.Unmarshal(saved.Payload, &payload)
+				for _, ref := range payload.References {
+					acceptedText += referenceText(ref)
+				}
 				for _, file := range payload.Attachments {
 					if file.MIME != "text/plain" {
 						a, data, err := s.Store.Attachment(ctx, file.ID)

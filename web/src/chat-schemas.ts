@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { automationRunSchema } from "./automation-schemas";
+import { savedReferenceSchema } from "./context-schema";
 import { executionSchema } from "./execution-schema";
 import { pullSummarySchema } from "./pull-schemas";
 
@@ -77,6 +78,7 @@ export const partSchema = z.looseObject({
 export type Part = z.infer<typeof partSchema>;
 const messageInfoSchema = z.object({ error: z.unknown().optional() });
 const payloadSchema = z.object({
+  references: z.array(savedReferenceSchema).optional(),
   parts: z.array(partSchema).default([]),
   info: messageInfoSchema.optional(),
 });
