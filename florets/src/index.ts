@@ -144,3 +144,6 @@ export { Diff } from "./components/diff";
 export { FileTypeIcon } from "./components/file-type-icon";
 
 export { MadlibPicker, MadlibSelect } from "./components/madlib-picker";
+
+export * from "./components/settings-group";
+export * from "./components/textarea-panel";

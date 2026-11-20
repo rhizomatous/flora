@@ -62,7 +62,7 @@ func TestChatAPIAuthenticationValidationAndReplay(t *testing.T) {
 		return b
 	}
 	for _, route := range []struct{ method, path string }{
-		{"GET", "/api/notifications"},
+		{"GET", "/api/notifications"}, {"POST", "/api/chats/read"},
 		{"GET", "/api/chats/missing/runtime"}, {"POST", "/api/chats/missing/wake"}, {"POST", "/api/chats/missing/keep-awake"},
 		{"POST", "/api/chats/missing/interrupt"}, {"POST", "/api/chats/missing/stop"},
 		{"PATCH", "/api/chats/missing"}, {"GET", "/api/chats"}, {"GET", "/api/chats/missing/setup-log"}, {"HEAD", "/api/chats/missing/setup-log"}, {"GET", "/api/chats/missing"}, {"GET", "/api/chats/missing/events"}, {"GET", "/api/chats/missing/questions"}, {"POST", "/api/projects/" + project.ID + "/chats"}, {"POST", "/api/chats/missing/messages"}, {"POST", "/api/chats/missing/questions/question/reply"},
@@ -87,6 +87,27 @@ func TestChatAPIAuthenticationValidationAndReplay(t *testing.T) {
 		t.Fatal("creation retry created a second chat")
 	}
 
+	for _, bad := range []string{`{}`, `{"observed":[]}`, `{"observed":[{"chatID":"missing","revision":-1}]}`, `{"observed":[],"unknown":true}`} {
+		call("POST", "/api/chats/read", bad, token, origin, 400)
+	}
+	call("POST", "/api/chats/read", `{"observed":[{"chatID":"missing","revision":0}]}`, token, origin, 404)
+	observed := fmt.Sprintf(`{"observed":[{"chatID":%q,"revision":%d}]}`, c.ID, c.ActivityRevision)
+	call("POST", "/api/chats/read", observed, token, origin, 200)
+	var readFeed struct {
+		Chats []storage.Chat `json:"chats"`
+	}
+	if err := json.Unmarshal(call("GET", "/api/notifications", "", token, "", 200), &readFeed); err != nil {
+		t.Fatal(err)
+	}
+	foundRead := false
+	for _, row := range readFeed.Chats {
+		if row.ID == c.ID {
+			foundRead = row.LastViewedRevision == c.ActivityRevision
+		}
+	}
+	if !foundRead {
+		t.Fatal("feed omitted durable read position")
+	}
 	organizationPath := "/api/chats/" + c.ID
 	for _, bad := range []string{`{}`, `{"revision":0}`, `{"revision":0,"title":" "}`, `{"revision":0,"title":"Valid","unknown":true}`, `{"revision":-1,"pinned":true}`} {
 		call("PATCH", organizationPath, bad, token, origin, 400)

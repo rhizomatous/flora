@@ -1,7 +1,21 @@
+import { detailSchema } from "../../src/chat-schemas";
 import { test, expect } from "./fixtures.ts";
 
 test("sidebar status labels stay stable when chats are read", async ({ page }) => {
   let updated = "2026-01-01T00:00:00Z";
+  let viewed = 0;
+  const revision = () => (updated === "2026-01-01T00:00:00Z" ? 1 : 2);
+  await page.route("**/api/chats/read", async (route) => {
+    viewed = Math.max(viewed, revision());
+    await route.fulfill({ json: [{ chatID: "completed", revision: viewed }] });
+  });
+  await page.route("**/api/chats/completed", async (route) => {
+    const response = await route.fetch();
+    const detail = detailSchema.parse(await response.json());
+    detail.chat.ActivityRevision = revision();
+    detail.chat.LastViewedRevision = viewed;
+    await route.fulfill({ response, json: detail });
+  });
   await page.route("**/api/notifications*", async (route) => {
     const response = await route.fetch();
     const feed: unknown = await response.json();
@@ -28,6 +42,7 @@ test("sidebar status labels stay stable when chats are read", async ({ page }) =
       if (chat.ID === "completed") {
         chat.Status = "idle";
         chat.UpdatedAt = updated;
+        Object.assign(chat, { ActivityRevision: revision(), LastViewedRevision: viewed });
       }
       if (chat.ID === "working") {
         chat.Status = "working";

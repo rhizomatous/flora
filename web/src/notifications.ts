@@ -3,6 +3,7 @@ import { useEffect, useEffectEvent, useState } from "react";
 import { latestOrganization, organizationEvent } from "./chat-organization";
 import { feedSchema, chatSchema, type Chat, type Completion } from "./chat-schemas";
 import { isExpired, request } from "./request";
+import { latestRead, readEvent, viewedSchema } from "./sidebar-status";
 import { useCompletionSound } from "./sound";
 
 export type Toast = Completion & { title: string };
@@ -37,8 +38,11 @@ export function useNotifications(authenticated: boolean, sound: boolean, onExpir
         cursor = feed.cursor;
         setChats((saved) =>
           feed.chats.map((chat) =>
-            latestOrganization(
-              chat,
+            latestRead(
+              latestOrganization(
+                chat,
+                saved?.find((row) => row.ID === chat.ID),
+              ),
               saved?.find((row) => row.ID === chat.ID),
             ),
           ),
@@ -66,9 +70,24 @@ export function useNotifications(authenticated: boolean, sound: boolean, onExpir
       setChats((rows) => {
         const saved = rows ?? [];
         if (!saved.some((row) => row.ID === chat.ID)) return [...saved, chat];
-        return saved.map((row) => (row.ID === chat.ID ? latestOrganization(chat, row) : row));
+        return saved.map((row) =>
+          row.ID === chat.ID ? latestRead(latestOrganization(chat, row), row) : row,
+        );
       });
     };
+    const read = (event: Event) => {
+      if (!(event instanceof CustomEvent)) return;
+      const parsed = viewedSchema.array().safeParse(event.detail);
+      if (!parsed.success) return;
+      const positions = new Map(parsed.data.map((item) => [item.chatID, item.revision]));
+      setChats((rows) =>
+        rows?.map((chat) => ({
+          ...chat,
+          LastViewedRevision: Math.max(chat.LastViewedRevision ?? 0, positions.get(chat.ID) ?? 0),
+        })),
+      );
+    };
+    window.addEventListener(readEvent, read);
     window.addEventListener(organizationEvent, organize);
     void load();
     const timer = setInterval(() => {
@@ -76,6 +95,7 @@ export function useNotifications(authenticated: boolean, sound: boolean, onExpir
     }, 1000);
     return () => {
       active = false;
+      window.removeEventListener(readEvent, read);
       window.removeEventListener(organizationEvent, organize);
       clearInterval(timer);
       setChats(undefined);

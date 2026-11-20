@@ -25,6 +25,7 @@ export function Preview() {
   return (
     <ExampleWrapper>
       <AvatarSizes />
+      <AvatarShapes />
       <AvatarWithBadge />
       <AvatarWithBadgeIcon />
       <AvatarGroupExample />
@@ -368,6 +369,30 @@ function AvatarInEmpty() {
           </Button>
         </EmptyContent>
       </Empty>
+    </Example>
+  );
+}
+
+function AvatarShapes() {
+  return (
+    <Example title="Shapes">
+      <div className="flex flex-wrap items-center gap-3">
+        <Avatar>
+          <AvatarImage src="https://github.com/shadcn.png" alt="Circular avatar" />
+          <AvatarFallback>CN</AvatarFallback>
+        </Avatar>
+        <Avatar shape="squircle">
+          <AvatarImage src="https://github.com/shadcn.png" alt="Squircle avatar" />
+          <AvatarFallback>CN</AvatarFallback>
+        </Avatar>
+        <Avatar shape="squircle" size="sm">
+          <AvatarFallback>CN</AvatarFallback>
+        </Avatar>
+        <Avatar shape="squircle" size="xs">
+          <AvatarImage src="https://github.com/shadcn.png" alt="Compact squircle avatar" />
+          <AvatarFallback>CN</AvatarFallback>
+        </Avatar>
+      </div>
     </Example>
   );
 }

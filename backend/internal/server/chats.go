@@ -90,6 +90,24 @@ func (a *api) chatViews(ctx context.Context, chats []storage.Chat) []chatView {
 
 func (a *api) chatRoutes(mux *http.ServeMux) {
 	store := a.settings.Store
+	mux.HandleFunc("POST /api/chats/read", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Observed []storage.ViewedRevision `json:"observed"`
+		}
+		if !decodeLimit(w, r, &in, 256*1024) {
+			return
+		}
+		saved, err := store.MarkChatsRead(r.Context(), in.Observed)
+		if errors.Is(err, storage.ErrInvalid) {
+			failure(w, 400, "Provide up to 1000 observed chat revisions.")
+			return
+		}
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		jsonResponse(w, 200, saved)
+	})
 	mux.HandleFunc("GET /api/models", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {
 			failure(w, 503, "Chat runtime is not configured.")
