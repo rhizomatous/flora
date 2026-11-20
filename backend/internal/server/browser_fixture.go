@@ -208,6 +208,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		mux := http.NewServeMux()
 		a.projectRoutes(mux)
 		a.chatRoutes(mux)
+		a.attachmentRoutes(mux)
 		projectHandler := a.protect(mux)
 		original := app
 		app = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
