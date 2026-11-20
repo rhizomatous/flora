@@ -15,7 +15,7 @@ test("canvas file tabs preserve repository identity and read without a runtime o
   await logIn(page);
   await page.goto(`${backend.url}/#chats/${backend.chatID}`);
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Machine files", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Files", exact: true }).click();
   await expect(page.getByRole("tab", { name: "Files", exact: true })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Side panel" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Workspace machine" })).toContainText("Missing");
@@ -67,7 +67,7 @@ test("highlighted Nix source, numbered lines, icons, and keyboard folder navigat
   await logIn(page);
   await page.goto(`${backend.url}/#chats/${backend.otherChatID}`);
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Machine files", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Files", exact: true }).click();
   await expect(page.getByRole("button", { name: "Workspace machine" })).toContainText("Asleep");
   await page.getByRole("button", { name: "flake.nix", exact: true }).click();
   const source = page.getByLabel("File contents", { exact: true });
@@ -96,7 +96,7 @@ test("narrow main canvas tabs preserve drafts and independent file tabs", async 
   const draft = page.getByLabel("Follow-up", { exact: true });
   await draft.fill("Keep this unsent draft while I inspect files.");
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Machine files", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Files", exact: true }).click();
   await page.getByRole("button", { name: "src", exact: true }).click();
   await page.getByRole("button", { name: "navigation.ts", exact: true }).click();
   await expect(page.getByLabel("File contents")).toBeVisible();
@@ -114,7 +114,7 @@ test("narrow main canvas tabs preserve drafts and independent file tabs", async 
   await expect(draft).toHaveValue("Keep this unsent draft while I inspect files.");
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Machine files", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Files", exact: true }).click();
   await expect(page.getByRole("button", { name: "navigation.ts", exact: true })).toBeVisible();
   await page.getByRole("tab", { name: "Explore workspace files", exact: true }).click();
   await expect(draft).toHaveValue("Keep this unsent draft while I inspect files.");

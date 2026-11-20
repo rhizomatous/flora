@@ -183,7 +183,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 `,
 					"README.txt":        "Workspace preview fixture\nRepository: " + repo.Name + "\n\nBrowse files, open src, and download a file.\n",
 					"package.json":      "{\n  \"name\": \"" + repo.Name + "\",\n  \"private\": true\n}\n",
-					"src/navigation.ts": "export const views = [\n  \"Overview\",\n  \"Diffs\",\n  \"Machine files\",\n];\n\nexport function label(index: number) {\n  return views[index] ?? \"Overview\";\n}\n",
+					"src/navigation.ts": "export const views = [\n  \"Overview\",\n  \"Diffs\",\n  \"Files\",\n];\n\nexport function label(index: number) {\n  return views[index] ?? \"Overview\";\n}\n",
 					"large.log":         strings.Repeat("Workspace checks passed. All services ready.\n", 20000),
 					"picture.bin":       string([]byte{0, 1, 2, 3}),
 					"empty.txt":         "",
