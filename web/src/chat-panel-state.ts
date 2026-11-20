@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { z } from "zod";
 
+const shellTabSchema = z.object({ id: z.string(), title: z.string() });
 const workspaceTabSchema = z.object({ repository: z.string(), path: z.string() });
 const schema = z.object({
   open: z.boolean().default(false),
@@ -9,6 +10,7 @@ const schema = z.object({
   mainSubagentTabs: z.array(z.string()).default([]),
   diffOpen: z.boolean().default(false),
   filesOpen: z.boolean().default(false),
+  shellTabs: z.array(shellTabSchema).default([]),
   workspaceTabs: z.array(workspaceTabSchema).default([]),
   workspaceExpanded: z.array(z.string()).default([]),
   fileRepository: z.string().default(""),
@@ -69,8 +71,11 @@ function subscribe(listener: () => void) {
 
 export function useChatPanelState(id: string) {
   const state = useSyncExternalStore(subscribe, () => read(id));
-  function update(patch: Partial<ChatPanelState>) {
-    const next = { ...read(id), ...patch };
+  function update(
+    patch: Partial<ChatPanelState> | ((current: ChatPanelState) => Partial<ChatPanelState>),
+  ) {
+    const current = read(id);
+    const next = { ...current, ...(typeof patch === "function" ? patch(current) : patch) };
     states.set(id, next);
     try {
       sessionStorage.setItem(key(id), JSON.stringify(next));

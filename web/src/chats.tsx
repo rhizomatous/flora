@@ -390,7 +390,8 @@ export function Chats({
   const sideOpen = existingChat && panelState.open;
   const agents = detail?.chat.ID === id ? detail.subagents : [];
   const mainAgents = agents.filter((agent) => panelState.mainSubagentTabs.includes(agent.id));
-  const workspaceTabbed = panelState.filesOpen || panelState.workspaceTabs.length > 0;
+  const workspaceTabbed =
+    panelState.filesOpen || panelState.workspaceTabs.length > 0 || panelState.shellTabs.length > 0;
   const mainTabbed = panelState.mainDiffOpen || workspaceTabbed || mainAgents.length > 0;
   const activeDiff = panelState.mainView === "diffs";
   function selectMain(view: string) {
@@ -560,6 +561,7 @@ export function Chats({
                       });
                     }}
                     filesOpen={panelState.mainView === "files"}
+                    overviewActive={panelState.mainView === "chat"}
                     diffsOpen={activeDiff}
                     onDiffsChange={(open) => {
                       updatePanel({

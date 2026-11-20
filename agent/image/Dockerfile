@@ -9,8 +9,9 @@ USER root
 # interactive login; sudo gives passwordless package installation inside the
 # sandbox; coreutils provides timeout(1) for setup;
 # shadow provides usermod/groupmod so the entrypoint can map the agent user
-# onto the storage owner's uid/gid.
-RUN apk add --no-cache git github-cli sudo coreutils shadow curl && \
+# onto the storage owner's uid/gid. Bash supplies the interactive shell;
+# gcompat loads the pinned runtime's glibc-built PTY library on Alpine.
+RUN apk add --no-cache git github-cli sudo coreutils shadow curl bash gcompat && \
     adduser -D -u 1000 flora && \
     printf 'flora ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/flora && \
     chmod 0440 /etc/sudoers.d/flora && \

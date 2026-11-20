@@ -52,4 +52,6 @@ if [ ! -f /var/lib/flora-setup.done ]; then
     fi
     touch /var/lib/flora-setup.done
 fi
-exec sudo -E -u flora opencode serve --hostname 0.0.0.0 --port 4096
+# The pinned PTY library needs glibc symbols even in the musl runtime. Load
+# gcompat after sudo, which strips dynamic-loader variables from its own input.
+exec sudo -E -u flora env LD_PRELOAD=/lib/libgcompat.so.0 opencode serve --hostname 0.0.0.0 --port 4096
