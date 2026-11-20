@@ -285,7 +285,13 @@ export function Chats({
     const rawExecution = text(fields, "execution");
     const execution = rawExecution ? (JSON.parse(rawExecution) as unknown) : undefined;
     const input = isNew
-      ? { title: chatTitle, text: message, attachments, execution }
+      ? {
+          title: chatTitle,
+          text: message,
+          attachments,
+          execution,
+          branches: JSON.parse(text(fields, "branches") || "{}") as unknown,
+        }
       : { text: message, attachments, execution };
     const scope = isNew ? `project:${project}` : `chat:${id}`;
     try {
@@ -299,6 +305,11 @@ export function Chats({
           },
         });
         form.reset();
+        try {
+          sessionStorage.removeItem(`flora-branches:${project}`);
+        } catch {
+          /* Storage may be disabled. */
+        }
         window.location.hash = `chats/${chat.ID}`;
       } else {
         await request(acceptanceSchema, `${chatPath}/messages`, {
@@ -574,11 +585,15 @@ export function Chats({
                   selectedProject={selectedProject}
                   onProjectChange={(selected) => {
                     setSelectedProjectID(selected);
+                    setError("");
                     try {
                       sessionStorage.setItem("flora-new-chat-project", selected);
                     } catch {
                       // Draft selection remains available until this page closes.
                     }
+                  }}
+                  onBranchesChange={() => {
+                    setError("");
                   }}
                   busy={busy}
                   onSend={(event) => {

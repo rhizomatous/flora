@@ -257,6 +257,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			return
 		}
 		var in struct {
+			Branches    map[string]string  `json:"branches"`
 			Execution   *storage.Execution `json:"execution"`
 			Title       string             `json:"title"`
 			RequestID   string             `json:"requestID"`
@@ -266,7 +267,20 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 		if !decodeChat(w, r, &in) {
 			return
 		}
-		c, err := a.chats.CreateWithExecution(r.Context(), r.PathValue("id"), in.Title, in.RequestID, in.Text, in.Execution, in.Attachments...)
+		// Reserved requests use their frozen configuration even if the branch is
+		// later deleted or GitHub is unavailable.
+		if in.Branches != nil {
+			if _, err := store.ChatRequest(r.Context(), r.PathValue("id"), in.RequestID); errors.Is(err, storage.ErrNotFound) {
+				if err := a.projects.ValidateBranches(r.Context(), r.PathValue("id"), in.Branches); err != nil {
+					projectError(w, err)
+					return
+				}
+			} else if err != nil {
+				chatError(w, err)
+				return
+			}
+		}
+		c, err := a.chats.CreateWithBranches(r.Context(), r.PathValue("id"), in.Title, in.RequestID, in.Text, in.Execution, in.Branches, in.Attachments...)
 		if err != nil {
 			chatError(w, err)
 			return

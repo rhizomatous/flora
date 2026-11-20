@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/auth"
@@ -38,7 +39,7 @@ func (f browserTransport) RoundTrip(r *http.Request) (*http.Response, error) { r
 // This code is compiled only into the fixture executable.
 func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	switch scenario {
-	case "models", "chat", "changes", "enrollment", "notifications", "projects", "settings":
+	case "models", "chat", "changes", "enrollment", "notifications", "projects", "settings", "branches":
 	default:
 		return nil, fmt.Errorf("unknown browser scenario %q", scenario)
 	}
@@ -83,6 +84,16 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		}
 		cleanup = append(cleanup, fixture.Close)
 		store, authentication = fixture.Store, fixture.Auth
+	}
+	if scenario == "branches" {
+		repos := []storage.Repository{{Name: "rhizomatous/flora", URL: "https://github.com/rhizomatous/flora.git", BaseBranch: "main", Role: "core"}}
+		if err = store.UpdateProject(ctx, fixture.Project.ID, "Flora", storage.Configuration{Repositories: repos}); err != nil {
+			return nil, err
+		}
+		repos = append(repos, storage.Repository{Name: "rhizomatous/florets", URL: "https://github.com/rhizomatous/florets.git", BaseBranch: "develop", Role: "extra"})
+		if _, err = store.CreateProject(ctx, "Flora workspace", storage.Configuration{Repositories: repos}); err != nil {
+			return nil, err
+		}
 	}
 	configuration := settings.New(store)
 	if scenario == "settings" {
@@ -155,8 +166,11 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}
 	srv := httptest.NewUnstartedServer(nil)
 	origin := "https://" + srv.Listener.Addr().String()
-	if scenario == "models" {
+	if scenario == "models" || scenario == "branches" {
 		origin = "http://" + srv.Listener.Addr().String()
+		if scenario == "branches" {
+			origin = strings.Replace(origin, "127.0.0.1", "localhost", 1)
+		}
 	}
 	var app http.Handler
 	if fixture == nil {
@@ -164,18 +178,37 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	} else {
 		app = New(webassets.FS(), authentication, configuration, origin, fixture.Service)
 	}
-	if scenario == "projects" {
+	var githubUnavailable atomic.Bool
+	if fixture != nil {
 		validation := projects.New(store)
 		validation.Client.Transport = browserTransport(func(r *http.Request) (*http.Response, error) {
 			code := 200
+			if scenario == "branches" {
+				body := `{"default_branch":"main"}`
+				if githubUnavailable.Load() {
+					code = 503
+				}
+				if strings.HasSuffix(r.URL.Path, "/branches/deleted") {
+					code = 404
+				}
+				if strings.HasSuffix(r.URL.Path, "/branches") {
+					body = `[{"name":"main"},{"name":"develop"},{"name":"release/stable"},{"name":"feature/branch-picker"},{"name":"deleted"}]`
+				}
+				return &http.Response{StatusCode: code, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body))}, nil
+			}
+			if strings.HasSuffix(r.URL.Path, "/branches") {
+				return &http.Response{StatusCode: code, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`[{"name":"main"},{"name":"release"}]`))}, nil
+			}
 			if strings.HasSuffix(r.URL.Path, "/branches/missing") {
 				code = 404
 			}
 			return &http.Response{StatusCode: code, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"default_branch":"main"}`))}, nil
 		})
-		a := &api{auth: authentication, projects: validation, origin: origin}
+		a := &api{auth: authentication, projects: validation, settings: configuration, chats: fixture.Service, origin: origin}
 		mux := http.NewServeMux()
 		a.projectRoutes(mux)
+		a.chatRoutes(mux)
+		a.attachmentRoutes(mux)
 		projectHandler := a.protect(mux)
 		original := app
 		app = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -206,14 +239,23 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 			"providerKey": credentials.ProviderKey, "githubToken": credentials.GitHubToken,
 		})
 	})
+	if scenario == "branches" {
+		mux.HandleFunc("POST /__fixture/github", func(w http.ResponseWriter, r *http.Request) {
+			githubUnavailable.Store(r.URL.Query().Get("unavailable") == "true")
+			w.WriteHeader(204)
+		})
+	}
 	mux.Handle("/", app)
 	srv.Config.Handler = mux
-	if scenario == "models" {
+	if scenario == "models" || scenario == "branches" {
 		srv.Start()
 	} else {
 		srv.StartTLS()
 	}
 	cleanup = append(cleanup, func() { srv.CloseClientConnections(); srv.Close() })
 	instance.URL = srv.URL
+	if scenario == "branches" {
+		instance.URL = strings.Replace(instance.URL, "127.0.0.1", "localhost", 1)
+	}
 	return instance, nil
 }

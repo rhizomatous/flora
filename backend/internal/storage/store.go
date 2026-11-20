@@ -324,7 +324,7 @@ func (s *Store) UpdateProject(ctx context.Context, projectID, name string, c Con
 }
 
 func (s *Store) CreateChat(ctx context.Context, projectID, title, imageDigest, harnessVersion string) (Chat, error) {
-	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, "", "", nil, nil)
+	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, "", "", nil, nil, nil)
 }
 
 // CreateChatRequest reserves a creation identity with the immutable first input.
@@ -334,13 +334,19 @@ func (s *Store) CreateChatRequest(ctx context.Context, projectID, title, imageDi
 }
 
 func (s *Store) CreateChatRequestWithExecution(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, selection *Execution, attachments ...string) (Chat, error) {
+	return s.CreateChatRequestWithBranches(ctx, projectID, title, imageDigest, harnessVersion, requestID, text, selection, nil, attachments...)
+}
+
+// CreateChatRequestWithBranches freezes validated repository overrides without changing the project.
+// Branches are keyed by the canonical repository name and are part of the retry identity.
+func (s *Store) CreateChatRequestWithBranches(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, selection *Execution, branches map[string]string, attachments ...string) (Chat, error) {
 	if requestID == "" || len(requestID) > 200 || (strings.TrimSpace(text) == "" && len(attachments) == 0) || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
 		return Chat{}, ErrInvalid
 	}
-	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, requestID, text, attachments, selection)
+	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, requestID, text, attachments, selection, branches)
 }
 
-func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, attachments []string, selection *Execution) (Chat, error) {
+func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, attachments []string, selection *Execution, branches map[string]string) (Chat, error) {
 	imageName, digest, pinned := strings.Cut(imageDigest, "@sha256:")
 	if title == "" || imageName == "" || !pinned || !hexHash(digest, 64) || harnessVersion == "" {
 		return Chat{}, ErrInvalid
@@ -348,12 +354,12 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 	chatID := id()
 	err := s.write(ctx, func(tx *sql.Tx) error {
 		if requestID != "" {
-			var savedTitle, savedText, savedAttachments, savedSelection string
-			err := tx.QueryRowContext(ctx, "SELECT chat_id,title,text,attachments,selection FROM chat_requests WHERE project_id=? AND request_id=?", projectID, requestID).Scan(&chatID, &savedTitle, &savedText, &savedAttachments, &savedSelection)
+			var savedTitle, savedText, savedAttachments, savedSelection, savedBranches string
+			err := tx.QueryRowContext(ctx, "SELECT chat_id,title,text,attachments,selection,branches FROM chat_requests WHERE project_id=? AND request_id=?", projectID, requestID).Scan(&chatID, &savedTitle, &savedText, &savedAttachments, &savedSelection, &savedBranches)
 			if err == nil {
 				var savedIDs []string
 				_ = json.Unmarshal([]byte(savedAttachments), &savedIDs)
-				if savedSelection != selectionJSON(selection) || title != savedTitle || text != savedText || !sameAttachmentIDs(savedIDs, attachments) {
+				if savedBranches != branchesJSON(branches) || savedSelection != selectionJSON(selection) || title != savedTitle || text != savedText || !sameAttachmentIDs(savedIDs, attachments) {
 					return ErrConflict
 				}
 				return nil
@@ -377,6 +383,20 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 		if err := json.Unmarshal([]byte(config), &snapshot); err != nil {
 			return err
 		}
+		remaining := len(branches)
+		for i := range snapshot.Repositories {
+			r := &snapshot.Repositories[i]
+			if branch, ok := branches[r.Name]; ok {
+				if branch == "" || len(branch) > 255 {
+					return ErrInvalid
+				}
+				r.BaseBranch = branch
+				remaining--
+			}
+		}
+		if remaining != 0 {
+			return ErrInvalid
+		}
 		snapshot.Runtime = &prefs.RuntimeDefaults
 		encoded, err := json.Marshal(snapshot)
 		if err != nil {
@@ -397,7 +417,7 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 				return err
 			}
 			encodedAttachments, _ := json.Marshal(append([]string{}, attachments...))
-			if _, err := tx.ExecContext(ctx, "INSERT INTO chat_requests(project_id,request_id,chat_id,title,text,attachments,selection) VALUES (?,?,?,?,?,?,?)", projectID, requestID, chatID, title, text, string(encodedAttachments), selectionJSON(selection)); err != nil {
+			if _, err := tx.ExecContext(ctx, "INSERT INTO chat_requests(project_id,request_id,chat_id,title,text,attachments,selection,branches) VALUES (?,?,?,?,?,?,?,?)", projectID, requestID, chatID, title, text, string(encodedAttachments), selectionJSON(selection), branchesJSON(branches)); err != nil {
 				return err
 			}
 		}
@@ -532,4 +552,12 @@ func hexHash(value string, length int) bool {
 		}
 	}
 	return true
+}
+
+func branchesJSON(branches map[string]string) string {
+	if len(branches) == 0 {
+		return "{}"
+	}
+	data, _ := json.Marshal(branches)
+	return string(data)
 }
