@@ -352,6 +352,10 @@ export function chatPreview(): Plugin {
       });
       return;
     }
+    if (url.pathname === "/api/folders") {
+      json(res, []);
+      return;
+    }
     if (url.pathname === "/api/usage") {
       const from = url.searchParams.get("from") ?? "";
       const to = url.searchParams.get("to") ?? "";

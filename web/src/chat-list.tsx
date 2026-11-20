@@ -17,10 +17,12 @@ import {
   PinIcon,
 } from "@flora/florets";
 
+import { FolderActions, NewFolderButton } from "./chat-folders";
 import { pinnedChats } from "./chat-organization";
 import { ChatOrganizationActions } from "./chat-organization-actions";
 import type { Chat } from "./chat-schemas";
 import { chatStatus, chatStatuses } from "./chat-status";
+import { useFolders } from "./folder-state";
 import { ListPage, ListFilters, ListEmpty } from "./list-page";
 import { MarkChatsRead, UnreadDot } from "./mark-chats-read";
 import type { ProjectSummary } from "./project-schemas";
@@ -67,14 +69,17 @@ export function ChatList({
       window.clearInterval(timer);
     };
   }, []);
+  const { folders, error: folderError } = useFolders();
   const rows = (list ?? []).filter((chat) => (chat.Archived === true) === archived);
   const emptyMessage = archived ? "No archived chats." : "No chats yet.";
   const projectNames = new Map(projects?.map((item) => [item.id, item.name]));
   const groups = [
-    { id: "pinned", name: "Pinned" },
+    { id: "pinned", name: "Pinned", folder: undefined },
+    ...(folders ?? []).map((folder) => ({ id: `folder:${folder.id}`, name: folder.name, folder })),
     ...[...new Set(rows.map((chat) => chat.ProjectID))].map((id) => ({
       id,
       name: projectNames.get(id) ?? "Project",
+      folder: undefined,
     })),
   ];
   const visible = rows
@@ -82,7 +87,7 @@ export function ChatList({
       (chat) =>
         (filter === "all" || chatStatus(chat).id === filter) &&
         (project === "" || chat.ProjectID === project) &&
-        `${chat.Title} ${chat.ID} ${projectNames.get(chat.ProjectID) ?? ""}`
+        `${chat.Title} ${chat.ID} ${projectNames.get(chat.ProjectID) ?? ""} ${folders?.find((f) => f.id === chat.FolderID)?.name ?? ""}`
           .toLowerCase()
           .includes(query.trim().toLowerCase()),
     )
@@ -91,12 +96,13 @@ export function ChatList({
     <ListPage
       title={archived ? "Archived chats" : "Chats"}
       searchLabel="Search chats"
-      searchPlaceholder="Search chats or projects"
+      searchPlaceholder="Search chats, projects, or folders"
       closeSearchLabel="Close chat search"
       query={query}
       onQueryChange={setQuery}
       actions={
         <>
+          <NewFolderButton />
           <MarkChatsRead chats={list === undefined ? undefined : visible} />
           <Button
             variant="ghost"
@@ -142,15 +148,22 @@ export function ChatList({
             className="max-w-full"
           >
             <option value="">All projects</option>
-            {groups.map(({ id, name }) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
+            {groups
+              .filter((group) => !group.folder && group.id !== "pinned")
+              .map(({ id, name }) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
           </NativeSelect>
         </ListFilters>
       }
     >
+      {folderError && (
+        <p role="status" className="mb-4 text-sm text-destructive">
+          {folderError}
+        </p>
+      )}
       {error !== "" && (
         <p role="alert" className="mb-4 text-sm text-destructive">
           {error}
@@ -161,38 +174,69 @@ export function ChatList({
           {error ? "Chats unavailable. Reconnecting…" : "Loading chats…"}
         </p>
       )}
-      {list !== undefined && visible.length === 0 && (
-        <ListEmpty>
-          <p>{rows.length === 0 ? emptyMessage : "No chats match these filters."}</p>
-          {rows.length === 0 && !archived ? (
-            <ButtonLink href="#chats/new" className="mt-2">
-              Start a chat
-            </ButtonLink>
-          ) : (
-            <Button
-              variant="link"
-              className="mt-2"
-              onClick={() => {
-                setFilter("all");
-                setProject("");
-                setQuery("");
-                if (archived && rows.length === 0) window.location.hash = "chats";
-              }}
-            >
-              {archived && rows.length === 0 ? "View current chats" : "Show all chats"}
-            </Button>
-          )}
-        </ListEmpty>
-      )}
+      {list !== undefined &&
+        visible.length === 0 &&
+        ((folders?.length ?? 0) === 0 ||
+          query.trim() !== "" ||
+          project !== "" ||
+          filter !== "all") && (
+          <ListEmpty>
+            <p>{rows.length === 0 ? emptyMessage : "No chats match these filters."}</p>
+            {rows.length === 0 && !archived ? (
+              <ButtonLink href="#chats/new" className="mt-2">
+                Start a chat
+              </ButtonLink>
+            ) : (
+              <Button
+                variant="link"
+                className="mt-2"
+                onClick={() => {
+                  setFilter("all");
+                  setProject("");
+                  setQuery("");
+                  if (archived && rows.length === 0) window.location.hash = "chats";
+                }}
+              >
+                {archived && rows.length === 0 ? "View current chats" : "Show all chats"}
+              </Button>
+            )}
+          </ListEmpty>
+        )}
       <div className="space-y-2">
-        {groups.map(({ id, name }) => {
+        {groups.map(({ id, name, folder }) => {
+          if (list === undefined) return null;
           const chats =
             id === "pinned"
               ? pinnedChats(visible)
-              : visible.filter((chat) => chat.ProjectID === id && (chat.PinnedAt ?? "") === "");
-          if (chats.length === 0) return null;
+              : visible.filter(
+                  (chat) =>
+                    (folder
+                      ? chat.FolderID === folder.id
+                      : chat.ProjectID === id &&
+                        ((chat.FolderID ?? "") === "" ||
+                          folders?.some((row) => row.id === chat.FolderID) !== true)) &&
+                    (chat.PinnedAt ?? "") === "",
+                );
+          if (chats.length === 0 && (!folder || query.trim() || project || filter !== "all")) {
+            return null;
+          }
           return (
-            <ListGroup key={id} label={name} count={chats.length} listLabel={`${name} chats`}>
+            <ListGroup
+              key={id}
+              label={name}
+              count={chats.length}
+              listLabel={`${name} chats`}
+              forceOpen={query.trim() !== ""}
+              actions={folder ? <FolderActions folder={folder} /> : undefined}
+            >
+              {chats.length === 0 && (
+                <li className="px-3 py-4 text-sm text-muted-foreground">
+                  {!archived &&
+                  rows.some((chat) => chat.FolderID === folder?.id && (chat.PinnedAt ?? "") !== "")
+                    ? "Chats in this folder are pinned"
+                    : `No ${archived ? "archived" : "current"} chats in this folder`}
+                </li>
+              )}
               {chats.map((chat) => {
                 const status = chatStatus(chat, isChatSeen(chat));
                 return (
@@ -231,6 +275,11 @@ export function ChatList({
                             <span className="truncate">{chat.Title || "Untitled chat"}</span>
                             <UnreadDot seen={isChatSeen(chat)} />
                           </ItemTitle>
+                          {folder && (
+                            <span className="hidden max-w-32 truncate text-xs text-muted-foreground lg:block">
+                              {projectNames.get(chat.ProjectID) ?? "Project"}
+                            </span>
+                          )}
                           <span className="shrink-0 text-xs text-muted-foreground sm:w-20">
                             {status.label}
                           </span>

@@ -22,12 +22,19 @@ function chat(id: string, pin = "") {
 
 test("late runtime snapshots retain renamed metadata while delivering current execution state", () => {
   const old = chat("one");
-  const renamed = { ...old, Title: "Useful name", Archived: true, OrganizationRevision: 2 };
+  const renamed = {
+    ...old,
+    Title: "Useful name",
+    FolderID: "release",
+    Archived: true,
+    OrganizationRevision: 2,
+  };
   const running = { ...old, Status: "working" as const, UpdatedAt: "2026-11-16T11:00:00Z" };
   expect(latestOrganization(running, renamed)).toEqual({
     ...running,
     Title: renamed.Title,
     Archived: true,
+    FolderID: "release",
     OrganizationRevision: 2,
   });
   expect(latestOrganization(renamed, running)).toEqual(renamed);

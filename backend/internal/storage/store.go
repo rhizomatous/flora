@@ -220,6 +220,7 @@ const (
 type Chat struct {
 	ActivityRevision, LastViewedRevision                int64
 	Execution                                           Execution
+	FolderID                                            string
 	PinnedAt                                            string
 	Archived                                            bool
 	OrganizationRevision                                int64
@@ -434,7 +435,7 @@ func (s *Store) Chat(ctx context.Context, chatID string) (Chat, error) {
 	var config, execution string
 	// Read the row and starting commits in one snapshot.
 	err := s.write(ctx, func(tx *sql.Tx) error {
-		err := tx.QueryRowContext(ctx, `SELECT id,project_id,title,config,image_digest,harness_version,coalesce(container_id,''),coalesce(session_id,''),status,status_reason,coalesce(active_message_id,''),created_at,updated_at,pinned_at,archived,organization_revision,execution,coalesce((SELECT max(sequence) FROM activity WHERE chat_id=chats.id AND kind<>'organization'),0),coalesce((SELECT revision FROM chat_read_state WHERE chat_id=chats.id),0) FROM chats WHERE id=?`, chatID).Scan(&c.ID, &c.ProjectID, &c.Title, &config, &c.ImageDigest, &c.HarnessVersion, &c.ContainerID, &c.SessionID, &c.Status, &c.StatusReason, &c.ActiveMessageID, &c.CreatedAt, &c.UpdatedAt, &c.PinnedAt, &c.Archived, &c.OrganizationRevision, &execution, &c.ActivityRevision, &c.LastViewedRevision)
+		err := tx.QueryRowContext(ctx, `SELECT id,project_id,title,config,image_digest,harness_version,coalesce(container_id,''),coalesce(session_id,''),status,status_reason,coalesce(active_message_id,''),created_at,updated_at,pinned_at,archived,organization_revision,coalesce(folder_id,''),execution,coalesce((SELECT max(sequence) FROM activity WHERE chat_id=chats.id AND kind<>'organization'),0),coalesce((SELECT revision FROM chat_read_state WHERE chat_id=chats.id),0) FROM chats WHERE id=?`, chatID).Scan(&c.ID, &c.ProjectID, &c.Title, &config, &c.ImageDigest, &c.HarnessVersion, &c.ContainerID, &c.SessionID, &c.Status, &c.StatusReason, &c.ActiveMessageID, &c.CreatedAt, &c.UpdatedAt, &c.PinnedAt, &c.Archived, &c.OrganizationRevision, &c.FolderID, &execution, &c.ActivityRevision, &c.LastViewedRevision)
 		if err != nil {
 			return found(err)
 		}
