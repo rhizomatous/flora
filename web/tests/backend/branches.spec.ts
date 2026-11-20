@@ -11,7 +11,7 @@ test("branch overrides keep drafts, defaults, and creation retries", async ({ pa
   await page.goto(`${backend.url}/#chats/new`);
   await page.getByRole("button", { name: "Project: Flora workspace", exact: true }).click();
   await page.getByRole("button", { name: "Flora", exact: true }).click();
-  const draft = page.getByRole("textbox", { name: "Message", exact: true });
+  const draft = page.getByLabel("Message", { exact: true });
   await draft.fill("Fix the release branch regression");
   const trigger = page.getByRole("button", { name: /^Base branches:/ });
   await trigger.click();

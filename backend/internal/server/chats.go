@@ -263,6 +263,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			RequestID   string             `json:"requestID"`
 			Text        string             `json:"text"`
 			Attachments []string           `json:"attachments"`
+			References  []string           `json:"references"`
 		}
 		if !decodeChat(w, r, &in) {
 			return
@@ -280,7 +281,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 				return
 			}
 		}
-		c, err := a.chats.CreateWithBranches(r.Context(), r.PathValue("id"), in.Title, in.RequestID, in.Text, in.Execution, in.Branches, in.Attachments...)
+		c, err := a.chats.CreateWithContext(r.Context(), r.PathValue("id"), in.Title, in.RequestID, in.Text, in.Execution, in.Branches, in.References, in.Attachments...)
 		if err != nil {
 			chatError(w, err)
 			return
@@ -346,11 +347,12 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			RequestID   string             `json:"requestID"`
 			Text        string             `json:"text"`
 			Attachments []string           `json:"attachments"`
+			References  []string           `json:"references"`
 		}
 		if !decodeChat(w, r, &in) {
 			return
 		}
-		accepted, err := a.chats.SubmitWithExecution(r.Context(), r.PathValue("id"), in.RequestID, in.Text, in.Execution, in.Attachments...)
+		accepted, err := a.chats.SubmitWithContext(r.Context(), r.PathValue("id"), in.RequestID, in.Text, in.Execution, in.References, in.Attachments...)
 		if err != nil {
 			chatError(w, err)
 			return

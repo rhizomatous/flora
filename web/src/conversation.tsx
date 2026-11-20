@@ -74,17 +74,47 @@ export function ConversationMessage({
           <span className="sr-only">
             {m.Role === "user" ? (delegated ? "Parent agent" : "You") : "Flora"}
           </span>
-          <Bubble variant={m.Role === "user" ? "muted" : "ghost"}>
-            <BubbleContent className="space-y-4 text-sm leading-6">
-              {parts.length > 0 ? (
-                parts.map((part, index) => (
-                  <MessagePart key={part.id ?? index} part={part} user={m.Role === "user"} />
-                ))
-              ) : (
-                <MessagePart part={{ type: "text", text: m.Text }} user={m.Role === "user"} />
-              )}
-            </BubbleContent>
-          </Bubble>
+          {(parts.length > 0 || m.Text !== "") && (
+            <Bubble variant={m.Role === "user" ? "muted" : "ghost"}>
+              <BubbleContent className="space-y-4 text-sm leading-6">
+                {parts.length > 0 ? (
+                  parts.map((part, index) => (
+                    <MessagePart key={part.id ?? index} part={part} user={m.Role === "user"} />
+                  ))
+                ) : (
+                  <MessagePart part={{ type: "text", text: m.Text }} user={m.Role === "user"} />
+                )}
+              </BubbleContent>
+            </Bubble>
+          )}
+          {m.Payload.references && m.Payload.references.length > 0 && (
+            <div
+              data-slot="message-context"
+              className="flex max-w-full flex-wrap justify-end gap-2"
+              aria-label="Sent context"
+            >
+              {m.Payload.references.map((ref) => (
+                <details
+                  key={ref.id}
+                  className="max-w-full min-w-0 rounded-lg border border-border bg-surface-panel px-3 py-2 text-xs"
+                >
+                  <summary className="cursor-pointer truncate rounded-sm font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+                    {ref.label} · Snapshot
+                  </summary>
+                  <div className="mt-2 space-y-2 break-words text-muted-foreground">
+                    <p>{ref.source}</p>
+                    <p>Saved {new Date(ref.capturedAt).toLocaleString()}</p>
+                    <p className="break-all">Version: {ref.version}</p>
+                    {ref.content !== undefined && ref.content !== "" && (
+                      <pre className="max-h-60 overflow-auto whitespace-pre-wrap text-foreground">
+                        {ref.content}
+                      </pre>
+                    )}
+                  </div>
+                </details>
+              ))}
+            </div>
+          )}
           {pullEvents?.map(({ pull, opened }) => (
             <PullEventCard key={pull.url} pull={pull} opened={opened} />
           ))}
