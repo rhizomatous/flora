@@ -31,7 +31,7 @@ export function Preview() {
             </Text>
           </Section>
           <Section>
-            <SectionHeader className="mx-px px-4">
+            <SectionHeader inset>
               <FieldLabel htmlFor="section-instructions">Instructions</FieldLabel>
               <Text tone="muted">Describe what the automation should do.</Text>
             </SectionHeader>
@@ -41,7 +41,7 @@ export function Preview() {
             />
           </Section>
           <Section>
-            <SectionHeader className="mx-px px-4">
+            <SectionHeader inset>
               <Heading level={2}>Run history</Heading>
             </SectionHeader>
             <Card className="px-4">No runs yet.</Card>
