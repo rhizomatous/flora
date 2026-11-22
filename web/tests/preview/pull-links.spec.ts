@@ -18,7 +18,7 @@ test("linked PRs appear in the sidebar, hover cards, and composer", async ({ pag
   await expect(preview.getByRole("link").first()).toHaveAttribute("title", /Closed/);
   await expect(preview.getByRole("link").first()).not.toContainText("Closed");
   await expect(preview.getByRole("link").last()).not.toContainText("Open");
-  await expect(preview.locator("time")).toHaveCount(0);
+  await expect(preview.locator(".chat-summary-footer time")).toBeVisible();
   await expect(preview.getByText("Your turn", { exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
   const title = page.getByRole("button", {
@@ -27,9 +27,8 @@ test("linked PRs appear in the sidebar, hover cards, and composer", async ({ pag
   });
   await title.focus();
   const summary = page.getByLabel("Chat summary", { exact: true });
-  await expect(
-    summary.getByRole("list", { name: "Linked pull requests" }).getByRole("link"),
-  ).toHaveCount(2);
+  await expect(summary.getByLabel("1 open pull request", { exact: true })).toBeVisible();
+  await expect(summary.getByLabel("1 closed pull request", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   const draft = page.getByLabel("Follow-up", { exact: true });
   await draft.fill("Keep this draft");
