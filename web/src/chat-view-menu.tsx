@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useContext, useRef, useState, type ReactNode } from "react";
 
 import {
   Button,
@@ -8,8 +8,6 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuGroup,
-  DropdownMenuLabel,
-  Input,
   PlusIcon,
   ListIcon,
   GitBranchIcon,
@@ -59,18 +57,8 @@ export function ChatViewMenu({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const isOpen = useRef(false);
-  const input = useRef<HTMLInputElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const focusPane = useRef<"main" | "side" | null>(null);
-  useEffect(() => {
-    if (!open) return;
-    const frame = requestAnimationFrame(() => {
-      input.current?.focus();
-    });
-    return () => {
-      cancelAnimationFrame(frame);
-    };
-  }, [open]);
   const [state, update] = useChatPanelState(chatID ?? "");
   const pane = useContext(SubagentPaneContext);
   const { agents, open: openAgent } = useSubagents();
@@ -180,6 +168,13 @@ export function ChatViewMenu({
   }
   return (
     <DropdownMenu
+      search={{
+        label: "Search views",
+        query,
+        onQueryChange: setQuery,
+        filter: null,
+        emptyText: "No matching views",
+      }}
       open={open}
       onOpenChange={(next) => {
         isOpen.current = next;
@@ -207,115 +202,69 @@ export function ChatViewMenu({
           if (focusPane.current === null) return trigger.current;
           return selectedTab() ?? trigger.current;
         }}
-        className="flex max-h-[min(36rem,var(--available-height))] w-80 max-w-[calc(100vw-24px)] flex-col overflow-hidden"
-        onKeyDownCapture={(event) => {
-          if (event.key !== "ArrowUp" || event.target === input.current) return;
-          const items = event.currentTarget.querySelectorAll<HTMLElement>(
-            '[role="menuitem"]:not([aria-disabled="true"]):not([data-disabled])',
-          );
-          if (event.target === items[0]) {
-            event.preventDefault();
-            event.stopPropagation();
-            input.current?.focus();
-          }
-        }}
+        aria-label={label}
+        className="w-80! max-w-[calc(100vw-24px)]! overflow-hidden p-0!"
       >
-        <div className="shrink-0 border-b border-border px-1 pt-1 pb-2">
-          <Input
-            ref={input}
-            aria-label="Search views"
-            placeholder="Search views…"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.preventDefault();
-                event.stopPropagation();
-                close();
-                return;
-              }
-              if (event.key === "Tab") return;
-              event.stopPropagation();
-              if (event.key === "ArrowDown" || event.key === "ArrowUp" || event.key === "Enter") {
-                event.preventDefault();
-                const items = event.currentTarget
-                  .closest('[role="menu"]')
-                  ?.querySelectorAll<HTMLElement>(
-                    '[role="menuitem"]:not([aria-disabled="true"]):not([data-disabled])',
-                  );
-                const item = event.key === "ArrowUp" ? [...(items ?? [])].at(-1) : items?.[0];
-                if (event.key === "Enter") item?.click();
-                else item?.focus();
-              }
-            }}
-          />
-        </div>
-        <div className="min-h-0 overflow-y-auto overscroll-contain pt-1">
-          {[...new Set(destinations.map((view) => view.group))].map((group) => (
-            <DropdownMenuGroup key={group}>
-              {group !== "Views" && <DropdownMenuLabel>{group}</DropdownMenuLabel>}
-              {destinations
-                .filter((view) => view.group === group)
-                .map((view) => (
-                  <DropdownMenuItem
-                    key={view.id}
-                    disabled={chatID === undefined || view.disabled}
-                    onClick={() => {
-                      focusPane.current = pane;
-                      if (view.id.startsWith("pull:")) focusPane.current = "side";
-                      if (view.id === "files" || view.id.startsWith("file:")) {
-                        focusPane.current = "main";
-                      }
-                      close();
-                      view.select?.();
-                    }}
-                  >
-                    {view.icon}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate">{view.title}</span>
-                      {"detail" in view && (
-                        <span
-                          className="block truncate text-xs text-muted-foreground"
-                          title={view.detail}
-                        >
-                          {view.detail}
-                        </span>
-                      )}
-                    </span>
-                    {(view.current || "status" in view) && (
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {view.current && view.disabled !== true ? "Current view" : view.status}
+        {[...new Set(destinations.map((view) => view.group))].map((group) => (
+          <DropdownMenuGroup key={group} label={group === "Views" ? undefined : group}>
+            {destinations
+              .filter((view) => view.group === group)
+              .map((view) => (
+                <DropdownMenuItem
+                  key={view.id}
+                  value={view.id}
+                  aria-label={`${view.title}${view.detail === undefined || view.detail === "" ? "" : ` ${view.detail}`}${view.disabled === true ? " Unavailable" : ""}`}
+                  className="min-h-7 py-1 [&>svg:last-child]:hidden"
+                  data-checked={view.current}
+                  disabled={chatID === undefined || view.disabled === true}
+                  onSelect={() => {
+                    focusPane.current = pane;
+                    if (view.id.startsWith("pull:")) focusPane.current = "side";
+                    if (view.id === "files" || view.id.startsWith("file:")) {
+                      focusPane.current = "main";
+                    }
+                    close();
+                    view.select?.();
+                  }}
+                >
+                  {view.icon}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{view.title}</span>
+                    {"detail" in view && (
+                      <span
+                        className="block truncate text-xs text-muted-foreground"
+                        title={view.detail}
+                      >
+                        {view.detail}
                       </span>
                     )}
-                  </DropdownMenuItem>
-                ))}
-            </DropdownMenuGroup>
-          ))}
-          {chatID === undefined ? (
-            destinations.length === 0 && (
-              <DropdownMenuItem disabled>No matching views</DropdownMenuItem>
-            )
-          ) : (
-            <ShellMenuItems
-              chatID={chatID}
-              open={open}
-              onSelect={() => {
-                focusPane.current = "main";
-                close();
-              }}
-              query={search}
-              hasViews={destinations.length > 0}
-            />
-          )}
-          {chatID !== undefined && search === "" && (
-            <>
-              <DropdownMenuSeparator />
-              <KeepAwakeItem id={chatID} open={open} />
-            </>
-          )}
-        </div>
+                  </span>
+                  {(view.current || "status" in view) && (
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {view.current && view.disabled !== true ? "Current view" : view.status}
+                    </span>
+                  )}
+                </DropdownMenuItem>
+              ))}
+          </DropdownMenuGroup>
+        ))}
+        {chatID !== undefined && (
+          <ShellMenuItems
+            chatID={chatID}
+            open={open}
+            onSelect={() => {
+              focusPane.current = "main";
+              close();
+            }}
+            query={search}
+          />
+        )}
+        {chatID !== undefined && search === "" && (
+          <>
+            <DropdownMenuSeparator />
+            <KeepAwakeItem id={chatID} open={open} onSelect={close} />
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

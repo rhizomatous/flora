@@ -13,11 +13,14 @@ test("view search supports keyboard selection, empty results, escape, and saved 
   const trigger = page.getByRole("button", { name: "Chat views", exact: true });
   await trigger.focus();
   await page.keyboard.press("Enter");
-  const search = page.getByRole("textbox", { name: "Search views", exact: true });
+  const search = page.getByRole("searchbox", { name: "Search views", exact: true });
   await expect(search).toBeFocused();
   await search.fill("  DIFFS  ");
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitem", { name: "Diffs", exact: true })).toBeFocused();
+  await expect(page.getByRole("menuitem", { name: "Diffs", exact: true })).toHaveAttribute(
+    "data-highlighted",
+    "",
+  );
   await page.keyboard.press("ArrowUp");
   await expect(search).toBeFocused();
   await page.keyboard.press("Enter");
@@ -32,13 +35,11 @@ test("view search supports keyboard selection, empty results, escape, and saved 
   await search.fill("Diffs");
   await search.press("ArrowUp");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(main.getByRole("tab", { name: "Diffs", exact: true })).toHaveCount(1);
   await trigger.click();
   await search.fill("Browser");
-  await expect(
-    page.getByRole("menuitem", { name: "No matching views", exact: true }),
-  ).toBeDisabled();
+  await expect(page.getByRole("status").filter({ hasText: "No matching views" })).toBeVisible();
   await search.press("Enter");
   await expect(search).toBeVisible();
   await search.press("Escape");
@@ -56,7 +57,7 @@ test("view search supports keyboard selection, empty results, escape, and saved 
   await page.setViewportSize({ width: 390, height: 844 });
   await sideTrigger.click();
   await search.fill("no such destination");
-  const bounds = await page.getByRole("menu").boundingBox();
+  const bounds = await page.getByRole("dialog").boundingBox();
   if (!bounds) throw new Error("Search menu is missing");
   expect(bounds.x).toBeGreaterThanOrEqual(0);
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
@@ -87,14 +88,14 @@ test("task searches reuse subagent identities in each pane and expose unavailabl
   await page.goto(`${base}/#chats/subagents`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const main = page.locator(".chat-main-pane");
-  const search = page.getByRole("textbox", { name: "Search views", exact: true });
+  const search = page.getByRole("searchbox", { name: "Search views", exact: true });
   for (let i = 0; i < 2; i++) {
     await main.getByRole("button", { name: "Chat views", exact: true }).click();
     await search.fill("reliability");
     await expect(page.getByRole("menuitem", { name: /Subagent 1/ })).toBeVisible();
     await search.press("ArrowDown");
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(main.getByRole("tab", { name: "Subagent 1", exact: true })).toHaveCount(1);
   }
   await main.getByRole("button", { name: "Chat views", exact: true }).click();
@@ -116,7 +117,7 @@ test("task searches reuse subagent identities in each pane and expose unavailabl
 test("pull request search reuses the existing side-panel tab", async ({ page }) => {
   await page.goto(`${base}/#chats/pagination`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
-  const search = page.getByRole("textbox", { name: "Search views", exact: true });
+  const search = page.getByRole("searchbox", { name: "Search views", exact: true });
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
   await search.fill("PR #19");
   await search.press("Enter");
@@ -143,7 +144,7 @@ test("shell search reuses shell IDs and disables unavailable saved shells", asyn
   await page.goto(`${base}/#chats/subagents`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const trigger = page.getByRole("button", { name: "Chat views", exact: true });
-  const search = page.getByRole("textbox", { name: "Search views", exact: true });
+  const search = page.getByRole("searchbox", { name: "Search views", exact: true });
   for (let i = 0; i < 2; i++) {
     await trigger.click();
     await search.fill("workspace logs");
@@ -151,7 +152,7 @@ test("shell search reuses shell IDs and disables unavailable saved shells", asyn
       page.getByRole("menuitem", { name: "workspace logs Ended", exact: true }),
     ).toBeVisible();
     await search.press("Enter");
-    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.getByRole("tab", { name: "workspace logs", exact: true })).toHaveCount(1);
   }
   await page.route("**/api/chats/subagents/shells", (route) =>

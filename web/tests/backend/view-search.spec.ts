@@ -7,7 +7,7 @@ test("search reuses file identities across repositories and preserves the file b
   await logIn(page);
   await page.goto(`${backend.url}/#chats/${backend.chatID}`);
   const trigger = page.getByRole("button", { name: "Chat views", exact: true });
-  const search = page.getByRole("textbox", { name: "Search views", exact: true });
+  const search = page.getByRole("searchbox", { name: "Search views", exact: true });
   await trigger.click();
   await expect(search).toBeFocused();
   await search.fill("files");

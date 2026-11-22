@@ -9,7 +9,6 @@ import "@xterm/xterm/css/xterm.css";
 import {
   Button,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuGroup,
   TerminalIcon,
   PlusIcon,
@@ -95,13 +94,11 @@ export function ShellMenuItems({
   open,
   onSelect,
   query = "",
-  hasViews = true,
 }: {
   chatID: string;
   open: boolean;
   onSelect: () => void;
   query?: string;
-  hasViews?: boolean;
 }) {
   const [panel, update] = useChatPanelState(chatID);
   const { shells, error } = useShells(chatID, open);
@@ -152,23 +149,22 @@ export function ShellMenuItems({
       !shells.some((shell) => shell.id === tab.id) &&
       matches(`${tab.title} terminal shell`),
   );
-  const noResults = !hasViews && visible.length === 0 && unavailable.length === 0 && !showCreate;
   return (
-    <DropdownMenuGroup>
-      {(visible.length > 0 || unavailable.length > 0 || showCreate) && (
-        <DropdownMenuLabel>Terminals</DropdownMenuLabel>
-      )}
-      {noResults && <DropdownMenuItem disabled>No matching views</DropdownMenuItem>}
+    <DropdownMenuGroup
+      label={visible.length > 0 || unavailable.length > 0 || showCreate ? "Terminals" : undefined}
+    >
       {shells === undefined && matches("shell terminals") && (
-        <DropdownMenuItem disabled>
+        <DropdownMenuItem value="shell-status" disabled className="[&>svg:last-child]:hidden">
           {error ? "Shells unavailable" : "Loading shells…"}
         </DropdownMenuItem>
       )}
       {visible.map((shell) => (
         <DropdownMenuItem
           key={shell.id}
+          value={`shell:${shell.id}`}
+          className="min-h-7 py-1"
           disabled={error !== ""}
-          onClick={() => {
+          onSelect={() => {
             select(shell);
           }}
         >
@@ -178,7 +174,12 @@ export function ShellMenuItems({
         </DropdownMenuItem>
       ))}
       {unavailable.map((shell) => (
-        <DropdownMenuItem key={shell.id} disabled>
+        <DropdownMenuItem
+          key={shell.id}
+          value={`shell:${shell.id}`}
+          disabled
+          className="[&>svg:last-child]:hidden"
+        >
           <TerminalIcon />
           <span className="min-w-0 flex-1 truncate">{shell.title}</span>
           <span className="ml-auto text-muted-foreground">Unavailable</span>
@@ -186,6 +187,8 @@ export function ShellMenuItems({
       ))}
       {showCreate && (
         <DropdownMenuItem
+          value="new-shell"
+          className="min-h-7 py-1"
           disabled={
             !canCreate ||
             runtimeError !== "" ||
@@ -193,7 +196,7 @@ export function ShellMenuItems({
             shells === undefined ||
             shells.length >= 8
           }
-          onClick={() => {
+          onSelect={() => {
             onSelect();
             void create();
           }}

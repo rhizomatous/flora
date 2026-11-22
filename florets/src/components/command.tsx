@@ -1,12 +1,11 @@
 "use client";
 
 import { Command as CommandPrimitive } from "cmdk";
-import { CheckIcon, SearchIcon } from "lucide-react";
+import { CheckIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "../lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./dialog";
-import { InputGroup, InputGroupAddon } from "./input-group";
 
 function Command({ className, ...props }: ComponentProps<typeof CommandPrimitive>) {
   return (
@@ -51,40 +50,17 @@ function CommandDialog({
   );
 }
 
-function CommandInput({
-  className,
-  variant = "default",
-  ...props
-}: ComponentProps<typeof CommandPrimitive.Input> & { variant?: "default" | "plain" }) {
-  if (variant === "plain") {
-    return (
-      <div data-slot="command-input-wrapper" className="border-b border-border px-3">
-        <CommandPrimitive.Input
-          data-slot="command-input"
-          className={cn(
-            "h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground",
-            className,
-          )}
-          {...props}
-        />
-      </div>
-    );
-  }
+function CommandInput({ className, ...props }: ComponentProps<typeof CommandPrimitive.Input>) {
   return (
-    <div data-slot="command-input-wrapper" className="p-1 pb-0">
-      <InputGroup className="h-8! rounded-lg! border-border bg-control-background shadow-none! *:data-[slot=input-group-addon]:pl-2!">
-        <CommandPrimitive.Input
-          data-slot="command-input"
-          className={cn(
-            "w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
-            className,
-          )}
-          {...props}
-        />
-        <InputGroupAddon>
-          <SearchIcon className="size-4 shrink-0 opacity-50" />
-        </InputGroupAddon>
-      </InputGroup>
+    <div data-slot="command-input-wrapper" className="shrink-0 border-b border-border px-3">
+      <CommandPrimitive.Input
+        data-slot="command-input"
+        className={cn(
+          "h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground",
+          className,
+        )}
+        {...props}
+      />
     </div>
   );
 }

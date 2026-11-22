@@ -20,7 +20,10 @@ const descriptions: Record<string, string> = {
   "code-block": "Display formatted source code with file labels and copy controls.",
   collapsible: "Expand and collapse a section of content.",
   combobox: "Search a list of options and select a value.",
-  command: "Find commands and options with a searchable keyboard-friendly menu.",
+  command:
+    "Build command palettes and keyboard-selectable lists. Enable search on DropdownMenu for searchable popup menus.",
+  "dropdown-menu-search":
+    "Enable search on DropdownMenu for a plain search row, keyboard selection, scrolling choices, and empty results.",
   "context-menu": "Offer contextual actions when a user right-clicks an element.",
   dialog: "Present a focused task in a modal over the current page.",
   direction: "Set the reading direction for layouts and interactive components.",
@@ -77,6 +80,7 @@ const descriptions: Record<string, string> = {
 
 const importNames: Record<string, string> = {
   chart: "ChartContainer",
+  "dropdown-menu-search": "DropdownMenu",
   direction: "DirectionProvider",
   "input-otp": "InputOTP",
   resizable: "ResizablePanelGroup",
@@ -91,6 +95,7 @@ export const componentDocs = [
   { name: "editable-text", url: "", examples: 4 },
   { name: "section", url: "", examples: 1 },
   { name: "settings-group", url: "", examples: 2 },
+  { name: "dropdown-menu-search", url: "", examples: 3 },
   { name: "madlib-picker", url: "", examples: 1 },
 ]
   .map(({ name, url, examples }) => ({
