@@ -10,7 +10,6 @@ import {
   EllipsisIcon,
   PinIcon,
   FolderIcon,
-  ListIcon,
   CheckIcon,
   DropdownMenu,
   DropdownMenuTrigger,
@@ -73,21 +72,32 @@ function ChatRow({
               href={`#chats/${chat.ID}`}
               aria-current={path === `chats/${chat.ID}` ? "page" : undefined}
               className="florets-navigation-link"
+              aria-label={
+                details
+                  ? undefined
+                  : `${chat.Title || "Chat"}, ${status.label}${seen ? "" : ", unread activity"}`
+              }
               onClick={close}
             >
-              <span
-                className="florets-navigation-icon sidebar-status"
-                aria-hidden="true"
-                data-tone={status.tone}
-                data-filled={status.filled || undefined}
-                data-pulse={status.pulse || undefined}
-              >
-                <span />
-              </span>
+              {details && (
+                <span
+                  className="florets-navigation-icon sidebar-status"
+                  aria-hidden="true"
+                  data-tone={status.tone}
+                  data-filled={status.filled || undefined}
+                  data-pulse={status.pulse || undefined}
+                >
+                  <span />
+                </span>
+              )}
               <span className="min-w-0 flex-1">
                 <span className="flex min-w-0 items-center gap-2">
-                  <span className="florets-navigation-title">{chat.Title || "Chat"}</span>
-                  <UnreadDot seen={seen} />
+                  <span
+                    className={`florets-navigation-title${!details && !seen ? " text-foreground" : ""}`}
+                  >
+                    {chat.Title || "Chat"}
+                  </span>
+                  {details && <UnreadDot seen={seen} />}
                 </span>
                 {details && (
                   <span className="florets-navigation-meta flex! flex-wrap items-center gap-x-2">
@@ -176,18 +186,7 @@ export function SidebarChats({
   }, []);
   const [query, setQuery] = useState("");
   const [preferences, update] = useSidebarPreferences();
-  const {
-    sort,
-    collapsed,
-    grouping,
-    status,
-    project: selectedProject,
-    unread,
-    details,
-  } = preferences;
-  const setSort = (value: typeof sort) => {
-    update({ sort: value });
-  };
+  const { collapsed, grouping, status, project: selectedProject, unread, details } = preferences;
   const setCollapsed = (value: string[] | ((ids: string[]) => string[])) => {
     update({ collapsed: typeof value === "function" ? value(collapsed) : value });
   };
@@ -243,11 +242,7 @@ export function SidebarChats({
                 .toLowerCase()
                 .includes(filter)),
         )
-        .toSorted((a, b) =>
-          sort === "title"
-            ? a.Title.localeCompare(b.Title)
-            : b.UpdatedAt.localeCompare(a.UpdatedAt),
-        ),
+        .toSorted((a, b) => b.UpdatedAt.localeCompare(a.UpdatedAt)),
     }))
     .filter(({ rows }) => (!filter && !activeFilters) || rows.length > 0);
   const projectGroups = projects
@@ -263,11 +258,7 @@ export function SidebarChats({
               folders?.some((folder) => folder.id === chat.FolderID) !== true) &&
             (!filter || `${chat.Title} ${project.name} ${chat.ID}`.toLowerCase().includes(filter)),
         )
-        .toSorted((a, b) =>
-          sort === "title"
-            ? a.Title.localeCompare(b.Title)
-            : b.UpdatedAt.localeCompare(a.UpdatedAt),
-        ),
+        .toSorted((a, b) => b.UpdatedAt.localeCompare(a.UpdatedAt)),
     }))
     .filter(({ rows }) => (!filter && !activeFilters) || rows.length > 0);
   const organizedGroups = [
@@ -276,9 +267,7 @@ export function SidebarChats({
   ];
   const unfiled = projectGroups
     .flatMap((group) => group.rows)
-    .toSorted((a, b) =>
-      sort === "title" ? a.Title.localeCompare(b.Title) : b.UpdatedAt.localeCompare(a.UpdatedAt),
-    );
+    .toSorted((a, b) => b.UpdatedAt.localeCompare(a.UpdatedAt));
   const groups =
     grouping === "project"
       ? organizedGroups
@@ -295,15 +284,15 @@ export function SidebarChats({
           (group) =>
             group.rows.length > 0 || (!filter && !activeFilters && group.folder !== undefined),
         );
-  const pinned = pinnedChats(available).filter(
-    (chat) =>
-      !filter ||
-      `${chat.Title} ${chat.ID} ${folders?.find((f) => f.id === chat.FolderID)?.name ?? ""} ${projects.find((project) => project.id === chat.ProjectID)?.name ?? ""}`
-        .toLowerCase()
-        .includes(filter),
-  );
-  const groupIDs = [...groups.map((g) => g.project.id), ...(pinned.length > 0 ? ["pinned"] : [])];
-  const allCollapsed = groupIDs.every((id) => collapsed.includes(id));
+  const pinned = pinnedChats(available)
+    .filter(
+      (chat) =>
+        !filter ||
+        `${chat.Title} ${chat.ID} ${folders?.find((f) => f.id === chat.FolderID)?.name ?? ""} ${projects.find((project) => project.id === chat.ProjectID)?.name ?? ""}`
+          .toLowerCase()
+          .includes(filter),
+    )
+    .toSorted((a, b) => b.UpdatedAt.localeCompare(a.UpdatedAt));
   const {
     mark: markRead,
     disabled: readDisabled,
@@ -382,34 +371,19 @@ export function SidebarChats({
               <FolderIcon />
               New folder
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                setSort(sort === "updated" ? "title" : "updated");
-              }}
-            >
-              <ListIcon />
-              Sort: {sort === "updated" ? "Updated" : "Title"}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={!!filter || chats === undefined || groupIDs.length === 0}
-              onClick={() => {
-                setCollapsed(
-                  allCollapsed
-                    ? collapsed.filter((id) => !groupIDs.includes(id))
-                    : [...new Set([...collapsed, ...groupIDs])],
-                );
-              }}
-            >
-              <InboxIcon />
-              {allCollapsed ? "Expand" : "Collapse"} all groups
-            </DropdownMenuItem>
-            <SidebarViewOptions preferences={preferences} update={update} projects={projects} />
-            <DropdownMenuSeparator />
             <DropdownMenuItem disabled={readDisabled} aria-busy={readBusy} onClick={markRead}>
               <CheckIcon />
               Mark all as read
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <SidebarViewOptions
+              preferences={preferences}
+              update={update}
+              projects={projects}
+              onSearch={() => {
+                setSearching(true);
+              }}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

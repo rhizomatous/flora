@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 const schema = z.object({
-  sort: z.enum(["updated", "title"]).catch("updated"),
   grouping: z.enum(["project", "status", "none"]).catch("project"),
   status: z.enum(["all", "working", "waiting", "idle", "failed", "stopped"]).catch("all"),
   project: z.string().catch(""),

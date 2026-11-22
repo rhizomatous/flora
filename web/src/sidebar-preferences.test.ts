@@ -19,7 +19,6 @@ test("missing, malformed and obsolete preferences use safe field defaults", () =
     ),
   ).toEqual({
     ...defaultSidebarPreferences,
-    sort: "title",
     details: false,
     collapsed: ["folder:release"],
   });

@@ -90,11 +90,10 @@ test("sidebar saves view choices, reveals search matches, and clears mobile filt
   });
   await search.press("Escape");
   await expect(release).toHaveCount(0);
-  await options(page, "Sort: Updated");
-  await options(page, "Group: Project");
+  await options(page, "Group by Project");
   await page.getByRole("menuitemradio", { name: "Status", exact: true }).click();
-  await options(page, "Display");
-  await page.getByRole("menuitemcheckbox", { name: "Show chat details", exact: true }).click();
+  await options(page, "Density Detailed");
+  await page.getByRole("menuitemradio", { name: "Compact", exact: true }).click();
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   await page.reload();
@@ -102,8 +101,17 @@ test("sidebar saves view choices, reveals search matches, and clears mobile filt
   await expect(nav.getByRole("button", { name: /^Expand folder Release planning$/ })).toBeVisible();
   await expect(nav.locator(".florets-navigation-meta")).toHaveCount(0);
   await options(page);
-  await expect(page.getByRole("menuitem", { name: "Sort: Title", exact: true })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Group: Status", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: /^Sort:/ })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: /all groups/ })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Density Compact", exact: true })).toBeVisible();
+  await expect(nav.locator(".sidebar-status")).toHaveCount(0);
+  await expect(nav.getByRole("img", { name: "Unread activity", exact: true })).toHaveCount(0);
+  await page.getByRole("menuitem", { name: "Filters", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Clear filters", exact: true })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menuitem", { name: "Group by Status", exact: true })).toBeVisible();
+  await options(page, "Density Compact");
+  await expect(page.getByRole("menuitemradio", { name: "Compact", exact: true })).toBeChecked();
   await page.screenshot({
     path: testInfo.outputPath("desktop-options.png"),
     animations: "disabled",
@@ -111,7 +119,10 @@ test("sidebar saves view choices, reveals search matches, and clears mobile filt
   await page.evaluate(() => document.documentElement.classList.remove("dark"));
   await page.screenshot({ path: testInfo.outputPath("desktop-options-light.png") });
   await page.evaluate(() => document.documentElement.classList.add("dark"));
-  await page.keyboard.press("Escape");
+  await options(page, "Search chats");
+  await expect(search).toBeFocused();
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await search.press("Escape");
   await options(page, "Filters", "Status");
   await page.getByRole("menuitemradio", { name: "Failed", exact: true }).click();
   await expect(nav.getByRole("button", { name: "Clear filters", exact: true })).toBeVisible();
@@ -158,7 +169,7 @@ test("sidebar saves view choices, reveals search matches, and clears mobile filt
     fresh.getByRole("button", { name: "Expand folder Release planning", exact: true }),
   ).toBeVisible();
   await options(fresh);
-  await expect(fresh.getByRole("menuitem", { name: "Group: Status", exact: true })).toBeVisible();
+  await expect(fresh.getByRole("menuitem", { name: "Group by Status", exact: true })).toBeVisible();
   await fresh.close();
   expect(errors).toEqual([]);
 });
@@ -209,7 +220,7 @@ test("removed groups are pruned only after successful loading and new groups sta
         sidebarPreferenceKey,
       ),
     )
-    .toMatchObject({ project: "", collapsed: [projects[0]!.id], sort: "title" });
+    .toMatchObject({ project: "", collapsed: [projects[0]!.id] });
   await expect(
     page.getByRole("button", { name: `Expand ${projects[0]!.name}`, exact: true }),
   ).toBeVisible();
