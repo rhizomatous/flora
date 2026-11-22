@@ -16,7 +16,16 @@ import (
 // ModelMetadata boots only OpenCode's server from the pinned image. It has no
 // host mounts, checkout, setup command, GitHub credentials, or saved sessions.
 // The process deadline and AutoRemove also bound its lifetime if Flora exits.
-func (m *Manager) ModelMetadata(ctx context.Context, credentials storage.Credentials) (result json.RawMessage, err error) {
+func (m *Manager) ModelMetadata(ctx context.Context, credentials storage.Credentials) (json.RawMessage, error) {
+	return m.runtimeMetadata(ctx, credentials, "/provider")
+}
+
+// CommandMetadata reads the installed runtime's command registry without starting a chat.
+func (m *Manager) CommandMetadata(ctx context.Context, credentials storage.Credentials) (json.RawMessage, error) {
+	return m.runtimeMetadata(ctx, credentials, "/command")
+}
+
+func (m *Manager) runtimeMetadata(ctx context.Context, credentials storage.Credentials, route string) (result json.RawMessage, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	keyName := map[string]string{"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "google": "GOOGLE_GENERATIVE_AI_API_KEY"}[credentials.Provider]
@@ -49,7 +58,7 @@ func (m *Manager) ModelMetadata(ctx context.Context, credentials storage.Credent
 		removeErr := m.engine.ContainerRemove(cleanup, id, true)
 		if removeErr != nil && !docker.IsNotFound(removeErr) {
 			result = nil
-			err = errors.New("model discovery cleanup failed")
+			err = errors.New("runtime discovery cleanup failed")
 		}
 	}()
 	if err = m.engine.ContainerStart(ctx, id); err != nil {
@@ -60,25 +69,25 @@ func (m *Manager) ModelMetadata(ctx context.Context, credentials storage.Credent
 	for {
 		info, inspectErr := m.engine.ContainerInspect(ctx, id)
 		if inspectErr != nil || !info.State.Running {
-			return nil, errors.New("model discovery runtime is unavailable")
+			return nil, errors.New("runtime discovery runtime is unavailable")
 		}
 		if address := info.LoopbackAddress(runtimePort); address != "" && m.health(ctx, "http://"+address, password) {
-			req, requestErr := http.NewRequestWithContext(ctx, "GET", "http://"+address+"/provider", nil)
+			req, requestErr := http.NewRequestWithContext(ctx, "GET", "http://"+address+route, nil)
 			if requestErr != nil {
 				return nil, requestErr
 			}
 			req.SetBasicAuth("opencode", password)
 			response, callErr := client.Do(req)
 			if callErr != nil {
-				return nil, errors.New("model discovery response is unavailable")
+				return nil, errors.New("runtime discovery response is unavailable")
 			}
 			defer response.Body.Close()
 			if response.StatusCode != 200 {
-				return nil, errors.New("model discovery request failed")
+				return nil, errors.New("runtime discovery request failed")
 			}
 			raw, readErr := io.ReadAll(io.LimitReader(response.Body, (16<<20)+1))
 			if readErr != nil || len(raw) > 16<<20 || !json.Valid(raw) {
-				return nil, errors.New("model discovery response is incomplete")
+				return nil, errors.New("runtime discovery response is incomplete")
 			}
 			return json.RawMessage(raw), nil
 		}

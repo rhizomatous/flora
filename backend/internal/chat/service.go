@@ -22,6 +22,7 @@ import (
 type Provisioner interface {
 	Identity() (string, string)
 	ModelMetadata(context.Context, storage.Credentials) (json.RawMessage, error)
+	CommandMetadata(context.Context, storage.Credentials) (json.RawMessage, error)
 	Start(context.Context, string) (provisioning.Endpoint, error)
 	Endpoint(context.Context, string) (provisioning.Endpoint, error)
 	BeginActivity(string)
@@ -153,7 +154,12 @@ func (s *Service) SubmitWithContext(ctx context.Context, chatID, requestID, text
 	if err != nil {
 		return storage.Acceptance{}, err
 	}
-	a, err := s.Store.AcceptMessageWithContext(ctx, chatID, requestID, text, selection, references, attachments...)
+	command, err := s.resolveCommand(ctx, chatID, text)
+	if err != nil {
+		return storage.Acceptance{}, err
+	}
+	a, err := s.Store.AcceptMessageWithCommand(ctx, chatID, requestID, text, selection, references, command, attachments...)
+
 	if err != nil || a.Duplicate {
 		return a, err
 	}
@@ -426,11 +432,22 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 	go func() {
 		defer close(promptDone)
 		var response runtimeMessage
-		err := rt.call(promptCtx, "POST", sessionPath(c.SessionID)+"/message", map[string]any{
-			"model":   map[string]string{"providerID": execution.Provider, "modelID": execution.Model},
-			"variant": execution.Variant,
-			"system":  SystemPrompt, "parts": parts,
-		}, &response)
+		route := sessionPath(c.SessionID) + "/message"
+		input := map[string]any{"model": map[string]string{"providerID": execution.Provider, "modelID": execution.Model}, "variant": execution.Variant, "parts": parts}
+		if command := storage.MessageCommand(message); command != nil {
+			route = sessionPath(c.SessionID) + "/command"
+			arguments := command.Arguments
+			files := []map[string]string{}
+			for _, part := range parts {
+				if part["type"] == "text" {
+					arguments += "\n\n" + part["text"]
+				} else {
+					files = append(files, part)
+				}
+			}
+			input = map[string]any{"command": command.Name, "arguments": arguments, "messageID": command.MessageID, "model": execution.Provider + "/" + execution.Model, "variant": execution.Variant, "parts": files}
+		}
+		err := rt.call(promptCtx, "POST", route, input, &response)
 		if err == nil && (response.Info.ID == "" || response.Info.Role != "assistant") {
 			err = errors.New("runtime completion response was incomplete")
 		}
@@ -597,6 +614,45 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 	if err := rt.call(ctx, "GET", sessionPath(c.SessionID)+"/message", nil, &history); err != nil {
 		return false, err
 	}
+	messages, err := s.Store.Messages(ctx, c.ID)
+	if err != nil {
+		return false, err
+	}
+	var accepted storage.Message
+	for _, saved := range messages {
+		if saved.ID == messageID {
+			accepted = saved
+			break
+		}
+	}
+	command := storage.MessageCommand(accepted)
+	parents := map[string]bool{}
+	if command != nil {
+		// OpenCode adds synthetic user text after a command subtask. The parent
+		// agent's summary of that text completes the same accepted turn.
+		rootSeen := false
+		for _, raw := range history {
+			var m runtimeMessage
+			if err := json.Unmarshal(raw, &m); err != nil {
+				return false, err
+			}
+			if m.Info.ID == command.MessageID {
+				rootSeen = true
+				parents[m.Info.ID] = true
+			}
+			if !rootSeen || m.Info.Role != "user" || len(m.Parts) == 0 {
+				continue
+			}
+			synthetic := true
+			for _, part := range m.Parts {
+				synthetic = synthetic && part.Type == "text" && part.Synthetic
+			}
+			if synthetic {
+				parents[m.Info.ID] = true
+				knownUsers[m.Info.ID] = true
+			}
+		}
+	}
 	providerFailure := false
 	*completed = false
 	unknownUsers := 0
@@ -615,13 +671,9 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 	var acceptedText string
 	var acceptedFiles []string
 	if unknownUsers == 1 {
-		messages, err := s.Store.Messages(ctx, c.ID)
-		if err != nil {
-			return false, err
-		}
 		for _, saved := range messages {
 			if saved.ID == messageID {
-				acceptedText = storage.MessageInputText(saved)
+				acceptedText = saved.Text
 				var payload struct {
 					Attachments []storage.Attachment       `json:"attachments"`
 					References  []storage.ContextReference `json:"references"`
@@ -666,7 +718,10 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 					text.WriteString(part.Text)
 				}
 			}
-			if text.String() != redaction.Text(acceptedText, secrets...) || strings.Join(files, "\x01") != strings.Join(acceptedFiles, "\x01") {
+			if command != nil && m.Info.ID != command.MessageID {
+				return false, errors.New("runtime command message identity does not match accepted input")
+			}
+			if command == nil && (text.String() != redaction.Text(acceptedText, secrets...) || strings.Join(files, "\x01") != strings.Join(acceptedFiles, "\x01")) {
 				return false, errors.New("runtime user message does not match accepted input")
 			}
 			if *runtimeID != "" && *runtimeID != m.Info.ID {
@@ -681,10 +736,10 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 		if m.Info.Role != "assistant" {
 			continue
 		}
-		if m.Info.ParentID == *runtimeID && len(m.Info.Error) > 0 && string(m.Info.Error) != "null" {
+		if (m.Info.ParentID == *runtimeID || parents[m.Info.ParentID]) && len(m.Info.Error) > 0 && string(m.Info.Error) != "null" {
 			providerFailure = true
 		}
-		if m.Info.ParentID == *runtimeID {
+		if m.Info.ParentID == *runtimeID || parents[m.Info.ParentID] {
 			*completed = m.Info.Time.Completed > 0 && (m.Info.Finish != "" && m.Info.Finish != "tool-calls" || len(m.Info.Error) > 0 && string(m.Info.Error) != "null")
 			var runtimeError struct {
 				Name string `json:"name"`
@@ -871,13 +926,4 @@ func (s *Service) Reply(ctx context.Context, chatID, questionID string, answers 
 	// capture worker. Its previous question wait must no longer pause timeout.
 	s.provisioner.BeginActivity(c.ContainerID)
 	return &ControlError{Reason: reason}
-}
-
-// CommandHarness returns the pinned runtime identity for new conversations.
-func (s *Service) CommandHarness() string {
-	if s.provisioner == nil {
-		return ""
-	}
-	_, harness := s.provisioner.Identity()
-	return harness
 }

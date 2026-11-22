@@ -44,6 +44,6 @@ export function autocompleteKey(
 
 /** A command occupies the leading token; slashes in paths and prose are literal. */
 export function commandQuery(value: string, caret: number) {
-  if (caret !== value.length || !/^\/[A-Za-z0-9-]*$/u.test(value)) return null;
+  if (caret !== value.length || !/^\/[^\s]*$/u.test(value) || value.startsWith("//")) return null;
   return value.slice(1).toLowerCase();
 }

@@ -8,8 +8,6 @@ import (
 	"slices"
 	"strings"
 	"unicode/utf8"
-
-	"github.com/rhizomatous/flora/backend/internal/commands"
 )
 
 type Message struct {
@@ -42,6 +40,12 @@ func (s *Store) AcceptMessageWithExecution(ctx context.Context, chatID, requestI
 }
 
 func (s *Store) AcceptMessageWithContext(ctx context.Context, chatID, requestID, text string, selection *Execution, references []ContextReference, attachments ...string) (Acceptance, error) {
+	return s.AcceptMessageWithCommand(ctx, chatID, requestID, text, selection, references, nil, attachments...)
+}
+
+// AcceptMessageWithCommand saves a runtime-resolved command with the same atomic
+// admission and retry identity as ordinary text. Only a new acceptance may run.
+func (s *Store) AcceptMessageWithCommand(ctx context.Context, chatID, requestID, text string, selection *Execution, references []ContextReference, command *Command, attachments ...string) (Acceptance, error) {
 	if requestID == "" || len(requestID) > 200 || (strings.TrimSpace(text) == "" && len(attachments) == 0 && len(references) == 0) || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
 		return Acceptance{}, ErrInvalid
 	}
@@ -70,16 +74,12 @@ func (s *Store) AcceptMessageWithContext(ctx context.Context, chatID, requestID,
 			return ErrInvalid
 		}
 		var status Status
-		var active, harness string
-		if err := tx.QueryRowContext(ctx, "SELECT status,coalesce(active_message_id,''),harness_version FROM chats WHERE id=?", chatID).Scan(&status, &active, &harness); err != nil {
+		var active string
+		if err := tx.QueryRowContext(ctx, "SELECT status,coalesce(active_message_id,'') FROM chats WHERE id=?", chatID).Scan(&status, &active); err != nil {
 			return found(err)
 		}
 		if active != "" || status == Working || status == Waiting {
 			return ErrActive
-		}
-		command, runtimeText, err := commands.Resolve(text, harness)
-		if err != nil {
-			return err
 		}
 		execution, err := resolveExecution(ctx, tx, chatID, selection)
 		if err != nil {
@@ -121,9 +121,13 @@ func (s *Store) AcceptMessageWithContext(ctx context.Context, chatID, requestID,
 			payloadFields["references"], _ = json.Marshal(references)
 		}
 		if command != nil {
-			payloadFields["command"], _ = json.Marshal(command)
+			saved := *command
+			saved.MessageID, err = commandMessageID(ctx, tx, chatID)
+			if err != nil {
+				return err
+			}
+			payloadFields["command"], _ = json.Marshal(saved)
 		}
-		payloadFields["runtimeText"], _ = json.Marshal(runtimeText)
 		payloadFields["execution"] = json.RawMessage(selectionJSON(&execution))
 		payloadFields["selection"] = json.RawMessage(selectionJSON(selection))
 		m.Payload, _ = json.Marshal(payloadFields)

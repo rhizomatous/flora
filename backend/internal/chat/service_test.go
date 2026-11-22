@@ -58,6 +58,8 @@ type runtimeFixture struct {
 	started             chan string
 	release             chan bool
 	prompts             atomic.Int32
+	commands            atomic.Int32
+	commandRegistry     json.RawMessage
 	sessions            atomic.Int32
 	question            bool
 	transportLoss       bool
@@ -91,6 +93,14 @@ func newFixture(t *testing.T) *runtimeFixture {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		switch {
+		case r.Method == "GET" && r.URL.Path == "/command":
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			if f.commandRegistry != nil {
+				w.Write(f.commandRegistry)
+			} else {
+				fmt.Fprint(w, `[{"name":"review","description":"Review changes","source":"command"},{"name":"init","description":"Create or update AGENTS.md","source":"command"},{"name":"audit","description":"Custom runtime command","source":"command"}]`)
+			}
 		case r.URL.Path == "/provider":
 			fmt.Fprint(w, `{"all":[]}`)
 		case strings.HasSuffix(r.URL.Path, "/children"):
@@ -197,13 +207,15 @@ func newFixture(t *testing.T) *runtimeFixture {
 				return
 			}
 			json.NewEncoder(w).Encode(f.history)
-		case r.Method == "POST" && r.URL.Path == "/session/ses_one/message":
+		case r.Method == "POST" && (r.URL.Path == "/session/ses_one/message" || r.URL.Path == "/session/ses_one/command"):
 			if f.promptStatus != 0 {
 				w.WriteHeader(f.promptStatus)
 				fmt.Fprint(w, `{"error":"provider_SECRET unavailable model"}`)
 				return
 			}
 			var in struct {
+				Command   string `json:"command"`
+				Arguments string `json:"arguments"`
 				MessageID string `json:"messageID"`
 				System    string `json:"system"`
 				Parts     []struct {
@@ -214,11 +226,23 @@ func newFixture(t *testing.T) *runtimeFixture {
 			if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 				t.Error(err)
 			}
-			if !strings.Contains(in.System, "commit") && !strings.Contains(in.System, "Commit") {
-				t.Error("missing local commit guidance")
+			if in.System != "" {
+				t.Error("standing instructions must come from OpenCode configuration")
+			}
+			if in.Command != "" {
+				f.commands.Add(1)
+				in.Parts = []struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				}{{Type: "text", Text: "Runtime expanded " + in.Command + ": " + in.Arguments}}
+				if in.Command == "review" {
+					in.Parts[0].Type = "subtask"
+				}
 			}
 			n := f.prompts.Add(1)
-			in.MessageID = fmt.Sprintf("msg_runtime_%d", n)
+			if in.MessageID == "" {
+				in.MessageID = fmt.Sprintf("msg_runtime_%d", n)
+			}
 			user, _ := json.Marshal(map[string]any{"info": map[string]string{"id": in.MessageID, "role": "user"}, "parts": in.Parts})
 			f.mu.Lock()
 			if !f.noRuntimeAcceptance {
@@ -627,4 +651,12 @@ func (p *testProvisioner) ModelMetadata(ctx context.Context, c storage.Credentia
 		return p.metadata(ctx, c)
 	}
 	return json.RawMessage(`{"connected":["anthropic"],"all":[{"id":"anthropic","models":{"model":{"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}}}}]}`), nil
+}
+
+func (p *testProvisioner) CommandMetadata(ctx context.Context, _ storage.Credentials) (json.RawMessage, error) {
+	rt := newRuntime(provisioning.Endpoint{URL: p.url, Username: "opencode", Password: "runtime_SECRET"})
+	defer rt.client.CloseIdleConnections()
+	var raw json.RawMessage
+	err := rt.call(ctx, "GET", "/command", nil, &raw)
+	return raw, err
 }

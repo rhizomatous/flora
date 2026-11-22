@@ -11,13 +11,16 @@ test("commands support keyboard selection, cancellation, IME, literal slashes an
   const composer = page.getByLabel("Follow-up", { exact: true });
   const options = page.getByRole("listbox", { name: "Commands", exact: true });
   await composer.fill("/");
-  await expect(options.getByRole("option")).toHaveCount(2);
+  await expect(options.getByRole("option")).toHaveCount(3);
   await expect(composer).toBeFocused();
   await expect(composer).toHaveAttribute("aria-expanded", "true");
   await composer.press("ArrowDown");
   await expect(options.getByRole("option", { selected: true })).toContainText("/init");
   await composer.press("ArrowDown");
+  await expect(options.getByRole("option", { selected: true })).toContainText("/audit");
+  await composer.press("ArrowDown");
   await expect(options.getByRole("option", { selected: true })).toContainText("/review");
+  await composer.press("ArrowUp");
   await composer.press("ArrowUp");
   await composer.press("Enter");
   await expect(composer).toHaveValue("/init ");
@@ -50,8 +53,8 @@ test("commands support keyboard selection, cancellation, IME, literal slashes an
   await composer.press("Escape");
   await composer.fill("/missing");
   await composer.press("Enter");
-  await expect(page.getByText("Unknown command /missing.", { exact: false })).toBeVisible();
-  await expect(composer).toHaveValue("/missing");
+  await expect(page.getByText("Saved response 1", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Sent command")).toHaveCount(0);
   await composer.fill("/review @Explore");
   const context = page.getByRole("listbox", { name: "Context results" });
   await expect(context.getByRole("option")).toHaveCount(1);
@@ -64,18 +67,19 @@ test("commands support keyboard selection, cancellation, IME, literal slashes an
   const response = await accepted;
   expect(response.status()).toBe(202);
   const body = await response.json();
-  expect(body.Message.Payload.command).toEqual({ name: "review", arguments: "main", version: 1 });
-  expect(body.Message.Payload.runtimeText).toContain("Review target: main");
+  expect(body.Message.Payload.command).toMatchObject({ name: "review", arguments: "main" });
+  expect(body.Message.Payload.command.messageID).toMatch(/^msg_/u);
+  expect(body.Message.Payload.runtimeText).toBeUndefined();
   await expect(page.getByLabel("Sent command")).toHaveText("Command /review");
   await expect(page.getByLabel("Sent context")).toContainText("Explore workspace files");
-  await expect(page.getByText("Saved response 1", { exact: true })).toBeVisible();
+  await expect(page.getByText("Saved response 2", { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("Sent command")).toHaveText("Command /review");
   await composer.fill("@Explore");
   await expect(page.getByRole("listbox", { name: "Context results" }).getByRole("option")).toHaveCount(1);
   await composer.press("Escape");
   await composer.fill("/");
-  await expect(options.getByRole("option")).toHaveCount(2);
+  await expect(options.getByRole("option")).toHaveCount(3);
   await page.setViewportSize({ width: 375, height: 812 });
   await expect(options).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -105,8 +109,9 @@ test("new chats execute commands and active work cannot admit another command", 
   const registry = await page.request.get(`/api/commands?chat=${id}`);
   const available: unknown = await registry.json();
   assert.deepEqual(available, { items: [
-    { name: "review", label: "Review changes", available: false },
-    { name: "init", label: "Update repository instructions", available: false },
+    { name: "review", description: "Review changes", source: "command" },
+    { name: "init", description: "Create or update AGENTS.md", source: "command" },
+    { name: "audit", description: "Custom runtime command", source: "command" },
   ] });
   await page.getByRole("button", { name: "Interrupt", exact: true }).click();
   await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeVisible();

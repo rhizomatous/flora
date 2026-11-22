@@ -10,13 +10,13 @@ import {
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { Popover, PopoverTrigger, PopoverContent, SearchIcon, FilesIcon } from "@flora/florets";
+import { Popover, PopoverTrigger, PopoverContent, SearchIcon } from "@flora/florets";
 
 import { autocompleteKey, commandQuery, type AutocompleteState } from "./composer-autocomplete";
 import type { ContextPickerHandle } from "./context-picker";
 import { errorMessage, request } from "./request";
 
-const commandSchema = z.object({ name: z.string(), label: z.string(), available: z.boolean() });
+const commandSchema = z.object({ name: z.string(), description: z.string(), source: z.string() });
 const schema = z.object({ items: z.array(commandSchema) });
 type Command = z.infer<typeof schema>["items"][number];
 export type CommandPickerHandle = Pick<ContextPickerHandle, "detect" | "keydown" | "close">;
@@ -59,9 +59,7 @@ export function CommandPicker({
           signal: controller.signal,
         });
         if (!controller.signal.aborted) {
-          setCommands(
-            result.items.map((item) => ({ ...item, available: item.available && !activeTurn })),
-          );
+          setCommands(result.items.filter((item) => item.source !== "skill"));
         }
       } catch (error) {
         if (!controller.signal.aborted) {
@@ -76,7 +74,7 @@ export function CommandPicker({
     return () => {
       controller.abort();
     };
-  }, [open, chatID, activeTurn]);
+  }, [open, chatID]);
   useEffect(() => {
     onActive({
       open: open && items.length > 0,
@@ -103,7 +101,7 @@ export function CommandPicker({
     setQuery(null);
   }
   function select(item: Command | undefined) {
-    if (item === undefined || !item.available || disabled || activeTurn) return;
+    if (item === undefined || disabled || activeTurn) return;
     close();
     onText(`/${item.name} `);
     textarea.current?.focus();
@@ -163,8 +161,8 @@ export function CommandPicker({
               id={`${listID}-${index}`}
               role="option"
               aria-selected={index === active}
-              aria-disabled={!item.available || activeTurn}
-              className={`flex w-full cursor-default items-center gap-2 rounded-md px-2 py-2 text-left text-sm ${index === active ? "bg-accent" : ""} ${!item.available || activeTurn ? "text-muted-foreground opacity-50" : ""}`}
+              aria-disabled={activeTurn}
+              className={`flex w-full cursor-default items-center gap-2 rounded-md px-2 py-2 text-left text-sm ${index === active ? "bg-accent" : ""} ${activeTurn ? "text-muted-foreground opacity-50" : ""}`}
               onMouseDown={(event) => {
                 event.preventDefault();
               }}
@@ -175,13 +173,10 @@ export function CommandPicker({
                 select(item);
               }}
             >
-              {item.name === "review" ? (
-                <SearchIcon className="size-4 shrink-0" />
-              ) : (
-                <FilesIcon className="size-4 shrink-0" />
-              )}
-              <span className="min-w-0 flex-1">{item.label}</span>
-              <span className="shrink-0 text-muted-foreground">/{item.name}</span>
+              <SearchIcon className="size-4 shrink-0" />
+              <span className="min-w-0 flex-1 truncate" title={item.description}>
+                /{item.name}
+              </span>
             </button>
           ))}
         </div>
