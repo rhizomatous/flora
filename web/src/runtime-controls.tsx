@@ -153,7 +153,15 @@ export function RuntimeMenu({
 }
 
 /** Each label names the lease action; the expiry is reported as machine status. */
-export function KeepAwakeItem({ id, open }: { id: string; open: boolean }) {
+export function KeepAwakeItem({
+  id,
+  open,
+  onSelect,
+}: {
+  id: string;
+  open: boolean;
+  onSelect: () => void;
+}) {
   const { runtime, pending, error, now, act } = useRuntime(id, open);
   const until = runtime?.keepAwakeUntil;
   const active = until !== undefined && until !== null && new Date(until).getTime() > now;
@@ -166,8 +174,11 @@ export function KeepAwakeItem({ id, open }: { id: string; open: boolean }) {
   if (runtime?.state === "stopped") status = "Asleep";
   return (
     <DropdownMenuItem
+      value="keep-awake"
+      className="min-h-7 py-1"
       disabled={!!pending || (!active && runtime?.state !== "running")}
-      onClick={() => {
+      onSelect={() => {
+        onSelect();
         void act("keep-awake", active ? 0 : 14_400);
       }}
     >

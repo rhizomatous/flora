@@ -14,7 +14,7 @@ test("a failed model save preserves the choice and unsent message", async ({ pag
     await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Cannot save this model right now." }) });
   });
   await page.getByRole("button", { name: "Model: Claude Haiku 4.5", exact: true }).click();
-  await page.getByRole("option", { name: "Claude Sonnet 4.6", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Claude Sonnet 4.6", exact: true }).click();
   await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Model: Claude Haiku 4.5", exact: true })).toBeDisabled();
   failSave?.();
@@ -28,7 +28,7 @@ test("one saved chat model applies before sending and survives a fresh browser s
   await logIn(page);
   await page.goto(`/#chats/${backend.chatID}`);
   await page.getByRole("button", { name: "Model: Claude Haiku 4.5", exact: true }).click();
-  await page.getByRole("option", { name: "Claude Sonnet 4.6", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Claude Sonnet 4.6", exact: true }).click();
   await expect(page.getByRole("button", { name: "Model: Claude Sonnet 4.6", exact: true })).toBeFocused();
   await page.getByLabel("Follow-up", { exact: true }).fill("Keep this follow-up draft");
   const title = page.getByRole("button", { name: "Review keyboard navigation", exact: true });

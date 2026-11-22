@@ -3,18 +3,14 @@ import { z } from "zod";
 
 import {
   ChevronLeftIcon,
-  Button,
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
+  DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownButton,
   GitBranchIcon,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
+  DropdownMenu,
+  DropdownMenuEmpty,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
 } from "@flora/florets";
 
 import { projectSchema, type Project, type Repository } from "./project-schemas";
@@ -38,6 +34,7 @@ export function ChatBranchPicker({
   const [revision, setRevision] = useState(0);
   const [open, setOpen] = useState(false);
   const [repository, setRepository] = useState<string>();
+  const [query, setQuery] = useState("");
   const [overrides, setOverrides] = useState<Record<string, string>>(() => {
     try {
       return overridesSchema.parse(
@@ -96,14 +93,28 @@ export function ChatBranchPicker({
   return (
     <>
       <input type="hidden" name="branches" value={JSON.stringify(overrides)} />
-      <Popover
+      <DropdownMenu
+        search={
+          single === undefined
+            ? {
+                label: active ? "Search branches" : "Search repositories",
+                query,
+                onQueryChange: setQuery,
+                filter: null,
+                emptyText: null,
+              }
+            : false
+        }
         open={open}
         onOpenChange={(value) => {
           setOpen(value);
-          if (!value) setRepository(undefined);
+          if (!value) {
+            setRepository(undefined);
+            setQuery("");
+          }
         }}
       >
-        <PopoverTrigger
+        <DropdownMenuTrigger
           render={
             <DropdownButton
               type="button"
@@ -118,10 +129,10 @@ export function ChatBranchPicker({
             </DropdownButton>
           }
         />
-        <PopoverContent
+        <DropdownMenuContent
           align="end"
           aria-label="Choose base branches"
-          className="w-[340px]! max-w-[calc(100vw-24px)] gap-0 overflow-hidden p-0!"
+          className="w-[340px]! max-w-[calc(100vw-24px)]!"
         >
           {active ? (
             <RepositoryBranches
@@ -129,6 +140,7 @@ export function ChatBranchPicker({
               projectID={projectID}
               repository={active}
               single={single !== undefined}
+              query={query}
               selected={overrides[active.name]}
               onChange={(branch) => {
                 change(active.name, branch);
@@ -137,108 +149,99 @@ export function ChatBranchPicker({
                 repos.length > 1
                   ? () => {
                       setRepository(undefined);
+                      setQuery("");
                     }
                   : undefined
               }
             />
           ) : (
-            <div>
-              <div className="border-b border-border px-3 py-2.5 text-sm font-medium">
-                Base branches
-              </div>
+            <DropdownMenuGroup label="Base branches">
               {error !== "" && (
-                <div className="space-y-2 p-3">
-                  <p role="alert" className="text-sm text-destructive">
-                    {error}
-                  </p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
+                <>
+                  <DropdownMenuItem
+                    value="repositories-unavailable"
+                    disabled
+
+                    aria-description={error}
+                  >
+                    Repositories unavailable
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    value="retry-repositories"
+                    closeOnClick={false}
+
+                    onSelect={() => {
                       setRevision((v) => v + 1);
                     }}
                   >
                     Try again
-                  </Button>
-                </div>
+                  </DropdownMenuItem>
+                </>
+              )}
+              {error === "" &&
+                project &&
+                repos
+                  .filter((repo) =>
+                    repo.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
+                  )
+                  .map((repo) => (
+                    <DropdownMenuItem
+                      key={repo.name}
+                      value={repo.name}
+                      closeOnClick={false}
+                      onSelect={() => {
+                        setRepository(repo.name);
+                        setQuery("");
+                      }}
+                    >
+                      <GitBranchIcon className="text-muted-foreground" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">{repo.name}</span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {overrides[repo.name] ?? repo.baseBranch}
+                          {overrides[repo.name] === undefined ? " · Project default" : ""}
+                        </span>
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+              {error === "" && project === undefined && (
+                <DropdownMenuItem value="loading-repositories" disabled>
+                  Loading repositories…
+                </DropdownMenuItem>
               )}
               {error === "" && project && (
-                <div>
-                  <Command>
-                    <CommandInput
-                      ref={focusSearch}
-                      aria-label="Search repositories"
-                      placeholder="Search repositories…"
-                    />
-                    <CommandList aria-label="Repositories">
-                      <CommandEmpty>No matching repositories.</CommandEmpty>
-                      <CommandGroup>
-                        {repos.map((repo) => (
-                          <CommandItem
-                            key={repo.name}
-                            value={repo.name}
-                            onSelect={() => {
-                              setRepository(repo.name);
-                            }}
-                          >
-                            <GitBranchIcon className="text-muted-foreground" />
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate">{repo.name}</span>
-                              <span className="block truncate text-xs text-muted-foreground">
-                                {overrides[repo.name] ?? repo.baseBranch}
-                                {overrides[repo.name] === undefined ? " · Project default" : ""}
-                              </span>
-                            </span>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </div>
+                <DropdownMenuEmpty>No matching repositories.</DropdownMenuEmpty>
               )}
-              {error === "" && project === undefined && (
-                <p role="status" className="p-3 text-sm text-muted-foreground">
-                  Loading repositories…
-                </p>
-              )}
-            </div>
+            </DropdownMenuGroup>
           )}
           {count > 0 && single === undefined && (
-            <Button
-              type="button"
-              variant="tertiary"
-              size="sm"
-              className="w-full"
-              onClick={() => {
-                setOverrides({});
-                onChange();
-                try {
-                  sessionStorage.removeItem(`flora-branches:${projectID}`);
-                } catch {
-                  /* Storage may be disabled. */
-                }
-              }}
-            >
-              Use project defaults
-            </Button>
+            <DropdownMenuGroup>
+              <DropdownMenuItem
+                value="project-defaults"
+
+                onSelect={() => {
+                  setOverrides({});
+                  onChange();
+                  try {
+                    sessionStorage.removeItem(`flora-branches:${projectID}`);
+                  } catch {
+                    /* Storage may be disabled. */
+                  }
+                }}
+              >
+                Use project defaults
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
           )}
-        </PopoverContent>
-      </Popover>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </>
   );
 }
 
-function focusSearch(input: HTMLInputElement | null) {
-  input?.focus();
-}
-
-function focusBranchList(element: HTMLDivElement | null) {
-  element?.focus();
-}
-
 function RepositoryBranches({
   single,
+  query,
   projectID,
   repository,
   selected,
@@ -246,6 +249,7 @@ function RepositoryBranches({
   onBack,
 }: {
   single: boolean;
+  query: string;
   projectID: string;
   repository: Repository;
   selected: string | undefined;
@@ -286,137 +290,129 @@ function RepositoryBranches({
     };
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Revision explicitly retries a failed request.
   }, [projectID, repository.name, page, revision]);
+  const matches = (value: string) =>
+    value.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
+  const visible = branches.filter(
+    (branch) => (!single || branch !== repository.baseBranch) && matches(branch),
+  );
+  const defaultVisible = matches(`Project default ${repository.baseBranch}`);
+  const savedVisible =
+    selected !== undefined &&
+    (!single || selected !== repository.baseBranch) &&
+    !branches.includes(selected) &&
+    matches(selected);
   return (
-    <div>
-      {!single && (
-        <div className="flex min-w-0 items-center gap-2 border-b border-border px-3 py-2.5">
-          {onBack && (
-            <Button
-              type="button"
-              variant="tertiary"
-              size="icon-sm"
-              aria-label="All repositories"
-              onClick={onBack}
-            >
-              <ChevronLeftIcon />
-            </Button>
-          )}
-          <span className="truncate text-sm font-medium">{repository.name}</span>
-        </div>
+    <>
+      {onBack && (
+        <DropdownMenuItem
+          value="all-repositories"
+          closeOnClick={false}
+
+          onSelect={onBack}
+        >
+          <ChevronLeftIcon />
+          All repositories
+        </DropdownMenuItem>
       )}
-      <Command
-        ref={single ? focusBranchList : undefined}
-        tabIndex={single ? 0 : undefined}
-        {...(single ? { defaultValue: selected ?? repository.baseBranch } : {})}
-      >
-        {!single && (
-          <CommandInput
-            ref={focusSearch}
-            aria-label="Search branches"
-            placeholder="Search branches…"
-          />
-        )}
-        <CommandList aria-label={`Branches for ${repository.name}`}>
-          <CommandGroup className={single ? "p-0" : undefined}>
-            <CommandItem
-              value={single ? repository.baseBranch : `Project default ${repository.baseBranch}`}
-              data-checked={
-                selected === undefined || (single && selected === repository.baseBranch)
-              }
-              onSelect={() => {
-                onChange();
-              }}
-            >
-              <GitBranchIcon />
-              {single ? (
-                <>
-                  <span className="min-w-0 flex-1 truncate">{repository.baseBranch}</span>
-                  <span className="text-muted-foreground">Default</span>
-                </>
-              ) : (
-                <span className="min-w-0 flex-1 truncate">
-                  Project default{" "}
-                  <span className="text-muted-foreground">· {repository.baseBranch}</span>
-                </span>
-              )}
-            </CommandItem>
-          </CommandGroup>
-          <CommandGroup
-            className={single ? "p-0" : undefined}
-            heading={single ? undefined : "Branches"}
+      <DropdownMenuGroup label={single ? undefined : repository.name}>
+        {defaultVisible && (
+          <DropdownMenuItem
+            value={single ? repository.baseBranch : `Project default ${repository.baseBranch}`}
+            data-checked={selected === undefined || (single && selected === repository.baseBranch)}
+            onSelect={() => {
+              onChange();
+            }}
           >
-            {selected !== undefined &&
-              (!single || selected !== repository.baseBranch) &&
-              !branches.includes(selected) && (
-                <CommandItem
-                  value={selected}
-                  data-checked
-                  onSelect={() => {
-                    onChange(selected);
-                  }}
-                >
-                  <GitBranchIcon />
-                  <span className="min-w-0 flex-1 truncate">{selected}</span>
-                </CommandItem>
-              )}
-            {branches
-              .filter((branch) => !single || branch !== repository.baseBranch)
-              .map((branch) => (
-                <CommandItem
-                  key={branch}
-                  value={branch}
-                  data-checked={selected === branch}
-                  onSelect={() => {
-                    onChange(branch);
-                  }}
-                >
-                  <GitBranchIcon />
-                  <span className="min-w-0 flex-1 truncate">{branch}</span>
-                </CommandItem>
-              ))}
-          </CommandGroup>
-          {!loading && !error && <CommandEmpty>No matching branches.</CommandEmpty>}
-        </CommandList>
-      </Command>
-      {(loading || error || nextPage > 0) && (
-        <div className="space-y-2 border-t border-border p-3">
+            <GitBranchIcon />
+            {single ? (
+              <>
+                <span className="min-w-0 flex-1 truncate">{repository.baseBranch}</span>
+                <span className="text-muted-foreground">Default</span>
+              </>
+            ) : (
+              <span className="min-w-0 flex-1 truncate">
+                Project default{" "}
+                <span className="text-muted-foreground">· {repository.baseBranch}</span>
+              </span>
+            )}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuGroup>
+      <DropdownMenuGroup label={single ? undefined : "Branches"}>
+        {savedVisible && (
+          <DropdownMenuItem
+            value={selected}
+            data-checked
+            onSelect={() => {
+              onChange(selected);
+            }}
+          >
+            <GitBranchIcon />
+            <span className="min-w-0 flex-1 truncate">{selected}</span>
+          </DropdownMenuItem>
+        )}
+        {visible.map((branch) => (
+          <DropdownMenuItem
+            key={branch}
+            value={branch}
+            data-checked={selected === branch}
+            onSelect={() => {
+              onChange(branch);
+            }}
+          >
+            <GitBranchIcon />
+            <span className="min-w-0 flex-1 truncate">{branch}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuGroup>
+      {!loading && !error && !defaultVisible && !savedVisible && visible.length === 0 && (
+        <DropdownMenuItem value="no-branches" disabled>
+          <span role="status">No matching branches.</span>
+        </DropdownMenuItem>
+      )}
+      {(loading || error !== "" || nextPage > 0) && (
+        <DropdownMenuGroup>
           {loading && (
-            <p role="status" className="text-xs text-muted-foreground">
+            <DropdownMenuItem value="loading-branches" disabled>
               Loading branches…
-            </p>
+            </DropdownMenuItem>
           )}
           {!loading && error !== "" && (
             <>
-              <p role="alert" className="text-xs text-destructive">
-                {error}
-              </p>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={() => {
+              <DropdownMenuItem
+                value="branches-unavailable"
+                disabled
+
+                aria-description={error}
+              >
+                Branches unavailable
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                value="retry-branches"
+                closeOnClick={false}
+
+                onSelect={() => {
                   setRevision((v) => v + 1);
                 }}
               >
                 Try again
-              </Button>
+              </DropdownMenuItem>
             </>
           )}
           {!loading && error === "" && nextPage > 0 && (
-            <Button
-              type="button"
-              size="sm"
-              variant="tertiary"
-              className="w-full"
-              onClick={() => {
+            <DropdownMenuItem
+              value="more-branches"
+              closeOnClick={false}
+
+              onSelect={() => {
                 setPage(nextPage);
               }}
             >
               Load more branches
-            </Button>
+            </DropdownMenuItem>
           )}
-        </div>
+        </DropdownMenuGroup>
       )}
-    </div>
+    </>
   );
 }

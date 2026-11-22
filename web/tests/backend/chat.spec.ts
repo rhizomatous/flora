@@ -21,13 +21,13 @@ test("chat creation, recovery, controls, and logout", async ({ page, context }) 
     .click();
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   await page.getByRole("button", { name: /^Project:/ }).click();
-  const projectSearch = page.getByRole("textbox", { name: "Search projects", exact: true });
+  const projectSearch = page.getByRole("searchbox", { name: "Search projects", exact: true });
   await expect(projectSearch).toBeFocused();
   await projectSearch.fill("No matching project");
   await expect(page.getByText("No projects found.", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Browser project", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Browser project", exact: true })).toHaveCount(0);
   await projectSearch.fill("Browser");
-  await page.getByRole("button", { name: "Browser project", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Browser project", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Project: Browser project", exact: true }),
   ).toBeFocused();

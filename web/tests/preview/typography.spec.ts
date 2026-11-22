@@ -80,7 +80,7 @@ test("editable controls keep their text size across viewport widths", async ({ p
     }
     await page.goto(`${base}/#chats/new`);
     await page.getByRole("button", { name: /^Model:/ }).click();
-    await expect(page.getByRole("combobox", { name: "Search models" })).toHaveCSS(
+    await expect(page.getByRole("searchbox", { name: "Search models" })).toHaveCSS(
       "font-size",
       "14px",
     );

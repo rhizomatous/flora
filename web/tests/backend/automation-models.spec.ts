@@ -13,9 +13,9 @@ test("automation model and reasoning choices save explicitly and can return to i
   await page.getByLabel("Runs in", { exact: true }).selectOption("same");
   await expect(model()).toHaveAccessibleName("Model: Chat's current model");
   await model().click();
-  await expect(page.getByRole("option", { name: "Chat's current model", exact: true })).toBeVisible();
-  await page.getByRole("combobox", { name: "Search models" }).fill("sonnet");
-  await page.getByRole("option", { name: "Claude Sonnet 4.6", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Chat's current model", exact: true })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Search models" }).fill("sonnet");
+  await page.getByRole("menuitem", { name: "Claude Sonnet 4.6", exact: true }).click();
   await page.getByRole("button", { name: /^Reasoning effort:/ }).click();
   await page.getByRole("menuitem", { name: "High", exact: true }).click();
   await page.getByRole("button", { name: "Create automation", exact: true }).click();
@@ -24,12 +24,12 @@ test("automation model and reasoning choices save explicitly and can return to i
   await expect(model()).toHaveAccessibleName("Model: Claude Sonnet 4.6");
   await expect(page.getByRole("button", { name: "Reasoning effort: High", exact: true })).toBeVisible();
   await model().click();
-  await page.getByRole("option", { name: "Chat's current model", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Chat's current model", exact: true }).click();
   await expect(page.getByRole("button", { name: /^Reasoning effort:/ })).toHaveCount(0);
   await page.reload();
   await expect(model()).toHaveAccessibleName("Model: Claude Sonnet 4.6");
   await model().click();
-  await page.getByRole("option", { name: "Chat's current model", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Chat's current model", exact: true }).click();
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
   await page.reload();

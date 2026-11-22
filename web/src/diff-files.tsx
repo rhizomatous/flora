@@ -3,16 +3,12 @@ import { useMemo, useRef, useState } from "react";
 import {
   Button,
   ChevronDownIcon,
-  Command,
-  CommandEmpty,
-  CommandInput,
-  CommandItem,
-  CommandList,
+  DropdownMenuItem,
   FileTypeIcon,
   FolderIcon,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
 } from "@flora/florets";
 
 import { changeStatus, type FileChange } from "./changes-schemas";
@@ -50,7 +46,16 @@ export function DiffFiles({
   const destination = useRef<HTMLElement | undefined>(undefined);
 
   return (
-    <Popover
+    <DropdownMenu
+      search={{
+        label: "Search changed files",
+        query,
+        onQueryChange: setQuery,
+        filter: null,
+        listLabel: "Changed files",
+        listClassName: "p-1.5",
+        emptyText: "No matching files.",
+      }}
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
@@ -60,7 +65,7 @@ export function DiffFiles({
         }
       }}
     >
-      <PopoverTrigger
+      <DropdownMenuTrigger
         render={
           <Button variant="ghost" size="sm" aria-label="Files" className="text-muted-foreground">
             Files <span className="opacity-60">{files.length}</span>
@@ -68,33 +73,21 @@ export function DiffFiles({
           </Button>
         }
       />
-      <PopoverContent
+      <DropdownMenuContent
         align="end"
         className="w-96! max-w-[calc(100vw-24px)]! p-0"
         aria-label="Changed files"
         finalFocus={() => destination.current ?? true}
       >
-        <Command shouldFilter={false} className="rounded-lg! p-0">
-          <CommandInput
-            variant="plain"
-            value={query}
-            onValueChange={setQuery}
-            aria-label="Search changed files"
-            placeholder="Search"
-          />
-          <CommandList aria-label="Changed files" className="p-1.5">
-            <CommandEmpty>No matching files.</CommandEmpty>
-            <FileTree
-              nodes={nodes}
-              onSelect={(index) => {
-                destination.current = onSelect(index);
-                setOpen(false);
-              }}
-            />
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+        <FileTree
+          nodes={nodes}
+          onSelect={(index) => {
+            destination.current = onSelect(index);
+            setOpen(false);
+          }}
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -119,11 +112,11 @@ function FileTree({
         </div>
       </div>
     ) : (
-      <CommandItem
+      <DropdownMenuItem
         key={node.path}
         value={node.path}
         title={node.path}
-        className="min-h-7 gap-2 rounded-sm py-1 [&>svg:last-child]:hidden"
+        className="min-h-7 gap-2 rounded-sm py-1"
         onSelect={() => {
           onSelect(node.index);
         }}
@@ -134,7 +127,7 @@ function FileTree({
           <span className="text-xs text-muted-foreground">{changeStatus(node.file.status)}</span>
         )}
         <ChangeCounts additions={node.file.additions} deletions={node.file.deletions} />
-      </CommandItem>
+      </DropdownMenuItem>
     ),
   );
 }

@@ -42,8 +42,7 @@
   font-size: 14px;
   line-height: 1.5;
 }
-.composer-textarea:focus-visible,
-.composer-search:focus-visible {
+.composer-textarea:focus-visible {
   outline: none;
   box-shadow: none;
 }
@@ -57,21 +56,6 @@
   gap: 4px;
   padding: 0 8px 6px;
   flex-wrap: wrap;
-}
-.composer-project-option,
-.composer-project-links a {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 10px;
-  font-size: 13px;
-  border-radius: 6px;
-  text-align: left;
-}
-.composer-project-option:hover,
-.composer-project-links a:hover {
-  background: var(--control-hover);
 }
 .composer-project-menu svg {
   width: 14px;

@@ -23,10 +23,10 @@ test("create, edit, pause, and run an automation in a dedicated chat", async ({ 
   await expect(page.getByRole("menuitemcheckbox", { name: "Friday", exact: true })).toBeChecked();
   await page.getByRole("menuitemcheckbox", { name: "Friday", exact: true }).press("Escape");
   await page.getByRole("button", { name: "Time zone", exact: true }).click();
-  await page.getByRole("combobox", { name: "Search time zones" }).fill("New York");
-  await page.getByRole("combobox", { name: "Search time zones" }).press("Enter");
+  await page.getByRole("searchbox", { name: "Search time zones" }).fill("New York");
+  await page.getByRole("searchbox", { name: "Search time zones" }).press("Enter");
   await expect(page.getByRole("button", { name: "Time zone", exact: true })).toHaveText("inAmerica/New_York");
-  await expect(page.getByRole("combobox", { name: "Search time zones" })).not.toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "Search time zones" })).not.toBeVisible();
   await expect(page.getByRole("textbox", { name: "Instructions", exact: true })).toHaveCSS("resize", "none");
   await assertFitsPhone(page);
   await page.setViewportSize({ width: 375, height: 600 });

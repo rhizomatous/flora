@@ -3,16 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
-  Button,
   CheckIcon,
   DropdownButton,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuGroup,
   DropdownMenuTrigger,
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
 } from "@flora/florets";
 
 import type { AttachmentPolicy } from "./attachments";
@@ -21,6 +18,7 @@ import { resolveModelChoice, useModelChoice } from "./model-choice";
 import { useModelDiscovery } from "./model-discovery";
 import { ModelIcon } from "./model-icon";
 import { modelChoiceLabel } from "./model-label";
+import { matchModel } from "./model-options";
 import { ModelPicker } from "./model-picker";
 import { errorMessage } from "./request";
 
@@ -103,8 +101,21 @@ export function ModelControls({
       {!automation && !scope.startsWith("chat:") && selected && (
         <input type="hidden" name="execution" value={JSON.stringify(selected)} />
       )}
-      <Popover open={modelOpen} onOpenChange={setModelOpen}>
-        <PopoverTrigger
+      <DropdownMenu
+        search={{
+          label: "Search models",
+          placeholder: "Search models",
+          filter: (text, query) =>
+            loading ||
+            (error !== "" && ["Models unavailable", "Retry discovery"].includes(text)) ||
+            matchModel(text, query),
+          emptyText: loading ? null : "No models found.",
+          listClassName: "scroll-py-2",
+        }}
+        open={modelOpen}
+        onOpenChange={setModelOpen}
+      >
+        <DropdownMenuTrigger
           render={
             <DropdownButton
               ref={modelTrigger}
@@ -120,7 +131,7 @@ export function ModelControls({
             </DropdownButton>
           }
         />
-        <PopoverContent
+        <DropdownMenuContent
           align="start"
           side="top"
           className="composer-menu max-h-(--available-height) w-[320px]! max-w-[calc(100vw-24px)]! gap-0 overflow-hidden p-0! transition-none"
@@ -150,26 +161,31 @@ export function ModelControls({
               setModelOpen(false);
             }}
           />
-          {error && (
-            <div className="border-t border-border px-3 py-2">
-              <p className="text-xs text-muted-foreground" role="status">
-                {error}
-              </p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="compact"
+          {error !== "" && (
+            <DropdownMenuGroup>
+              <DropdownMenuItem
+                value="models-unavailable"
+                label="Models unavailable"
+                disabled
+                aria-description={error}
+              >
+                Models unavailable
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                value="retry-models"
+                label="Retry discovery"
                 disabled={loading}
+                closeOnClick={false}
                 onClick={() => {
                   retry();
                 }}
               >
                 Retry discovery
-              </Button>
-            </div>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
           )}
-        </PopoverContent>
-      </Popover>
+        </DropdownMenuContent>
+      </DropdownMenu>
       {(!automation || effective) && (
         <DropdownMenu>
           <DropdownMenuTrigger
