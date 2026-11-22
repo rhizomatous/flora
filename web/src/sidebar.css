@@ -133,3 +133,25 @@
     animation: sidebar-status-pulse 2.4s ease-in-out infinite;
   }
 }
+
+.sidebar-chats .sidebar-folder-heading {
+  padding-inline-end: 0;
+}
+.sidebar-folder-actions {
+  display: inline-flex;
+  align-items: center;
+}
+.sidebar-folder-actions button,
+.sidebar-chats .florets-navigation-actions button {
+  width: 26px;
+  height: 26px;
+}
+.sidebar-folder-actions svg,
+.sidebar-chats .florets-navigation-actions svg {
+  width: 14px;
+  height: 14px;
+}
+.sidebar-chats .florets-navigation-actions {
+  right: 0;
+  top: 2px;
+}

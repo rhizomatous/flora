@@ -90,6 +90,7 @@ func (a *api) chatViews(ctx context.Context, chats []storage.Chat) []chatView {
 
 func (a *api) chatRoutes(mux *http.ServeMux) {
 	store := a.settings.Store
+	a.folderRoutes(mux)
 	mux.HandleFunc("POST /api/chats/read", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			Observed []storage.ViewedRevision `json:"observed"`
