@@ -91,7 +91,7 @@ export function ChatTitle({
         className="chat-title-card chat-summary-card font-normal"
         aria-label="Chat summary"
       >
-        <ChatSummary chat={chat} title={title} pulls={pulls} />
+        <ChatSummary chat={chat} title={title} pulls={pulls} showPullList={false} />
       </HoverCardContent>
     </HoverCard>
   );

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ChatModelSummary } from "./chat-model-summary";
 import type { Chat } from "./chat-schemas";
 import { chatStatus } from "./chat-status";
-import { PullList } from "./pull-links";
+import { PullCount, PullList } from "./pull-links";
 import type { PullSummary } from "./pull-schemas";
 
 /** Title and sidebar previews show the same saved identity and useful related work. */
@@ -12,11 +12,13 @@ export function ChatSummary({
   title,
   pulls,
   now: suppliedNow,
+  showPullList = true,
 }: {
   chat: Chat | undefined;
   title: string;
   pulls: PullSummary | undefined;
   now?: number;
+  showPullList?: boolean;
 }) {
   const [clock, setClock] = useState(() => Date.now());
   useEffect(() => {
@@ -54,8 +56,11 @@ export function ChatSummary({
             {relative}
           </time>
         )}
+        {!showPullList && (pulls?.items.length ?? 0) > 0 && (
+          <PullCount pulls={pulls?.items ?? []} />
+        )}
       </div>
-      {((pulls?.items.length ?? 0) > 0 || (pulls?.error ?? "") !== "") && (
+      {showPullList && ((pulls?.items.length ?? 0) > 0 || (pulls?.error ?? "") !== "") && (
         <section aria-label="Pull requests" className="chat-summary-section">
           <p className="chat-summary-section-label">Pull requests</p>
           <PullList summary={pulls} chatID={chat?.ID} />
@@ -64,7 +69,7 @@ export function ChatSummary({
       {(chat?.subagents?.length ?? 0) > 0 && (
         <section aria-label="Subagents" className="chat-summary-section">
           <p className="chat-summary-section-label">Subagents</p>
-          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-[13px]">
             {chat?.subagents?.map((agent) => (
               <div key={agent.id} className="contents">
                 <dt className="text-muted-foreground">Subagent {agent.number}</dt>

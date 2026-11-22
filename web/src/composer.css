@@ -120,12 +120,14 @@
 
 /* Chat reuses the start-screen controls in a shorter input with a wider reading column. */
 .follow-up-composer .composer-textarea {
-  min-height: 38px;
+  min-height: 42px;
   max-height: 25dvh;
-  padding: 12px 15px 4px;
+  padding: 12px 14px 6px;
 }
 .follow-up-composer .composer-bottom-bar {
   flex-wrap: nowrap;
+  padding: 0 8px 8px;
+  gap: 4px;
 }
 .follow-up-composer .composer-bottom-bar > .composer-model {
   min-width: 0;
@@ -173,22 +175,10 @@
   padding-top: 4px;
 }
 
-.follow-up-composer .composer-box {
-  border-radius: 12px;
-  box-shadow: 0 4px 16px #0000000a;
-}
-.follow-up-composer .composer-textarea {
-  min-height: 54px;
-  padding: 16px 16px 8px;
-}
 .follow-up-composer .composer-textarea::placeholder {
   color: var(--muted-foreground);
 }
-.follow-up-composer .composer-bottom-bar {
-  padding: 0 10px 10px;
-  gap: 6px;
-}
 .chat-composer .composer-send {
-  width: 30px !important;
-  height: 30px !important;
+  width: 28px !important;
+  height: 28px !important;
 }

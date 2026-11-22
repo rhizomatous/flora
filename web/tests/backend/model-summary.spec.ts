@@ -24,7 +24,7 @@ test("a failed model save preserves the choice and unsent message", async ({ pag
   await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this message");
 });
 
-test("one saved chat model applies before sending and survives a fresh browser session", async ({ page, backend, browser }) => {
+test("one saved chat model applies before sending and survives a fresh browser session", async ({ page, backend, browser }, testInfo) => {
   await logIn(page);
   await page.goto(`/#chats/${backend.chatID}`);
   await page.getByRole("button", { name: "Model: Claude Haiku 4.5", exact: true }).click();
@@ -35,6 +35,7 @@ test("one saved chat model applies before sending and survives a fresh browser s
   const label = "Chat model: anthropic / claude-sonnet-4-6";
   await title.focus();
   const summary = page.getByLabel("Chat summary", { exact: true });
+  await expect(summary.getByRole("region", { name: "Subagents", exact: true })).toBeVisible();
   await expect(summary.getByRole("img", { name: label, exact: true })).toHaveText("Claude Sonnet 4.6");
   await expect(summary).not.toContainText("2 models");
   await page.keyboard.press("Escape");
@@ -48,11 +49,21 @@ test("one saved chat model applies before sending and survives a fresh browser s
   const detail = await (await page.request.get(`/api/chats/${backend.chatID}`)).json();
   expect(detail.chat.Execution.model).toBe("claude-sonnet-4-6");
   expect(detail.messages).toHaveLength(2);
-  const otherContext = await browser.newContext({ storageState: await page.context().storageState(), ignoreHTTPSErrors: true });
+  const otherContext = await browser.newContext({ storageState: await page.context().storageState(), ignoreHTTPSErrors: true, viewport: { width: 1512, height: 838 }, deviceScaleFactor: 2 });
   try {
     const otherPage = await otherContext.newPage();
     await otherPage.goto(`${backend.url}/#chats/${backend.chatID}`);
     await expect(otherPage.getByRole("button", { name: "Model: Claude Sonnet 4.6", exact: true })).toBeVisible();
+    await otherPage.getByRole("button", { name: "Review keyboard navigation", exact: true }).focus();
+    await expect(otherPage.getByLabel("Chat summary", { exact: true }).getByRole("region", { name: "Subagents", exact: true })).toBeVisible();
+    await expect(otherPage.getByRole("heading", { name: "Keyboard navigation", exact: true })).toBeVisible();
+    await otherPage.screenshot({ path: testInfo.outputPath("compact-chat-desktop.png"), animations: "disabled" });
+    await otherPage.keyboard.press("Escape");
+    await otherPage.getByRole("button", { name: "Review keyboard navigation", exact: true }).blur();
+    await otherPage.setViewportSize({ width: 375, height: 812 });
+    await otherPage.getByRole("button", { name: "Review keyboard navigation", exact: true }).focus();
+    await expect.poll(async () => await otherPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await otherPage.screenshot({ path: testInfo.outputPath("compact-chat-narrow.png"), animations: "disabled" });
   } finally {
     await otherContext.close();
   }

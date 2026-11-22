@@ -158,14 +158,13 @@
 
 /* Keep task names readable and reveal secondary actions without covering text. */
 .sidebar-chats .florets-navigation-link {
-  min-height: 42px;
-  align-items: center;
-  padding-block: 10px;
+  min-height: 34px;
+  padding-block: 7px;
   gap: 10px;
 }
 .sidebar-chats .florets-navigation-title {
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 13px;
+  line-height: 18px;
 }
 .sidebar-chats .florets-navigation-meta:empty {
   display: none !important;
@@ -174,21 +173,18 @@
   font-size: 12px;
   line-height: 18px;
 }
-.sidebar-chats .florets-navigation-icon {
-  margin-top: 0;
-}
 .sidebar-chats .florets-navigation-age {
   min-width: 26px;
   font-size: 12px;
   text-align: end;
 }
 .sidebar-chats .florets-navigation-actions {
-  top: 8px;
+  top: 4px;
   right: 4px;
 }
 .sidebar-chats .florets-navigation-row:is(:hover, :focus-within) .florets-navigation-age {
   visibility: hidden;
 }
 .flora-sidebar .sidebar-chats {
-  padding-top: 20px;
+  padding-top: 8px;
 }

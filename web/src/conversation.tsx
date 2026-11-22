@@ -76,7 +76,7 @@ export function ConversationMessage({
             {m.Role === "user" ? (delegated ? "Parent agent" : "You") : "Flora"}
           </span>
           <Bubble variant={m.Role === "user" ? "muted" : "ghost"}>
-            <BubbleContent className="space-y-4 text-sm leading-6">
+            <BubbleContent className="chat-message-body space-y-4 text-sm leading-6">
               {parts.length > 0 ? (
                 parts.map((part, index) => (
                   <MessagePart key={part.id ?? index} part={part} user={m.Role === "user"} />
