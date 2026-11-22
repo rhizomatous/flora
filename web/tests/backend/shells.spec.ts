@@ -23,7 +23,7 @@ test("real shell reconnect, resize, exit and tab navigation", async ({ page, bac
   await input.pressSequentially("printf 'reconnected:%s\\n' \"$CHECK\"");
   await input.press("Enter");
   await expect(terminal.locator(".xterm-accessibility")).toContainText("reconnected:preserved");
-  await input.press("Shift+Escape");
+  await input.press("Shift+Tab");
   await expect(page.getByRole("tab", { name: "Shell 1", exact: true })).toBeFocused();
   await page.getByRole("tab", { name: "Explore the workspace", exact: true }).click();
   await expect(draft).toHaveValue("Keep my draft while I inspect the workspace");

@@ -260,11 +260,20 @@ function ShellTerminal({
     terminal.current = term;
     fit.current = addon;
     term.textarea?.setAttribute("aria-label", `${shell.title} terminal input`);
+    term.textarea?.setAttribute("aria-description", "Press Shift+Tab to return to the tab bar");
     // Keep clipboard access under browser/user control. Terminal output cannot
     // open links, read the clipboard, or change application navigation.
     term.parser.registerOscHandler(52, () => true);
     term.attachCustomKeyEventHandler((event) => {
-      if (event.type === "keydown" && event.key === "Escape" && event.shiftKey) {
+      if (
+        event.type === "keydown" &&
+        event.key === "Tab" &&
+        event.shiftKey &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey
+      ) {
+        event.preventDefault();
         document
           .querySelector<HTMLButtonElement>('.chat-main-pane [role="tab"][aria-selected="true"]')
           ?.focus();
@@ -446,9 +455,6 @@ function ShellTerminal({
       >
         <div ref={host} className="h-full w-full" />
       </div>
-      <p className="shrink-0 border-t border-border px-4 py-2 text-xs text-muted-foreground sm:px-8">
-        Shift+Escape returns to tabs
-      </p>
     </section>
   );
 }
