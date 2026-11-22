@@ -100,6 +100,7 @@ export function Composer({
   draftScope,
   projectID,
   execution,
+  executionRevision,
   activeTurn = false,
 }: {
   id: string;
@@ -114,8 +115,10 @@ export function Composer({
   draftScope?: string;
   projectID?: string;
   execution?: Execution | undefined;
+  executionRevision?: number | undefined;
   activeTurn?: boolean;
 }) {
+  const [modelSaving, setModelSaving] = useState(false);
   const [modelPolicy, setModelPolicy] = useState<AttachmentPolicy>();
   const attachments = useAttachments(draftScope ?? id, projectID ?? "", modelPolicy);
   const context = useRef<ContextPickerHandle>(null);
@@ -131,7 +134,7 @@ export function Composer({
   const root = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const hasInput = message.trim() !== "" || attachments.items.length > 0 || referenceCount > 0;
-  const ready = canSend && attachments.ready && hasInput;
+  const ready = !modelSaving && canSend && attachments.ready && hasInput;
   useEffect(() => {
     const form = root.current?.closest("form");
     const reset = () => {
@@ -233,7 +236,7 @@ export function Composer({
         aria-activedescendant={contextActive.open ? contextActive.activeID : undefined}
         className="composer-textarea"
         rows={1}
-        placeholder="Ask anything, / for commands, @ for context"
+        placeholder={label === "Follow-up" ? "Ask a follow-up…" : "Describe a task…"}
         value={message}
         onChange={(event) => {
           onChange(event.target.value);
@@ -401,6 +404,8 @@ export function Composer({
           key={draftScope ?? id}
           scope={draftScope ?? id}
           saved={execution}
+          savedRevision={executionRevision}
+          onSaving={setModelSaving}
           onPolicy={setModelPolicy}
           disabled={disabled || activeTurn}
         />

@@ -215,3 +215,9 @@ details[open] > .overview-section-heading .overview-section-caret {
     pointer-events: none;
   }
 }
+
+.chat-message-body :is(h3, h4) {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+}

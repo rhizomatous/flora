@@ -1,11 +1,11 @@
-import { useEffect, useState, type ReactNode } from "react";
+/* oxlint-disable import/max-dependencies -- Chat controls compose summary, panel, and machine actions. */
+import { useState, type ReactNode } from "react";
 
 import {
   TabsTrigger,
   HoverCard,
   HoverCardTrigger,
   HoverCardContent,
-  FlowerIcon,
   Button,
   DropdownMenu,
   DropdownMenuTrigger,
@@ -31,13 +31,12 @@ import {
 
 import { ChatOrganizationActions } from "./chat-organization-actions";
 import type { Chat, Usage, ContextUsage } from "./chat-schemas";
-import { chatStatus } from "./chat-status";
+import { ChatSummary } from "./chat-summary";
 import { ContextUsagePopover } from "./context-usage";
 import { PullCount, PullList } from "./pull-links";
 import type { PullSummary } from "./pull-schemas";
 import { KeepAwakeItem, RuntimeMenu, StopMachineItem } from "./runtime-controls";
 import { ShellMenuItems } from "./shells";
-// oxlint-disable-next-line import/max-dependencies -- The view menu composes the chat panels and machine controls.
 import { SubagentMenuItems } from "./subagents";
 
 /** Shows saved chat metadata and linked pull requests. */
@@ -55,32 +54,6 @@ export function ChatTitle({
   pulls: PullSummary | undefined;
 }) {
   const [open, setOpen] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!open) return;
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, 60_000);
-    return () => {
-      clearInterval(timer);
-    };
-  }, [open]);
-  const updated = chat ? new Date(chat.UpdatedAt) : undefined;
-  const age = updated ? Math.max(0, now - updated.getTime()) : Number.NaN;
-  let ageLabel = "Unavailable";
-  if (Number.isFinite(age)) {
-    let unit: "day" | "hour" | "minute" = "minute";
-    if (age >= 86_400_000) unit = "day";
-    else if (age >= 3_600_000) unit = "hour";
-    const divisor = { day: 86_400_000, hour: 3_600_000, minute: 60_000 }[unit];
-    ageLabel =
-      age < 60_000
-        ? "Just now"
-        : new Intl.RelativeTimeFormat(undefined, { numeric: "always" }).format(
-            -Math.floor(age / divisor),
-            unit,
-          );
-  }
   const titleButton = (
     <Button
       variant={active ? "secondary" : "ghost"}
@@ -89,11 +62,9 @@ export function ChatTitle({
       aria-label={title}
       onClick={() => {
         setOpen(true);
-        setNow(Date.now());
       }}
       onFocus={() => {
         setOpen(true);
-        setNow(Date.now());
       }}
     >
       <CloudIcon />
@@ -105,7 +76,6 @@ export function ChatTitle({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) setNow(Date.now());
       }}
     >
       <HoverCardTrigger
@@ -118,32 +88,10 @@ export function ChatTitle({
         align="start"
         alignOffset={0}
         density="compact"
-        className="chat-title-card florets-menu-surface font-normal"
+        className="chat-title-card chat-summary-card font-normal"
         aria-label="Chat summary"
       >
-        <div className="chat-summary-meta flex items-center justify-between gap-3 text-muted-foreground">
-          <span className="truncate" title={chat?.ID}>
-            {chat?.ID ?? "—"}
-          </span>
-          <span
-            className="chat-summary-model flex shrink-0 items-center gap-1.5 text-muted-foreground [&_svg]:size-3.5"
-            title="Model details unavailable"
-          >
-            <FlowerIcon />
-            Model —
-          </span>
-        </div>
-        <p className="chat-summary-title mt-[3px] wrap-anywhere">{title}</p>
-        <div className="chat-summary-footer mt-2.5 flex items-center gap-4 border-t border-border pt-2.5 text-muted-foreground">
-          <span title={chat?.StatusReason}>{chat ? chatStatus(chat).label : "Loading"}</span>
-          <time dateTime={chat?.UpdatedAt} title={updated?.toLocaleString()}>
-            {ageLabel}
-          </time>
-          <PullCount pulls={pulls?.items ?? []} />
-        </div>
-        <div className="mt-2 border-t border-border pt-2">
-          <PullList summary={pulls} chatID={chat?.ID} />
-        </div>
+        <ChatSummary chat={chat} title={title} pulls={pulls} showPullList={false} />
       </HoverCardContent>
     </HoverCard>
   );
@@ -258,6 +206,11 @@ export function ChatHeaderActions({
   const costUnavailable = usage?.costUSD === undefined || usage.costUSD === null;
   const refreshFailed =
     usage?.collection === "history_unavailable" || usage?.collection === "runtime_stopped";
+  const cost = usage?.costUSD;
+  let costLabel = "Usage";
+  if (cost !== undefined && cost !== null) {
+    costLabel = cost > 0 && cost < 0.01 ? "<$0.01" : `$${cost.toFixed(2)}`;
+  }
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -279,11 +232,16 @@ export function ChatHeaderActions({
       <span className="ml-auto" />
       <Popover>
         <PopoverTrigger
-          render={<Button variant="ghost" size="compact" aria-label="Estimated chat cost" />}
+          render={
+            <Button
+              variant="ghost"
+              size="compact"
+              aria-label="Estimated chat cost"
+              title={costUnavailable ? "Model usage" : `Estimated cost: ${costLabel}`}
+            />
+          }
         >
-          {usage?.costUSD === undefined || usage.costUSD === null
-            ? "Cost —"
-            : `Est. ${usage.costUSD > 0 && usage.costUSD < 0.01 ? "<$0.01" : `$${usage.costUSD.toFixed(2)}`}`}
+          {costLabel}
         </PopoverTrigger>
         <PopoverContent align="end" className="w-72">
           <PopoverTitle className="text-base font-semibold">Model usage</PopoverTitle>
@@ -385,48 +343,50 @@ export function ChatReviewStrip({
     <div className="composer-review flex flex-col items-center gap-1.5 pb-1.5">
       <div className="composer-accessories flex min-h-7 items-center justify-center gap-1.5">
         {children}
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger
-            render={
-              <Button
-                variant="secondary"
-                size="sm"
-                className="composer-accessory group h-7 gap-1.5 border border-border px-2.5 text-xs [&_svg]:size-[13px]!"
-                aria-label={`Linked pull requests${pulls ? ` (${count})` : ""}`}
-              >
-                {count > 0 ? <PullCount pulls={pulls?.items ?? []} /> : <GitPullRequestIcon />}
-                <ChevronDownIcon
-                  className="rotate-180 text-muted-foreground group-aria-expanded:rotate-0"
-                  aria-hidden="true"
-                />
-              </Button>
-            }
-          />
-          <PopoverContent
-            onClickCapture={(event) => {
-              if (
-                event.target instanceof Element &&
-                event.target.closest("a[data-pr-state]") &&
-                !event.metaKey &&
-                !event.ctrlKey &&
-                !event.shiftKey &&
-                !event.altKey
-              ) {
-                setOpen(false);
+        {(count > 0 || (pulls?.error ?? "") !== "") && (
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger
+              render={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="composer-accessory group h-7 gap-1.5 border border-border px-2.5 text-xs [&_svg]:size-[13px]!"
+                  aria-label={`Linked pull requests${pulls ? ` (${count})` : ""}`}
+                >
+                  {count > 0 ? <PullCount pulls={pulls?.items ?? []} /> : <GitPullRequestIcon />}
+                  <ChevronDownIcon
+                    className="rotate-180 text-muted-foreground group-aria-expanded:rotate-0"
+                    aria-hidden="true"
+                  />
+                </Button>
               }
-            }}
-            side="top"
-            align="center"
-            density="compact"
-            className="max-h-[50dvh] w-96! max-w-[calc(100vw-24px)]! overflow-y-auto"
-          >
-            <PopoverTitle>Linked pull requests</PopoverTitle>
-            <PopoverDescription className="sr-only">
-              Saved GitHub pull requests for this chat.
-            </PopoverDescription>
-            <PullList summary={pulls} />
-          </PopoverContent>
-        </Popover>
+            />
+            <PopoverContent
+              onClickCapture={(event) => {
+                if (
+                  event.target instanceof Element &&
+                  event.target.closest("a[data-pr-state]") &&
+                  !event.metaKey &&
+                  !event.ctrlKey &&
+                  !event.shiftKey &&
+                  !event.altKey
+                ) {
+                  setOpen(false);
+                }
+              }}
+              side="top"
+              align="center"
+              density="compact"
+              className="max-h-[50dvh] w-96! max-w-[calc(100vw-24px)]! overflow-y-auto"
+            >
+              <PopoverTitle>Linked pull requests</PopoverTitle>
+              <PopoverDescription className="sr-only">
+                Saved GitHub pull requests for this chat.
+              </PopoverDescription>
+              <PullList summary={pulls} />
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
     </div>
   );

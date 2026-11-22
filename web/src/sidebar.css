@@ -153,5 +153,34 @@
 }
 .sidebar-chats .florets-navigation-actions {
   right: 0;
-  top: 2px;
+  top: 4px;
+}
+
+/* Keep task names readable and reveal secondary actions without covering text. */
+.sidebar-chats .florets-navigation-link {
+  min-height: 34px;
+  padding-block: 7px;
+  gap: 10px;
+}
+.sidebar-chats .florets-navigation-title {
+  font-size: 13px;
+  line-height: 18px;
+}
+.sidebar-chats .florets-navigation-meta:empty {
+  display: none !important;
+}
+.sidebar-chats .florets-navigation-meta {
+  font-size: 12px;
+  line-height: 18px;
+}
+.sidebar-chats .florets-navigation-age {
+  min-width: 26px;
+  font-size: 12px;
+  text-align: end;
+}
+.sidebar-chats .florets-navigation-row:is(:hover, :focus-within) .florets-navigation-age {
+  visibility: hidden;
+}
+.flora-sidebar .sidebar-chats {
+  padding-top: 8px;
 }

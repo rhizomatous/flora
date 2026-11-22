@@ -8,7 +8,7 @@ for (const width of [1440, 390]) {
     await page.goto(`${base}/#chats/new`);
     await page.getByRole("button", { name: "Hide controls", exact: true }).click();
     const main = page.locator("#main-content");
-    const composer = main.getByPlaceholder("Ask anything, / for commands, @ for context");
+    const composer = main.getByRole("combobox", { name: "Message", exact: true });
     await expect(composer).toBeVisible();
     await expect(main.locator(":scope > header")).toHaveCount(0);
     await expect(main.locator(".chat-header")).toHaveCount(0);

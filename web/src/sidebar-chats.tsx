@@ -26,9 +26,10 @@ import { pinnedChats } from "./chat-organization";
 import { ChatOrganizationActions } from "./chat-organization-actions";
 import type { Chat } from "./chat-schemas";
 import { chatStatus, chatStatuses } from "./chat-status";
+import { ChatSummary } from "./chat-summary";
 import { useFolders } from "./folder-state";
 import { UnreadDot } from "./mark-chats-read";
-import { PullCount, PullList } from "./pull-links";
+import { PullCount } from "./pull-links";
 import { useSidebarPreferences } from "./sidebar-preferences";
 import { isChatSeen, useMarkChatsRead } from "./sidebar-status";
 import { SidebarViewOptions } from "./sidebar-view-options";
@@ -62,9 +63,10 @@ function ChatRow({
   details: boolean;
 }) {
   const status = chatStatus(chat, seen);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   return (
     <li className="florets-navigation-row" data-active={path === `chats/${chat.ID}` || undefined}>
-      <HoverCard>
+      <HoverCard open={summaryOpen} onOpenChange={setSummaryOpen}>
         <HoverCardTrigger
           delay={500}
           render={
@@ -77,7 +79,13 @@ function ChatRow({
                   ? undefined
                   : `${chat.Title || "Chat"}, ${status.label}${seen ? "" : ", unread activity"}`
               }
-              onClick={close}
+              onClick={() => {
+                setSummaryOpen(false);
+                close();
+              }}
+              onFocus={() => {
+                setSummaryOpen(true);
+              }}
             >
               {details && (
                 <span
@@ -123,35 +131,13 @@ function ChatRow({
           side="right"
           align="start"
           density="compact"
-          className="sidebar-chat-preview florets-menu-surface w-[420px]! max-w-[calc(100vw-32px)]! wrap-anywhere"
+          className="sidebar-chat-preview chat-summary-card"
         >
-          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-            <span className="truncate">{chat.ID}</span>
-          </div>
-          <p className="mt-2">{chat.Title || "Chat"}</p>
-          {((chat.pulls?.items.length ?? 0) > 0 || (chat.pulls?.error ?? "") !== "") && (
-            <div className="mt-3 border-t border-border pt-2">
-              <p className="mb-1 text-xs text-muted-foreground">Pull requests</p>
-              <PullList summary={chat.pulls} chatID={chat.ID} />
-            </div>
-          )}
-          {(chat.subagents?.length ?? 0) > 0 && (
-            <section aria-label="Subagents" className="mt-3 border-t border-border pt-2">
-              <p className="mb-2 text-xs text-muted-foreground">Subagents</p>
-              <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
-                {chat.subagents?.map((agent) => (
-                  <div key={agent.id} className="contents">
-                    <dt className="text-muted-foreground">Subagent {agent.number}</dt>
-                    <dd>{agent.title || "Delegated task"}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-          )}
+          <ChatSummary chat={chat} title={chat.Title || "Chat"} pulls={chat.pulls} now={now} />
         </HoverCardContent>
       </HoverCard>
       <div className="florets-navigation-actions">
-        <ChatOrganizationActions chat={chat} quick />
+        <ChatOrganizationActions chat={chat} />
       </div>
     </li>
   );
