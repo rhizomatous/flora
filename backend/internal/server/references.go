@@ -159,7 +159,7 @@ func (a *api) referenceRoutes(mux *http.ServeMux) {
 			}
 		case "pr":
 			for _, repo := range repos[:min(len(repos), 5)] {
-				pulls, err := a.projects.ContextPulls(r.Context(), repo.Name, 0)
+				pulls, err := a.projects.ContextPulls(r.Context(), repo.Name)
 				if err != nil {
 					projectError(w, err)
 					return

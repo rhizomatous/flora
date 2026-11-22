@@ -111,7 +111,7 @@ type ChatContextPage struct {
 func (s *Store) ReadReferencedChat(ctx context.Context, reader, target string, before int64) (ChatContextPage, error) {
 	page := ChatContextPage{Messages: []ContextMessage{}}
 	var allowed int
-	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM messages,json_each(messages.payload,'$.references') WHERE chat_id=? AND role='user' AND json_extract(value,'$.kind')='chat' AND json_extract(value,'$.chatID')=?`, reader, target).Scan(&allowed)
+	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM messages,json_each(messages.payload,'$.references') WHERE chat_id=? AND role='user' AND json_extract(value,'$.kind')='chat' AND json_extract(value,'$.chatID')=? AND EXISTS(SELECT 1 FROM chats WHERE id=?)`, reader, target, target).Scan(&allowed)
 	if err != nil {
 		return page, err
 	}
