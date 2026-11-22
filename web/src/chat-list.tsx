@@ -126,36 +126,39 @@ export function ChatList({
           value={filter}
           onChange={setFilter}
         >
-          <NativeSelect
-            size="sm"
-            aria-label="Chat collection"
-            value={archived ? "archived" : "current"}
-            onChange={(event) => {
-              window.location.hash =
-                event.target.value === "archived" ? "chats?view=archived" : "chats";
-            }}
-          >
-            <option value="current">Current chats</option>
-            <option value="archived">Archived chats</option>
-          </NativeSelect>
-          <NativeSelect
-            size="sm"
-            aria-label="Project"
-            value={project}
-            onChange={(event) => {
-              setProject(event.target.value);
-            }}
-            className="max-w-full"
-          >
-            <option value="">All projects</option>
-            {groups
-              .filter((group) => !group.folder && group.id !== "pinned")
-              .map(({ id, name }) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-          </NativeSelect>
+          <div className="flex max-w-full flex-wrap items-center gap-3">
+            <NativeSelect
+              size="sm"
+              className="w-36 shrink-0"
+              aria-label="Chat collection"
+              value={archived ? "archived" : "current"}
+              onChange={(event) => {
+                window.location.hash =
+                  event.target.value === "archived" ? "chats?view=archived" : "chats";
+              }}
+            >
+              <option value="current">Current chats</option>
+              <option value="archived">Archived chats</option>
+            </NativeSelect>
+            <NativeSelect
+              size="sm"
+              aria-label="Project"
+              value={project}
+              onChange={(event) => {
+                setProject(event.target.value);
+              }}
+              className="w-44 max-w-full shrink-0"
+            >
+              <option value="">All projects</option>
+              {groups
+                .filter((group) => !group.folder && group.id !== "pinned")
+                .map(({ id, name }) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+            </NativeSelect>
+          </div>
         </ListFilters>
       }
     >

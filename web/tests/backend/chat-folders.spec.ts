@@ -49,15 +49,13 @@ test("folders share moves, preserve drafts and pins, and search collapsed groups
   await expect(page.getByRole("region", { name: "Release planning", exact: true })).toContainText(
     "Release checklist",
   );
-  const group = main
-    .locator("details")
-    .filter({
-      has: page.getByRole("list", {
-        name: "Release planning chats",
-        exact: true,
-        includeHidden: true,
-      }),
-    });
+  const group = main.locator("details").filter({
+    has: page.getByRole("list", {
+      name: "Release planning chats",
+      exact: true,
+      includeHidden: true,
+    }),
+  });
   await group.locator("summary").click();
   await expect(group).not.toHaveAttribute("open", "");
   await main.getByRole("button", { name: "Search chats", exact: true }).click();
@@ -214,4 +212,95 @@ test("concurrent edits preserve drafts and deleted destinations cannot hide chat
   ).toBeVisible();
   const folders = folderSchema.array().parse(await (await page.request.get("/api/folders")).json());
   expect(folders).toEqual([]);
+});
+
+test("menus stay anchored off hover and filters keep stable widths", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await logIn(page);
+  await expect(page.getByRole("heading", { name: "New chat", exact: true })).toBeVisible();
+  const origin = new URL(page.url()).origin;
+  const projects = (await (await page.request.get("/api/projects")).json()) as { id: string }[];
+  for (const [index, project] of projects.entries()) {
+    const title = index === 0 ? "Anchor check" : "Other project";
+    const response = await page.request.post(`/api/projects/${project.id}/chats`, {
+      headers: { Origin: origin },
+      data: { title, requestID: `anchor-${index}`, text: "Check navigation" },
+    });
+    expect(response.status()).toBe(202);
+    await page
+      .getByRole("button", { name: `Dismiss completion for ${title}`, exact: true })
+      .click();
+  }
+  const folderResponse = await page.request.post("/api/folders", {
+    headers: { Origin: origin },
+    data: { name: "Review folder" },
+  });
+  expect(folderResponse.status()).toBe(200);
+  await page.getByRole("link", { name: "All chats", exact: true }).click();
+  const nav = page.getByRole("navigation", { name: "Main", exact: true });
+  const main = page.getByRole("main");
+  const title = nav.getByRole("link", { name: /Anchor check/ });
+  await title.hover();
+  const actions = nav.getByRole("button", { name: "Actions for Anchor check", exact: true });
+  const anchor = await actions.boundingBox();
+  expect(anchor).not.toBeNull();
+  await actions.click();
+  const menu = page.getByRole("menu");
+  await menu.evaluate(async (element) => {
+    await Promise.allSettled(element.getAnimations().map((animation) => animation.finished));
+  });
+  const positioned = await menu.boundingBox();
+  expect(positioned).not.toBeNull();
+  await page.mouse.move(1100, 750);
+  await expect(actions.locator("..")).toHaveCSS("opacity", "1");
+  const after = await menu.boundingBox();
+  expect(after?.x).toBeCloseTo(positioned!.x, 0);
+  expect(after?.y).toBeCloseTo(positioned!.y, 0);
+  expect((await actions.boundingBox())?.width).toBe(anchor!.width);
+  await page.getByRole("menuitem", { name: "Rename", exact: true }).hover();
+  await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Rename chat", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  const options = nav.getByRole("button", { name: "Chat list options", exact: true });
+  const folderActions = nav.getByRole("button", {
+    name: "Actions for folder Review folder",
+    exact: true,
+  });
+  const optionsBox = await options.boundingBox();
+  const folderBox = await folderActions.boundingBox();
+  expect(folderBox?.width).toBe(optionsBox!.width);
+  expect(folderBox?.height).toBe(optionsBox!.height);
+  expect(folderBox!.x + folderBox!.width / 2).toBe(optionsBox!.x + optionsBox!.width / 2);
+  expect(anchor!.x + anchor!.width / 2).toBe(optionsBox!.x + optionsBox!.width / 2);
+  await options.click();
+  await expect(page.getByRole("menuitem", { name: "Archived chats", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "View all chats", exact: true })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    const collection = main.getByRole("combobox", { name: "Chat collection", exact: true });
+    const project = main.getByRole("combobox", { name: "Project", exact: true });
+    const beforeCollection = await collection.boundingBox();
+    const beforeProject = await project.boundingBox();
+    await project.selectOption(projects[0]!.id);
+    expect((await collection.boundingBox())?.width).toBe(beforeCollection!.width);
+    expect((await project.boundingBox())?.width).toBe(beforeProject!.width);
+    await project.selectOption("");
+    await collection.selectOption("archived");
+    expect((await collection.boundingBox())?.width).toBe(beforeCollection!.width);
+    expect((await project.boundingBox())?.width).toBe(beforeProject!.width);
+    await collection.selectOption("current");
+    const folderButton = main.getByRole("button", {
+      name: "Actions for folder Review folder",
+      exact: true,
+    });
+    const buttonBox = await folderButton.boundingBox();
+    const summaryBox = await folderButton
+      .locator("..")
+      .locator("..")
+      .locator("summary")
+      .boundingBox();
+    expect(buttonBox!.y + buttonBox!.height / 2).toBe(summaryBox!.y + summaryBox!.height / 2);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+  }
 });

@@ -122,8 +122,10 @@ test("organize chats across header, sidebar, search, archive, reload, and restor
   await page.reload();
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Release checklist", exact: true })).toBeVisible();
-  await nav.getByRole("button", { name: "Chat list options", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Archived chats", exact: true }).click();
+  await nav.getByRole("link", { name: "All chats", exact: true }).click();
+  await page
+    .getByRole("combobox", { name: "Chat collection", exact: true })
+    .selectOption("archived");
   const region = page
     .locator("#main-content")
     .getByRole("region", { name: "Archived chats", exact: true });

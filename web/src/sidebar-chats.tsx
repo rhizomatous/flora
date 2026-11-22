@@ -333,23 +333,6 @@ export function SidebarChats({
               <CheckIcon />
               Mark all as read
             </DropdownMenuItem>
-            <DropdownMenuItem
-              nativeButton={false}
-              render={
-                <a href="#chats?view=archived" onClick={close}>
-                  Archived chats
-                </a>
-              }
-            />
-            <DropdownMenuItem
-              nativeButton={false}
-              render={
-                <a href="#chats" onClick={close}>
-                  <ListIcon />
-                  View all chats
-                </a>
-              }
-            />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -395,7 +378,9 @@ export function SidebarChats({
             className="florets-navigation-group"
             data-expanded={expanded}
           >
-            <div className="florets-navigation-group-heading">
+            <div
+              className={`florets-navigation-group-heading${folder ? " sidebar-folder-heading" : ""}`}
+            >
               {folder ? (
                 <div className="min-w-0 flex-1">
                   <button
@@ -427,7 +412,9 @@ export function SidebarChats({
                 </a>
               )}
               {folder ? (
-                <FolderActions folder={folder} />
+                <span className="sidebar-folder-actions">
+                  <FolderActions folder={folder} />
+                </span>
               ) : (
                 <button
                   type="button"

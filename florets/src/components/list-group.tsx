@@ -30,7 +30,9 @@ export function ListGroup({
   }, [forceOpen]);
   return (
     <div className="relative">
-      {actions !== undefined && <div className="absolute end-1 top-0.5 z-10">{actions}</div>}
+      {actions !== undefined && (
+        <div className="absolute end-1 top-2 z-10 sm:top-0.5">{actions}</div>
+      )}
       <details ref={details} open className="group/list-group" data-slot="list-group">
         <summary
           style={actions === undefined ? undefined : { paddingInlineEnd: "3rem" }}
