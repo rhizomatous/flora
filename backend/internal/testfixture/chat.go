@@ -71,7 +71,7 @@ func (*Provisioner) ConfirmInterrupt(context.Context, string) error { return nil
 
 // New seeds credentials and a project in directory and starts a fake runtime.
 // Call Close before removing directory. Interactive fixtures ask a question on the first turn.
-func New(ctx context.Context, directory string, interactive bool) (*Fixture, error) {
+func New(ctx context.Context, directory string, interactive bool, compaction ...bool) (*Fixture, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	success := false
 	defer func() {
@@ -102,6 +102,7 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 	}
 	var mu sync.Mutex
 	history := []json.RawMessage{}
+	var reserved *int64
 	turn := 0
 	pending := false
 	answer := make(chan struct{})
@@ -115,9 +116,29 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/provider":
-			fmt.Fprint(w, `{"connected":["anthropic"],"all":[{"id":"anthropic","models":{"model":{"name":"Installation default","capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}},"claude-sonnet-4-6":{"name":"Claude Sonnet 4.6","cost":{"input":3,"output":15},"variants":{"low":{},"medium":{},"high":{},"max":{}},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}},"claude-haiku-4-5":{"name":"Claude Haiku 4.5","cost":{"input":1,"output":5},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}}}}]}`)
+			metadata := `{"connected":["anthropic"],"all":[{"id":"anthropic","models":{"model":{"name":"Installation default","limit":{"context":200000,"output":64000},"variants":{},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}},"claude-sonnet-4-6":{"name":"Claude Sonnet 4.6","cost":{"input":3,"output":15},"variants":{"low":{},"medium":{},"high":{},"max":{}},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}},"claude-haiku-4-5":{"name":"Claude Haiku 4.5","cost":{"input":1,"output":5},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}}}}]}`
+			if len(compaction) > 0 && compaction[0] {
+				metadata = strings.Replace(metadata, `"models":{`, `"models":{"compaction-fixture":{"name":"Compaction fixture","limit":{"context":100000,"input":90000,"output":8000},"variants":{},"capabilities":{"toolcall":true,"input":{}}},`, 1)
+			}
+			fmt.Fprint(w, metadata)
 		case "/config":
-			fmt.Fprint(w, `{"model":"anthropic/model"}`)
+			mu.Lock()
+			defer mu.Unlock()
+			json.NewEncoder(w).Encode(map[string]any{"model": "anthropic/model", "compaction": map[string]any{"reserved": reserved}})
+		case "/global/config":
+			var in struct {
+				Compaction struct {
+					Reserved int64 `json:"reserved"`
+				} `json:"compaction"`
+			}
+			if r.Method != "PATCH" || json.NewDecoder(r.Body).Decode(&in) != nil {
+				w.WriteHeader(400)
+				return
+			}
+			mu.Lock()
+			reserved = &in.Compaction.Reserved
+			mu.Unlock()
+			fmt.Fprint(w, `{}`)
 		case "/session":
 			fmt.Fprint(w, `{"id":"ses_browser"}`)
 		case "/session/status":

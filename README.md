@@ -384,3 +384,28 @@ process liveness only; it does not claim runtime or container readiness.
 dependencies. Builds use `GOTOOLCHAIN=local` and readonly Go modules. To update,
 deliberately update the relevant lockfile, then rerun the documented checks.
 The initial build downloads dependencies; it is not an offline Nix derivation.
+
+## Context compaction
+
+Open Context in a chat's composer to choose an earlier token threshold or restore
+the runtime default. Choices are saved per chat and model, survive restart, and
+apply to the next accepted message. Switching models uses that model's saved
+choice or its runtime default. Active work keeps its accepted setting. Subagents
+share the chat runtime's token reserve, so their threshold depends on their own
+model's input limit.
+
+The pinned OpenCode 1.2.27 applies custom reserves only to models reporting an
+explicit input limit. Flora offers thresholds from 1 token through the runtime
+default, preserving its default output reserve. Models with only a context limit
+ignore custom reserves; Flora displays their default threshold without an edit
+control. Models without a context limit show an unknown threshold. Reported
+context usage remains the latest main-session call, separate from the selected
+model and its compaction preference. Unknown context limits have no percentage.
+Supporting custom thresholds for context-only models requires a runtime change
+to apply the reserve in that branch of the overflow calculation.
+
+Run `OPENCODE_BIN=/path/to/opencode-1.2.27 node scripts/check-compaction.ts` to
+verify behavior with the exact pinned binary, an isolated temporary model catalog,
+and a deterministic local provider. The fixture checks default versus custom
+compaction, ignored reserves without input limits, restart persistence, retained
+history, and summary-based continuation. It uses no real provider credentials.

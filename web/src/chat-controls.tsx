@@ -325,7 +325,7 @@ export function ChatComposerFooter({
         }}
         disabled={busy}
       />
-      <ContextUsagePopover usage={contextUsage} />
+      <ContextUsagePopover key={id} id={id} usage={contextUsage} />
     </div>
   );
 }
