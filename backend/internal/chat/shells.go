@@ -5,11 +5,13 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"path"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/rhizomatous/flora/backend/internal/provisioning"
 	"github.com/rhizomatous/flora/backend/internal/storage"
@@ -18,6 +20,7 @@ import (
 type runtimeShell struct {
 	ID     string `json:"id"`
 	Status string `json:"status"`
+	PID    int    `json:"pid"`
 }
 
 func shellPath(id string) string { return "/pty/" + url.PathEscape(id) + "?directory=%2Fworkspace" }
@@ -49,6 +52,28 @@ func (s *Service) Shells(ctx context.Context, id string) ([]storage.Shell, error
 			return nil, err
 		}
 	}
+	directories := map[int]string{}
+	if inspector, ok := s.provisioner.(interface {
+		ShellDirectories(context.Context, string, string, []int) (map[int]string, error)
+	}); ok && ended == nil {
+		pids := []int{}
+		for _, shell := range shells {
+			if shell.State != "running" || shell.ContainerID != endpoint.ContainerID {
+				continue
+			}
+			for _, pty := range live {
+				if pty.ID == shell.RuntimeID && pty.Status == "running" && pty.PID > 0 {
+					pids = append(pids, pty.PID)
+					break
+				}
+			}
+		}
+		if len(pids) > 0 {
+			if observed, err := inspector.ShellDirectories(ctx, id, endpoint.ContainerID, pids); err == nil {
+				directories = observed
+			}
+		}
+	}
 	for i := range shells {
 		shell := &shells[i]
 		if shell.State != "running" {
@@ -59,6 +84,20 @@ func (s *Service) Shells(ctx context.Context, id string) ([]storage.Shell, error
 			for _, p := range live {
 				if p.ID == shell.RuntimeID && p.Status == "running" {
 					found = true
+					if directory, ok := directories[p.PID]; ok {
+						title := strings.Map(func(r rune) rune {
+							if unicode.IsControl(r) {
+								return unicode.ReplacementChar
+							}
+							return r
+						}, path.Base(directory))
+						if title != shell.Title {
+							if err := s.Store.UpdateShellTitle(ctx, shell.ID, title); err != nil {
+								return nil, err
+							}
+							shell.Title = title
+						}
+					}
 				}
 			}
 		}
@@ -91,14 +130,7 @@ func (s *Service) CreateShell(ctx context.Context, id string) (storage.Shell, er
 	}
 	rt := newRuntime(endpoint)
 	defer rt.client.CloseIdleConnections()
-	number := 0
-	for _, shell := range shells {
-		var n int
-		if _, err := fmt.Sscanf(shell.Title, "Shell %d", &n); err == nil && n > number {
-			number = n
-		}
-	}
-	title := fmt.Sprintf("Shell %d", number+1)
+	title := "workspace"
 	var p runtimeShell
 	if err := shellCall(rt, ctx, "POST", "/pty?directory=%2Fworkspace", map[string]any{"command": "/bin/bash", "cwd": "/workspace", "title": title}, &p); err != nil {
 		return storage.Shell{}, err

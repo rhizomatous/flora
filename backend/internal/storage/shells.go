@@ -41,3 +41,8 @@ func (s *Store) DeleteShell(ctx context.Context, chatID, id string) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM shells WHERE chat_id = ? AND id = ?", chatID, id)
 	return err
 }
+
+func (s *Store) UpdateShellTitle(ctx context.Context, id, title string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE shells SET title = ? WHERE id = ? AND state = 'running'", title, id)
+	return err
+}

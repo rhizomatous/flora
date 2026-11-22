@@ -11,6 +11,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuGroup,
   TerminalIcon,
+  PlusIcon,
   TabsTrigger,
   TabsContent,
   XIcon,
@@ -29,6 +30,23 @@ type Shell = z.infer<typeof shellSchema>;
 const shellURL = (id: string) => `chats/${encodeURIComponent(id)}/shells`;
 
 function useShells(chatID: string, active: boolean) {
+  const [panel, update] = useChatPanelState(chatID);
+  const syncTitles = useEffectEvent((shells: Shell[]) => {
+    if (
+      !panel.shellTabs.some((tab) =>
+        shells.some((shell) => shell.id === tab.id && shell.title !== tab.title),
+      )
+    ) {
+      return;
+    }
+    update((current) => {
+      const shellTabs = current.shellTabs.map((tab) => {
+        const saved = shells.find((shell) => shell.id === tab.id);
+        return saved && saved.title !== tab.title ? { ...tab, title: saved.title } : tab;
+      });
+      return { shellTabs };
+    });
+  });
   const [shells, setShells] = useState<Shell[]>();
   const [error, setError] = useState("");
   useEffect(() => {
@@ -39,6 +57,7 @@ function useShells(chatID: string, active: boolean) {
       try {
         const result = await request(shellsSchema, shellURL(chatID), { signal: controller.signal });
         if (!controller.signal.aborted) {
+          syncTitles(result.shells);
           setShells(result.shells);
           setError("");
         }
@@ -85,7 +104,7 @@ export function ShellMenuItems({
   }
   return (
     <DropdownMenuGroup>
-      <DropdownMenuLabel>Terminals{shells ? ` · ${shells.length}` : ""}</DropdownMenuLabel>
+      <DropdownMenuLabel>Terminals</DropdownMenuLabel>
       {shells?.map((shell) => (
         <DropdownMenuItem
           key={shell.id}
@@ -118,7 +137,7 @@ export function ShellMenuItems({
           void create();
         }}
       >
-        <TerminalIcon />
+        <PlusIcon />
         {creating ? "Opening shell…" : "New shell"}
       </DropdownMenuItem>
       {(failure || error) && (
@@ -146,10 +165,14 @@ export function ShellTabs({ chatID }: { chatID: string }) {
             value={`shell:${shell.id}`}
             data-workspace-view={`shell:${shell.id}`}
             variant="control"
-            render={<Button variant="ghost" size="compact" className="chat-diff-tab-trigger" />}
+            render={
+              <Button variant="ghost" size="compact" className="chat-diff-tab-trigger max-w-56" />
+            }
           >
             <TerminalIcon />
-            <span className="florets-control-label">{shell.title}</span>
+            <span className="florets-control-label truncate" title={shell.title}>
+              {shell.title}
+            </span>
           </TabsTrigger>
           <Button
             variant="ghost"
@@ -259,7 +282,6 @@ function ShellTerminal({
     term.open(host.current);
     terminal.current = term;
     fit.current = addon;
-    term.textarea?.setAttribute("aria-label", `${shell.title} terminal input`);
     term.textarea?.setAttribute("aria-description", "Press Shift+Tab to return to the tab bar");
     // Keep clipboard access under browser/user control. Terminal output cannot
     // open links, read the clipboard, or change application navigation.
@@ -299,6 +321,10 @@ function ShellTerminal({
       terminal.current = null;
       fit.current = null;
     };
+  }, []);
+
+  useEffect(() => {
+    terminal.current?.textarea?.setAttribute("aria-label", `${shell.title} terminal input`);
   }, [shell.title]);
 
   useEffect(() => {
