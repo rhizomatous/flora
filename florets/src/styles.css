@@ -459,8 +459,11 @@
   font-size: 11px;
   line-height: 18px;
 }
+/* Keep menu triggers measurable while their portaled menus own focus. */
 .florets-navigation-actions {
-  display: none;
+  display: flex;
+  opacity: 0;
+  pointer-events: none;
   position: absolute;
   right: 4px;
   top: 3px;
@@ -468,8 +471,10 @@
   border-radius: 4px;
 }
 .florets-navigation-row:hover .florets-navigation-actions,
-.florets-navigation-row:focus-within .florets-navigation-actions {
-  display: flex;
+.florets-navigation-row:focus-within .florets-navigation-actions,
+.florets-navigation-actions:has([data-popup-open]) {
+  opacity: 1;
+  pointer-events: auto;
 }
 .florets-navigation-actions button {
   width: 23px;

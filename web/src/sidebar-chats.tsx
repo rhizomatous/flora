@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+/* oxlint-disable import/max-dependencies -- Sidebar composes shared chat and folder actions with navigation. */
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   Button,
@@ -22,10 +23,12 @@ import {
   HoverCardContent,
 } from "@flora/florets";
 
+import { FolderActions } from "./chat-folders";
 import { pinnedChats } from "./chat-organization";
 import { ChatOrganizationActions } from "./chat-organization-actions";
 import type { Chat } from "./chat-schemas";
 import { chatStatus } from "./chat-status";
+import { useFolders } from "./folder-state";
 import { UnreadDot } from "./mark-chats-read";
 import { PullCount, PullList } from "./pull-links";
 import { isChatSeen, useMarkChatsRead } from "./sidebar-status";
@@ -47,12 +50,14 @@ function ChatRow({
   close,
   now,
   seen,
+  projectName,
 }: {
   chat: Chat;
   path: string;
   close: () => void;
   now: number;
   seen: boolean;
+  projectName?: string | undefined;
 }) {
   const status = chatStatus(chat, seen);
   return (
@@ -82,6 +87,9 @@ function ChatRow({
                   <UnreadDot seen={seen} />
                 </span>
                 <span className="florets-navigation-meta flex! flex-wrap items-center gap-x-2">
+                  {projectName !== undefined && (
+                    <span className="max-w-28 truncate">{projectName}</span>
+                  )}
                   <span>{status.label}</span>
                   <PullCount pulls={chat.pulls?.items ?? []} />
                 </span>
@@ -149,6 +157,7 @@ export function SidebarChats({
   searching: boolean;
   setSearching: (value: boolean) => void;
 }) {
+  const folderTrigger = useRef<HTMLButtonElement>(null);
   const focusSearch = useCallback((node: HTMLInputElement | null) => {
     node?.focus();
   }, []);
@@ -164,8 +173,31 @@ export function SidebarChats({
       clearInterval(timer);
     };
   }, []);
+  const { folders, error: folderError, openFolder } = useFolders();
   const filter = query.trim().toLowerCase();
-  const groups = projects
+  const folderGroups = (folders ?? [])
+    .map((folder) => ({
+      project: { id: `folder:${folder.id}`, name: folder.name },
+      folder,
+      rows: (chats ?? [])
+        .filter(
+          (chat) =>
+            chat.Archived !== true &&
+            (chat.PinnedAt ?? "") === "" &&
+            chat.FolderID === folder.id &&
+            (!filter ||
+              `${chat.Title} ${chat.ID} ${folder.name} ${projects.find((p) => p.id === chat.ProjectID)?.name ?? ""}`
+                .toLowerCase()
+                .includes(filter)),
+        )
+        .toSorted((a, b) =>
+          sort === "title"
+            ? a.Title.localeCompare(b.Title)
+            : b.UpdatedAt.localeCompare(a.UpdatedAt),
+        ),
+    }))
+    .filter(({ rows }) => !filter || rows.length > 0);
+  const projectGroups = projects
     .map((project) => ({
       project,
       rows: (chats ?? [])
@@ -174,6 +206,8 @@ export function SidebarChats({
             chat.Archived !== true &&
             (chat.PinnedAt ?? "") === "" &&
             chat.ProjectID === project.id &&
+            ((chat.FolderID ?? "") === "" ||
+              folders?.some((folder) => folder.id === chat.FolderID) !== true) &&
             (!filter || `${chat.Title} ${project.name} ${chat.ID}`.toLowerCase().includes(filter)),
         )
         .toSorted((a, b) =>
@@ -183,10 +217,14 @@ export function SidebarChats({
         ),
     }))
     .filter(({ rows }) => !filter || rows.length > 0);
+  const groups = [
+    ...folderGroups,
+    ...projectGroups.map((group) => ({ ...group, folder: undefined })),
+  ];
   const pinned = pinnedChats(chats ?? []).filter(
     (chat) =>
       !filter ||
-      `${chat.Title} ${chat.ID} ${projects.find((project) => project.id === chat.ProjectID)?.name ?? ""}`
+      `${chat.Title} ${chat.ID} ${folders?.find((f) => f.id === chat.FolderID)?.name ?? ""} ${projects.find((project) => project.id === chat.ProjectID)?.name ?? ""}`
         .toLowerCase()
         .includes(filter),
   );
@@ -248,13 +286,22 @@ export function SidebarChats({
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button variant="ghost" size="icon-sm" aria-label="Chat list options">
+              <Button
+                ref={folderTrigger}
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Chat list options"
+              >
                 <EllipsisIcon />
               </Button>
             }
           />
           <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuItem disabled>
+            <DropdownMenuItem
+              onClick={() => {
+                openFolder({ finalFocus: folderTrigger });
+              }}
+            >
               <FolderIcon />
               New folder
             </DropdownMenuItem>
@@ -269,11 +316,13 @@ export function SidebarChats({
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => {
-                setCollapsed(collapsed.length === projects.length ? [] : projects.map((p) => p.id));
+                setCollapsed(
+                  collapsed.length === groups.length ? [] : groups.map((group) => group.project.id),
+                );
               }}
             >
               <InboxIcon />
-              {collapsed.length === projects.length ? "Expand" : "Collapse"} all projects
+              {collapsed.length === groups.length ? "Expand" : "Collapse"} all groups
             </DropdownMenuItem>
             <DropdownMenuItem disabled>
               <Settings2Icon />
@@ -284,26 +333,14 @@ export function SidebarChats({
               <CheckIcon />
               Mark all as read
             </DropdownMenuItem>
-            <DropdownMenuItem
-              nativeButton={false}
-              render={
-                <a href="#chats?view=archived" onClick={close}>
-                  Archived chats
-                </a>
-              }
-            />
-            <DropdownMenuItem
-              nativeButton={false}
-              render={
-                <a href="#chats" onClick={close}>
-                  <ListIcon />
-                  View all chats
-                </a>
-              }
-            />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      {folderError && (
+        <p role="status" className="px-4 py-1.5 text-xs text-destructive">
+          {folderError}
+        </p>
+      )}
       {chats === undefined && (
         <p className="sidebar-empty px-4 py-1.5 text-xs text-muted-foreground" role="status">
           Loading chats…
@@ -332,7 +369,7 @@ export function SidebarChats({
           </ul>
         </section>
       )}
-      {groups.map(({ project, rows }) => {
+      {groups.map(({ project, rows, folder }) => {
         const expanded = !!filter || !collapsed.includes(project.id);
         return (
           <section
@@ -341,26 +378,59 @@ export function SidebarChats({
             className="florets-navigation-group"
             data-expanded={expanded}
           >
-            <div className="florets-navigation-group-heading">
-              <a href={`#projects/${project.id}`} onClick={close}>
-                <InboxIcon />
-                <span className="truncate">{project.name}</span>
-                <span className="florets-navigation-count">{rows.length}</span>
-              </a>
-              <button
-                type="button"
-                aria-label={`${expanded ? "Collapse" : "Expand"} ${project.name}`}
-                aria-expanded={expanded}
-                onClick={() => {
-                  setCollapsed((ids) =>
-                    ids.includes(project.id)
-                      ? ids.filter((id) => id !== project.id)
-                      : [...ids, project.id],
-                  );
-                }}
-              >
-                <ChevronRightIcon className={expanded ? "rotate-90" : ""} />
-              </button>
+            <div
+              className={`florets-navigation-group-heading${folder ? " sidebar-folder-heading" : ""}`}
+            >
+              {folder ? (
+                <div className="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    className="flex min-h-7 w-full min-w-0 cursor-pointer items-center gap-[9px] text-left hover:text-foreground"
+                    aria-label={`${expanded ? "Collapse" : "Expand"} folder ${folder.name}`}
+                    aria-expanded={expanded}
+                    onClick={() => {
+                      setCollapsed((ids) =>
+                        ids.includes(project.id)
+                          ? ids.filter((id) => id !== project.id)
+                          : [...ids, project.id],
+                      );
+                    }}
+                  >
+                    <FolderIcon className="size-3.5 shrink-0" />
+                    <span className="min-w-0 truncate">{folder.name}</span>
+                    <span className="florets-navigation-count">{rows.length}</span>
+                    <ChevronRightIcon
+                      className={expanded ? "size-2.5 shrink-0 rotate-90" : "size-2.5 shrink-0"}
+                    />
+                  </button>
+                </div>
+              ) : (
+                <a href={`#projects/${project.id}`} onClick={close}>
+                  <InboxIcon />
+                  <span className="truncate">{project.name}</span>
+                  <span className="florets-navigation-count">{rows.length}</span>
+                </a>
+              )}
+              {folder ? (
+                <span className="sidebar-folder-actions">
+                  <FolderActions folder={folder} />
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  aria-label={`${expanded ? "Collapse" : "Expand"} ${project.name}`}
+                  aria-expanded={expanded}
+                  onClick={() => {
+                    setCollapsed((ids) =>
+                      ids.includes(project.id)
+                        ? ids.filter((id) => id !== project.id)
+                        : [...ids, project.id],
+                    );
+                  }}
+                >
+                  <ChevronRightIcon className={expanded ? "rotate-90" : ""} />
+                </button>
+              )}
             </div>
             {expanded && (
               <ul>
@@ -368,6 +438,9 @@ export function SidebarChats({
                   <ChatRow
                     key={chat.ID}
                     chat={chat}
+                    projectName={
+                      folder ? projects.find((p) => p.id === chat.ProjectID)?.name : undefined
+                    }
                     seen={isChatSeen(chat)}
                     path={path}
                     close={close}
@@ -376,13 +449,26 @@ export function SidebarChats({
                 ))}
                 {chats !== undefined && rows.length === 0 && (
                   <li>
-                    <a
-                      className="sidebar-empty block px-4 py-1.5 text-xs text-muted-foreground"
-                      href={`#chats/new?project=${encodeURIComponent(project.id)}`}
-                      onClick={close}
-                    >
-                      Start a chat
-                    </a>
+                    {folder ? (
+                      <p className="sidebar-empty px-4 py-1.5 text-xs text-muted-foreground">
+                        {chats.some(
+                          (chat) =>
+                            chat.FolderID === folder.id &&
+                            chat.Archived !== true &&
+                            (chat.PinnedAt ?? "") !== "",
+                        )
+                          ? "Chats in this folder are pinned"
+                          : "No current chats in this folder"}
+                      </p>
+                    ) : (
+                      <a
+                        className="sidebar-empty block px-4 py-1.5 text-xs text-muted-foreground"
+                        href={`#chats/new?project=${encodeURIComponent(project.id)}`}
+                        onClick={close}
+                      >
+                        Start a chat
+                      </a>
+                    )}
                   </li>
                 )}
               </ul>

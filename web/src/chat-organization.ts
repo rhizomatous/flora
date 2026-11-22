@@ -14,6 +14,7 @@ export function latestOrganization(incoming: Chat, saved?: Chat): Chat {
   return {
     ...incoming,
     Title: saved.Title,
+    FolderID: saved.FolderID,
     Archived: saved.Archived,
     PinnedAt: saved.PinnedAt,
     OrganizationRevision: saved.OrganizationRevision,

@@ -62,13 +62,14 @@ func TestChatAPIAuthenticationValidationAndReplay(t *testing.T) {
 		return b
 	}
 	for _, route := range []struct{ method, path string }{
+		{"GET", "/api/folders"}, {"POST", "/api/folders"}, {"PATCH", "/api/folders/missing"}, {"DELETE", "/api/folders/missing"},
 		{"GET", "/api/notifications"}, {"POST", "/api/chats/read"},
 		{"GET", "/api/chats/missing/runtime"}, {"POST", "/api/chats/missing/wake"}, {"POST", "/api/chats/missing/keep-awake"},
 		{"POST", "/api/chats/missing/interrupt"}, {"POST", "/api/chats/missing/stop"},
 		{"PATCH", "/api/chats/missing"}, {"GET", "/api/chats"}, {"GET", "/api/chats/missing/setup-log"}, {"HEAD", "/api/chats/missing/setup-log"}, {"GET", "/api/chats/missing"}, {"GET", "/api/chats/missing/events"}, {"GET", "/api/chats/missing/questions"}, {"POST", "/api/projects/" + project.ID + "/chats"}, {"POST", "/api/chats/missing/messages"}, {"POST", "/api/chats/missing/questions/question/reply"},
 	} {
 		call(route.method, route.path, "{}", "", origin, 401)
-		if route.method == "POST" || route.method == "PATCH" {
+		if route.method == "POST" || route.method == "PATCH" || route.method == "DELETE" {
 			call(route.method, route.path, "{}", token, "https://evil.test", 403)
 		}
 	}
@@ -132,6 +133,23 @@ func TestChatAPIAuthenticationValidationAndReplay(t *testing.T) {
 		}
 	}
 	call("PATCH", organizationPath, `{"revision":2,"archived":false}`, token, origin, 200)
+	var folder storage.ChatFolder
+	json.Unmarshal(call("POST", "/api/folders", `{"name":"Release"}`, token, origin, 200), &folder)
+	call("POST", "/api/folders", `{"name":" release "}`, token, origin, 409)
+	call("POST", "/api/folders", `{"name":" "}`, token, origin, 400)
+	call("POST", "/api/folders", "{\"name\":\""+string([]byte{255})+"\"}", token, origin, 400)
+	call("PATCH", "/api/folders/"+folder.ID, `{"name":"Renamed"}`, token, origin, 400)
+	call("PATCH", "/api/folders/"+folder.ID, `{"name":"Renamed","revision":0}`, token, origin, 200)
+	call("DELETE", "/api/folders/"+folder.ID, `{"revision":0}`, token, origin, 409)
+	call("PATCH", organizationPath, fmt.Sprintf(`{"folderID":%q,"revision":3}`, folder.ID), token, origin, 200)
+	for _, endpoint := range []string{"/api/chats", "/api/notifications", organizationPath} {
+		if !strings.Contains(string(call("GET", endpoint, "", token, "", 200)), `"FolderID":"`+folder.ID+`"`) {
+			t.Fatal("missing folder membership", endpoint)
+		}
+	}
+	call("DELETE", "/api/folders/"+folder.ID, `{"revision":1}`, token, origin, 200)
+	call("PATCH", organizationPath, fmt.Sprintf(`{"folderID":%q,"revision":5}`, folder.ID), token, origin, 404)
+
 	call("GET", "/api/chats/"+c.ID+"/setup-log", "", token, "", 404)
 	paths, err := store.Paths(context.Background(), c.ID)
 	if err != nil {
