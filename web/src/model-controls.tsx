@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { z } from "zod";
+/* oxlint-disable import/max-dependencies -- Model controls combine saved choices, discovery, file policy, and picker UI. */
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import {
   CheckIcon,
@@ -12,30 +13,32 @@ import {
 } from "@flora/florets";
 
 import type { AttachmentPolicy } from "./attachments";
-import { executionSchema, type Execution } from "./chat-schemas";
+import type { Execution } from "./chat-schemas";
+import { resolveModelChoice, useModelChoice } from "./model-choice";
+import { useModelDiscovery } from "./model-discovery";
 import { ModelIcon } from "./model-icon";
-import { modelOptionSchema, matchModel } from "./model-options";
+import { modelChoiceLabel } from "./model-label";
+import { matchModel } from "./model-options";
 import { ModelPicker } from "./model-picker";
-import { errorMessage, request } from "./request";
+import { errorMessage } from "./request";
 
-const modelsSchema = z.object({
-  default: executionSchema,
-  models: z.array(modelOptionSchema),
-  error: z.string(),
-});
 const effortLabel = (value: string) =>
   value === "xhigh" ? "Extra high" : value.charAt(0).toUpperCase() + value.slice(1);
 
-/** Chat drafts save on message acceptance; controlled automation choices save with the form. */
+/** Chat choices save immediately; controlled automation choices save with their form. */
 export function ModelControls({
   scope,
   saved,
+  savedRevision,
+  onSaving,
   disabled,
   onPolicy,
   automation,
 }: {
   scope: string;
   saved?: Execution | undefined;
+  savedRevision?: number | undefined;
+  onSaving?: ((saving: boolean) => void) | undefined;
   disabled: boolean;
   onPolicy?: ((policy: AttachmentPolicy | undefined) => void) | undefined;
   automation?:
@@ -46,49 +49,17 @@ export function ModelControls({
       }
     | undefined;
 }) {
-  const [selected, setSelected] = useState<Execution | null>(() => {
-    if (automation) return null;
-    try {
-      const draft = executionSchema.safeParse(
-        JSON.parse(sessionStorage.getItem(`flora-model:${scope}`) ?? "null"),
-      );
-      if (draft.success) return draft.data;
-    } catch {
-      // Storage may be disabled.
-    }
-    return null;
-  });
-  const [options, setOptions] = useState<z.infer<typeof modelsSchema>>();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [attempt, setAttempt] = useState(0);
+  const { selected, pending, choose: saveChoice } = useModelChoice(scope, saved, savedRevision);
+  const { options, loading, error, retry } = useModelDiscovery(scope);
+  const modelTrigger = useRef<HTMLButtonElement>(null);
+  const effortTrigger = useRef<HTMLButtonElement>(null);
   const [modelOpen, setModelOpen] = useState(false);
-  const discoveryPath = scope.startsWith("chat:")
-    ? `models?chat=${encodeURIComponent(scope.slice(5))}`
-    : "models";
-  useEffect(() => {
-    const controller = new AbortController();
-    async function load() {
-      try {
-        const result = await request(modelsSchema, discoveryPath, { signal: controller.signal });
-        setOptions(result);
-        setError(result.error);
-      } catch (e) {
-        if (!controller.signal.aborted) setError(errorMessage(e, "Could not load models."));
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    }
-    void load();
-    return () => {
-      controller.abort();
-    };
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Retrying starts a fresh discovery request.
-  }, [attempt, discoveryPath]);
   const effective = automation
     ? (automation.value ?? undefined)
-    : (selected ?? (saved?.model !== undefined && saved.model !== "" ? saved : options?.default));
-  const current = options?.models.find((model) => model.id === effective?.model);
+    : resolveModelChoice(selected, options?.default);
+  const current = options?.models.find(
+    (model) => model.provider === effective?.provider && model.id === effective.model,
+  );
   useEffect(() => {
     onPolicy?.(
       current && current.id !== options?.default.model && options?.error === ""
@@ -102,22 +73,32 @@ export function ModelControls({
   }, [current, options, onPolicy]);
   const reasoningAvailable =
     (current?.variants.length ?? 0) > 0 || (effective?.variant ?? "") !== "";
-  const label = current?.name ?? effective?.model ?? automation?.inheritedLabel ?? "Default model";
-  function choose(value: Execution) {
+  const label =
+    effective !== undefined && effective.model !== ""
+      ? modelChoiceLabel(effective, current?.name).text
+      : (automation?.inheritedLabel ?? "Default model");
+  async function choose(value: Execution, focusTarget: HTMLButtonElement | null) {
     if (automation) {
       automation.onChange(value);
       return;
     }
-    setSelected(value);
+    onSaving?.(true);
     try {
-      sessionStorage.setItem(`flora-model:${scope}`, JSON.stringify(value));
-    } catch {
-      // Storage may be disabled.
+      await saveChoice(value);
+    } catch (cause) {
+      toast.error(errorMessage(cause, "Could not save the model. Try again."), {
+        toasterId: "chat-organization",
+      });
+    } finally {
+      onSaving?.(false);
+      requestAnimationFrame(() => {
+        if (document.activeElement === document.body) focusTarget?.focus();
+      });
     }
   }
   return (
     <>
-      {!automation && selected && (
+      {!automation && !scope.startsWith("chat:") && selected && (
         <input type="hidden" name="execution" value={JSON.stringify(selected)} />
       )}
       <DropdownMenu
@@ -137,10 +118,11 @@ export function ModelControls({
         <DropdownMenuTrigger
           render={
             <DropdownButton
+              ref={modelTrigger}
               type="button"
               variant="ghost"
               size="compact"
-              disabled={disabled}
+              disabled={disabled || pending}
               aria-label={`Model: ${label}`}
               className="composer-model max-w-[min(220px,42vw)] min-w-0"
             >
@@ -172,7 +154,10 @@ export function ModelControls({
                 : undefined
             }
             onSelect={(model) => {
-              choose({ provider: model.provider, model: model.id, variant: "" });
+              void choose(
+                { provider: model.provider, model: model.id, variant: "" },
+                modelTrigger.current,
+              );
               setModelOpen(false);
             }}
           />
@@ -192,8 +177,7 @@ export function ModelControls({
                 disabled={loading}
                 closeOnClick={false}
                 onClick={() => {
-                  setLoading(true);
-                  setAttempt((value) => value + 1);
+                  retry();
                 }}
               >
                 Retry discovery
@@ -207,10 +191,11 @@ export function ModelControls({
           <DropdownMenuTrigger
             render={
               <DropdownButton
+                ref={effortTrigger}
                 type="button"
                 variant="ghost"
                 size="compact"
-                disabled={disabled || !effective || loading || !reasoningAvailable}
+                disabled={disabled || pending || !effective || loading || !reasoningAvailable}
                 aria-label={`Reasoning effort: ${(effective?.variant ?? "") !== "" && effective ? effortLabel(effective.variant) : "Default"}`}
               >
                 <span className="florets-control-label">
@@ -224,7 +209,7 @@ export function ModelControls({
           <DropdownMenuContent align="start" side="top" className="composer-menu w-[200px]!">
             <DropdownMenuItem
               onClick={() => {
-                if (effective) choose({ ...effective, variant: "" });
+                if (effective) void choose({ ...effective, variant: "" }, effortTrigger.current);
               }}
             >
               Default{(effective?.variant ?? "") === "" && <CheckIcon className="ml-auto" />}
@@ -233,7 +218,7 @@ export function ModelControls({
               <DropdownMenuItem
                 key={variant}
                 onClick={() => {
-                  if (effective) choose({ ...effective, variant });
+                  if (effective) void choose({ ...effective, variant }, effortTrigger.current);
                 }}
               >
                 {effortLabel(variant)}

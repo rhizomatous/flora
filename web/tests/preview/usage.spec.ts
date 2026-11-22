@@ -21,7 +21,7 @@ test("chat cost distinguishes no usage, reported zero, and refresh failures", as
   });
   await page.goto(`${base}/#chats/completed`);
   const cost = page.getByRole("button", { name: "Estimated chat cost", exact: true });
-  await expect(cost).toHaveText("Est. $0.04");
+  await expect(cost).toHaveText("$0.04");
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await cost.click();
   await expect(page.getByText("Input tokens", { exact: true })).toBeVisible();
@@ -31,7 +31,7 @@ test("chat cost distinguishes no usage, reported zero, and refresh failures", as
 
   usage.collection = "history_unavailable";
   await page.reload();
-  await expect(cost).toHaveText("Est. $0.04");
+  await expect(cost).toHaveText("$0.04");
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await cost.click();
   await expect(
@@ -43,7 +43,7 @@ test("chat cost distinguishes no usage, reported zero, and refresh failures", as
   usage.steps = 0;
   usage.collection = "pending";
   await page.reload();
-  await expect(cost).toHaveText("Cost —");
+  await expect(cost).toHaveText("Usage");
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await cost.click();
   await expect(page.getByText("No usage yet.")).toBeVisible();
@@ -52,8 +52,8 @@ test("chat cost distinguishes no usage, reported zero, and refresh failures", as
   usage.collection = "complete";
   usage.costUSD = 0;
   await page.reload();
-  await expect(cost).toHaveText("Est. $0.00");
+  await expect(cost).toHaveText("$0.00");
   usage.costUSD = 0.001;
   await page.reload();
-  await expect(cost).toHaveText("Est. <$0.01");
+  await expect(cost).toHaveText("<$0.01");
 });

@@ -42,7 +42,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		return newShellBrowserInstance()
 	}
 	switch scenario {
-	case "models", "chat", "changes", "enrollment", "notifications", "projects", "settings", "workspace", "branches", "context":
+	case "model-summary", "models", "chat", "changes", "enrollment", "notifications", "projects", "settings", "workspace", "branches", "context":
 	default:
 		return nil, fmt.Errorf("unknown browser scenario %q", scenario)
 	}
@@ -87,6 +87,12 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		}
 		cleanup = append(cleanup, fixture.Close)
 		store, authentication = fixture.Store, fixture.Auth
+	}
+	if scenario == "model-summary" {
+		instance.ChatID, instance.OtherChatID, err = seedModelSummaries(ctx, store, fixture.Project)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if scenario == "branches" {
 		repos := []storage.Repository{{Name: "rhizomatous/flora", URL: "https://github.com/rhizomatous/flora.git", BaseBranch: "main", Role: "core"}}
@@ -283,7 +289,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}
 	srv := httptest.NewUnstartedServer(nil)
 	origin := "https://" + srv.Listener.Addr().String()
-	if scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
+	if scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
 		origin = "http://" + srv.Listener.Addr().String()
 		if scenario == "branches" {
 			origin = strings.Replace(origin, "127.0.0.1", "localhost", 1)
@@ -372,7 +378,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}
 	mux.Handle("/", app)
 	srv.Config.Handler = mux
-	if scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
+	if scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
 		srv.Start()
 	} else {
 		srv.StartTLS()

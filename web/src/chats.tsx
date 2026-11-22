@@ -826,7 +826,11 @@ function ChatDetail({
               {(chat.Status === "failed" ||
                 chat.Status === "stopped" ||
                 chat.StatusReason.includes("interrupted")) &&
-                chat.StatusReason !== "" && <Text role="status">{chat.StatusReason}</Text>}
+                chat.StatusReason !== "" && (
+                  <Text role="status" className="text-xs text-muted-foreground">
+                    {chat.StatusReason}
+                  </Text>
+                )}
             </MessageScrollerContent>
           </MessageScrollerViewport>
           <ChatTurnNavigation rows={rows} />
@@ -847,6 +851,7 @@ function ChatDetail({
           </ChatReviewStrip>
           <FollowUpComposer
             execution={detail.chat.Execution}
+            executionRevision={detail.chat.ExecutionRevision}
             projectID={detail.chat.ProjectID}
             contextUsage={detail.contextUsage}
             key={id}
@@ -882,6 +887,7 @@ function readDraft(id: string) {
 
 function FollowUpComposer({
   execution,
+  executionRevision,
   projectID,
   contextUsage,
   id,
@@ -893,6 +899,7 @@ function FollowUpComposer({
   onControl,
 }: {
   execution: Detail["chat"]["Execution"];
+  executionRevision: Detail["chat"]["ExecutionRevision"];
   contextUsage: Detail["contextUsage"];
   id: string;
   projectID: string;
@@ -923,6 +930,7 @@ function FollowUpComposer({
     >
       <Composer
         execution={execution}
+        executionRevision={executionRevision}
         activeTurn={activeTurn}
         id="follow-up-message"
         projectID={projectID}

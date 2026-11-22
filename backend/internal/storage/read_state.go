@@ -33,7 +33,7 @@ func (s *Store) MarkChatsRead(ctx context.Context, observed []ViewedRevision) ([
 				return ErrNotFound
 			}
 			if item.Revision > 0 {
-				if err := tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM activity WHERE chat_id=? AND sequence=? AND kind<>'organization')", item.ChatID, item.Revision).Scan(&exists); err != nil {
+				if err := tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM activity WHERE chat_id=? AND sequence=? AND kind NOT IN ('organization','model.choice'))", item.ChatID, item.Revision).Scan(&exists); err != nil {
 					return err
 				}
 				if !exists {

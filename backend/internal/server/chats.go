@@ -61,8 +61,9 @@ func decodeChat(w http.ResponseWriter, r *http.Request, v any) bool {
 
 type chatView struct {
 	storage.Chat
-	Pulls     changes.PullSummary `json:"pulls"`
-	Subagents []subagentSummary   `json:"subagents"`
+	ReportedModel *storage.ModelSummary `json:"reportedModel,omitempty"`
+	Pulls         changes.PullSummary   `json:"pulls"`
+	Subagents     []subagentSummary     `json:"subagents"`
 }
 
 type subagentSummary struct {
@@ -77,7 +78,12 @@ func (a *api) chatView(ctx context.Context, c storage.Chat) chatView {
 	for _, agent := range agents {
 		summaries = append(summaries, subagentSummary{ID: agent.ID, Number: agent.Number, Title: agent.Title})
 	}
-	return chatView{Chat: c, Pulls: changes.New(a.settings.Store, nil).ReadPulls(ctx, c.ID), Subagents: summaries}
+	model, err := a.settings.Store.ChatModel(ctx, c.ID)
+	var reported *storage.ModelSummary
+	if err == nil {
+		reported = &model
+	}
+	return chatView{Chat: c, ReportedModel: reported, Pulls: changes.New(a.settings.Store, nil).ReadPulls(ctx, c.ID), Subagents: summaries}
 }
 
 func (a *api) chatViews(ctx context.Context, chats []storage.Chat) []chatView {
@@ -122,6 +128,29 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			}
 		}
 		jsonResponse(w, 200, a.chats.Models(r.Context(), id))
+	})
+	mux.HandleFunc("PATCH /api/chats/{id}/model", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Execution storage.Execution `json:"execution"`
+			Revision  *int64            `json:"revision"`
+		}
+		if !decodeChat(w, r, &in) {
+			return
+		}
+		if in.Revision == nil || *in.Revision < 0 || !in.Execution.Valid() {
+			failure(w, 400, "Provide a model, provider, and saved model revision.")
+			return
+		}
+		if a.chats == nil {
+			failure(w, 503, "Chat runtime is not configured.")
+			return
+		}
+		c, err := a.chats.SetChatModel(r.Context(), r.PathValue("id"), in.Execution, *in.Revision)
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		jsonResponse(w, 200, a.chatView(r.Context(), c))
 	})
 	mux.HandleFunc("PATCH /api/chats/{id}", func(w http.ResponseWriter, r *http.Request) {
 		var in storage.ChatOrganization

@@ -5,6 +5,7 @@ import {
   Button,
   FlowerMark,
   CrossCircledIcon,
+  CopyIcon,
   Message as ChatMessage,
   MessageContent,
   Bubble,
@@ -77,7 +78,7 @@ export function ConversationMessage({
           </span>
           {(parts.length > 0 || m.Text !== "") && (
             <Bubble variant={m.Role === "user" ? "muted" : "ghost"}>
-              <BubbleContent className="space-y-4 text-sm leading-6">
+              <BubbleContent className="chat-message-body space-y-4 text-sm leading-6">
                 {parts.length > 0 ? (
                   parts.map((part, index) => (
                     <MessagePart key={part.id ?? index} part={part} user={m.Role === "user"} />
@@ -111,8 +112,12 @@ export function ConversationMessage({
                 void copy();
               }}
               aria-label="Copy message"
+              title={copyStatus}
             >
-              <span role="status">{copyStatus}</span>
+              <CopyIcon className="size-3.5" aria-hidden="true" />
+              <span role="status" className={copyStatus === "Copy" ? "sr-only" : ""}>
+                {copyStatus}
+              </span>
             </Button>
           )}
         </MessageContent>
