@@ -124,7 +124,12 @@ export function ChatHeaderActions({
   }
   async function copyLink() {
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      const link = new URL(window.location.href);
+      if (chat) {
+        const query = link.hash.includes("?") ? `?${link.hash.split("?")[1]}` : "";
+        link.hash = `chats/${chat.PublicID}${query}`;
+      }
+      await navigator.clipboard.writeText(link.href);
       setCopyState("Link copied");
     } catch {
       setCopyState("Could not copy link");

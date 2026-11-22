@@ -100,8 +100,8 @@ func (a *api) referenceRoutes(mux *http.ServeMux) {
 				return
 			}
 			for _, c := range chats {
-				if c.ID != chat && strings.Contains(strings.ToLower(c.Title), query) {
-					items = append(items, contextSource{Kind: kind, ChatID: c.ID, Label: c.Title})
+				if c.ID != chat && strings.Contains(strings.ToLower(c.Title+" "+c.PublicID), query) {
+					items = append(items, contextSource{Kind: kind, ChatID: c.PublicID, Label: c.PublicID + " · " + c.Title})
 					if len(items) == 30 {
 						break
 					}
@@ -189,6 +189,14 @@ func (a *api) referenceRoutes(mux *http.ServeMux) {
 		if !decodeLimit(w, r, &in, 4096) {
 			return
 		}
+		if in.ChatID != "" {
+			c, err := a.settings.Store.Chat(r.Context(), in.ChatID)
+			if err != nil {
+				chatError(w, err)
+				return
+			}
+			in.ChatID = c.ID
+		}
 		project := r.PathValue("id")
 		config, err := a.contextConfiguration(r.Context(), project, in.ChatID)
 		if err != nil {
@@ -232,7 +240,7 @@ func (a *api) referenceRoutes(mux *http.ServeMux) {
 				failure(w, 400, "Choose another chat.")
 				return
 			}
-			ref = storage.ContextReference{Kind: "chat", Label: c.Title, ChatID: c.ID}
+			ref = storage.ContextReference{Kind: "chat", Label: c.PublicID + " · " + c.Title, ChatID: c.PublicID}
 		case "pr":
 			known := false
 			for _, repo := range config.Repositories {

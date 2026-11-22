@@ -110,6 +110,7 @@ test("chat parsing preserves linked pull-request metadata and normalizes empty s
   };
   const chat = {
     ID: "chat",
+    PublicID: "FLORA-1",
     ProjectID: "project",
     Title: "Chat",
     Status: "idle",

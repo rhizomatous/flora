@@ -42,8 +42,8 @@ export function ChatSummary({
     <div className="chat-summary">
       <div className="chat-summary-meta">
         {chat && (
-          <span className="chat-summary-id" title={chat.ID} aria-label={`Chat ID: ${chat.ID}`}>
-            Chat {chat.ID.slice(0, 6)}
+          <span className="chat-summary-id" aria-label={`Chat ID: ${chat.PublicID}`}>
+            {chat.PublicID}
           </span>
         )}
         {chat && <ChatModelSummary key={chat.ID} chat={chat} />}

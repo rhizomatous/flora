@@ -1,0 +1,54 @@
+import { test, expect } from "../fixtures.ts";
+import { logIn, pageErrors } from "../helpers.ts";
+import { detailSchema } from "../../src/chat-schemas";
+
+test.use({ scenario: "context" });
+
+test("canonical links preserve legacy drafts, panel state, and chat identity after reload", async ({ page, backend, context }, testInfo) => {
+  const errors = pageErrors(page);
+  await logIn(page);
+  await expect(page.getByRole("link", { name: "New chat", exact: true })).toBeVisible();
+  const detail = detailSchema.parse(await (await page.request.get(`/api/chats/${backend.chatID}`)).json());
+  const { ID: internal, PublicID: canonical, Title: title } = detail.chat;
+  expect(canonical).toMatch(/^FLORA-[1-9]\d*$/u);
+  await page.evaluate((id) => {
+    sessionStorage.setItem(`flora-draft:${id}`, "Keep this draft across old and public links");
+    sessionStorage.setItem(`flora-panel:${id}`, JSON.stringify({ open: true, view: "overview", width: 40 }));
+  }, internal);
+  await page.goto(`/#chats/${internal}?run=old-message`);
+  await expect(page).toHaveURL(new RegExp(`#chats/${canonical}\\?run=old-message$`, "u"));
+  await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this draft across old and public links");
+  await expect(page.getByRole("button", { name: "Close side panel", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: title, exact: true }).focus();
+  await expect(page.getByLabel(`Chat ID: ${canonical}`, { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("public-id-desktop-summary.png"), animations: "disabled" });
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Close side panel", exact: true }).click();
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.getByRole("button", { name: "More chat actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Copy link", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain(`#chats/${canonical}?run=old-message`);
+  await page.reload();
+  await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this draft across old and public links");
+  await expect(page.getByRole("button", { name: "Open side panel", exact: true })).toBeVisible();
+  await page.goto("/#chats");
+  const link = page.getByRole("link", { name: `Open chat: ${title}`, exact: true }).filter({ has: page.getByText(canonical, { exact: true }) });
+  await expect(link).toHaveAttribute("href", `#chats/${canonical}`);
+  await page.getByRole("button", { name: "Search chats", exact: true }).last().click();
+  await page.getByRole("textbox", { name: "Search chats", exact: true }).fill(canonical.toLowerCase());
+  await expect(link).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("public-id-desktop-search.png"), animations: "disabled" });
+  await page.getByRole("textbox", { name: "Search chats", exact: true }).fill("FLORA-999999");
+  await expect(page.getByText("No chats match these filters.", { exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: "Search chats", exact: true }).fill(canonical);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+  await page.screenshot({ path: testInfo.outputPath("public-id-narrow-search.png"), animations: "disabled" });
+  await link.click();
+  await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this draft across old and public links");
+  await page.getByRole("button", { name: title, exact: true }).focus();
+  await expect(page.getByLabel(`Chat ID: ${canonical}`, { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("public-id-narrow-summary.png"), animations: "disabled" });
+  await page.keyboard.press("Escape");
+  expect(errors).toEqual([]);
+});

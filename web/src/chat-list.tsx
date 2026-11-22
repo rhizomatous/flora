@@ -87,7 +87,7 @@ export function ChatList({
       (chat) =>
         (filter === "all" || chatStatus(chat).id === filter) &&
         (project === "" || chat.ProjectID === project) &&
-        `${chat.Title} ${chat.ID} ${projectNames.get(chat.ProjectID) ?? ""} ${folders?.find((f) => f.id === chat.FolderID)?.name ?? ""}`
+        `${chat.Title} ${chat.PublicID} ${projectNames.get(chat.ProjectID) ?? ""} ${folders?.find((f) => f.id === chat.FolderID)?.name ?? ""}`
           .toLowerCase()
           .includes(query.trim().toLowerCase()),
     )
@@ -252,11 +252,11 @@ export function ChatList({
                             className="min-w-0 flex-1"
                             render={
                               <a
-                                href={`#chats/${chat.ID}`}
-                                aria-label={`Open chat: ${chat.Title || chat.ID}`}
+                                href={`#chats/${chat.PublicID}`}
+                                aria-label={`Open chat: ${chat.Title || chat.PublicID}`}
                               />
                             }
-                            aria-label={`Open chat: ${chat.Title || chat.ID}`}
+                            aria-label={`Open chat: ${chat.Title || chat.PublicID}`}
                             aria-description={chat.StatusReason || status.label}
                           />
                         }
@@ -283,8 +283,9 @@ export function ChatList({
                               {projectNames.get(chat.ProjectID) ?? "Project"}
                             </span>
                           )}
-                          <span className="shrink-0 text-xs text-muted-foreground sm:w-20">
-                            {status.label}
+                          <span className="flex shrink-0 flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                            <span>{chat.PublicID}</span>
+                            <span className="sm:w-20">{status.label}</span>
                           </span>
                         </ItemContent>
                         <ItemActions className="shrink-0 gap-3">

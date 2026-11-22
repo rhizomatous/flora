@@ -23,12 +23,13 @@ type AutomationConfig struct {
 }
 type Automation struct {
 	AutomationConfig
-	ID        string `json:"id"`
-	ProjectID string `json:"projectID"`
-	Enabled   bool   `json:"enabled"`
-	NextRun   string `json:"nextRun"`
-	ChatID    string `json:"chatID"`
-	Revision  int    `json:"revision"`
+	ID           string `json:"id"`
+	ProjectID    string `json:"projectID"`
+	Enabled      bool   `json:"enabled"`
+	NextRun      string `json:"nextRun"`
+	ChatID       string `json:"chatID"`
+	PublicChatID string `json:"publicChatID,omitempty"`
+	Revision     int    `json:"revision"`
 }
 type AutomationRun struct {
 	ID           string `json:"id"`
@@ -37,6 +38,7 @@ type AutomationRun struct {
 	Status       string `json:"status"`
 	Reason       string `json:"reason"`
 	ChatID       string `json:"chatID"`
+	PublicChatID string `json:"publicChatID,omitempty"`
 	MessageID    string `json:"messageID"`
 	Released     bool   `json:"-"`
 }
@@ -112,12 +114,12 @@ func (c AutomationConfig) Next(after time.Time) (time.Time, error) {
 	return time.Time{}, ErrInvalid
 }
 
-const automationSelect = `SELECT id,project_id,config,enabled,next_run,chat_id,revision FROM automations`
+const automationSelect = `SELECT id,project_id,config,enabled,next_run,chat_id,revision,coalesce((SELECT 'FLORA-' || number FROM chat_public_ids WHERE chat_id=automations.chat_id),'') FROM automations`
 
 func scanAutomation(row scanner) (Automation, error) {
 	var a Automation
 	var config string
-	err := row.Scan(&a.ID, &a.ProjectID, &config, &a.Enabled, &a.NextRun, &a.ChatID, &a.Revision)
+	err := row.Scan(&a.ID, &a.ProjectID, &config, &a.Enabled, &a.NextRun, &a.ChatID, &a.Revision, &a.PublicChatID)
 	if err != nil {
 		return a, found(err)
 	}
@@ -194,7 +196,10 @@ func (s *Store) SaveAutomation(ctx context.Context, a Automation, at time.Time) 
 		_, err = tx.ExecContext(ctx, "UPDATE automations SET config=?,enabled=?,next_run=?,chat_id=?,revision=? WHERE id=?", string(config), a.Enabled, a.NextRun, a.ChatID, a.Revision, a.ID)
 		return err
 	})
-	return a, err
+	if err != nil {
+		return a, err
+	}
+	return s.Automation(ctx, a.ID)
 }
 func equalDays(a, b []int) bool {
 	if len(a) != len(b) {
@@ -208,11 +213,11 @@ func equalDays(a, b []int) bool {
 	return true
 }
 
-const runSelect = `SELECT id,automation_id,scheduled_at,status,reason,chat_id,message_id,released FROM automation_runs`
+const runSelect = `SELECT id,automation_id,scheduled_at,status,reason,chat_id,message_id,released,coalesce((SELECT 'FLORA-' || number FROM chat_public_ids WHERE chat_id=automation_runs.chat_id),'') FROM automation_runs`
 
 func scanRun(row scanner) (AutomationRun, error) {
 	var r AutomationRun
-	err := row.Scan(&r.ID, &r.AutomationID, &r.ScheduledAt, &r.Status, &r.Reason, &r.ChatID, &r.MessageID, &r.Released)
+	err := row.Scan(&r.ID, &r.AutomationID, &r.ScheduledAt, &r.Status, &r.Reason, &r.ChatID, &r.MessageID, &r.Released, &r.PublicChatID)
 	return r, found(err)
 }
 func (s *Store) AutomationRuns(ctx context.Context, automationID string) ([]AutomationRun, error) {

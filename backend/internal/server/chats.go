@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -118,6 +119,17 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 		}
 		if !decodeLimit(w, r, &in, 256*1024) {
 			return
+		}
+		for i := range in.Observed {
+			if !strings.HasPrefix(in.Observed[i].ChatID, "FLORA-") {
+				continue
+			}
+			c, err := store.Chat(r.Context(), in.Observed[i].ChatID)
+			if err != nil {
+				chatError(w, err)
+				return
+			}
+			in.Observed[i].ChatID = c.ID
 		}
 		saved, err := store.MarkChatsRead(r.Context(), in.Observed)
 		if errors.Is(err, storage.ErrInvalid) {
@@ -364,7 +376,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			chatError(w, err)
 			return
 		}
-		w.Header().Set("Location", "/api/chats/"+c.ID)
+		w.Header().Set("Location", "/api/chats/"+c.PublicID)
 		jsonResponse(w, 202, c)
 	})
 	mux.HandleFunc("GET /api/chats/{id}", func(w http.ResponseWriter, r *http.Request) {

@@ -13,6 +13,7 @@ const pull: Pull = {
 function chat(id: string, items: Pull[] | null, checkedAt = "2026-01-01"): Chat {
   return {
     ID: id,
+    PublicID: "FLORA-1",
     Title: id,
     ProjectID: "project",
     Status: "idle",

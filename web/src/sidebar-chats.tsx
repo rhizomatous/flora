@@ -65,14 +65,26 @@ function ChatRow({
   const status = chatStatus(chat, seen);
   const [summaryOpen, setSummaryOpen] = useState(false);
   return (
-    <li className="florets-navigation-row" data-active={path === `chats/${chat.ID}` || undefined}>
+    <li
+      className="florets-navigation-row"
+      data-active={
+        path.split("?")[0] === `chats/${chat.PublicID}` ||
+        path.split("?")[0] === `chats/${chat.ID}` ||
+        undefined
+      }
+    >
       <HoverCard open={summaryOpen} onOpenChange={setSummaryOpen}>
         <HoverCardTrigger
           delay={500}
           render={
             <a
-              href={`#chats/${chat.ID}`}
-              aria-current={path === `chats/${chat.ID}` ? "page" : undefined}
+              href={`#chats/${chat.PublicID}`}
+              aria-current={
+                path.split("?")[0] === `chats/${chat.PublicID}` ||
+                path.split("?")[0] === `chats/${chat.ID}`
+                  ? "page"
+                  : undefined
+              }
               className="florets-navigation-link"
               aria-label={
                 details
@@ -109,6 +121,7 @@ function ChatRow({
                 </span>
                 {details && (
                   <span className="florets-navigation-meta flex! flex-wrap items-center gap-x-2">
+                    <span className="shrink-0">{chat.PublicID}</span>
                     {projectName !== undefined && (
                       <span className="max-w-28 truncate">{projectName}</span>
                     )}
@@ -224,7 +237,7 @@ export function SidebarChats({
             (chat.PinnedAt ?? "") === "" &&
             chat.FolderID === folder.id &&
             (!filter ||
-              `${chat.Title} ${chat.ID} ${folder.name} ${projects.find((p) => p.id === chat.ProjectID)?.name ?? ""}`
+              `${chat.Title} ${chat.PublicID} ${folder.name} ${projects.find((p) => p.id === chat.ProjectID)?.name ?? ""}`
                 .toLowerCase()
                 .includes(filter)),
         )
@@ -242,7 +255,8 @@ export function SidebarChats({
             chat.ProjectID === project.id &&
             ((chat.FolderID ?? "") === "" ||
               folders?.some((folder) => folder.id === chat.FolderID) !== true) &&
-            (!filter || `${chat.Title} ${project.name} ${chat.ID}`.toLowerCase().includes(filter)),
+            (!filter ||
+              `${chat.Title} ${project.name} ${chat.PublicID}`.toLowerCase().includes(filter)),
         )
         .toSorted((a, b) => b.UpdatedAt.localeCompare(a.UpdatedAt)),
     }))
@@ -274,7 +288,7 @@ export function SidebarChats({
     .filter(
       (chat) =>
         !filter ||
-        `${chat.Title} ${chat.ID} ${folders?.find((f) => f.id === chat.FolderID)?.name ?? ""} ${projects.find((project) => project.id === chat.ProjectID)?.name ?? ""}`
+        `${chat.Title} ${chat.PublicID} ${folders?.find((f) => f.id === chat.FolderID)?.name ?? ""} ${projects.find((project) => project.id === chat.ProjectID)?.name ?? ""}`
           .toLowerCase()
           .includes(filter),
     )

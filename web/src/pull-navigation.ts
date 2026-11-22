@@ -1,10 +1,12 @@
 import { useContext, type MouseEvent } from "react";
 
+import { useChatReference } from "./chat-identity";
 import { useChatPanelState } from "./chat-panel-state";
 import type { Pull } from "./pull-schemas";
 import { SubagentsContext } from "./subagent-state";
 
 export function usePullNavigation(override?: string) {
+  const reference = useChatReference();
   const { chatID: currentChat } = useContext(SubagentsContext);
   const chatID = override ?? currentChat;
   const [state, update] = useChatPanelState(chatID);
@@ -16,8 +18,8 @@ export function usePullNavigation(override?: string) {
         view: `pull:${pull.url}`,
         pullTabs: [...new Set([...state.pullTabs, pull.url])],
       });
-      if (window.location.hash.split("?")[0] !== `#chats/${chatID}`) {
-        window.location.hash = `chats/${chatID}`;
+      if (window.location.hash.split("?")[0] !== `#chats/${reference(chatID)}`) {
+        window.location.hash = `chats/${reference(chatID)}`;
       }
       requestAnimationFrame(() => {
         document

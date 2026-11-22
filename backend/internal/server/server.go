@@ -69,7 +69,7 @@ func New(assets fs.FS, authentication *auth.Service, credentials *settings.Servi
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write(index)
 	})
-	return api.protect(mux)
+	return api.protect(api.chatReferences(mux))
 }
 
 // Only known static extensions on the final segment suppress the SPA fallback;

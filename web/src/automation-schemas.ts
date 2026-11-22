@@ -9,6 +9,7 @@ export const automationRunSchema = z.object({
   status: z.string(),
   reason: z.string(),
   chatID: z.string(),
+  publicChatID: z.string().optional(),
   messageID: z.string(),
 });
 
@@ -27,6 +28,7 @@ export const automationSchema = z.object({
   enabled: z.boolean(),
   nextRun: z.string(),
   chatID: z.string(),
+  publicChatID: z.string().optional(),
   revision: z.number(),
   latestRun: automationRunSchema.optional(),
 });

@@ -51,6 +51,12 @@ function replayFrames(frames: Frame[]) {
 }
 
 const epoch = "2026-01-01T12:00:00.000Z";
+const publicIDs = new Map<string, string>();
+function publicID(id: string) {
+  if (!publicIDs.has(id)) publicIDs.set(id, `FLORA-${publicIDs.size + 1}`);
+  return present(publicIDs.get(id));
+}
+
 /** Projects captured OpenCode history into the same saved-message fields as captureHistory and AcceptMessage. */
 export function messages(frame: Frame, chatID: string) {
   return frame.history.map(({ info, parts }) => {
@@ -139,6 +145,7 @@ export function chatAt(scenario: (typeof demoScenarios)[number], frame: Frame, f
       checkedAt: epoch,
     },
     ID: id,
+    PublicID: publicID(id),
     ProjectID: project.id,
     Title: scenario.title,
     Configuration: project.configuration,
@@ -246,6 +253,16 @@ export function chatPreview(): Plugin {
   });
   const handler = (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     const url = new URL(req.url ?? "/", "http://localhost");
+    for (const scenario of scenarios) {
+      const canonical = publicID(scenario.id);
+      if (
+        url.pathname === `/api/chats/${canonical}` ||
+        url.pathname.startsWith(`/api/chats/${canonical}/`)
+      ) {
+        url.pathname = url.pathname.replace(`/api/chats/${canonical}`, `/api/chats/${scenario.id}`);
+      }
+      if (url.searchParams.get("chat") === canonical) url.searchParams.set("chat", scenario.id);
+    }
     if (url.pathname === "/__preview/checks" && (req.method === "POST" || req.method === "GET")) {
       const chat = url.searchParams.get("chat") ?? "";
       const state = url.searchParams.get("state") ?? "saved";

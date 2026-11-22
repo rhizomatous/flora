@@ -60,7 +60,14 @@ func TestCompactionUpgradePreservesEncryptedCredentials(t *testing.T) {
 	must(t, err)
 	_, err = s.db.Exec("DROP TABLE chat_environment_requests; DROP TABLE environment_variables; DROP TABLE compaction_choices")
 	must(t, err)
-	_, err = s.db.Exec(fmt.Sprintf("PRAGMA user_version=%d", len(entries)-3))
+	version := 0
+	for i, entry := range entries {
+		if entry.Name() == "021_compaction.sql" {
+			version = i
+			break
+		}
+	}
+	_, err = s.db.Exec(fmt.Sprintf("PRAGMA user_version=%d", version))
 	must(t, err)
 	must(t, s.Close())
 	s = openTest(t, root)
