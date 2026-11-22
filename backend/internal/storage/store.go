@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -35,6 +36,8 @@ var (
 var migrations embed.FS
 
 type Store struct {
+	secretMu      sync.Mutex
+	secrets       *secretBox
 	db            *sql.DB
 	root          string
 	cleanupCancel context.CancelFunc
@@ -45,6 +48,12 @@ type Paths struct{ Workspace, RuntimeState, Logs, Artifacts string }
 // Open initializes private application-owned storage. The root must be on a
 // local filesystem, owned by the application user, and not shared with agents.
 func Open(ctx context.Context, root string) (*Store, error) {
+	return OpenWithKeyFile(ctx, root, filepath.Clean(root)+".key")
+}
+
+// OpenWithKeyFile keeps the encryption key outside the data directory. The caller
+// must exclude other application processes during migration and key rotation.
+func OpenWithKeyFile(ctx context.Context, root, keyFile string) (*Store, error) {
 	if root == "" {
 		return nil, ErrInvalid
 	}
@@ -81,6 +90,7 @@ func Open(ctx context.Context, root string) (*Store, error) {
 	q.Add("_pragma", "busy_timeout(5000)")
 	q.Add("_pragma", "journal_mode(WAL)")
 	q.Add("_pragma", "synchronous(FULL)")
+	q.Add("_pragma", "secure_delete(ON)")
 	q.Set("_txlock", "immediate")
 	u.RawQuery = q.Encode()
 	db, err := sql.Open("sqlite", u.String())
@@ -92,6 +102,10 @@ func Open(ctx context.Context, root string) (*Store, error) {
 	if err := s.migrate(ctx); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("initialize storage schema: %w", err)
+	}
+	if err := s.initializeSecrets(ctx, keyFile); err != nil {
+		db.Close()
+		return nil, err
 	}
 	if err := s.CleanupAttachments(ctx); err != nil {
 		db.Close()

@@ -76,8 +76,13 @@ override in their Instructions panel. Without an override, new-chat automations
 use the installation default and same-chat automations retain that chat's selection.
 
 HTTP responses expose non-secret settings and whether each key is saved, never key values.
-Credentials are stored in the private SQLite database, not encrypted separately.
-Protect the storage directory and backups, and never mount them into agents.
+Recoverable credentials use AES-256-GCM in SQLite. The owner-only encryption key
+is outside the data directory, at `data-dir.key` by default. Set
+`-credential-key-file /private/path/key` to choose another location. Keep key
+backups separate from database backups. Missing or wrong keys prevent startup.
+See [credential storage and recovery](INSTALL.md#credential-storage-and-recovery)
+for migration, rotation, backup and lost-key limits. Never mount the storage
+directory or encryption key into agents.
 
 Installation settings also control container capacity, CPU/memory/process limits,
 setup and continuous-activity timeouts, inline diff and message sizes, absolute

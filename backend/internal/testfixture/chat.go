@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -79,7 +80,7 @@ func New(ctx context.Context, directory string, interactive bool) (*Fixture, err
 			cancel()
 		}
 	}()
-	store, err := storage.Open(ctx, directory)
+	store, err := storage.OpenWithKeyFile(ctx, filepath.Join(directory, "data"), filepath.Join(directory, "credentials.key"))
 	if err != nil {
 		return nil, err
 	}

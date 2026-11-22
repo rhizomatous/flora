@@ -35,7 +35,28 @@ func main() {
 	agentID := flag.String("agent-image-id", "", "expected sha256 content ID, required for a local image tag")
 	maxRunning := flag.Int("max-running", provisioning.DefaultMaxRunning, "maximum running chat containers, including idle; lowering it does not stop existing containers")
 	dockerSocket := flag.String("docker-socket", docker.DefaultSocket, "Docker Engine socket on this host")
+	keyFile := flag.String("credential-key-file", "", "private encryption key file outside data-dir (defaults to data-dir.key)")
+	rotateKey := flag.String("rotate-credential-key-to", "", "offline: re-encrypt credentials using this separate key file, then exit")
 	flag.Parse()
+	if *keyFile == "" {
+		*keyFile = filepath.Clean(*dataDir) + ".key"
+	}
+	if *rotateKey != "" {
+		store, unlock, err := openCredentialStore(context.Background(), *dataDir, *keyFile)
+		if err == nil {
+			defer unlock()
+		}
+		if err == nil {
+			err = store.RotateCredentialKey(context.Background(), *rotateKey)
+			_ = store.Close()
+		}
+		if err != nil {
+			slog.Error("Credential key rotation failed; retain both key files and use the one matching the committed database", "error", err)
+			os.Exit(1)
+		}
+		slog.Info("Credential key rotation complete; configure -credential-key-file with the destination before restarting")
+		return
+	}
 	if err := loopbackAddress(*addr); err != nil {
 		slog.Error("Invalid -listen", "error", err)
 		os.Exit(1)
@@ -61,11 +82,12 @@ func main() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	store, err := storage.Open(ctx, *dataDir)
+	store, unlock, err := openCredentialStore(ctx, *dataDir, *keyFile)
 	if err != nil {
 		slog.Error("Storage initialization failed; check -data-dir ownership, permissions, free space, and schema version", "error", err)
 		os.Exit(1)
 	}
+	defer unlock()
 	defer func() {
 		if err := store.Close(); err != nil {
 			slog.Error("Storage close failed", "error", err)
@@ -89,12 +111,6 @@ func main() {
 			slog.Error("Cannot prepare private deployment directory", "error", err)
 			os.Exit(1)
 		}
-		unlock, err := lockDeployment(filepath.Join(dir, "lock"))
-		if err != nil {
-			slog.Error("Cannot lock deployment; another Flora process may be using this data directory", "error", err)
-			os.Exit(1)
-		}
-		defer unlock()
 		if err := requireDeploymentIdentity(ctx, store, dir); err != nil {
 			slog.Error("Cannot use saved application data", "error", err)
 			os.Exit(1)
@@ -282,4 +298,35 @@ func serveGitHub(ctx context.Context, broker *githubbroker.Broker, addr string, 
 		}
 	}()
 	return listener.Addr(), nil
+}
+
+// openCredentialStore excludes other Flora processes before schema conversion or
+// rotation touches SQLite. Storage errors release the deployment lock.
+func openCredentialStore(ctx context.Context, root, keyFile string) (*storage.Store, func(), error) {
+	if root == "" {
+		return nil, nil, storage.ErrInvalid
+	}
+	if err := os.MkdirAll(root, 0700); err != nil {
+		return nil, nil, err
+	}
+	info, err := os.Lstat(root)
+	if err != nil || !info.IsDir() {
+		return nil, nil, errors.New("data directory must be a directory, not a symlink")
+	}
+	if err := os.Chmod(root, 0700); err != nil {
+		return nil, nil, err
+	}
+	if err := privateDir(filepath.Join(root, "deployment")); err != nil {
+		return nil, nil, err
+	}
+	unlock, err := lockDeployment(filepath.Join(root, "deployment", "lock"))
+	if err != nil {
+		return nil, nil, err
+	}
+	store, err := storage.OpenWithKeyFile(ctx, root, keyFile)
+	if err != nil {
+		unlock()
+		return nil, nil, err
+	}
+	return store, unlock, nil
 }
