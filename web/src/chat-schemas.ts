@@ -12,7 +12,14 @@ const subagentSummarySchema = z.object({
   title: z.string(),
 });
 
+const reportedIdentitySchema = z.object({ provider: z.string(), model: z.string() });
+const reportedModelSchema = z.object({
+  latest: reportedIdentitySchema.nullable(),
+  models: z.number().int().nonnegative(),
+});
+
 export const chatSchema = z.object({
+  reportedModel: reportedModelSchema.optional(),
   Execution: executionSchema.optional(),
   pulls: pullSummarySchema.optional(),
   subagents: z.array(subagentSummarySchema).optional(),

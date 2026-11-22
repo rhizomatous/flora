@@ -61,8 +61,9 @@ func decodeChat(w http.ResponseWriter, r *http.Request, v any) bool {
 
 type chatView struct {
 	storage.Chat
-	Pulls     changes.PullSummary `json:"pulls"`
-	Subagents []subagentSummary   `json:"subagents"`
+	ReportedModel *storage.ModelSummary `json:"reportedModel,omitempty"`
+	Pulls         changes.PullSummary   `json:"pulls"`
+	Subagents     []subagentSummary     `json:"subagents"`
 }
 
 type subagentSummary struct {
@@ -77,7 +78,12 @@ func (a *api) chatView(ctx context.Context, c storage.Chat) chatView {
 	for _, agent := range agents {
 		summaries = append(summaries, subagentSummary{ID: agent.ID, Number: agent.Number, Title: agent.Title})
 	}
-	return chatView{Chat: c, Pulls: changes.New(a.settings.Store, nil).ReadPulls(ctx, c.ID), Subagents: summaries}
+	model, err := a.settings.Store.ChatModel(ctx, c.ID)
+	var reported *storage.ModelSummary
+	if err == nil {
+		reported = &model
+	}
+	return chatView{Chat: c, ReportedModel: reported, Pulls: changes.New(a.settings.Store, nil).ReadPulls(ctx, c.ID), Subagents: summaries}
 }
 
 func (a *api) chatViews(ctx context.Context, chats []storage.Chat) []chatView {

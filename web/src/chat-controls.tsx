@@ -1,3 +1,4 @@
+/* oxlint-disable import/max-dependencies -- Chat controls compose summary, panel, and machine actions. */
 import { useEffect, useState, type ReactNode } from "react";
 
 import {
@@ -5,7 +6,6 @@ import {
   HoverCard,
   HoverCardTrigger,
   HoverCardContent,
-  FlowerIcon,
   Button,
   DropdownMenu,
   DropdownMenuTrigger,
@@ -35,9 +35,9 @@ import { chatStatus } from "./chat-status";
 import { ContextUsagePopover } from "./context-usage";
 import { PullCount, PullList } from "./pull-links";
 import type { PullSummary } from "./pull-schemas";
+import { ReportedModelSummary } from "./reported-model-summary";
 import { KeepAwakeItem, RuntimeMenu, StopMachineItem } from "./runtime-controls";
 import { ShellMenuItems } from "./shells";
-// oxlint-disable-next-line import/max-dependencies -- The view menu composes the chat panels and machine controls.
 import { SubagentMenuItems } from "./subagents";
 
 /** Shows saved chat metadata and linked pull requests. */
@@ -121,17 +121,11 @@ export function ChatTitle({
         className="chat-title-card florets-menu-surface font-normal"
         aria-label="Chat summary"
       >
-        <div className="chat-summary-meta flex items-center justify-between gap-3 text-muted-foreground">
+        <div className="chat-summary-meta flex flex-wrap items-center justify-between gap-3 text-muted-foreground">
           <span className="truncate" title={chat?.ID}>
             {chat?.ID ?? "—"}
           </span>
-          <span
-            className="chat-summary-model flex shrink-0 items-center gap-1.5 text-muted-foreground [&_svg]:size-3.5"
-            title="Model details unavailable"
-          >
-            <FlowerIcon />
-            Model —
-          </span>
+          <ReportedModelSummary summary={chat?.reportedModel} />
         </div>
         <p className="chat-summary-title mt-[3px] wrap-anywhere">{title}</p>
         <div className="chat-summary-footer mt-2.5 flex items-center gap-4 border-t border-border pt-2.5 text-muted-foreground">

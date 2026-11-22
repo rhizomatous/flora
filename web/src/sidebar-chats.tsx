@@ -31,6 +31,7 @@ import { chatStatus } from "./chat-status";
 import { useFolders } from "./folder-state";
 import { UnreadDot } from "./mark-chats-read";
 import { PullCount, PullList } from "./pull-links";
+import { ReportedModelSummary } from "./reported-model-summary";
 import { isChatSeen, useMarkChatsRead } from "./sidebar-status";
 
 type Project = { id: string; name: string };
@@ -60,9 +61,10 @@ function ChatRow({
   projectName?: string | undefined;
 }) {
   const status = chatStatus(chat, seen);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   return (
     <li className="florets-navigation-row" data-active={path === `chats/${chat.ID}` || undefined}>
-      <HoverCard>
+      <HoverCard open={summaryOpen} onOpenChange={setSummaryOpen}>
         <HoverCardTrigger
           delay={500}
           render={
@@ -71,6 +73,9 @@ function ChatRow({
               aria-current={path === `chats/${chat.ID}` ? "page" : undefined}
               className="florets-navigation-link"
               onClick={close}
+              onFocus={() => {
+                setSummaryOpen(true);
+              }}
             >
               <span
                 className="florets-navigation-icon sidebar-status"
@@ -110,8 +115,9 @@ function ChatRow({
           density="compact"
           className="sidebar-chat-preview florets-menu-surface w-[420px]! max-w-[calc(100vw-32px)]! wrap-anywhere"
         >
-          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
             <span className="truncate">{chat.ID}</span>
+            <ReportedModelSummary summary={chat.reportedModel} />
           </div>
           <p className="mt-2">{chat.Title || "Chat"}</p>
           {((chat.pulls?.items.length ?? 0) > 0 || (chat.pulls?.error ?? "") !== "") && (

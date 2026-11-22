@@ -16,6 +16,7 @@ type Fixtures = {
     | "shells"
     | "workspace"
     | "branches"
+    | "model-summary"
     | "models"
     | "chat"
     | "changes"
