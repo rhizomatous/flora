@@ -42,7 +42,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		return newShellBrowserInstance()
 	}
 	switch scenario {
-	case "model-summary", "models", "chat", "changes", "enrollment", "notifications", "projects", "settings", "workspace", "branches":
+	case "model-summary", "models", "chat", "changes", "enrollment", "notifications", "projects", "settings", "workspace", "branches", "context":
 	default:
 		return nil, fmt.Errorf("unknown browser scenario %q", scenario)
 	}
@@ -124,7 +124,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		}
 		instance.ChatID = c.ID
 	}
-	if scenario == "workspace" {
+	if scenario == "workspace" || scenario == "context" {
 		project, createErr := store.CreateProject(ctx, "Workspace preview", storage.Configuration{Repositories: []storage.Repository{
 			{Name: "flora/web", URL: "https://github.com/flora/web", BaseBranch: "main", Role: "core"},
 			{Name: "flora/api", URL: "https://github.com/flora/api", BaseBranch: "main", Role: "core"},
@@ -143,13 +143,29 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 			}
 			binding := "workspace-stopped"
 			if multi {
-				binding = "missing-browser-container"
+				if scenario == "workspace" {
+					binding = "missing-browser-container"
+				}
 				instance.ChatID = c.ID
 			} else {
 				instance.OtherChatID = c.ID
 			}
-			if err = store.BindRuntime(ctx, c.ID, binding, ""); err != nil {
-				return nil, err
+			if scenario != "context" {
+				if err = store.BindRuntime(ctx, c.ID, binding, ""); err != nil {
+					return nil, err
+				}
+			}
+			if scenario == "context" {
+				accepted, e := store.AcceptMessage(ctx, c.ID, "sample-first-message", "Help me understand this workspace.")
+				if e != nil {
+					return nil, e
+				}
+				if e := store.SaveRuntimeMessage(ctx, "sample-assistant", storage.Message{ChatID: c.ID, Role: "assistant", RuntimeMessageID: "sample-assistant", Text: "The workspace has web and API repositories. Start with each README.", Payload: json.RawMessage(`{}`)}); e != nil {
+					return nil, e
+				}
+				if e := store.Transition(ctx, c.ID, accepted.Message.ID, storage.Idle, "Ready for input"); e != nil {
+					return nil, e
+				}
 			}
 			paths, pathErr := store.Paths(ctx, c.ID)
 			if pathErr != nil {
@@ -273,7 +289,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}
 	srv := httptest.NewUnstartedServer(nil)
 	origin := "https://" + srv.Listener.Addr().String()
-	if scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" {
+	if scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
 		origin = "http://" + srv.Listener.Addr().String()
 		if scenario == "branches" {
 			origin = strings.Replace(origin, "127.0.0.1", "localhost", 1)
@@ -290,6 +306,13 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		validation := projects.New(store)
 		validation.Client.Transport = browserTransport(func(r *http.Request) (*http.Response, error) {
 			code := 200
+			if strings.Contains(r.URL.Path, "/pulls") {
+				body := `{"number":42,"title":"Keep workspace context with each message","body":"Read referenced files and chats while working.","state":"open","updated_at":"2026-11-20T10:00:00Z","head":{"sha":"abc123"},"base":{"sha":"def456"}}`
+				if strings.HasSuffix(r.URL.Path, "/pulls") {
+					body = "[" + body + "]"
+				}
+				return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body))}, nil
+			}
 			if scenario == "branches" {
 				body := `{"default_branch":"main"}`
 				if githubUnavailable.Load() {
@@ -316,6 +339,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		a.projectRoutes(mux)
 		a.chatRoutes(mux)
 		a.attachmentRoutes(mux)
+		a.referenceRoutes(mux)
 		projectHandler := a.protect(mux)
 		original := app
 		app = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -354,7 +378,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}
 	mux.Handle("/", app)
 	srv.Config.Handler = mux
-	if scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" {
+	if scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
 		srv.Start()
 	} else {
 		srv.StartTLS()

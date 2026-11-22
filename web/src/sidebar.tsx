@@ -40,6 +40,7 @@ export function Sidebar({
 }) {
   const [searching, setSearching] = useState(false);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [projectsReady, setProjectsReady] = useState(false);
   const [error, setError] = useState("");
   const { open, isMobile, openMobile, setOpenMobile } = useSidebar();
   const mobileToggle = useRef<HTMLButtonElement>(null);
@@ -61,6 +62,7 @@ export function Sidebar({
         const rows = await request(projectSummarySchema.array(), "projects");
         if (active) {
           setProjects(rows);
+          setProjectsReady(true);
           setError("");
         }
       } catch (reason) {
@@ -238,6 +240,7 @@ export function Sidebar({
             )}
             <SidebarChats
               projects={projects}
+              projectsReady={projectsReady}
               chats={chats}
               path={path}
               close={() => {

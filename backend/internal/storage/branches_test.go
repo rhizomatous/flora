@@ -60,7 +60,7 @@ func TestBranchMigrationPreservesCreationIdentityAndReadState(t *testing.T) {
 	must(t, err)
 	_, err = s.MarkChatsRead(ctx, []ViewedRevision{{c.ID, c.ActivityRevision}})
 	must(t, err)
-	_, err = s.db.Exec(`DROP INDEX chats_folder; ALTER TABLE chats DROP COLUMN folder_id; DROP TABLE chat_folders; ALTER TABLE chat_requests DROP COLUMN branches; PRAGMA user_version=17`)
+	_, err = s.db.Exec(`DROP INDEX chats_folder; ALTER TABLE chats DROP COLUMN folder_id; DROP TABLE chat_folders; ALTER TABLE chat_requests DROP COLUMN context_references; ALTER TABLE chat_requests DROP COLUMN branches; PRAGMA user_version=17`)
 	must(t, err)
 	must(t, s.Close())
 	s = openTest(t, root)

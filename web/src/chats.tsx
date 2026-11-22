@@ -268,8 +268,12 @@ export function Chats({
     const attachments = fields
       .getAll("attachments")
       .filter((value): value is string => typeof value === "string");
+    const references = fields
+      .getAll("references")
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => JSON.parse(value) as unknown);
     if (
-      (message.trim() === "" && attachments.length === 0) ||
+      (message.trim() === "" && attachments.length === 0 && references.length === 0) ||
       new TextEncoder().encode(message).length > messageBytes
     ) {
       setError(`Enter a message of at most ${messageBytes.toLocaleString()} UTF-8 bytes.`);
@@ -279,10 +283,12 @@ export function Chats({
     setBusy(true);
     setError("");
     const project = text(fields, "project");
+    const titleInput =
+      message.trim().replaceAll(/\s+/gu, " ") ||
+      (references.length > 0 ? "Referenced context" : "Attached files");
     // Forty-five Unicode code points fit within the server's 200-byte title limit.
-    const chatTitle =
-      // oxlint-disable-next-line typescript/no-misused-spread -- Bound code points to stay below the UTF-8 byte limit without splitting surrogate pairs.
-      [...(message.trim().replaceAll(/\s+/gu, " ") || "Attached files")].slice(0, 45).join("");
+    // oxlint-disable-next-line typescript/no-misused-spread -- Bound code points to stay below the UTF-8 byte limit without splitting surrogate pairs.
+    const chatTitle = [...titleInput].slice(0, 45).join("");
     const rawExecution = text(fields, "execution");
     const execution = rawExecution ? (JSON.parse(rawExecution) as unknown) : undefined;
     const input = isNew
@@ -290,10 +296,11 @@ export function Chats({
           title: chatTitle,
           text: message,
           attachments,
+          references,
           execution,
           branches: JSON.parse(text(fields, "branches") || "{}") as unknown,
         }
-      : { text: message, attachments, execution };
+      : { text: message, attachments, references, execution };
     const scope = isNew ? `project:${project}` : `chat:${id}`;
     try {
       const requestID = identity(scope, input);

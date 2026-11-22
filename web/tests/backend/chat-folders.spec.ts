@@ -26,14 +26,14 @@ test("folders share moves, preserve drafts and pins, and search collapsed groups
     .getByRole("button", { name: "Dismiss completion for Release checklist", exact: true })
     .click();
   let chat = chatSchema.parse(await response.json());
-  await page.getByRole("textbox", { name: "Message", exact: true }).fill("Keep my unsent draft");
+  await page.getByLabel("Message", { exact: true }).fill("Keep my unsent draft");
   await page.getByRole("button", { name: "Chat list options", exact: true }).click();
   await page.getByRole("menuitem", { name: "New folder", exact: true }).click();
   await page.getByLabel("Folder name", { exact: true }).fill("Release planning");
   await page.getByLabel("Folder name", { exact: true }).press("Enter");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Chat list options", exact: true })).toBeFocused();
-  await expect(page.getByRole("textbox", { name: "Message", exact: true })).toHaveValue(
+  await expect(page.getByLabel("Message", { exact: true })).toHaveValue(
     "Keep my unsent draft",
   );
   await expect(page.getByRole("region", { name: "Release planning", exact: true })).toContainText(
