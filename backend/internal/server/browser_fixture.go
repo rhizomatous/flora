@@ -42,7 +42,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		return newShellBrowserInstance()
 	}
 	switch scenario {
-	case "compaction", "model-summary", "models", "chat", "changes", "enrollment", "notifications", "projects", "settings", "workspace", "branches", "context":
+	case "compaction", "model-summary", "models", "chat", "changes", "enrollment", "credential-setup", "notifications", "projects", "settings", "workspace", "branches", "context":
 	default:
 		return nil, fmt.Errorf("unknown browser scenario %q", scenario)
 	}
@@ -66,7 +66,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}()
 	var authentication *auth.Service
 	var fixture *testfixture.Fixture
-	if scenario == "enrollment" {
+	if scenario == "enrollment" || scenario == "credential-setup" {
 		store, err = storage.Open(ctx, filepath.Join(directory, "data"))
 		if err != nil {
 			return nil, err
@@ -137,7 +137,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		}
 	}
 	configuration := settings.New(store)
-	if scenario == "settings" {
+	if scenario == "settings" || scenario == "credential-setup" {
 		configuration.MaxRunningOverride = 4
 		configuration.Validate = func(_ context.Context, c storage.Credentials) error {
 			if c.ProviderKey == "invalid-fixture-key" {

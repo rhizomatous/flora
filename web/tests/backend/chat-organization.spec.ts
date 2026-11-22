@@ -9,7 +9,7 @@ test("saved organization survives reload while archived execution finishes", asy
   await logIn(page);
   await page.getByRole("link", { name: "New chat", exact: true }).click();
   await page.getByRole("button", { name: /^Project:/ }).click();
-  await page.getByRole("button", { name: "Browser project", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Browser project", exact: true }).click();
   await page.getByLabel("Message", { exact: true }).fill("Organize running work");
   await page.getByRole("button", { name: "Start chat", exact: true }).click();
   await page.waitForURL(/#chats\/(?!new)/);

@@ -2,10 +2,12 @@ import { useState, type SubmitEvent } from "react";
 
 import {
   DropdownButton,
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-  CheckIcon,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   InboxIcon,
   KeyRoundIcon,
   PlusIcon,
@@ -44,9 +46,6 @@ export function NewChatComposer({
   });
   const [search, setSearch] = useState("");
   const [projectOpen, setProjectOpen] = useState(false);
-  const filtered = projects.filter((project) =>
-    project.name.toLowerCase().includes(search.toLowerCase()),
-  );
   return (
     <form
       onSubmit={onSend}
@@ -62,14 +61,21 @@ export function NewChatComposer({
     >
       <div className="composer-topbar">
         <input type="hidden" name="project" value={selectedProject?.id ?? ""} />
-        <Popover
+        <DropdownMenu
+          search={{
+            label: "Search projects",
+            placeholder: "Search projects",
+            query: search,
+            onQueryChange: setSearch,
+            emptyText: "No projects found.",
+          }}
           open={projectOpen}
           onOpenChange={(open) => {
             setProjectOpen(open);
             if (!open) setSearch("");
           }}
         >
-          <PopoverTrigger
+          <DropdownMenuTrigger
             render={
               <DropdownButton
                 type="button"
@@ -84,56 +90,54 @@ export function NewChatComposer({
               </DropdownButton>
             }
           />
-          <PopoverContent
+          <DropdownMenuContent
             align="start"
             className="composer-menu composer-project-menu w-[260px]! max-w-[calc(100vw-24px)] gap-0 overflow-hidden p-0!"
             aria-label="Choose project"
           >
-            <input
-              className="composer-search w-full border-b border-border bg-transparent px-3 py-2.5 text-[13px] outline-none"
-              aria-label="Search projects"
-              placeholder="Search projects"
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-              }}
-            />
-            <div className="composer-project-list max-h-60 overflow-y-auto p-1.5">
-              {filtered.map((project) => (
-                <button
-                  type="button"
-                  className="composer-project-option"
+            <DropdownMenuGroup>
+              {projects.map((project) => (
+                <DropdownMenuItem
+                  value={project.id}
+                  keywords={[project.name]}
                   key={project.id}
-                  aria-pressed={selectedProject?.id === project.id}
-                  onClick={() => {
+                  data-checked={selectedProject?.id === project.id}
+                  onSelect={() => {
                     onProjectChange(project.id);
                     setProjectOpen(false);
                     setSearch("");
                   }}
                 >
                   <InboxIcon />
-                  <span className="florets-control-label truncate">{project.name}</span>
-                  {selectedProject?.id === project.id && <CheckIcon className="ml-auto" />}
-                </button>
+                  <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                </DropdownMenuItem>
               ))}
-              {filtered.length === 0 && (
-                <p className="composer-menu-note px-2.5 py-1.5 text-xs leading-normal text-muted-foreground">
-                  No projects found.
-                </p>
-              )}
-            </div>
-            <div className="composer-project-links border-t border-border p-1.5">
-              <a href="#projects/new">
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem
+                value="new-project"
+                keywords={["New project"]}
+                onSelect={() => {
+                  window.location.hash = "projects/new";
+                }}
+              >
                 <PlusIcon />
-                <span className="florets-control-label">New project</span>
-              </a>
-              <a href="#projects">
+                <span>New project</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                value="manage-projects"
+                keywords={["Manage projects"]}
+                onSelect={() => {
+                  window.location.hash = "projects";
+                }}
+              >
                 <Settings2Icon />
-                <span className="florets-control-label">Manage projects</span>
-              </a>
-            </div>
-          </PopoverContent>
-        </Popover>
+                <span>Manage projects</span>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <div className="composer-branch ml-auto shrink-0">
           <ChatBranchPicker
             projectID={selectedProject?.id ?? ""}

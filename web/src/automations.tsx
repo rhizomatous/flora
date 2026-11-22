@@ -6,19 +6,12 @@ import {
   Alert,
   Button,
   Card,
-  Command,
-  CommandInput,
-  CommandEmpty,
-  CommandList,
-  CommandItem,
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
   MadlibPicker,
   MadlibSelect,
   FieldLabel,
   EditableText,
   DropdownMenu,
+  DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
@@ -155,8 +148,18 @@ function TimeZonePicker({
   const [open, setOpen] = useState(false);
   const zones = timeZones.includes(value) ? timeZones : [value, ...timeZones];
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
+    <DropdownMenu
+      search={{
+        label: "Search time zones",
+        placeholder: "Search time zones",
+        listLabel: "Time zones",
+        listClassName: "p-1.5",
+        emptyText: "No time zones found.",
+      }}
+      open={open}
+      onOpenChange={setOpen}
+    >
+      <DropdownMenuTrigger
         render={
           <MadlibPicker
             prefix="in"
@@ -168,38 +171,28 @@ function TimeZonePicker({
           </MadlibPicker>
         }
       />
-      <PopoverContent
+      <DropdownMenuContent
         align="start"
         className="w-72! max-w-[calc(100vw-24px)]! p-0"
         aria-label="Time zones"
       >
-        <Command className="rounded-lg! p-0">
-          <CommandInput
-            variant="plain"
-            aria-label="Search time zones"
-            placeholder="Search time zones"
-          />
-          <CommandList aria-label="Time zones" className="p-1.5">
-            <CommandEmpty>No time zones found.</CommandEmpty>
-            {zones.map((zone) => (
-              <CommandItem
-                key={zone}
-                value={zone}
-                keywords={[zone.replaceAll("_", " ")]}
-                data-checked={zone === value}
-                className="min-h-7 rounded-sm py-1"
-                onSelect={() => {
-                  onChange(zone);
-                  setOpen(false);
-                }}
-              >
-                {zone}
-              </CommandItem>
-            ))}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+        {zones.map((zone) => (
+          <DropdownMenuItem
+            key={zone}
+            value={zone}
+            keywords={[zone.replaceAll("_", " ")]}
+            data-checked={zone === value}
+            className="min-h-7 rounded-sm py-1"
+            onSelect={() => {
+              onChange(zone);
+              setOpen(false);
+            }}
+          >
+            {zone}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

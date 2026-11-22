@@ -2,8 +2,18 @@ import assert from "node:assert/strict";
 import { readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-import { chromium, expect } from "@playwright/test";
+import { chromium, expect, type Locator } from "@playwright/test";
 import { preview } from "vite";
+
+async function assertSearchStaysVisible(menu: Locator, search: Locator) {
+  if ((await menu.getByRole("menuitem").count()) <= 20) return;
+  const before = await search.boundingBox();
+  await menu.getByRole("menu").evaluate((list) => {
+    list.scrollTop = list.scrollHeight;
+  });
+  const after = await search.boundingBox();
+  assert.equal(after?.y, before?.y);
+}
 
 const server = await preview({
   root: fileURLToPath(new URL("../florets/docs", import.meta.url)),
@@ -25,6 +35,107 @@ try {
     ).toBeVisible({ timeout: 15_000 });
     assert.deepEqual(errors, [], name);
   };
+
+  await openExample("dropdown-menu-search");
+  for (const dark of [true, false]) {
+    await page.evaluate(
+      (enabled) => document.documentElement.classList.toggle("dark", enabled),
+      dark,
+    );
+    for (const width of [1200, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      const menuExamples = await page.locator('[data-slot="example"]').all();
+      for (const example of menuExamples.slice(0, 2)) {
+        const trigger = example.getByRole("button", { name: "Views", exact: true });
+        await trigger.click();
+        const menu = page.getByRole("dialog", { name: "Views", exact: true });
+        const search = menu.getByRole("searchbox");
+        await expect(search).toHaveAccessibleName(/Search/);
+        await expect(search).toBeFocused();
+        await expect(search).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+        await expect(search).toHaveCSS("border-top-width", "0px");
+        await expect(search).toHaveCSS("border-radius", "0px");
+        await expect(search).toHaveCSS("box-shadow", "none");
+        await expect(search).toHaveCSS("font-size", "14px");
+        await expect(menu.locator('[data-slot="dropdown-menu-search"]')).toHaveCSS(
+          "border-bottom-width",
+          "1px",
+        );
+        await expect(menu.getByRole("menuitem", { name: "Overview", exact: true })).toHaveAttribute(
+          "data-highlighted",
+          "",
+        );
+        await search.press("ArrowDown");
+        await expect(
+          menu.getByRole("menuitem", { name: "Browser Unavailable", exact: true }),
+        ).toHaveAttribute("data-highlighted", "");
+        await search.press("Enter");
+        await expect(menu).toBeVisible();
+        await search.press("ArrowDown");
+        await expect(menu.getByRole("menuitem", { name: "Diffs", exact: true })).toHaveAttribute(
+          "data-highlighted",
+          "",
+        );
+        await expect(search).toBeFocused();
+        await expect(menu.getByRole("menuitem", { name: "Diffs", exact: true })).not.toHaveCSS(
+          "background-color",
+          "rgba(0, 0, 0, 0)",
+        );
+        await assertSearchStaysVisible(menu, search);
+        const selectedID = await menu
+          .getByRole("menuitem", { name: "Diffs", exact: true })
+          .getAttribute("id");
+        await expect(search).toHaveAttribute("aria-activedescendant", selectedID ?? "");
+        await search.fill("no such view");
+        await expect(menu.getByRole("status")).toHaveText(/No matching (views|results)\./);
+        await search.press("Enter");
+        await expect(menu).toBeVisible();
+        await search.fill("diffs");
+        await search.press("Enter");
+        await expect(menu).toHaveCount(0);
+        await expect(trigger).toBeFocused();
+        await trigger.click();
+        await search.fill("browser");
+        await expect(menu.getByRole("menuitem", { name: "Browser Unavailable" })).toBeDisabled();
+        const bounds = await menu.boundingBox();
+        assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= width);
+        await search.press("Escape");
+        await expect(trigger).toBeFocused();
+        await expect(menu).toHaveCount(0);
+      }
+      const actions = page.getByRole("button", { name: "Actions", exact: true });
+      await actions.click();
+      const actionsMenu = page.getByRole("dialog", { name: "Actions", exact: true });
+      const actionsSearch = actionsMenu.getByRole("searchbox", { name: "Search actions" });
+      await actionsSearch.fill("Show status");
+      await actionsSearch.press("Enter");
+      const status = actionsMenu.getByRole("menuitemcheckbox", {
+        name: "Show status",
+        exact: true,
+      });
+      await expect(status).toBeChecked();
+      await expect(actionsSearch).toBeFocused();
+      await actionsSearch.press("Enter");
+      await expect(status).not.toBeChecked();
+      await actionsSearch.fill("Comfortable");
+      await actionsSearch.press("Enter");
+      await expect(
+        actionsMenu.getByRole("menuitemradio", { name: "Comfortable", exact: true }),
+      ).toBeChecked();
+      await actionsSearch.fill("More views");
+      await actionsSearch.press("ArrowRight");
+      const nested = page.getByRole("dialog", { name: "More views", exact: true });
+      const nestedSearch = nested.getByRole("searchbox", { name: "Search more views" });
+      await expect(nestedSearch).toBeFocused();
+      await nestedSearch.fill("History");
+      await nestedSearch.press("Escape");
+      await expect(nested).toHaveCount(0);
+      await expect(actionsSearch).toBeFocused();
+      await actionsSearch.press("Escape");
+      await expect(actionsMenu).toHaveCount(0);
+      await expect(actions).toBeFocused();
+    }
+  }
 
   await openExample("settings-group");
   for (const dark of [true, false]) {

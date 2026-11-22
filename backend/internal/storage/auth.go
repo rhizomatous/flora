@@ -60,18 +60,20 @@ func (s *Store) RevokeSession(ctx context.Context, tokenHash string) error {
 type Credentials struct{ Provider, Model, GitHubToken, ProviderKey string }
 
 func (s *Store) Credentials(ctx context.Context) (Credentials, error) {
-	var c Credentials
-	err := s.db.QueryRowContext(ctx, "SELECT provider,model,github_token,provider_key FROM installation_credentials WHERE id=1").Scan(&c.Provider, &c.Model, &c.GitHubToken, &c.ProviderKey)
-	return c, found(err)
+	s.secretMu.Lock()
+	defer s.secretMu.Unlock()
+	return readCredentials(ctx, s.db, s.secrets)
 }
 
-// SaveCredentials permits key rotation but never changes an installed model.
+// SaveCredentials replaces upstream credentials but never changes an installed model.
 func (s *Store) SaveCredentials(ctx context.Context, c Credentials) error {
 	return s.SaveInstallation(ctx, c, nil)
 }
 
 // SaveInstallation commits validated credentials and optional limits together.
 func (s *Store) SaveInstallation(ctx context.Context, c Credentials, p *Preferences) error {
+	s.secretMu.Lock()
+	defer s.secretMu.Unlock()
 	if p != nil {
 		if err := p.Validate(); err != nil {
 			return err
@@ -83,15 +85,14 @@ func (s *Store) SaveInstallation(ctx context.Context, c Credentials, p *Preferen
 	}
 	defer unlock()
 	return s.write(ctx, func(tx *sql.Tx) error {
-		var provider, model string
-		err := tx.QueryRowContext(ctx, "SELECT provider,model FROM installation_credentials WHERE id=1").Scan(&provider, &model)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		saved, err := readCredentials(ctx, tx, s.secrets)
+		if err != nil && !errors.Is(err, ErrNotFound) {
 			return err
 		}
-		if err == nil && (provider != c.Provider || model != c.Model) {
+		if err == nil && (saved.Provider != c.Provider || saved.Model != c.Model) {
 			return ErrConflict
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO installation_credentials VALUES(1,?,?,?,?) ON CONFLICT(id) DO UPDATE SET github_token=excluded.github_token,provider_key=excluded.provider_key`, c.Provider, c.Model, c.GitHubToken, c.ProviderKey)
+		_, err = tx.ExecContext(ctx, `INSERT INTO installation_credentials VALUES(1,?,?,?,?) ON CONFLICT(id) DO UPDATE SET github_token=excluded.github_token,provider_key=excluded.provider_key`, c.Provider, c.Model, s.secrets.seal(c.GitHubToken, credentialContext(c, "github")), s.secrets.seal(c.ProviderKey, credentialContext(c, "provider")))
 		if err == nil && p != nil {
 			raw, e := json.Marshal(p)
 			if e != nil {

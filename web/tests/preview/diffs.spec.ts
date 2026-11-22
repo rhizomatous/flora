@@ -81,6 +81,10 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   await page.keyboard.press("Escape");
 
   const closeDiffs = page.getByRole("button", { name: "Close Diffs", exact: true });
+  await expect(diffTab).toBeFocused();
+  await diffTab.evaluate((element) => {
+    element.blur();
+  });
   await review.getByLabel("Change summary").hover();
   await expect(closeDiffs).toHaveCSS("opacity", "0");
   await diffTab.hover();
@@ -123,10 +127,10 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
   await expect(review.getByText("const limit = 20;", { exact: true })).toBeVisible();
   await review.getByRole("button", { name: "Collapse all", exact: true }).click();
   await review.getByRole("button", { name: "Files", exact: true }).click();
-  await page.getByRole("combobox", { name: "Search changed files" }).fill("no-such-file");
+  await page.getByRole("searchbox", { name: "Search changed files" }).fill("no-such-file");
   await expect(page.getByText("No matching files.", { exact: true })).toBeVisible();
-  await page.getByRole("combobox", { name: "Search changed files" }).fill("notes");
-  await page.getByRole("combobox", { name: "Search changed files" }).press("Enter");
+  await page.getByRole("searchbox", { name: "Search changed files" }).fill("notes");
+  await page.getByRole("searchbox", { name: "Search changed files" }).press("Enter");
   await expect(review.locator("summary").first()).toBeFocused();
   await expect(review.getByRole("button", { name: "Collapse all", exact: true })).toBeVisible();
   await expect(review.getByText("const limit = 20;", { exact: true })).toBeVisible();
@@ -227,16 +231,16 @@ test("live mock shows multiple languages, inline edits, and separated hunks", as
   await expect(page.getByText("feed.css", { exact: true })).toBeVisible();
   await review.getByRole("button", { name: "Files", exact: true }).click();
   await expect(page.getByText("internal / notes", { exact: true })).toBeVisible();
-  await expect(page.getByRole("option")).toHaveCount(6);
-  const search = page.getByRole("combobox", { name: "Search changed files" });
+  await expect(page.getByRole("menuitem")).toHaveCount(6);
+  const search = page.getByRole("searchbox", { name: "Search changed files" });
   await search.fill("internal cursor");
-  await expect(page.getByRole("option")).toHaveCount(1);
+  await expect(page.getByRole("menuitem")).toHaveCount(1);
   await expect(page.getByText("web / src", { exact: true })).toHaveCount(0);
   await search.press("Enter");
   await expect(review.locator("summary").filter({ hasText: "cursor.go" })).toBeFocused();
   await page.setViewportSize({ width: 390, height: 844 });
   await review.getByRole("button", { name: "Files", exact: true }).click();
   await expect(search).toHaveValue("");
-  await expect(page.getByRole("option")).toHaveCount(6);
+  await expect(page.getByRole("menuitem")).toHaveCount(6);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });

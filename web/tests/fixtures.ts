@@ -23,6 +23,7 @@ type Fixtures = {
     | "chat"
     | "changes"
     | "enrollment"
+    | "credential-setup"
     | "notifications"
     | "projects"
     | "settings";

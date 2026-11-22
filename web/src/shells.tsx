@@ -9,7 +9,6 @@ import "@xterm/xterm/css/xterm.css";
 import {
   Button,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuGroup,
   TerminalIcon,
   PlusIcon,
@@ -94,12 +93,14 @@ export function ShellMenuItems({
   chatID,
   open,
   onSelect,
+  query = "",
 }: {
   chatID: string;
   open: boolean;
   onSelect: () => void;
+  query?: string;
 }) {
-  const [, update] = useChatPanelState(chatID);
+  const [panel, update] = useChatPanelState(chatID);
   const { shells, error } = useShells(chatID, open);
   const { runtime, error: runtimeError } = useRuntime(chatID, open);
   const canCreate =
@@ -134,39 +135,76 @@ export function ShellMenuItems({
       });
     }
   }
+  function status(shell: Shell) {
+    if (error !== "") return "Unavailable";
+    return shell.state === "ended" ? "Ended" : "Running";
+  }
+  const matches = (text: string) =>
+    query.split(/\s+/).every((word) => text.toLocaleLowerCase().includes(word));
+  const visible = shells?.filter((shell) => matches(`${shell.title} terminal shell`)) ?? [];
+  const showCreate = matches("New shell terminal");
+  const unavailable = panel.shellTabs.filter(
+    (tab) =>
+      shells !== undefined &&
+      !shells.some((shell) => shell.id === tab.id) &&
+      matches(`${tab.title} terminal shell`),
+  );
   return (
-    <DropdownMenuGroup>
-      <DropdownMenuLabel>Terminals</DropdownMenuLabel>
-      {shells?.map((shell) => (
+    <DropdownMenuGroup
+      label={visible.length > 0 || unavailable.length > 0 || showCreate ? "Terminals" : undefined}
+    >
+      {shells === undefined && matches("shell terminals") && (
+        <DropdownMenuItem value="shell-status" disabled className="[&>svg:last-child]:hidden">
+          {error ? "Shells unavailable" : "Loading shells…"}
+        </DropdownMenuItem>
+      )}
+      {visible.map((shell) => (
         <DropdownMenuItem
           key={shell.id}
-          onClick={() => {
+          value={`shell:${shell.id}`}
+          className="min-h-7 py-1"
+          disabled={error !== ""}
+          onSelect={() => {
             select(shell);
           }}
         >
           <TerminalIcon />
-          {shell.title}
-          <span className="ml-auto text-muted-foreground">
-            {shell.state === "ended" ? "Ended" : "Running"}
-          </span>
+          <span className="min-w-0 flex-1 truncate">{shell.title}</span>
+          <span className="ml-auto text-muted-foreground">{status(shell)}</span>
         </DropdownMenuItem>
       ))}
-      <DropdownMenuItem
-        disabled={
-          !canCreate ||
-          runtimeError !== "" ||
-          error !== "" ||
-          shells === undefined ||
-          shells.length >= 8
-        }
-        onClick={() => {
-          onSelect();
-          void create();
-        }}
-      >
-        <PlusIcon />
-        New shell
-      </DropdownMenuItem>
+      {unavailable.map((shell) => (
+        <DropdownMenuItem
+          key={shell.id}
+          value={`shell:${shell.id}`}
+          disabled
+          className="[&>svg:last-child]:hidden"
+        >
+          <TerminalIcon />
+          <span className="min-w-0 flex-1 truncate">{shell.title}</span>
+          <span className="ml-auto text-muted-foreground">Unavailable</span>
+        </DropdownMenuItem>
+      ))}
+      {showCreate && (
+        <DropdownMenuItem
+          value="new-shell"
+          className="min-h-7 py-1"
+          disabled={
+            !canCreate ||
+            runtimeError !== "" ||
+            error !== "" ||
+            shells === undefined ||
+            shells.length >= 8
+          }
+          onSelect={() => {
+            onSelect();
+            void create();
+          }}
+        >
+          <PlusIcon />
+          New shell
+        </DropdownMenuItem>
+      )}
     </DropdownMenuGroup>
   );
 }

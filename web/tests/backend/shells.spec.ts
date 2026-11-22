@@ -90,7 +90,7 @@ test("machine stop and wake keep old shells ended and never replace the containe
   await page.goto(`${backend.url}/#chats/${backend.otherChatID}`);
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "New shell", exact: true })).toBeDisabled();
-  await expect(page.getByRole("menu", { name: "Chat views", exact: true }).getByRole("alert")).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Chat views", exact: true }).getByRole("alert")).toHaveCount(0);
 });
 
 
@@ -103,7 +103,7 @@ test("New shell wakes the saved sleeping machine and keeps unavailable actions d
   await page.getByRole("menuitem", { name: "Stop machine", exact: true }).click();
   await expect.poll(() => page.evaluate(async id => (await (await fetch(`/api/chats/${id}/runtime`)).json()).state, backend.chatID)).toBe("stopped");
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
-  const menu = page.getByRole("menu", { name: "Chat views", exact: true });
+  const menu = page.getByRole("dialog", { name: "Chat views", exact: true });
   await expect(menu.getByRole("menuitem", { name: "New shell", exact: true })).toBeEnabled();
   await menu.getByRole("menuitem", { name: "New shell", exact: true }).click();
   await expect(menu).toHaveCount(0);

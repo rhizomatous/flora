@@ -1,4 +1,3 @@
-/* oxlint-disable import/max-dependencies -- Chat controls compose summary, panel, and machine actions. */
 import { useState, type ReactNode } from "react";
 
 import {
@@ -7,9 +6,6 @@ import {
   HoverCardTrigger,
   HoverCardContent,
   Button,
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   Popover,
@@ -18,26 +14,21 @@ import {
   PopoverTitle,
   PopoverDescription,
   CloudIcon,
-  GitBranchIcon,
   GitPullRequestIcon,
   ChevronDownIcon,
-  PlusIcon,
   PanelRightIcon,
   ExternalLinkIcon,
   CopyIcon,
-  FilesIcon,
-  ListIcon,
 } from "@flora/florets";
 
 import { ChatOrganizationActions } from "./chat-organization-actions";
 import type { Chat, Usage, ContextUsage } from "./chat-schemas";
 import { ChatSummary } from "./chat-summary";
+import { ChatViewMenu } from "./chat-view-menu";
 import { ContextUsagePopover } from "./context-usage";
 import { PullCount, PullList } from "./pull-links";
 import type { PullSummary } from "./pull-schemas";
-import { KeepAwakeItem, RuntimeMenu, StopMachineItem } from "./runtime-controls";
-import { ShellMenuItems } from "./shells";
-import { SubagentMenuItems } from "./subagents";
+import { RuntimeMenu, StopMachineItem } from "./runtime-controls";
 
 /** Shows saved chat metadata and linked pull requests. */
 export function ChatTitle({
@@ -97,92 +88,11 @@ export function ChatTitle({
   );
 }
 
-export function ChatViewMenu({
-  chatID,
-  label = "Chat views",
-  diffsOpen,
-  onDiffsChange,
-  onFilesOpen,
-  filesOpen = false,
-  overviewActive = !diffsOpen && !filesOpen,
-}: {
-  chatID?: string | undefined;
-  label?: string;
-  diffsOpen: boolean;
-  onDiffsChange: (open: boolean) => void;
-  onFilesOpen: () => void;
-  filesOpen?: boolean;
-  overviewActive?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger
-        render={
-          <Button variant="ghost" size="icon-sm" aria-label={label}>
-            <PlusIcon />
-          </Button>
-        }
-      />
-      <DropdownMenuContent
-        align="start"
-        className={`${chatID === undefined ? "w-64" : "w-80"} max-w-[calc(100vw-24px)]`}
-      >
-        <DropdownMenuItem
-          onClick={() => {
-            onDiffsChange(false);
-          }}
-        >
-          <ListIcon />
-          Overview
-          {overviewActive && (
-            <span className="ml-auto shrink-0 whitespace-nowrap text-muted-foreground">
-              Current view
-            </span>
-          )}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => {
-            onDiffsChange(true);
-          }}
-        >
-          <GitBranchIcon />
-          Diffs
-          {diffsOpen && (
-            <span className="ml-auto shrink-0 whitespace-nowrap text-muted-foreground">Open</span>
-          )}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onFilesOpen}>
-          <FilesIcon />
-          Files
-          {filesOpen && <span className="ml-auto text-muted-foreground">Current view</span>}
-        </DropdownMenuItem>
-        <SubagentMenuItems />
-        <DropdownMenuSeparator />
-        {chatID !== undefined && (
-          <ShellMenuItems
-            key={chatID}
-            chatID={chatID}
-            open={open}
-            onSelect={() => {
-              setOpen(false);
-            }}
-          />
-        )}
-        {chatID !== undefined && (
-          <>
-            <DropdownMenuSeparator />
-            <KeepAwakeItem key={chatID} id={chatID} open={open} />
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+export { ChatViewMenu } from "./chat-view-menu";
 
 export function ChatHeaderActions({
   chat,
+  pulls,
   sideOpen,
   onSideToggle,
   usage,
@@ -193,6 +103,7 @@ export function ChatHeaderActions({
   overviewActive,
 }: {
   chat: Chat | undefined;
+  pulls: PullSummary | undefined;
   sideOpen: boolean;
   onSideToggle: () => void;
   usage: Usage | undefined;
@@ -223,6 +134,7 @@ export function ChatHeaderActions({
     <>
       <ChatViewMenu
         chatID={chat?.ID}
+        pulls={pulls}
         diffsOpen={diffsOpen}
         onDiffsChange={onDiffsChange}
         onFilesOpen={onFilesOpen}

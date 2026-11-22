@@ -173,6 +173,7 @@ export function ChatSidePanel({
               ))}
             </TabsList>
             <ChatViewMenu
+              pulls={pulls}
               chatID={chatID}
               onFilesOpen={() => {
                 update({
@@ -189,6 +190,7 @@ export function ChatSidePanel({
                 });
               }}
               label="Side panel views"
+              overviewActive={view === "overview"}
               diffsOpen={view === "diffs"}
               onDiffsChange={(open) => {
                 update({ diffOpen: open || diffOpen, view: open ? "diffs" : "overview" });
