@@ -1,0 +1,79 @@
+import { useEffect, useState } from "react";
+
+import type { Chat } from "./chat-schemas";
+import { chatStatus } from "./chat-status";
+import { PullList } from "./pull-links";
+import type { PullSummary } from "./pull-schemas";
+import { ReportedModelSummary } from "./reported-model-summary";
+
+/** Title and sidebar previews show the same saved identity and useful related work. */
+export function ChatSummary({
+  chat,
+  title,
+  pulls,
+  now: suppliedNow,
+}: {
+  chat: Chat | undefined;
+  title: string;
+  pulls: PullSummary | undefined;
+  now?: number;
+}) {
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    if (suppliedNow !== undefined) return;
+    const timer = setInterval(() => {
+      setClock(Date.now());
+    }, 60_000);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [suppliedNow]);
+  const age = chat ? Math.max(0, (suppliedNow ?? clock) - Date.parse(chat.UpdatedAt)) : Number.NaN;
+  let relative = "";
+  if (Number.isFinite(age)) {
+    if (age < 60_000) relative = "Just now";
+    else if (age < 3_600_000) relative = `${Math.floor(age / 60_000)}m ago`;
+    else if (age < 86_400_000) relative = `${Math.floor(age / 3_600_000)}h ago`;
+    else relative = `${Math.floor(age / 86_400_000)}d ago`;
+  }
+  return (
+    <div className="chat-summary">
+      <div className="chat-summary-meta">
+        {chat && (
+          <span className="chat-summary-id" title={chat.ID} aria-label={`Chat ID: ${chat.ID}`}>
+            Chat {chat.ID.slice(0, 6)}
+          </span>
+        )}
+        <ReportedModelSummary summary={chat?.reportedModel} />
+      </div>
+      <p className="chat-summary-title">{title}</p>
+      <div className="chat-summary-footer">
+        <span title={chat?.StatusReason}>{chat ? chatStatus(chat).label : "Loading"}</span>
+        {chat && relative && (
+          <time dateTime={chat.UpdatedAt} title={new Date(chat.UpdatedAt).toLocaleString()}>
+            {relative}
+          </time>
+        )}
+      </div>
+      {((pulls?.items.length ?? 0) > 0 || (pulls?.error ?? "") !== "") && (
+        <section aria-label="Pull requests" className="chat-summary-section">
+          <p className="chat-summary-section-label">Pull requests</p>
+          <PullList summary={pulls} chatID={chat?.ID} />
+        </section>
+      )}
+      {(chat?.subagents?.length ?? 0) > 0 && (
+        <section aria-label="Subagents" className="chat-summary-section">
+          <p className="chat-summary-section-label">Subagents</p>
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
+            {chat?.subagents?.map((agent) => (
+              <div key={agent.id} className="contents">
+                <dt className="text-muted-foreground">Subagent {agent.number}</dt>
+                <dd className="min-w-0 wrap-anywhere">{agent.title || "Delegated task"}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
+    </div>
+  );
+}

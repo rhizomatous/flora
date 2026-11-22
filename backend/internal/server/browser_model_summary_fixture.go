@@ -50,6 +50,26 @@ func seedModelSummaries(ctx context.Context, store *storage.Store, project stora
 				return "", "", err
 			}
 		}
+		if i == 0 {
+			accepted, acceptErr := store.AcceptMessage(ctx, c.ID, "preview-task", "Review keyboard navigation in the chat view. Make actions easy to find and keep drafts intact.")
+			if acceptErr != nil {
+				return "", "", acceptErr
+			}
+			text := "The chat view keeps the task in focus, with secondary details available when you need them.\n\n### Keyboard navigation\n\n- Tab through the sidebar and chat controls in reading order.\n- Focus a chat title to see its model and saved state.\n- Press Escape to close a summary and keep your place.\n\n### Drafts stay with the chat\n\nYour follow-up stays in the composer when you switch views or reload. Model choices apply to the next message; saved summaries show what handled earlier responses."
+			raw, marshalErr := json.Marshal(map[string]any{
+				"info":  map[string]any{"id": "preview-response", "role": "assistant", "providerID": "anthropic", "modelID": "claude-haiku-4-5", "time": map[string]int{"created": 5, "completed": 6}},
+				"parts": []map[string]any{{"type": "text", "text": text}},
+			})
+			if marshalErr != nil {
+				return "", "", marshalErr
+			}
+			if err = store.SaveRuntimeMessage(ctx, "preview-response", storage.Message{ChatID: c.ID, RuntimeMessageID: "preview-response", Role: "assistant", Text: text, Provider: "anthropic", Model: "claude-haiku-4-5", Payload: raw}); err != nil {
+				return "", "", err
+			}
+			if err = store.CompleteTurn(ctx, c.ID, accepted.Message.ID, "Review complete"); err != nil {
+				return "", "", err
+			}
+		}
 		if err = store.Transition(ctx, c.ID, "", storage.Stopped, "Machine stopped"); err != nil {
 			return "", "", err
 		}

@@ -158,11 +158,9 @@ test("shared composer stays compact and preserves drafts", async ({ page }) => {
     await page.getByRole("button", { name: "Context usage", exact: true }).click();
     await expect(page.getByRole("progressbar", { name: "Context window used" })).toBeVisible();
     await page.keyboard.press("Escape");
-    const review = page.getByRole("button", { name: "Linked pull requests (0)", exact: true });
-    await review.click();
-    await expect(page.getByText("No linked pull requests yet.", { exact: true })).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.getByText("No linked pull requests yet.", { exact: true })).toBeHidden();
+    await expect(
+      page.getByRole("button", { name: "Linked pull requests (0)", exact: true }),
+    ).toHaveCount(0);
     await expect(followUp).toHaveValue("Draft a follow-up");
   }
   assert.deepEqual(errors, []);
@@ -177,7 +175,7 @@ test("title summary opens independently of the plus menu", async ({ page }) => {
   await title.hover();
   await expect(summary).toBeVisible();
   await expect(summary.getByText("Idle", { exact: true })).toBeVisible();
-  await expect(summary.getByText("completed", { exact: true })).toBeVisible();
+  await expect(summary.getByLabel("Chat ID: completed", { exact: true })).toBeVisible();
   await expect(summary.locator("time")).toHaveAttribute("datetime", /.+/);
   await page.keyboard.press("Escape");
   await expect(summary).toBeHidden();

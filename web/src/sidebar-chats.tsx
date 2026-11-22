@@ -28,10 +28,10 @@ import { pinnedChats } from "./chat-organization";
 import { ChatOrganizationActions } from "./chat-organization-actions";
 import type { Chat } from "./chat-schemas";
 import { chatStatus } from "./chat-status";
+import { ChatSummary } from "./chat-summary";
 import { useFolders } from "./folder-state";
 import { UnreadDot } from "./mark-chats-read";
-import { PullCount, PullList } from "./pull-links";
-import { ReportedModelSummary } from "./reported-model-summary";
+import { PullCount } from "./pull-links";
 import { isChatSeen, useMarkChatsRead } from "./sidebar-status";
 
 type Project = { id: string; name: string };
@@ -72,7 +72,10 @@ function ChatRow({
               href={`#chats/${chat.ID}`}
               aria-current={path === `chats/${chat.ID}` ? "page" : undefined}
               className="florets-navigation-link"
-              onClick={close}
+              onClick={() => {
+                setSummaryOpen(false);
+                close();
+              }}
               onFocus={() => {
                 setSummaryOpen(true);
               }}
@@ -95,8 +98,12 @@ function ChatRow({
                   {projectName !== undefined && (
                     <span className="max-w-28 truncate">{projectName}</span>
                   )}
-                  <span>{status.label}</span>
-                  <PullCount pulls={chat.pulls?.items ?? []} />
+                  {(chat.Status === "working" ||
+                    chat.Status === "waiting" ||
+                    chat.Status === "failed") && <span>{status.label}</span>}
+                  {(chat.pulls?.items.length ?? 0) > 0 && (
+                    <PullCount pulls={chat.pulls?.items ?? []} />
+                  )}
                 </span>
               </span>
               <time
@@ -113,36 +120,13 @@ function ChatRow({
           side="right"
           align="start"
           density="compact"
-          className="sidebar-chat-preview florets-menu-surface w-[420px]! max-w-[calc(100vw-32px)]! wrap-anywhere"
+          className="sidebar-chat-preview chat-summary-card"
         >
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-            <span className="truncate">{chat.ID}</span>
-            <ReportedModelSummary summary={chat.reportedModel} />
-          </div>
-          <p className="mt-2">{chat.Title || "Chat"}</p>
-          {((chat.pulls?.items.length ?? 0) > 0 || (chat.pulls?.error ?? "") !== "") && (
-            <div className="mt-3 border-t border-border pt-2">
-              <p className="mb-1 text-xs text-muted-foreground">Pull requests</p>
-              <PullList summary={chat.pulls} chatID={chat.ID} />
-            </div>
-          )}
-          {(chat.subagents?.length ?? 0) > 0 && (
-            <section aria-label="Subagents" className="mt-3 border-t border-border pt-2">
-              <p className="mb-2 text-xs text-muted-foreground">Subagents</p>
-              <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
-                {chat.subagents?.map((agent) => (
-                  <div key={agent.id} className="contents">
-                    <dt className="text-muted-foreground">Subagent {agent.number}</dt>
-                    <dd>{agent.title || "Delegated task"}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-          )}
+          <ChatSummary chat={chat} title={chat.Title || "Chat"} pulls={chat.pulls} now={now} />
         </HoverCardContent>
       </HoverCard>
       <div className="florets-navigation-actions">
-        <ChatOrganizationActions chat={chat} quick />
+        <ChatOrganizationActions chat={chat} />
       </div>
     </li>
   );

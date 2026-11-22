@@ -6,3 +6,65 @@
 .composer-accessories .chat-scroll-latest[data-active="false"] {
   display: none;
 }
+
+.chat-summary-card {
+  width: 420px;
+  max-width: calc(100vw - 24px);
+  padding: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.chat-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.chat-summary-id {
+  flex-shrink: 0;
+}
+.chat-summary-meta .chat-summary-model {
+  max-width: 100%;
+}
+.chat-summary-title {
+  margin-top: 10px;
+  color: var(--foreground);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.chat-summary-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.chat-summary-section {
+  margin-top: 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.chat-summary-section-label {
+  margin-bottom: 8px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.chat-header .chat-title {
+  height: 32px;
+  padding-inline: 10px;
+  font-size: 14px;
+}
+.composer-accessories:has(> .chat-scroll-latest[data-active="false"]:only-child) {
+  display: none;
+}
+.composer-review:has(
+  > .composer-accessories:only-child > .chat-scroll-latest[data-active="false"]:only-child
+) {
+  padding: 0;
+}

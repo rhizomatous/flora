@@ -216,7 +216,7 @@ export function Composer({
         name="text"
         className="composer-textarea"
         rows={1}
-        placeholder="Ask anything, / for commands, @ for context"
+        placeholder={label === "Follow-up" ? "Ask a follow-up…" : "Describe a task…"}
         value={message}
         onChange={(event) => {
           onChange(event.target.value);

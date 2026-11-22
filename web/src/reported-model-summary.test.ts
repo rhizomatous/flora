@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { reportedModelLabel } from "./reported-model-label";
+import { reportedModelLabel, reportedModelName } from "./reported-model-label";
 
 describe("reported model labels", () => {
   it("distinguishes missing summaries, no calls, and unreported metadata", () => {
@@ -12,6 +12,19 @@ describe("reported model labels", () => {
     expect(
       reportedModelLabel({ latest: { provider: "", model: "custom-model" }, models: 1 }).label,
     ).toContain("Provider not reported / custom-model");
+  });
+
+  it.each([
+    ["claude-haiku-4-5", "Claude Haiku 4.5"],
+    ["claude-sonnet-4-6", "Claude Sonnet 4.6"],
+    ["claude-sonnet-4-20250514", "Claude Sonnet 4"],
+    ["gpt-5.1-mini", "GPT-5.1 mini"],
+    ["custom-model-2026", "custom-model-2026"],
+  ])("formats reported ID %s without changing its identity", (id, name) => {
+    expect(reportedModelName(id)).toBe(name);
+    expect(
+      reportedModelLabel({ latest: { provider: "provider", model: id }, models: 1 }).label,
+    ).toContain(id);
   });
 
   it("preserves reported IDs and explains model changes", () => {

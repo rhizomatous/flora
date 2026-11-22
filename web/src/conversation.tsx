@@ -5,6 +5,7 @@ import {
   Button,
   FlowerMark,
   CrossCircledIcon,
+  CopyIcon,
   Message as ChatMessage,
   MessageContent,
   Bubble,
@@ -105,8 +106,12 @@ export function ConversationMessage({
                 void copy();
               }}
               aria-label="Copy message"
+              title={copyStatus}
             >
-              <span role="status">{copyStatus}</span>
+              <CopyIcon className="size-3.5" aria-hidden="true" />
+              <span role="status" className={copyStatus === "Copy" ? "sr-only" : ""}>
+                {copyStatus}
+              </span>
             </Button>
           )}
         </MessageContent>

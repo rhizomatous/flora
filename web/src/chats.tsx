@@ -818,7 +818,11 @@ function ChatDetail({
               {(chat.Status === "failed" ||
                 chat.Status === "stopped" ||
                 chat.StatusReason.includes("interrupted")) &&
-                chat.StatusReason !== "" && <Text role="status">{chat.StatusReason}</Text>}
+                chat.StatusReason !== "" && (
+                  <Text role="status" className="text-xs text-muted-foreground">
+                    {chat.StatusReason}
+                  </Text>
+                )}
             </MessageScrollerContent>
           </MessageScrollerViewport>
           <ChatTurnNavigation rows={rows} />
