@@ -21,10 +21,13 @@ import (
 )
 
 func chatError(w http.ResponseWriter, err error) {
+	var environment *storage.EnvironmentError
 	var capacity *provisioning.CapacityError
 	var control *chat.ControlError
 	var attachment *storage.AttachmentError
 	switch {
+	case errors.As(err, &environment):
+		failure(w, 400, environment.Message)
 	case errors.As(err, &capacity):
 		failure(w, 409, capacity.Error())
 	case errors.As(err, &attachment):
@@ -319,13 +322,14 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			return
 		}
 		var in struct {
-			Branches    map[string]string          `json:"branches"`
-			Execution   *storage.Execution         `json:"execution"`
-			Title       string                     `json:"title"`
-			RequestID   string                     `json:"requestID"`
-			Text        string                     `json:"text"`
-			Attachments []string                   `json:"attachments"`
-			References  []storage.ContextReference `json:"references"`
+			Environment []storage.EnvironmentChange `json:"environment"`
+			Branches    map[string]string           `json:"branches"`
+			Execution   *storage.Execution          `json:"execution"`
+			Title       string                      `json:"title"`
+			RequestID   string                      `json:"requestID"`
+			Text        string                      `json:"text"`
+			Attachments []string                    `json:"attachments"`
+			References  []storage.ContextReference  `json:"references"`
 		}
 		if !decodeChat(w, r, &in) {
 			return
@@ -343,7 +347,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 				return
 			}
 		}
-		c, err := a.chats.CreateWithContext(r.Context(), r.PathValue("id"), in.Title, in.RequestID, in.Text, in.Execution, in.Branches, in.References, in.Attachments...)
+		c, err := a.chats.CreateWithEnvironment(r.Context(), r.PathValue("id"), in.Title, in.RequestID, in.Text, in.Execution, in.Branches, in.References, in.Environment, in.Attachments...)
 		if err != nil {
 			chatError(w, err)
 			return

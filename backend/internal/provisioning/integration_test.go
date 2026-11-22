@@ -282,9 +282,20 @@ func TestProvisioningDocker(t *testing.T) {
 	})
 
 	t.Run("setup failure timeout and explicit retry", func(t *testing.T) {
-		setup := "printf 'setup attempt running\\n'; printf 'attempt\\n' >> /home/flora/setup/attempts; if [ ! -f /home/flora/setup/retry ]; then touch /home/flora/setup/retry; exit 23; fi"
+		isolatedConfig := cfg
+		isolatedConfig.MaxRunning = 1000
+		isolated, err := New(engine, store, isolatedConfig, checkout)
+		if err != nil {
+			t.Fatal(err)
+		}
+		isolated.health = healthy
+		m := isolated
+		if err := store.SaveEnvironment(ctx, "installation", "", []storage.EnvironmentChange{{Name: "TASK_REGION", Action: "set", Value: "fixture-region"}, {Name: "SERVICE_TOKEN", Action: "replace", Value: "fixture_service_secret_124", Secret: true}}); err != nil {
+			t.Fatal(err)
+		}
+		setup := `test "$TASK_REGION" = fixture-region && test "$SERVICE_TOKEN" = fixture_service_secret_124 || exit 42; printf "%s" "$SERVICE_TOKEN"; printf 'setup attempt running\n'; printf 'attempt\n' >> /home/flora/setup/attempts; if [ ! -f /home/flora/setup/retry ]; then touch /home/flora/setup/retry; exit 23; fi`
 		chat := newChatWithSetup("setup-failure", setup)
-		_, err := m.Start(ctx, chat.ID)
+		_, err = m.Start(ctx, chat.ID)
 		saved, serr := store.Chat(ctx, chat.ID)
 		if serr == nil && saved.ContainerID != "" {
 			containers = append(containers, saved.ContainerID)
@@ -296,6 +307,12 @@ func TestProvisioningDocker(t *testing.T) {
 		if setupErr.ExitCode != 23 || !strings.Contains(setupErr.OutputTail, "setup attempt") {
 			t.Fatalf("setup error must carry exit status and output: %+v", setupErr)
 		}
+		if strings.Contains(setupErr.OutputTail, "fixture_service_secret_124") || !strings.Contains(setupErr.OutputTail, "[redacted]") {
+			t.Fatal("setup secret was not redacted")
+		}
+		if err := store.SaveEnvironment(ctx, "installation", "", []storage.EnvironmentChange{{Name: "SERVICE_TOKEN", Action: "replace", Value: "changed_fixture_secret", Secret: true}}); err != nil {
+			t.Fatal(err)
+		}
 		// Explicit retry: the same failed setup now succeeds.
 		endpoint, err := m.Start(ctx, chat.ID)
 		if err != nil {
@@ -304,7 +321,67 @@ func TestProvisioningDocker(t *testing.T) {
 		if code, _ := get(endpoint, true); code != http.StatusOK {
 			t.Fatal("runtime must become ready after retried setup")
 		}
-		// Free the slot for the capacity subtest.
+		exit, err := engine.Exec(ctx, endpoint.ContainerID, "flora", []string{"sh", "-c", `test "$TASK_REGION" = fixture-region && test "$SERVICE_TOKEN" = fixture_service_secret_124`}, nil, io.Discard, io.Discard)
+		if err != nil || exit != 0 {
+			t.Fatal("runtime container lost frozen environment")
+		}
+		requestRuntime := func(path string, body any) []byte {
+			t.Helper()
+			raw, _ := json.Marshal(body)
+			method := "POST"
+			if body == nil {
+				method = "GET"
+			}
+			req, err := http.NewRequestWithContext(ctx, method, endpoint.URL+path, strings.NewReader(string(raw)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			req.SetBasicAuth(endpoint.Username, endpoint.Password)
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer res.Body.Close()
+			result, err := io.ReadAll(res.Body)
+			if err != nil || res.StatusCode != 200 {
+				t.Fatal("runtime execution request failed")
+			}
+			return result
+		}
+		rawSession := requestRuntime("/session", map[string]any{})
+		var session struct {
+			ID string `json:"id"`
+		}
+		if json.Unmarshal(rawSession, &session) != nil || session.ID == "" {
+			t.Fatal("runtime session unavailable")
+		}
+		requestRuntime("/session/"+session.ID+"/shell", map[string]any{"agent": "build", "command": `test "$TASK_REGION" = fixture-region && test "$SERVICE_TOKEN" = fixture_service_secret_124 && printf environment-delivered`})
+		rawHistory := requestRuntime("/session/"+session.ID+"/message", nil)
+		var history []struct {
+			Parts []struct {
+				Type  string
+				State struct {
+					Status string
+					Output string
+				}
+			}
+		}
+		if json.Unmarshal(rawHistory, &history) != nil {
+			t.Fatal("runtime history unavailable")
+		}
+		delivered := false
+		for _, message := range history {
+			for _, part := range message.Parts {
+				if part.Type == "tool" && part.State.Status == "completed" && part.State.Output == "environment-delivered" {
+					delivered = true
+				}
+			}
+		}
+		if !delivered {
+			t.Fatal("runtime shell did not receive frozen environment")
+		}
+
 		if err := m.Stop(ctx, chat.ID); err != nil {
 			t.Fatal(err)
 		}

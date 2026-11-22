@@ -138,7 +138,7 @@ func TestExecutionUpgradePreservesLegacyRequests(t *testing.T) {
 	first, err := s.AcceptMessage(ctx, c.ID, "old-create", "Old prompt")
 	must(t, err)
 	must(t, s.CompleteTurn(ctx, c.ID, first.Message.ID, "Done"))
-	_, err = s.db.Exec(`DROP TABLE compaction_choices; DROP INDEX chats_folder; ALTER TABLE chats DROP COLUMN folder_id; DROP TABLE chat_folders; UPDATE messages SET payload='{}' WHERE id=?; DROP TABLE chat_read_state; ALTER TABLE chat_requests DROP COLUMN context_references; ALTER TABLE chat_requests DROP COLUMN branches; ALTER TABLE chats DROP COLUMN execution; ALTER TABLE chat_requests DROP COLUMN selection; PRAGMA user_version=14`, first.Message.ID)
+	_, err = s.db.Exec(`DROP TABLE chat_environment_requests; DROP TABLE environment_variables; DROP TABLE compaction_choices; DROP INDEX chats_folder; ALTER TABLE chats DROP COLUMN folder_id; DROP TABLE chat_folders; UPDATE messages SET payload='{}' WHERE id=?; DROP TABLE chat_read_state; ALTER TABLE chat_requests DROP COLUMN context_references; ALTER TABLE chat_requests DROP COLUMN branches; ALTER TABLE chats DROP COLUMN execution; ALTER TABLE chat_requests DROP COLUMN selection; PRAGMA user_version=14`, first.Message.ID)
 	must(t, err)
 	must(t, s.Close())
 	s = openTest(t, root)

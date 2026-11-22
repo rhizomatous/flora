@@ -65,6 +65,10 @@ func (s *Service) CreateWithBranches(ctx context.Context, project, title, reques
 	return s.CreateWithContext(ctx, project, title, requestID, text, selection, branches, nil, attachments...)
 }
 func (s *Service) CreateWithContext(ctx context.Context, project, title, requestID, text string, selection *storage.Execution, branches map[string]string, references []storage.ContextReference, attachments ...string) (storage.Chat, error) {
+	return s.CreateWithEnvironment(ctx, project, title, requestID, text, selection, branches, references, nil, attachments...)
+}
+func (s *Service) CreateWithEnvironment(ctx context.Context, project, title, requestID, text string, selection *storage.Execution, branches map[string]string, references []storage.ContextReference, environment []storage.EnvironmentChange, attachments ...string) (storage.Chat, error) {
+
 	if s.provisioner == nil {
 		return storage.Chat{}, errors.New("chat runtime is not configured")
 	}
@@ -85,7 +89,7 @@ func (s *Service) CreateWithContext(ctx context.Context, project, title, request
 		return storage.Chat{}, reservedErr
 	}
 	image, harness := s.provisioner.Identity()
-	c, err := s.Store.CreateChatRequestWithContext(ctx, project, title, image, harness, requestID, text, selection, branches, references, attachments...)
+	c, err := s.Store.CreateChatRequestWithEnvironment(ctx, project, title, image, harness, requestID, text, selection, branches, references, environment, attachments...)
 	if err != nil {
 		return c, err
 	}

@@ -1,6 +1,10 @@
-import { useState, type SubmitEvent } from "react";
+import { useRef, useState, type SubmitEvent } from "react";
 
 import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   DropdownButton,
   DropdownMenu,
   DropdownMenuTrigger,
@@ -17,11 +21,14 @@ import {
 } from "@flora/florets";
 
 import { ChatBranchPicker } from "./chat-branch-picker";
-import { Composer, PlaceholderMenu } from "./composer";
+import { Composer } from "./composer";
+import { EnvironmentEditor, type EnvironmentChange } from "./environment";
+
+const environmentDrafts = new Map<string, EnvironmentChange[]>();
 
 export type ComposerProject = { id: string; name: string };
 
-/** Selects the saved project and submits text; unfinished controls expose their availability in menus. */
+/** Keeps project drafts and submits the first message with runtime overrides. */
 export function NewChatComposer({
   projects,
   selectedProject,
@@ -44,6 +51,16 @@ export function NewChatComposer({
       return "";
     }
   });
+  const [environmentOpen, setEnvironmentOpen] = useState(false);
+  const settingsButton = useRef<HTMLButtonElement>(null);
+  const scope = selectedProject?.id ?? "";
+  const [environment, setEnvironment] = useState<EnvironmentChange[]>(
+    () => environmentDrafts.get(scope) ?? [],
+  );
+  function editEnvironment(changes: EnvironmentChange[]) {
+    setEnvironment(changes);
+    environmentDrafts.set(scope, changes);
+  }
   const [search, setSearch] = useState("");
   const [projectOpen, setProjectOpen] = useState(false);
   return (
@@ -51,6 +68,8 @@ export function NewChatComposer({
       onSubmit={onSend}
       onReset={() => {
         setMessage("");
+        setEnvironment([]);
+        environmentDrafts.delete(scope);
         try {
           sessionStorage.removeItem(`flora-draft:new:${selectedProject?.id ?? ""}`);
         } catch {
@@ -59,6 +78,24 @@ export function NewChatComposer({
       }}
       className="chat-composer new-chat-composer"
     >
+      <input type="hidden" name="environment" value={JSON.stringify(environment)} />
+      <Dialog open={environmentOpen} onOpenChange={setEnvironmentOpen}>
+        <DialogContent
+          finalFocus={settingsButton}
+          className="max-h-[85dvh] overflow-y-auto sm:max-w-xl"
+        >
+          <DialogTitle>Environment variables</DialogTitle>
+          <EnvironmentEditor
+            path={`projects/${encodeURIComponent(selectedProject?.id ?? "")}/environment/effective`}
+            draft={environment}
+            onEditing={editEnvironment}
+            onDraft={(changes) => {
+              editEnvironment(changes);
+              setEnvironmentOpen(false);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
       <div className="composer-topbar">
         <input type="hidden" name="project" value={selectedProject?.id ?? ""} />
         <DropdownMenu
@@ -164,16 +201,40 @@ export function NewChatComposer({
         canSend={!busy}
         sendLabel={busy ? "Starting chat" : "Start chat"}
         settings={
-          <PlaceholderMenu
-            label="Chat settings"
-            iconOnly
-            items={[
-              { label: "Environment variables", icon: <KeyRoundIcon /> },
-              { label: "MCP servers", icon: <PuzzleIcon /> },
-            ]}
-          >
-            <SlidersHorizontalIcon />
-          </PlaceholderMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-compact"
+                  ref={settingsButton}
+                  aria-label="Chat settings"
+                  disabled={busy}
+                >
+                  <SlidersHorizontalIcon />
+                </Button>
+              }
+            />
+            <DropdownMenuContent
+              align="start"
+              side="top"
+              className="composer-menu w-[260px]! max-w-[calc(100vw-24px)]"
+            >
+              <DropdownMenuItem
+                onClick={() => {
+                  setEnvironmentOpen(true);
+                }}
+              >
+                <KeyRoundIcon />
+                Environment variables
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled>
+                <PuzzleIcon />
+                MCP servers
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
     </form>

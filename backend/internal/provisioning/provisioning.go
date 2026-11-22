@@ -396,7 +396,12 @@ func (m *Manager) start(ctx context.Context, chatID string, existingOnly bool) (
 			if err != nil {
 				return Endpoint{}, err
 			}
+			environment, _, err := m.store.RuntimeEnvironment(ctx, chat.ID)
+			if err != nil {
+				return Endpoint{}, err
+			}
 			spec := m.containerSpec(chat, paths, password, uid, gid)
+			spec.Env = append(spec.Env, environment...)
 			credentials, credentialsErr := m.store.Credentials(ctx)
 			if credentialsErr == nil {
 				keyName := map[string]string{"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "google": "GOOGLE_GENERATIVE_AI_API_KEY"}[credentials.Provider]
