@@ -129,6 +129,38 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 		}
 		jsonResponse(w, 200, a.chats.Models(r.Context(), id))
 	})
+	mux.HandleFunc("GET /api/chats/{id}/compaction", func(w http.ResponseWriter, r *http.Request) {
+		if a.chats == nil {
+			failure(w, 503, "Chat runtime is not configured.")
+			return
+		}
+		result, err := a.chats.Compaction(r.Context(), r.PathValue("id"))
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		jsonResponse(w, 200, result)
+	})
+	mux.HandleFunc("PATCH /api/chats/{id}/compaction", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Provider  string `json:"provider"`
+			Model     string `json:"model"`
+			Threshold *int64 `json:"threshold"`
+		}
+		if !decodeChat(w, r, &in) {
+			return
+		}
+		if a.chats == nil {
+			failure(w, 503, "Chat runtime is not configured.")
+			return
+		}
+		result, err := a.chats.SetCompaction(r.Context(), r.PathValue("id"), storage.Execution{Provider: in.Provider, Model: in.Model}, in.Threshold)
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		jsonResponse(w, 200, result)
+	})
 	mux.HandleFunc("PATCH /api/chats/{id}/model", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			Execution storage.Execution `json:"execution"`

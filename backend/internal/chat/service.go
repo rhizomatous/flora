@@ -141,6 +141,18 @@ func (s *Service) SubmitWithContext(ctx context.Context, chatID, requestID, text
 			return storage.Acceptance{}, &ControlError{Reason: reason}
 		}
 	}
+	compactionModel := effective
+	if compactionModel.Model == "" {
+		credentials, err := s.Store.Credentials(ctx)
+		if err != nil {
+			return storage.Acceptance{}, err
+		}
+		compactionModel = storage.Execution{Provider: credentials.Provider, Model: credentials.Model}
+	}
+	threshold, err := s.Store.CompactionThreshold(ctx, chatID, compactionModel)
+	if err != nil {
+		return storage.Acceptance{}, err
+	}
 	a, err := s.Store.AcceptMessageWithContext(ctx, chatID, requestID, text, selection, references, attachments...)
 	if err != nil || a.Duplicate {
 		return a, err
@@ -148,7 +160,7 @@ func (s *Service) SubmitWithContext(ctx context.Context, chatID, requestID, text
 	// Only the process that first accepts the message starts delivery. A crash
 	// between acceptance and launch leaves saved uncertainty, never an auto-retry.
 	workerCtx, cancel := context.WithCancel(s.ctx)
-	job := &turnJob{cancel: cancel, done: make(chan struct{}), resume: c.Status == storage.Stopped}
+	job := &turnJob{cancel: cancel, done: make(chan struct{}), resume: c.Status == storage.Stopped, compactionThreshold: threshold}
 	s.turnMu.Lock()
 	s.jobs[chatID] = job
 	s.turnMu.Unlock()
@@ -292,6 +304,13 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 			fail("The selected model or reasoning effort is unavailable in this runtime. No message was delivered. Choose another configuration and send again.")
 			return
 		}
+	}
+	compactCtx, compactCancel := context.WithTimeout(ctx, 15*time.Second)
+	compactErr := s.applyCompaction(compactCtx, rt, c, execution, job.compactionThreshold)
+	compactCancel()
+	if compactErr != nil {
+		fail("The saved compaction threshold could not be applied. No message was delivered. Restore the runtime default in Context or retry.")
+		return
 	}
 	selectedCredentials := credentials
 	selectedCredentials.Provider, selectedCredentials.Model = execution.Provider, execution.Model

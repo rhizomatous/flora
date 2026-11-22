@@ -42,7 +42,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		return newShellBrowserInstance()
 	}
 	switch scenario {
-	case "model-summary", "models", "chat", "changes", "enrollment", "credential-setup", "notifications", "projects", "settings", "workspace", "branches", "context":
+	case "compaction", "model-summary", "models", "chat", "changes", "enrollment", "credential-setup", "notifications", "projects", "settings", "workspace", "branches", "context":
 	default:
 		return nil, fmt.Errorf("unknown browser scenario %q", scenario)
 	}
@@ -81,12 +81,44 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 			return nil, err
 		}
 	} else {
-		fixture, err = testfixture.New(ctx, directory, scenario == "chat" || scenario == "settings" || scenario == "notifications")
+		fixture, err = testfixture.New(ctx, directory, scenario == "chat" || scenario == "settings" || scenario == "notifications", scenario == "compaction")
 		if err != nil {
 			return nil, err
 		}
 		cleanup = append(cleanup, fixture.Close)
 		store, authentication = fixture.Store, fixture.Auth
+	}
+	if scenario == "compaction" {
+		c, e := store.CreateChat(ctx, fixture.Project.ID, "Plan the garden", "flora@sha256:"+strings.Repeat("a", 64), "1.2.27")
+		if e != nil {
+			return nil, e
+		}
+		instance.ChatID = c.ID
+		selected := storage.Execution{Provider: "anthropic", Model: "compaction-fixture"}
+		c, e = store.SetChatExecution(ctx, c.ID, selected, 0)
+		if e != nil {
+			return nil, e
+		}
+		accepted, e := store.AcceptMessage(ctx, c.ID, "compaction-preview", "Remember that the garden should include marigolds. Plan the next planting steps.")
+		if e != nil {
+			return nil, e
+		}
+		if e = store.BindRuntime(ctx, c.ID, "browser-container", "ses_browser"); e != nil {
+			return nil, e
+		}
+		raw := json.RawMessage(`{"info":{"id":"compaction-preview-assistant","role":"assistant","providerID":"anthropic","modelID":"compaction-fixture","time":{"created":1,"completed":2},"tokens":{"input":30000,"output":10,"cache":{"read":0,"write":0}}},"parts":[{"type":"text","text":"We will plant marigolds along the sunny border, then water the seedlings."}]}`)
+		if e = store.SaveUsageMessage(ctx, c.ID, "ses_browser", "", "", raw); e != nil {
+			return nil, e
+		}
+		if e = store.SaveRuntimeMessage(ctx, "compaction-preview-assistant", storage.Message{ChatID: c.ID, Role: "assistant", Provider: "anthropic", Model: "compaction-fixture", RuntimeMessageID: "compaction-preview-assistant", Text: "We will plant marigolds along the sunny border, then water the seedlings.", Payload: raw}); e != nil {
+			return nil, e
+		}
+		if e = store.SaveContextLimit(ctx, c.ID, "anthropic", "compaction-fixture", 100000); e != nil {
+			return nil, e
+		}
+		if e = store.Transition(ctx, c.ID, accepted.Message.ID, storage.Idle, "Ready for input"); e != nil {
+			return nil, e
+		}
 	}
 	if scenario == "model-summary" {
 		instance.ChatID, instance.OtherChatID, err = seedModelSummaries(ctx, store, fixture.Project)
@@ -289,7 +321,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}
 	srv := httptest.NewUnstartedServer(nil)
 	origin := "https://" + srv.Listener.Addr().String()
-	if scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
+	if scenario == "compaction" || scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
 		origin = "http://" + srv.Listener.Addr().String()
 		if scenario == "branches" {
 			origin = strings.Replace(origin, "127.0.0.1", "localhost", 1)
@@ -378,7 +410,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}
 	mux.Handle("/", app)
 	srv.Config.Handler = mux
-	if scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
+	if scenario == "compaction" || scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
 		srv.Start()
 	} else {
 		srv.StartTLS()

@@ -19,8 +19,8 @@ RUN apk add --no-cache git github-cli sudo coreutils shadow curl bash gcompat &&
     git config --system user.email flora@rhizomato.us
 COPY entrypoint.sh /usr/local/bin/flora-entrypoint
 COPY opencode.json /etc/flora/opencode.json
-# Project config is disabled so the baked installation config is the only
-# runtime configuration. The question tool flag is a safeguard; the pinned
+# Project config is disabled so repository files cannot override installation
+# settings or Flora's saved runtime preferences. The question tool flag is a safeguard; the pinned
 # cli client identity already registers it in headless serve mode.
 ENV HOME=/home/flora XDG_DATA_HOME=/home/flora/.local/share \
     XDG_STATE_HOME=/home/flora/.local/state XDG_CONFIG_HOME=/home/flora/.config \

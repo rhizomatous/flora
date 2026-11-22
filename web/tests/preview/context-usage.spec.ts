@@ -23,7 +23,7 @@ test("context displays the reported snapshot and handles an unknown limit", asyn
     "40",
   );
   await expect(page.getByText("System prompt", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Compact at" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Compact at", exact: true })).toBeDisabled();
   await page.keyboard.press("Escape");
   usage.tokens = 10_000;
   await page.reload();
@@ -39,6 +39,6 @@ test("context displays the reported snapshot and handles an unknown limit", asyn
   usage.tokens = null;
   await page.reload();
   await trigger.click();
-  await expect(page.getByText("No context usage yet.", { exact: true })).toBeVisible();
+  await expect(page.getByText("No usage yet", { exact: true })).toBeVisible();
   await expect(page.getByRole("progressbar")).toHaveCount(0);
 });

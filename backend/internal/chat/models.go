@@ -16,14 +16,17 @@ import (
 )
 
 type ModelOption struct {
-	Provider    string   `json:"provider"`
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Variants    []string `json:"variants"`
-	Image       bool     `json:"image"`
-	PDF         bool     `json:"pdf"`
-	InputPrice  *float64 `json:"inputPrice"`
-	OutputPrice *float64 `json:"outputPrice"`
+	ContextLimit int64    `json:"contextLimit"`
+	InputLimit   int64    `json:"inputLimit"`
+	OutputLimit  int64    `json:"outputLimit"`
+	Provider     string   `json:"provider"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Variants     []string `json:"variants"`
+	Image        bool     `json:"image"`
+	PDF          bool     `json:"pdf"`
+	InputPrice   *float64 `json:"inputPrice"`
+	OutputPrice  *float64 `json:"outputPrice"`
 }
 type ModelOptions struct {
 	Default storage.Execution `json:"default"`
@@ -43,6 +46,11 @@ type runtimeProviders struct {
 	All []struct {
 		ID     string `json:"id"`
 		Models map[string]struct {
+			Limit struct {
+				Context int64 `json:"context"`
+				Input   int64 `json:"input"`
+				Output  int64 `json:"output"`
+			} `json:"limit"`
 			Name   string `json:"name"`
 			Status string `json:"status"`
 			Cost   struct {
@@ -163,7 +171,7 @@ func providerOptions(providers runtimeProviders, fallback ModelOptions) ModelOpt
 			if name == "" {
 				name = id
 			}
-			result.Models = append(result.Models, ModelOption{Provider: p.ID, ID: id, Name: name, Variants: variants, Image: m.Capabilities.Input.Image, PDF: m.Capabilities.Input.PDF, InputPrice: validModelRate(m.Cost.Input), OutputPrice: validModelRate(m.Cost.Output)})
+			result.Models = append(result.Models, ModelOption{ContextLimit: m.Limit.Context, InputLimit: m.Limit.Input, OutputLimit: m.Limit.Output, Provider: p.ID, ID: id, Name: name, Variants: variants, Image: m.Capabilities.Input.Image, PDF: m.Capabilities.Input.PDF, InputPrice: validModelRate(m.Cost.Input), OutputPrice: validModelRate(m.Cost.Output)})
 		}
 	}
 	if len(result.Models) == 0 {

@@ -13,11 +13,12 @@ import (
 )
 
 type turnJob struct {
-	cancel    context.CancelFunc
-	done      chan struct{}
-	resume    bool
-	attempted atomic.Bool
-	finished  bool // Protected by Service.turnMu, set before done closes.
+	compactionThreshold *int64 // Captured at acceptance; later settings edits affect subsequent turns.
+	cancel              context.CancelFunc
+	done                chan struct{}
+	resume              bool
+	attempted           atomic.Bool
+	finished            bool // Protected by Service.turnMu, set before done closes.
 }
 
 // ControlError contains only a fixed, credential-free explanation of an

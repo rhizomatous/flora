@@ -410,6 +410,18 @@ export function chatPreview(): Plugin {
       });
       return;
     }
+    if (endpoint === "compaction") {
+      json(res, {
+        provider: "anthropic",
+        model: "claude-sonnet-4-6",
+        threshold: null,
+        default: 168_000,
+        maximum: null,
+        reason:
+          "This model has no explicit input limit. OpenCode 1.2.27 ignores custom compaction reserves for it.",
+      });
+      return;
+    }
     if (endpoint.startsWith("subagents/")) {
       const child = subagentSnapshots(frame).find(({ agent }) => agent.id === endpoint.slice(10));
       json(
