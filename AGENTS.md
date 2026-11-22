@@ -21,6 +21,8 @@ When doing _any_ UI work, refer to [specs/DESIGN.md](specs/DESIGN.md).
 
 Keep UI copy direct and focused on the action. Do not add preemptive caveats, implementation disclaimers, limit lists, or retention notices beneath routine menu items and controls. A menu item should usually contain only its label, icon, and optional shortcut. Explain a constraint when it affects the current action or in a specific validation error, rather than surrounding ordinary actions with defensive copy.
 
+Menus must remain lists of commands or choices, with group labels, separators, icons, shortcuts, and compact state indicators. Never put error messages, explanatory paragraphs, recovery instructions, forms, or content panels between or beneath menu items. Close the menu when starting an action and report failures through the existing toast pattern or the owning view. Disable actions that cannot run; do not explain their disabled state with text inside the menu.
+
 For collection screens, inspect `web/src/chat-list.tsx` and `web/src/pull-requests-page.tsx` before introducing a layout. Reuse `ListPage` and `ListFilters` for the header, search, and filters. Use Florets `ListGroup` for collapsible sections and `Item size="list"` for rows, with `ItemContent`, `ItemTitle`, and `ItemActions`. Match their responsive behavior and interactions.
 
 For settings and detail screens, use Florets section, settings-row, and textarea-panel components. Refer to the [settings composition example](florets/docs/src/examples/upstream/settings-group.tsx) and [Automations](web/src/automations.tsx). Verify narrow and wide layouts, including long labels, keyboard focus, and scrolling.

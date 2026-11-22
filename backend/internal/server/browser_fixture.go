@@ -38,6 +38,9 @@ func (f browserTransport) RoundTrip(r *http.Request) (*http.Response, error) { r
 // NewBrowserInstance starts one scenario. The caller must close it after the test.
 // This code is compiled only into the fixture executable.
 func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
+	if scenario == "shells" {
+		return newShellBrowserInstance()
+	}
 	switch scenario {
 	case "models", "chat", "changes", "enrollment", "notifications", "projects", "settings", "workspace", "branches", "context":
 	default:
