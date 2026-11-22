@@ -31,11 +31,9 @@ test("sidebar searches, collapses projects, and preserves navigation on narrow s
   await expect(page.getByRole("menuitem", { name: "Archive", exact: true })).toBeEnabled();
   await page.keyboard.press("Escape");
   await nav.getByRole("button", { name: "Chat list options", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Sort: Updated", exact: true }).click();
-  const fieldnotes = nav.getByRole("region", { name: "Fieldnotes API", exact: true });
-  await expect(fieldnotes.locator(".florets-navigation-link").first()).toContainText(
-    "Fix duplicate",
-  );
+  await expect(page.getByRole("menuitem", { name: /^Sort:/ })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Group by Project", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await expect(nav).toBeVisible();
