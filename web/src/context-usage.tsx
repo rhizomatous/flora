@@ -185,12 +185,12 @@ export function ContextUsagePopover({
         <PopoverContent
           side="top"
           align="end"
-          className="max-h-[calc(100dvh-32px)] w-[min(24rem,calc(100vw-24px))]! max-w-[calc(100vw-24px)]! gap-4 overflow-y-auto p-4"
+          className="max-h-[calc(100dvh-32px)] w-[min(18rem,calc(100vw-24px))]! max-w-[calc(100vw-24px)]! gap-3 overflow-y-auto p-3"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <PopoverTitle className="text-base font-medium">Context</PopoverTitle>
+            <PopoverTitle className="text-sm font-medium">Context</PopoverTitle>
             <span
-              className="text-sm text-muted-foreground tabular-nums"
+              className="text-xs text-muted-foreground tabular-nums"
               title={
                 used === null
                   ? undefined
@@ -212,7 +212,7 @@ export function ContextUsagePopover({
           )}
           <button
             type="button"
-            className="flex w-full items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5 text-sm transition-colors outline-none hover:bg-control-hover focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:hover:bg-transparent"
+            className="flex min-h-7 w-full items-center justify-between gap-3 rounded-md border border-border px-2 py-0.5 text-sm transition-colors outline-none hover:bg-control-hover focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:hover:bg-transparent"
             aria-label="Compact at"
             disabled={
               loading || !settings || (settings.maximum === null && settings.threshold === null)
