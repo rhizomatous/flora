@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"net/http"
 	"os"
@@ -15,26 +14,7 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/workspace"
 )
 
-type contextSource struct {
-	Kind       string `json:"kind"`
-	ChatID     string `json:"chatID,omitempty"`
-	Repository string `json:"repository,omitempty"`
-	Path       string `json:"path,omitempty"`
-	Number     int    `json:"number,omitempty"`
-	Label      string `json:"label"`
-}
-
-func contextAllowed(name string) bool {
-	if !workspace.ValidPath(name) {
-		return false
-	}
-	for _, part := range strings.Split(strings.ToLower(name), "/") {
-		if strings.HasPrefix(part, ".env") || strings.Contains(part, "credential") || strings.Contains(part, "secret") || part == ".git" || part == ".ssh" || part == ".aws" || part == ".docker" || part == ".kube" || part == ".gnupg" || part == "auth.json" || part == ".config" || part == ".netrc" || part == ".npmrc" || part == ".pypirc" || strings.HasSuffix(part, ".pem") || strings.HasSuffix(part, ".key") || strings.HasPrefix(part, "id_rsa") || strings.HasPrefix(part, "id_ed25519") {
-			return false
-		}
-	}
-	return true
-}
+type contextSource = storage.ContextReference
 
 func (a *api) contextConfiguration(ctx context.Context, project, chat string) (storage.Configuration, error) {
 	if chat != "" {
@@ -127,7 +107,7 @@ func (a *api) referenceRoutes(mux *http.ServeMux) {
 					}
 				}
 			}
-			note = "Latest 20 text messages per chat"
+
 		case "file":
 			if len(repos) > 10 {
 				note = "Showing the first 10 repositories. Choose a repository to see more."
@@ -165,7 +145,7 @@ func (a *api) referenceRoutes(mux *http.ServeMux) {
 					continue
 				}
 				for _, name := range names {
-					if contextAllowed(name) {
+					if storage.ContextPathAllowed(name) {
 						items = append(items, contextSource{Kind: kind, Repository: repo.Name, Path: name, Label: path.Base(name)})
 						if len(items) >= 50 {
 							break
@@ -191,7 +171,7 @@ func (a *api) referenceRoutes(mux *http.ServeMux) {
 					}
 				}
 			}
-			note = "PR title, description, and head/base revisions"
+
 			if len(repos) > 5 {
 				note = "Showing recent PRs from the first 5 repositories. Choose a repository to see more."
 			}
@@ -216,11 +196,11 @@ func (a *api) referenceRoutes(mux *http.ServeMux) {
 			return
 		}
 		source := in.Source
-		ref := storage.ContextReference{Kind: source.Kind}
+		ref := source
 		switch source.Kind {
 		case "file":
-			if !contextAllowed(source.Path) {
-				failure(w, 400, "Credential and private configuration files cannot be added as context.")
+			if !storage.ContextPathAllowed(source.Path) {
+				failure(w, 400, "Credential and private configuration files cannot be referenced.")
 				return
 			}
 			root, err := a.contextRoot(r.Context(), in.ChatID, config, source.Repository)
@@ -229,28 +209,19 @@ func (a *api) referenceRoutes(mux *http.ServeMux) {
 				return
 			}
 			defer root.Close()
-			for i := range strings.Split(source.Path, "/") {
-				part := strings.Join(strings.Split(source.Path, "/")[:i+1], "/")
-				info, err := root.Lstat(part)
+			parts := strings.Split(source.Path, "/")
+			for i := range parts {
+				info, err := root.Lstat(strings.Join(parts[:i+1], "/"))
 				if err != nil {
 					workspaceError(w, err)
 					return
 				}
-				if info.Mode()&os.ModeSymlink != 0 {
+				if info.Mode()&os.ModeSymlink != 0 || (i == len(parts)-1 && !info.Mode().IsRegular()) {
 					failure(w, 400, "Select a regular workspace file rather than a symlink.")
 					return
 				}
 			}
-			preview, _, err := workspace.Read(root, source.Path, "", false)
-			if err != nil {
-				workspaceError(w, err)
-				return
-			}
-			if preview.Kind != "text" || preview.Truncated || len(preview.Text) > storage.MaxReferenceBytes {
-				failure(w, 400, "Choose a UTF-8 text file of at most 32 KiB. Copy a smaller excerpt or upload it instead.")
-				return
-			}
-			ref.Label, ref.Source, ref.Version, ref.Content = path.Base(source.Path), source.Repository+"/"+source.Path, preview.Version, preview.Text
+			ref = storage.ContextReference{Kind: "file", Label: path.Base(source.Path), Repository: source.Repository, Path: source.Path}
 		case "chat":
 			c, err := a.settings.Store.Chat(r.Context(), source.ChatID)
 			if err != nil {
@@ -261,13 +232,7 @@ func (a *api) referenceRoutes(mux *http.ServeMux) {
 				failure(w, 400, "Choose another chat.")
 				return
 			}
-			content, err := a.settings.Store.ContextMessages(r.Context(), c.ID)
-			if err != nil {
-				chatError(w, err)
-				return
-			}
-			ref.Label, ref.Source, ref.Content = c.Title, "chat:"+c.ID, content
-			ref.Version = fmt.Sprintf("%x", sha256.Sum256([]byte(content)))
+			ref = storage.ContextReference{Kind: "chat", Label: c.Title, ChatID: c.ID}
 		case "pr":
 			known := false
 			for _, repo := range config.Repositories {
@@ -275,38 +240,17 @@ func (a *api) referenceRoutes(mux *http.ServeMux) {
 					known = true
 				}
 			}
-			if !known || source.Number < 1 {
+			if !known || source.Number < 1 || len(source.Label) > 500 {
 				failure(w, 400, "Choose a pull request in this project's repositories.")
 				return
 			}
-			pulls, err := a.projects.ContextPulls(r.Context(), source.Repository, source.Number)
-			if err != nil {
-				projectError(w, err)
-				return
-			}
-			p := pulls[0]
-			ref.Label = fmt.Sprintf("#%d %s", p.Number, p.Title)
-			ref.Source = fmt.Sprintf("https://github.com/%s/pull/%d", source.Repository, p.Number)
-			ref.Version = p.Head.SHA + ":" + p.Base.SHA + ":" + p.UpdatedAt
-			ref.Content = fmt.Sprintf("%s\nState: %s\nHead: %s\nBase: %s\n\n%s", p.Title, p.State, p.Head.SHA, p.Base.SHA, p.Body)
+			ref = storage.ContextReference{Kind: "pr", Label: source.Label, Repository: source.Repository, Number: source.Number}
 		default:
 			failure(w, 400, "Choose a supported context source.")
 			return
 		}
 		secrets := redaction.Values(r.Context(), a.settings.Store, in.ChatID)
-		if source.ChatID != "" {
-			secrets = append(secrets, redaction.Values(r.Context(), a.settings.Store, source.ChatID)...)
-		}
-		ref.Content = redaction.Text(ref.Content, secrets...)
 		ref.Label = redaction.Text(ref.Label, secrets...)
-		ref.Source = redaction.Text(ref.Source, secrets...)
-		ref.Version = redaction.Text(ref.Version, secrets...)
-		ref, err = a.settings.Store.PutContextReference(r.Context(), project, ref)
-		if err != nil {
-			chatError(w, err)
-			return
-		}
-		ref.Content = ""
-		jsonResponse(w, 201, ref)
+		jsonResponse(w, 200, ref)
 	})
 }

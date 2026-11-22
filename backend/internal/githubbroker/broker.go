@@ -65,6 +65,10 @@ func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path, escaped := r.URL.Path, r.URL.EscapedPath()
+	if strings.HasPrefix(path, "/api/v3/flora/chats/") && escaped == path {
+		b.readChat(w, r, chatID, credential)
+		return
+	}
 	if path == "/api/v3/flora/repositories" && escaped == path {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)

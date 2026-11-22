@@ -20,6 +20,7 @@ import {
 
 import { AttachmentPreview } from "./attachment-preview";
 import { type Message, type Part, toolDisplayInputSchema } from "./chat-schemas";
+import { referenceKey, referenceLocation } from "./context-schema";
 import { PullEventCard } from "./pull-links";
 import type { Pull } from "./pull-schemas";
 import { subagentSession } from "./subagent-state";
@@ -94,24 +95,13 @@ export function ConversationMessage({
               aria-label="Sent context"
             >
               {m.Payload.references.map((ref) => (
-                <details
-                  key={ref.id}
-                  className="max-w-full min-w-0 rounded-lg border border-border bg-surface-panel px-3 py-2 text-xs"
+                <span
+                  key={referenceKey(ref)}
+                  className="max-w-full truncate rounded-lg border border-border bg-surface-panel px-3 py-2 text-xs"
+                  title={referenceLocation(ref)}
                 >
-                  <summary className="cursor-pointer truncate rounded-sm font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
-                    {ref.label} · Snapshot
-                  </summary>
-                  <div className="mt-2 space-y-2 break-words text-muted-foreground">
-                    <p>{ref.source}</p>
-                    <p>Saved {new Date(ref.capturedAt).toLocaleString()}</p>
-                    <p className="break-all">Version: {ref.version}</p>
-                    {ref.content !== undefined && ref.content !== "" && (
-                      <pre className="max-h-60 overflow-auto whitespace-pre-wrap text-foreground">
-                        {ref.content}
-                      </pre>
-                    )}
-                  </div>
-                </details>
+                  {ref.label}
+                </span>
               ))}
             </div>
           )}

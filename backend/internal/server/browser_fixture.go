@@ -146,6 +146,18 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 					return nil, err
 				}
 			}
+			if scenario == "context" {
+				accepted, e := store.AcceptMessage(ctx, c.ID, "sample-first-message", "Help me understand this workspace.")
+				if e != nil {
+					return nil, e
+				}
+				if e := store.SaveRuntimeMessage(ctx, "sample-assistant", storage.Message{ChatID: c.ID, Role: "assistant", RuntimeMessageID: "sample-assistant", Text: "The workspace has web and API repositories. Start with each README.", Payload: json.RawMessage(`{}`)}); e != nil {
+					return nil, e
+				}
+				if e := store.Transition(ctx, c.ID, accepted.Message.ID, storage.Idle, "Ready for input"); e != nil {
+					return nil, e
+				}
+			}
 			paths, pathErr := store.Paths(ctx, c.ID)
 			if pathErr != nil {
 				return nil, pathErr
@@ -286,7 +298,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		validation.Client.Transport = browserTransport(func(r *http.Request) (*http.Response, error) {
 			code := 200
 			if strings.Contains(r.URL.Path, "/pulls") {
-				body := `{"number":42,"title":"Keep workspace context with each message","body":"Save selected file and chat references with a stable snapshot.","state":"open","updated_at":"2026-11-20T10:00:00Z","head":{"sha":"abc123"},"base":{"sha":"def456"}}`
+				body := `{"number":42,"title":"Keep workspace context with each message","body":"Read referenced files and chats while working.","state":"open","updated_at":"2026-11-20T10:00:00Z","head":{"sha":"abc123"},"base":{"sha":"def456"}}`
 				if strings.HasSuffix(r.URL.Path, "/pulls") {
 					body = "[" + body + "]"
 				}

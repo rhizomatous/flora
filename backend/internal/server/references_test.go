@@ -15,7 +15,7 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/webassets"
 )
 
-func TestReferenceFileSnapshotSafety(t *testing.T) {
+func TestFileReferencesDoNotCaptureContents(t *testing.T) {
 	store, _, auth, token, p, cleanup := chatAPI(t)
 	defer cleanup()
 	ctx := context.Background()
@@ -31,7 +31,7 @@ func TestReferenceFileSnapshotSafety(t *testing.T) {
 	if err := store.SaveCredentials(ctx, creds); err != nil {
 		t.Fatal(err)
 	}
-	for name, value := range map[string]string{"task.txt": "Use " + creds.ProviderKey + " and " + creds.GitHubToken, "large.txt": strings.Repeat("x", storage.MaxReferenceBytes+1), ".env": "password", "binary": string([]byte{0, 1, 2})} {
+	for name, value := range map[string]string{"task.txt": "Use " + creds.ProviderKey + " and " + creds.GitHubToken, "large.txt": strings.Repeat("x", 1000000), ".env": "password", "binary": string([]byte{0, 1, 2})} {
 		if err := os.WriteFile(filepath.Join(paths.Workspace, name), []byte(value), 0600); err != nil {
 			t.Fatal(err)
 		}
@@ -53,31 +53,34 @@ func TestReferenceFileSnapshotSafety(t *testing.T) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	w := call("task.txt", c.ID, token)
-	if w.Code != 201 {
+	if w.Code != 200 {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	var ref storage.ContextReference
 	if err := json.Unmarshal(w.Body.Bytes(), &ref); err != nil {
 		t.Fatal(err)
 	}
-	if ref.Content != "" || ref.Version == "" {
-		t.Fatal("snapshot response exposed bytes or lost version")
+	if ref.Path != "task.txt" || strings.Contains(w.Body.String(), "content") {
+		t.Fatal("selection copied file contents", w.Body.String())
 	}
 	if err := os.WriteFile(filepath.Join(paths.Workspace, "task.txt"), []byte("changed"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	a, err := store.AcceptMessageWithContext(ctx, c.ID, "send", "Review", nil, []string{ref.ID})
+	a, err := store.AcceptMessageWithContext(ctx, c.ID, "send", "Review", nil, []storage.ContextReference{ref})
 	if err != nil {
 		t.Fatal(err)
 	}
 	raw := string(a.Message.Payload)
-	if strings.Contains(raw, creds.ProviderKey) || strings.Contains(raw, creds.GitHubToken) || strings.Contains(raw, "changed") || !strings.Contains(raw, "[redacted]") {
-		t.Fatal("unsafe or changed snapshot", raw)
+	if strings.Contains(raw, creds.ProviderKey) || strings.Contains(raw, creds.GitHubToken) || strings.Contains(raw, "changed") {
+		t.Fatal("source content entered message payload", raw)
 	}
-	for _, name := range []string{"missing.txt", "large.txt", ".env", "binary", "../escape"} {
+	for _, name := range []string{"missing.txt", ".env", "../escape"} {
 		if w := call(name, c.ID, token); w.Code < 400 {
 			t.Fatal("accepted", name, w.Body.String())
 		}
+	}
+	if w := call("large.txt", c.ID, token); w.Code != 200 {
+		t.Fatal("large file pointer rejected", w.Code, w.Body.String())
 	}
 	if w := call("task.txt", "", token); w.Code != 409 {
 		t.Fatal("new chat read workspace", w.Code, w.Body.String())

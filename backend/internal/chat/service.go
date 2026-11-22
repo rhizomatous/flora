@@ -64,7 +64,7 @@ func (s *Service) CreateWithExecution(ctx context.Context, project, title, reque
 func (s *Service) CreateWithBranches(ctx context.Context, project, title, requestID, text string, selection *storage.Execution, branches map[string]string, attachments ...string) (storage.Chat, error) {
 	return s.CreateWithContext(ctx, project, title, requestID, text, selection, branches, nil, attachments...)
 }
-func (s *Service) CreateWithContext(ctx context.Context, project, title, requestID, text string, selection *storage.Execution, branches map[string]string, references []string, attachments ...string) (storage.Chat, error) {
+func (s *Service) CreateWithContext(ctx context.Context, project, title, requestID, text string, selection *storage.Execution, branches map[string]string, references []storage.ContextReference, attachments ...string) (storage.Chat, error) {
 	if s.provisioner == nil {
 		return storage.Chat{}, errors.New("chat runtime is not configured")
 	}
@@ -103,7 +103,7 @@ func (s *Service) Submit(ctx context.Context, chatID, requestID, text string, at
 func (s *Service) SubmitWithExecution(ctx context.Context, chatID, requestID, text string, selection *storage.Execution, attachments ...string) (storage.Acceptance, error) {
 	return s.SubmitWithContext(ctx, chatID, requestID, text, selection, nil, attachments...)
 }
-func (s *Service) SubmitWithContext(ctx context.Context, chatID, requestID, text string, selection *storage.Execution, references []string, attachments ...string) (storage.Acceptance, error) {
+func (s *Service) SubmitWithContext(ctx context.Context, chatID, requestID, text string, selection *storage.Execution, references []storage.ContextReference, attachments ...string) (storage.Acceptance, error) {
 	unlock := s.lockOperation(chatID)
 	defer unlock()
 	if s.provisioner == nil {
@@ -609,7 +609,7 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 				}
 				_ = json.Unmarshal(saved.Payload, &payload)
 				for _, ref := range payload.References {
-					acceptedText += referenceText(ref)
+					acceptedText += referenceText(ref, c.Configuration)
 				}
 				for _, file := range payload.Attachments {
 					if file.MIME != "text/plain" {

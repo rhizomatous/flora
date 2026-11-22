@@ -28,17 +28,10 @@ import {
   PopoverContent,
 } from "@flora/florets";
 
-import { referenceSchema } from "./context-schema";
+import { referenceSchema, referenceKey, referenceLocation } from "./context-schema";
 import { request, errorMessage } from "./request";
 
-const sourceSchema = z.object({
-  kind: z.enum(["file", "chat", "pr"]),
-  label: z.string(),
-  chatID: z.string().optional(),
-  repository: z.string().optional(),
-  path: z.string().optional(),
-  number: z.number().optional(),
-});
+const sourceSchema = referenceSchema;
 const resultsSchema = z.object({
   items: z.array(sourceSchema),
   note: z.string(),
@@ -69,7 +62,7 @@ function read(scope: string): Reference[] {
   }
 }
 
-/** Selected references retain their snapshot identity through draft reloads and request retries. */
+/** Drafts retain source identifiers. Source contents are read by the agent when needed. */
 export function ContextPicker({
   ref,
   scope,
@@ -102,13 +95,13 @@ export function ContextPicker({
     error: string;
   }>();
   const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [active, setActive] = useState(0);
   const [revision, setRevision] = useState(0);
   const search = useRef<HTMLInputElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const mounted = useRef(true);
-  const snapshotRequest = useRef<AbortController | null>(null);
+  const selectionRequest = useRef<AbortController | null>(null);
   const chatID = scope.startsWith("chat:") ? scope.slice(5) : "";
   const listID = `context-options-${scope.replaceAll(":", "-")}`;
   const lookup = `${kind}:${query}:${repository}:${revision}`;
@@ -135,7 +128,7 @@ export function ContextPicker({
     mounted.current = true;
     return () => {
       mounted.current = false;
-      snapshotRequest.current?.abort();
+      selectionRequest.current?.abort();
     };
   }, []);
   useEffect(() => {
@@ -187,31 +180,38 @@ export function ContextPicker({
       ?.scrollIntoView({ block: "nearest" });
   }, [active, listID]);
   function close() {
-    snapshotRequest.current?.abort();
+    selectionRequest.current?.abort();
     setOpen(false);
     setMention(null);
     textarea.current?.focus();
   }
   async function select(source: Source) {
-    if (saving || disabled) return;
-    if (references.length >= 5) {
+    if (adding || disabled) return;
+    if (
+      references.length >= 5 &&
+      !references.some((item) => referenceKey(item) === referenceKey(source))
+    ) {
       setError("Use at most 5 context references. Remove one to add another.");
       return;
     }
-    setSaving(true);
+    setAdding(true);
     setError("");
     const controller = new AbortController();
-    snapshotRequest.current = controller;
+    selectionRequest.current = controller;
     const range = mention;
     const originalText = textarea.current?.value;
     try {
-      const snapshot = await request(referenceSchema, endpoint, {
+      const reference = await request(referenceSchema, endpoint, {
         method: "POST",
         body: { chatID, source },
         signal: controller.signal,
       });
       if (!mounted.current || controller.signal.aborted) return;
-      setReferences((current) => [...current, snapshot]);
+      setReferences((current) =>
+        current.some((item) => referenceKey(item) === referenceKey(reference))
+          ? current
+          : [...current, reference],
+      );
       if (range && textarea.current && textarea.current.value === originalText) {
         const { value } = textarea.current;
         onText(value.slice(0, range.start) + value.slice(range.end));
@@ -222,10 +222,10 @@ export function ContextPicker({
       close();
     } catch (e) {
       if (mounted.current && !controller.signal.aborted) {
-        setError(errorMessage(e, "Could not save this context. Try again."));
+        setError(errorMessage(e, "Could not add this reference. Try again."));
       }
     } finally {
-      if (mounted.current) setSaving(false);
+      if (mounted.current) setAdding(false);
     }
   }
   function keydown(event: KeyboardEvent<HTMLElement>) {
@@ -256,7 +256,7 @@ export function ContextPicker({
     ) {
       event.preventDefault();
       const source = result?.items[active];
-      if (source && !loading && !saving) void select(source);
+      if (source && !loading && !adding) void select(source);
       return true;
     }
     return false;
@@ -289,7 +289,12 @@ export function ContextPicker({
   return (
     <>
       {references.map((item) => (
-        <input key={item.id} type="hidden" name="references" value={item.id} />
+        <input
+          key={referenceKey(item)}
+          type="hidden"
+          name="references"
+          value={JSON.stringify(item)}
+        />
       ))}
       {references.length > 0 && (
         <div
@@ -300,21 +305,15 @@ export function ContextPicker({
             const Icon = kinds.find((k) => k.kind === item.kind)?.icon ?? FilesIcon;
             return (
               <Attachment
-                key={item.id}
+                key={referenceKey(item)}
                 size="xs"
                 className="max-w-full"
-                title={`${item.source}\nSnapshot: ${item.capturedAt}\nVersion: ${item.version}`}
+                title={referenceLocation(item)}
               >
                 <Icon className="ml-2 size-3.5 shrink-0 self-center text-muted-foreground" />
                 <AttachmentContent>
                   <AttachmentTitle>{item.label}</AttachmentTitle>
-                  <AttachmentDescription>
-                    Snapshot ·{" "}
-                    {new Date(item.capturedAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </AttachmentDescription>
+                  <AttachmentDescription>{referenceLocation(item)}</AttachmentDescription>
                 </AttachmentContent>
                 <AttachmentActions>
                   <Button
@@ -324,7 +323,9 @@ export function ContextPicker({
                     disabled={disabled}
                     aria-label={`Remove context ${item.label}`}
                     onClick={() => {
-                      setReferences((current) => current.filter((entry) => entry.id !== item.id));
+                      setReferences((current) =>
+                        current.filter((entry) => referenceKey(entry) !== referenceKey(item)),
+                      );
                       textarea.current?.focus();
                     }}
                   >
@@ -341,7 +342,7 @@ export function ContextPicker({
         onOpenChange={(next) => {
           setOpen(next);
           if (!next) {
-            snapshotRequest.current?.abort();
+            selectionRequest.current?.abort();
             setMention(null);
           }
         }}
@@ -378,7 +379,7 @@ export function ContextPicker({
                 type="button"
                 size="compact"
                 variant={kind === next ? "secondary" : "ghost"}
-                disabled={saving}
+                disabled={adding}
                 aria-pressed={kind === next}
                 onKeyDown={handlePanelKeydown}
                 onClick={() => {
@@ -418,7 +419,7 @@ export function ContextPicker({
                 aria-controls={listID}
                 aria-activedescendant={result?.items[active] ? `${listID}-${active}` : undefined}
                 value={query}
-                disabled={saving}
+                disabled={adding}
                 onChange={(event) => {
                   setQuery(event.target.value);
                 }}
@@ -435,7 +436,7 @@ export function ContextPicker({
                 aria-label="Context repository"
                 className="w-full"
                 value={repository}
-                disabled={saving}
+                disabled={adding}
                 onKeyDown={(event) => {
                   if (event.key === "Escape") close();
                 }}
@@ -458,7 +459,7 @@ export function ContextPicker({
             id={listID}
             role="listbox"
             aria-label="Context results"
-            aria-busy={loading || saving}
+            aria-busy={loading || adding}
           >
             {loading ? (
               <p className="px-2 py-4 text-muted-foreground" role="status">
@@ -469,13 +470,13 @@ export function ContextPicker({
                 const Icon = kinds.find((k) => k.kind === source.kind)?.icon ?? FilesIcon;
                 return (
                   <button
-                    key={`${source.kind}:${source.chatID ?? source.repository}:${source.path ?? source.number ?? ""}`}
+                    key={referenceKey(source)}
                     id={`${listID}-${index}`}
                     type="button"
                     role="option"
                     aria-selected={active === index}
                     tabIndex={-1}
-                    disabled={saving || disabled}
+                    disabled={adding || disabled}
                     onPointerMove={() => {
                       setActive(index);
                     }}
@@ -490,10 +491,10 @@ export function ContextPicker({
                     <Icon className="size-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{source.label}</span>
-                      {source.repository !== undefined && (
+                      {source.kind !== "chat" && (
                         <span className="block truncate text-xs text-muted-foreground">
                           {source.repository}
-                          {source.path === undefined ? "" : `/${source.path}`}
+                          {source.kind === "file" ? `/${source.path}` : ""}
                         </span>
                       )}
                     </span>
@@ -507,10 +508,10 @@ export function ContextPicker({
               </p>
             )}
           </div>
-          {(saving || error !== "" || loadError !== "" || (result?.note ?? "") !== "") && (
+          {(adding || error !== "" || loadError !== "" || (result?.note ?? "") !== "") && (
             <div className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
-              {saving && <p role="status">Saving snapshot…</p>}
-              {!saving && (error !== "" || loadError !== "") && (
+              {adding && <p role="status">Adding reference…</p>}
+              {!adding && (error !== "" || loadError !== "") && (
                 <div role="alert">
                   <p className="text-destructive">{error || loadError}</p>
                   <Button
@@ -525,7 +526,7 @@ export function ContextPicker({
                   </Button>
                 </div>
               )}
-              {!saving && error === "" && loadError === "" && <p>{result?.note}</p>}
+              {!adding && error === "" && loadError === "" && <p>{result?.note}</p>}
             </div>
           )}
         </PopoverContent>

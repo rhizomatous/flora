@@ -5,7 +5,7 @@ import { logIn, pageErrors } from "../helpers.ts";
 
 test.use({ scenario: "context" });
 
-test("context picker saves snapshots, restores drafts, and supports keyboard selection in both composers", async ({
+test("context picker adds live references, restores drafts, and supports keyboard selection in both composers", async ({
   page,
   backend,
 }) => {
@@ -59,12 +59,9 @@ test("context picker saves snapshots, restores drafts, and supports keyboard sel
   ).toContainText("#42");
   await search.press("Enter");
   await expect(page.getByLabel("Draft context")).toContainText("#42");
-  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
   await expect(page.getByLabel("Sent context")).toContainText("#42");
-  await page
-    .getByText("#42 Keep workspace context with each message · Snapshot", { exact: true })
-    .click();
-  await expect(page.getByLabel("Sent context")).toContainText("Head: abc123");
+  await expect(page.getByLabel("Sent context")).not.toContainText("Snapshot");
   await expect(page.getByLabel("Draft context")).toHaveCount(0);
   await expect(page.getByText("Saved response 1",{exact:true})).toBeVisible();
   await page.goto(`${backend.url}/#chats/new`);
@@ -96,7 +93,7 @@ test("context picker saves snapshots, restores drafts, and supports keyboard sel
   assert.deepEqual(errors, []);
 });
 
-test("file context shows empty and oversized states without losing input", async ({
+test("file references do not copy large contents and keep the draft", async ({
   page,
   backend,
 }) => {
@@ -113,7 +110,7 @@ test("file context shows empty and oversized states without losing input", async
     page.getByRole("listbox", { name: "Context results" }).getByRole("option"),
   ).toHaveCount(2);
   await search.press("Enter");
-  await expect(page.getByRole("alert")).toContainText("at most 32 KiB");
-  await search.press("Escape");
+  await expect(page.getByLabel("Draft context")).toContainText("large.log");
+  await expect(page.getByRole("dialog",{name:"Add context"})).toHaveCount(0);
   await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this draft");
 });

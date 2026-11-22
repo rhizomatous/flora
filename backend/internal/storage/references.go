@@ -4,130 +4,141 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
+	"io/fs"
+	"regexp"
 	"slices"
 	"strings"
-	"time"
 )
 
 const MaxReferences = 5
-const MaxReferenceBytes = 32 << 10
 
+// ContextReference identifies a source. Its contents are read by the agent when needed.
 type ContextReference struct {
-	ID         string `json:"id"`
 	Kind       string `json:"kind"`
 	Label      string `json:"label"`
-	Source     string `json:"source"`
-	Version    string `json:"version"`
-	CapturedAt string `json:"capturedAt"`
-	Content    string `json:"content"`
+	Repository string `json:"repository,omitempty"`
+	Path       string `json:"path,omitempty"`
+	ChatID     string `json:"chatID,omitempty"`
+	Number     int    `json:"number,omitempty"`
 }
 
-// PutContextReference saves server-resolved text and provenance, never caller-supplied content.
-// Draft snapshots expire after a day; accepted messages keep their own complete copy.
-func (s *Store) PutContextReference(ctx context.Context, project string, ref ContextReference) (ContextReference, error) {
-	if len(ref.Content) > MaxReferenceBytes || len(ref.Label) > 500 || len(ref.Source) > 2048 || len(ref.Version) > 500 {
-		return ref, &AttachmentError{Reason: "Context exceeds 32 KiB. Choose a smaller source."}
+var contextChatID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+func ContextPathAllowed(name string) bool {
+	if !fs.ValidPath(name) || name == "." || strings.ContainsAny(name, "\\\x00") {
+		return false
 	}
-	ref.ID, ref.CapturedAt = id(), now()
-	raw, err := json.Marshal(ref)
-	if err != nil {
-		return ref, err
+	for _, part := range strings.Split(strings.ToLower(name), "/") {
+		if strings.HasPrefix(part, ".env") || strings.Contains(part, "credential") || strings.Contains(part, "secret") || slices.Contains([]string{".git", ".ssh", ".aws", ".docker", ".kube", ".gnupg", "auth.json", ".config", ".netrc", ".npmrc", ".pypirc"}, part) || strings.HasSuffix(part, ".pem") || strings.HasSuffix(part, ".key") || strings.HasPrefix(part, "id_rsa") || strings.HasPrefix(part, "id_ed25519") {
+			return false
+		}
 	}
-	err = s.write(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, "DELETE FROM context_references WHERE created_at<? AND id NOT IN (SELECT value FROM request_context, json_each(request_context.refs))", time.Now().Add(-24*time.Hour).UTC().Format(time.RFC3339Nano)); err != nil {
-			return err
-		}
-		var total int
-		if err := tx.QueryRowContext(ctx, "SELECT coalesce(sum(length(CAST(payload AS BLOB))),0) FROM context_references WHERE id NOT IN (SELECT value FROM request_context,json_each(request_context.refs))").Scan(&total); err != nil {
-			return err
-		}
-		if total > 100<<20 {
-			return &AttachmentError{Reason: "Draft context has reached 100 MiB. Try again after unused snapshots expire within 24 hours."}
-		}
-		_, err := tx.ExecContext(ctx, "INSERT INTO context_references(id,project_id,payload,created_at) VALUES(?,?,?,?)", ref.ID, project, string(raw), ref.CapturedAt)
-		return err
-	})
-	return ref, err
+	return true
 }
 
-// reserveContext records ordered snapshot identities in the same transaction as the request.
-// A retry compares identities and uses the frozen text, without reading any live source.
-func reserveContext(ctx context.Context, tx *sql.Tx, scope, request, project string, ids []string) ([]ContextReference, error) {
-	if len(ids) > MaxReferences {
-		return nil, &AttachmentError{Reason: "Use at most 5 context references."}
-	}
-	encoded, _ := json.Marshal(append([]string{}, ids...))
-	var old string
-	err := tx.QueryRowContext(ctx, "SELECT refs FROM request_context WHERE scope=? AND request_id=?", scope, request).Scan(&old)
-	reserved := err == nil
-	if err == nil && old != string(encoded) {
-		return nil, ErrConflict
-	}
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
-	}
-	refs := []ContextReference{}
-	for i, key := range ids {
-		if slices.Contains(ids[:i], key) {
-			return nil, ErrInvalid
-		}
-		var raw string
-		if err := tx.QueryRowContext(ctx, "SELECT payload FROM context_references WHERE id=? AND project_id=?", key, project).Scan(&raw); err != nil {
-			return nil, &AttachmentError{Reason: "A context snapshot expired or belongs to another project. Remove it and select the source again."}
-		}
-		var ref ContextReference
-		if err := json.Unmarshal([]byte(raw), &ref); err != nil {
-			return nil, err
-		}
-		stamp, e := time.Parse(time.RFC3339Nano, ref.CapturedAt)
-		if !reserved && (e != nil || time.Since(stamp) > 24*time.Hour) {
-			var pinned int
-			if err := tx.QueryRowContext(ctx, "SELECT count(*) FROM request_context,json_each(request_context.refs) WHERE value=?", key).Scan(&pinned); err != nil {
-				return nil, err
-			}
-			if pinned == 0 {
-				return nil, &AttachmentError{Reason: "A context snapshot expired. Remove it and select the source again."}
-			}
-		}
-		refs = append(refs, ref)
-	}
-	_, err = tx.ExecContext(ctx, "INSERT OR IGNORE INTO request_context(scope,request_id,refs) VALUES(?,?,?)", scope, request, string(encoded))
-	return refs, err
-}
-func referenceIDs(raw json.RawMessage) []string {
+func References(raw json.RawMessage) []ContextReference {
 	var payload struct {
 		References []ContextReference `json:"references"`
 	}
 	_ = json.Unmarshal(raw, &payload)
-	ids := []string{}
-	for _, r := range payload.References {
-		ids = append(ids, r.ID)
-	}
-	return ids
+	return payload.References
+}
+func ReferencesJSON(refs []ContextReference) string {
+	raw, _ := json.Marshal(append([]ContextReference{}, refs...))
+	return string(raw)
 }
 
-// ContextMessages selects the latest twenty user and assistant text records only.
-// Tool payloads, runtime configuration, and nested context are deliberately excluded.
-func (s *Store) ContextMessages(ctx context.Context, chat string) (string, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT role,substr(text,1,32769) FROM messages WHERE chat_id=? AND role IN ('user','assistant') ORDER BY sequence DESC LIMIT 20", chat)
+// validateReferences checks identifiers against the destination's saved repository configuration.
+// It saves no source content and grants access only to chats explicitly named in the message.
+func validateReferences(ctx context.Context, tx *sql.Tx, config Configuration, chat string, refs []ContextReference) error {
+	if len(refs) > MaxReferences {
+		return &AttachmentError{Reason: "Use at most 5 context references."}
+	}
+	for i, ref := range refs {
+		if len(ref.Label) == 0 || len(ref.Label) > 500 || len(ref.Path) > 2048 || slices.Contains(refs[:i], ref) {
+			return ErrInvalid
+		}
+		switch ref.Kind {
+		case "file", "pr":
+			known := false
+			for _, repo := range config.Repositories {
+				if repo.Name == ref.Repository {
+					known = true
+				}
+			}
+			if !known || ref.ChatID != "" {
+				return ErrInvalid
+			}
+			if ref.Kind == "file" && (chat == "" || !ContextPathAllowed(ref.Path) || ref.Number != 0) {
+				return &AttachmentError{Reason: "Select an available workspace file. Credential paths cannot be referenced."}
+			}
+			if ref.Kind == "pr" && (ref.Number < 1 || ref.Path != "") {
+				return ErrInvalid
+			}
+		case "chat":
+			if !contextChatID.MatchString(ref.ChatID) || ref.ChatID == chat || ref.Repository != "" || ref.Path != "" || ref.Number != 0 {
+				return ErrInvalid
+			}
+			var exists int
+			if err := tx.QueryRowContext(ctx, "SELECT count(*) FROM chats WHERE id=?", ref.ChatID).Scan(&exists); err != nil {
+				return err
+			}
+			if exists == 0 {
+				return &AttachmentError{Reason: "The referenced chat is missing. Remove it or choose another chat."}
+			}
+		default:
+			return ErrInvalid
+		}
+	}
+	return nil
+}
+
+type ContextMessage struct {
+	Sequence  int64  `json:"sequence"`
+	Role      string `json:"role"`
+	Text      string `json:"text"`
+	CreatedAt string `json:"createdAt"`
+	Truncated bool   `json:"truncated,omitempty"`
+}
+type ChatContextPage struct {
+	Messages []ContextMessage `json:"messages"`
+	Before   int64            `json:"before,omitempty"`
+}
+
+// ReadReferencedChat reads current user and assistant text, excluding tool payloads and configuration.
+// A chat's agent can read only chats named by accepted user references in that conversation.
+// Pages run newest first; before retrieves older messages. A single long message is marked truncated.
+func (s *Store) ReadReferencedChat(ctx context.Context, reader, target string, before int64) (ChatContextPage, error) {
+	page := ChatContextPage{Messages: []ContextMessage{}}
+	var allowed int
+	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM messages,json_each(messages.payload,'$.references') WHERE chat_id=? AND role='user' AND json_extract(value,'$.kind')='chat' AND json_extract(value,'$.chatID')=?`, reader, target).Scan(&allowed)
 	if err != nil {
-		return "", err
+		return page, err
+	}
+	if allowed == 0 {
+		return page, ErrNotFound
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT sequence,role,substr(text,1,32769),created_at FROM messages WHERE chat_id=? AND role IN ('user','assistant') AND (?=0 OR sequence<?) ORDER BY sequence DESC LIMIT 21`, target, before, before)
+	if err != nil {
+		return page, err
 	}
 	defer rows.Close()
-	var parts []string
-	total := 0
+	remaining := 32 << 10
 	for rows.Next() {
-		var role, text string
-		if err := rows.Scan(&role, &text); err != nil {
-			return "", err
+		var m ContextMessage
+		if err := rows.Scan(&m.Sequence, &m.Role, &m.Text, &m.CreatedAt); err != nil {
+			return page, err
 		}
-		total += len(role) + len(text) + 4
-		if total > MaxReferenceBytes {
-			return "", &AttachmentError{Reason: "The latest 20 messages exceed 32 KiB. Copy a smaller excerpt instead."}
+		if len(page.Messages) == 20 || (len(m.Text) > remaining && len(page.Messages) > 0) {
+			page.Before = page.Messages[len(page.Messages)-1].Sequence
+			break
 		}
-		parts = append(parts, role+":\n"+text)
+		if len(m.Text) > remaining {
+			m.Text = strings.ToValidUTF8(m.Text[:remaining], "")
+			m.Truncated = true
+		}
+		remaining -= len(m.Text)
+		page.Messages = append(page.Messages, m)
 	}
-	slices.Reverse(parts)
-	return strings.Join(parts, "\n\n"), rows.Err()
+	return page, rows.Err()
 }

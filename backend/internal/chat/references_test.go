@@ -3,20 +3,33 @@ package chat
 import (
 	"context"
 	"encoding/json"
+	"github.com/rhizomatous/flora/backend/internal/storage"
 	"strings"
 	"testing"
-
-	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
-func TestRuntimeContextUsesAcceptedBytesOnly(t *testing.T) {
-	raw, _ := json.Marshal(map[string]any{"references": []storage.ContextReference{{ID: "snapshot", Kind: "pr", Label: "#42 Context", Source: "https://github.com/owner/repo/pull/42", Version: "head:base:updated", CapturedAt: "2026-11-20T00:00:00Z", Content: "saved description"}}})
-	// No runtime or source client is available: delivery must need only the accepted payload.
-	parts, err := (&Service{}).runtimeParts(context.Background(), nil, storage.Message{Text: "Review", Payload: raw}, storage.Credentials{})
-	if err != nil || len(parts) != 2 {
+func TestRuntimeReferencesContainPointersOnly(t *testing.T) {
+	refs := []storage.ContextReference{{Kind: "file", Label: "main.go", Repository: "owner/repo", Path: "main.go"}, {Kind: "chat", Label: "Source", ChatID: "source-chat"}, {Kind: "pr", Label: "#42", Repository: "owner/repo", Number: 42}}
+	ctx := context.Background()
+	store, err := storage.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	project, err := store.CreateProject(ctx, "Project", storage.Configuration{Repositories: []storage.Repository{{Name: "owner/repo", URL: "https://github.com/owner/repo", Role: "core", BaseBranch: "main"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := store.CreateChat(ctx, project.ID, "Chat", "flora@sha256:"+strings.Repeat("a", 64), "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(map[string]any{"references": refs})
+	parts, err := (&Service{Store: store}).runtimeParts(context.Background(), nil, storage.Message{ChatID: c.ID, Text: "Review", Payload: raw}, storage.Credentials{})
+	if err != nil || len(parts) != 4 {
 		t.Fatal(parts, err)
 	}
-	if parts[0]["text"] != "Review" || !strings.Contains(parts[1]["text"], "saved description") || !strings.Contains(parts[1]["text"], "head:base:updated") || parts[1]["type"] != "text" {
+	if !strings.Contains(parts[1]["text"], "/workspace/main.go") || !strings.Contains(parts[2]["text"], "gh api /flora/chats/source-chat") || !strings.Contains(parts[3]["text"], "https://github.com/owner/repo/pull/42") {
 		t.Fatal(parts)
 	}
 }

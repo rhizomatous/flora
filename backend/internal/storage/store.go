@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -343,14 +342,14 @@ func (s *Store) CreateChatRequestWithExecution(ctx context.Context, projectID, t
 func (s *Store) CreateChatRequestWithBranches(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, selection *Execution, branches map[string]string, attachments ...string) (Chat, error) {
 	return s.CreateChatRequestWithContext(ctx, projectID, title, imageDigest, harnessVersion, requestID, text, selection, branches, nil, attachments...)
 }
-func (s *Store) CreateChatRequestWithContext(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, selection *Execution, branches map[string]string, references []string, attachments ...string) (Chat, error) {
+func (s *Store) CreateChatRequestWithContext(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, selection *Execution, branches map[string]string, references []ContextReference, attachments ...string) (Chat, error) {
 	if requestID == "" || len(requestID) > 200 || (strings.TrimSpace(text) == "" && len(attachments) == 0 && len(references) == 0) || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
 		return Chat{}, ErrInvalid
 	}
 	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, requestID, text, attachments, selection, branches, references)
 }
 
-func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, attachments []string, selection *Execution, branches map[string]string, references []string) (Chat, error) {
+func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, attachments []string, selection *Execution, branches map[string]string, references []ContextReference) (Chat, error) {
 	imageName, digest, pinned := strings.Cut(imageDigest, "@sha256:")
 	if title == "" || imageName == "" || !pinned || !hexHash(digest, 64) || harnessVersion == "" {
 		return Chat{}, ErrInvalid
@@ -358,19 +357,12 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 	chatID := id()
 	err := s.write(ctx, func(tx *sql.Tx) error {
 		if requestID != "" {
-			var savedTitle, savedText, savedAttachments, savedSelection, savedBranches string
-			err := tx.QueryRowContext(ctx, "SELECT chat_id,title,text,attachments,selection,branches FROM chat_requests WHERE project_id=? AND request_id=?", projectID, requestID).Scan(&chatID, &savedTitle, &savedText, &savedAttachments, &savedSelection, &savedBranches)
+			var savedTitle, savedText, savedAttachments, savedSelection, savedBranches, savedReferences string
+			err := tx.QueryRowContext(ctx, "SELECT chat_id,title,text,attachments,selection,branches,context_references FROM chat_requests WHERE project_id=? AND request_id=?", projectID, requestID).Scan(&chatID, &savedTitle, &savedText, &savedAttachments, &savedSelection, &savedBranches, &savedReferences)
 			if err == nil {
 				var savedIDs []string
 				_ = json.Unmarshal([]byte(savedAttachments), &savedIDs)
-				var old string
-				e := tx.QueryRowContext(ctx, "SELECT refs FROM request_context WHERE scope=? AND request_id=?", "project:"+projectID, requestID).Scan(&old)
-				if e != nil && !errors.Is(e, sql.ErrNoRows) {
-					return e
-				}
-				var oldRefs []string
-				_ = json.Unmarshal([]byte(old), &oldRefs)
-				if !slices.Equal(oldRefs, references) {
+				if savedReferences != ReferencesJSON(references) {
 					return ErrConflict
 				}
 				if savedBranches != branchesJSON(branches) || savedSelection != selectionJSON(selection) || title != savedTitle || text != savedText || !sameAttachmentIDs(savedIDs, attachments) {
@@ -427,14 +419,14 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 			return err
 		}
 		if requestID != "" {
-			if _, err := reserveContext(ctx, tx, "project:"+projectID, requestID, projectID, references); err != nil {
+			if err := validateReferences(ctx, tx, snapshot, "", references); err != nil {
 				return err
 			}
 			if _, err := reserveAttachments(ctx, tx, projectID, chatID, "", attachments); err != nil {
 				return err
 			}
 			encodedAttachments, _ := json.Marshal(append([]string{}, attachments...))
-			if _, err := tx.ExecContext(ctx, "INSERT INTO chat_requests(project_id,request_id,chat_id,title,text,attachments,selection,branches) VALUES (?,?,?,?,?,?,?,?)", projectID, requestID, chatID, title, text, string(encodedAttachments), selectionJSON(selection), branchesJSON(branches)); err != nil {
+			if _, err := tx.ExecContext(ctx, "INSERT INTO chat_requests(project_id,request_id,chat_id,title,text,attachments,selection,branches,context_references) VALUES (?,?,?,?,?,?,?,?,?)", projectID, requestID, chatID, title, text, string(encodedAttachments), selectionJSON(selection), branchesJSON(branches), ReferencesJSON(references)); err != nil {
 				return err
 			}
 		}

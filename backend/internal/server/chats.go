@@ -257,13 +257,13 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			return
 		}
 		var in struct {
-			Branches    map[string]string  `json:"branches"`
-			Execution   *storage.Execution `json:"execution"`
-			Title       string             `json:"title"`
-			RequestID   string             `json:"requestID"`
-			Text        string             `json:"text"`
-			Attachments []string           `json:"attachments"`
-			References  []string           `json:"references"`
+			Branches    map[string]string          `json:"branches"`
+			Execution   *storage.Execution         `json:"execution"`
+			Title       string                     `json:"title"`
+			RequestID   string                     `json:"requestID"`
+			Text        string                     `json:"text"`
+			Attachments []string                   `json:"attachments"`
+			References  []storage.ContextReference `json:"references"`
 		}
 		if !decodeChat(w, r, &in) {
 			return
@@ -343,11 +343,11 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			return
 		}
 		var in struct {
-			Execution   *storage.Execution `json:"execution"`
-			RequestID   string             `json:"requestID"`
-			Text        string             `json:"text"`
-			Attachments []string           `json:"attachments"`
-			References  []string           `json:"references"`
+			Execution   *storage.Execution         `json:"execution"`
+			RequestID   string                     `json:"requestID"`
+			Text        string                     `json:"text"`
+			Attachments []string                   `json:"attachments"`
+			References  []storage.ContextReference `json:"references"`
 		}
 		if !decodeChat(w, r, &in) {
 			return

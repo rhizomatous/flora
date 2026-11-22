@@ -270,7 +270,8 @@ export function Chats({
       .filter((value): value is string => typeof value === "string");
     const references = fields
       .getAll("references")
-      .filter((value): value is string => typeof value === "string");
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => JSON.parse(value) as unknown);
     if (
       (message.trim() === "" && attachments.length === 0 && references.length === 0) ||
       new TextEncoder().encode(message).length > messageBytes

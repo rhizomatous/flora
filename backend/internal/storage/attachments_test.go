@@ -164,7 +164,7 @@ func TestAttachmentsUpgradePreservesChatOrganization(t *testing.T) {
 	_, chat := fixture(t, s)
 	_, err := s.db.Exec("UPDATE chats SET pinned_at=?,archived=1,organization_revision=3 WHERE id=?", "2026-11-17T00:00:00Z", chat.ID)
 	must(t, err)
-	_, err = s.db.Exec("DROP TABLE chat_read_state; ALTER TABLE chat_requests DROP COLUMN branches; ALTER TABLE chats DROP COLUMN execution; ALTER TABLE chat_requests DROP COLUMN selection; DROP TABLE attachments; ALTER TABLE chat_requests DROP COLUMN attachments; PRAGMA user_version=13")
+	_, err = s.db.Exec("DROP TABLE chat_read_state; ALTER TABLE chat_requests DROP COLUMN context_references; ALTER TABLE chat_requests DROP COLUMN branches; ALTER TABLE chats DROP COLUMN execution; ALTER TABLE chat_requests DROP COLUMN selection; DROP TABLE attachments; ALTER TABLE chat_requests DROP COLUMN attachments; PRAGMA user_version=13")
 	must(t, err)
 	must(t, s.Close())
 	s = openTest(t, root)
