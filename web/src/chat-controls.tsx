@@ -214,6 +214,7 @@ export function ChatViewMenu({
         <DropdownMenuSeparator />
         {chatID !== undefined && (
           <ShellMenuItems
+            key={chatID}
             chatID={chatID}
             open={open}
             onSelect={() => {

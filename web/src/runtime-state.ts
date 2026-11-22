@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import { chatSchema } from "./chat-schemas";
@@ -73,7 +74,11 @@ export function useRuntime(id: string, open: boolean) {
           })
         : request(chatSchema, `${path}/${action}`, { method: "POST", body: {} }));
     } catch (e) {
-      if (revision === actionRevision.current) setError(errorMessage(e, "Machine action failed."));
+      if (revision === actionRevision.current) {
+        const message = errorMessage(e, "Machine action failed.");
+        setError(message);
+        toast.error(message, { toasterId: "chat-organization" });
+      }
     } finally {
       if (revision === actionRevision.current) {
         setPending("");

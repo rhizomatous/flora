@@ -1,6 +1,7 @@
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import "@xterm/xterm/css/xterm.css";
@@ -100,8 +101,9 @@ export function ShellMenuItems({
 }) {
   const [, update] = useChatPanelState(chatID);
   const { shells, error } = useShells(chatID, open);
-  const [creating, setCreating] = useState(false);
-  const [failure, setFailure] = useState("");
+  const { runtime, error: runtimeError } = useRuntime(chatID, open);
+  const canCreate =
+    runtime?.state === "running" || runtime?.state === "stopped" || runtime?.state === "failed";
   function select(shell: Shell) {
     update((current) => ({
       shellTabs: current.shellTabs.some((tab) => tab.id === shell.id)
@@ -111,6 +113,26 @@ export function ShellMenuItems({
       open: current.open && !window.matchMedia("(max-width: 900px)").matches,
     }));
     onSelect();
+  }
+  async function create() {
+    const notification = toast.loading("Opening shell…", {
+      toasterId: "chat-organization",
+    });
+    try {
+      if (runtime?.state === "stopped" || runtime?.state === "failed") {
+        await request(chatSchema, `chats/${encodeURIComponent(chatID)}/wake`, {
+          method: "POST",
+          body: {},
+        });
+      }
+      select(await request(shellSchema, shellURL(chatID), { method: "POST", body: {} }));
+      toast.dismiss(notification);
+    } catch (e) {
+      toast.error(errorMessage(e, "Could not create a shell."), {
+        id: notification,
+        toasterId: "chat-organization",
+      });
+    }
   }
   return (
     <DropdownMenuGroup>
@@ -130,31 +152,21 @@ export function ShellMenuItems({
         </DropdownMenuItem>
       ))}
       <DropdownMenuItem
-        disabled={creating || (shells !== undefined && shells.length >= 8)}
-        closeOnClick={false}
+        disabled={
+          !canCreate ||
+          runtimeError !== "" ||
+          error !== "" ||
+          shells === undefined ||
+          shells.length >= 8
+        }
         onClick={() => {
-          setCreating(true);
-          setFailure("");
-          async function create() {
-            try {
-              select(await request(shellSchema, shellURL(chatID), { method: "POST", body: {} }));
-            } catch (e) {
-              setFailure(errorMessage(e, "Could not create a shell."));
-            } finally {
-              setCreating(false);
-            }
-          }
+          onSelect();
           void create();
         }}
       >
         <PlusIcon />
-        {creating ? "Opening shell…" : "New shell"}
+        New shell
       </DropdownMenuItem>
-      {(failure || error) && (
-        <p role="alert" className="px-2 py-1 text-sm text-destructive">
-          {failure || error}
-        </p>
-      )}
     </DropdownMenuGroup>
   );
 }

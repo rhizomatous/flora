@@ -89,6 +89,35 @@ test("machine stop and wake keep old shells ended and never replace the containe
   expect(after.chat.ContainerID).toBe(before.chat.ContainerID);
   await page.goto(`${backend.url}/#chats/${backend.otherChatID}`);
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
-  await page.getByRole("menuitem", { name: "New shell", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("Missing containers must be restored");
+  await expect(page.getByRole("menuitem", { name: "New shell", exact: true })).toBeDisabled();
+  await expect(page.getByRole("menu", { name: "Chat views", exact: true }).getByRole("alert")).toHaveCount(0);
+});
+
+
+test("New shell wakes the saved sleeping machine and keeps unavailable actions disabled", async ({ page, backend }) => {
+  await logIn(page);
+  await page.goto(`${backend.url}/#chats/${backend.chatID}`);
+  await expect(page.getByRole("button", { name: "Chat views", exact: true })).toBeVisible();
+  const before = await page.evaluate(async id => (await (await fetch(`/api/chats/${id}`)).json()).chat.ContainerID, backend.chatID);
+  await page.getByRole("button", { name: "More chat actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Stop machine", exact: true }).click();
+  await expect.poll(() => page.evaluate(async id => (await (await fetch(`/api/chats/${id}/runtime`)).json()).state, backend.chatID)).toBe("stopped");
+  await page.getByRole("button", { name: "Chat views", exact: true }).click();
+  const menu = page.getByRole("menu", { name: "Chat views", exact: true });
+  await expect(menu.getByRole("menuitem", { name: "New shell", exact: true })).toBeEnabled();
+  await menu.getByRole("menuitem", { name: "New shell", exact: true }).click();
+  await expect(menu).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "workspace terminal", exact: true }).getByRole("status")).toHaveText("Connected");
+  const after = await page.evaluate(async id => (await (await fetch(`/api/chats/${id}`)).json()).chat.ContainerID, backend.chatID);
+  expect(after).toBe(before);
+  await page.route("**/api/chats/*/shells", route => route.request().method() === "POST" ? route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({error:"Could not open a shell"})}) : route.continue());
+  await page.getByRole("button", { name: "Chat views", exact: true }).click();
+  await menu.getByRole("menuitem", { name: "New shell", exact: true }).click();
+  await expect(menu).toHaveCount(0);
+  await expect(page.getByText("Could not open a shell", {exact:true})).toBeVisible();
+  await page.route("**/api/chats/*/runtime", route => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Machine state unavailable" }) }));
+  await page.getByRole("button", { name: "Chat views", exact: true }).click();
+  await expect(menu.getByRole("menuitem", { name: /Keep awake/ })).toContainText("Unknown");
+  await expect(menu.getByRole("menuitem", { name: "New shell", exact: true })).toBeDisabled();
+  await expect(menu.getByRole("alert")).toHaveCount(0);
 });

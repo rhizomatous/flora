@@ -122,22 +122,10 @@ export function RuntimeMenu({
               Usage unavailable
             </p>
           )}
-          {state === "missing" && (
-            <p className="mt-1 text-muted-foreground">Restore the saved machine to wake it.</p>
-          )}
-          {state === "unknown" && runtime && runtime.collectionError !== "" && (
-            <p className="mt-1 text-muted-foreground">{runtime.collectionError}</p>
-          )}
-          {error && (
-            <p role="alert" className="mt-1 text-destructive">
-              {error}
-            </p>
-          )}
         </div>
         {(state === "stopped" || state === "failed") && pending !== "wake" && (
           <DropdownMenuItem
             disabled={disabled || !!pending}
-            closeOnClick={false}
             onClick={() => {
               void act("wake");
             }}
@@ -149,7 +137,6 @@ export function RuntimeMenu({
         {(state === "starting" || state === "unknown" || pending === "wake") && (
           <DropdownMenuItem
             disabled={disabled || (pending !== "" && pending !== "wake")}
-            closeOnClick={false}
             onClick={() => {
               if (pending === "wake") void act("stop");
               else if (onStop) onStop();
@@ -178,52 +165,36 @@ export function KeepAwakeItem({ id, open }: { id: string; open: boolean }) {
   }
   if (runtime?.state === "stopped") status = "Asleep";
   return (
-    <>
-      <DropdownMenuItem
-        disabled={!!pending || (!active && runtime?.state !== "running")}
-        closeOnClick={false}
-        onClick={() => {
-          void act("keep-awake", active ? 0 : 14_400);
-        }}
-      >
-        <ClockIcon />
-        <span className="shrink-0">{active ? "Cancel keep-awake" : "Keep awake 4h"}</span>
-        <span className="ml-auto flex items-center gap-1.5 whitespace-nowrap text-muted-foreground">
-          <span
-            className={`size-[5px] rounded-full ${runtime?.state === "running" ? "bg-green-500" : "bg-muted-foreground"}`}
-          />
-          {status}
-        </span>
-      </DropdownMenuItem>
-      {error && (
-        <p role="alert" className="px-1.5 py-1 text-xs text-destructive">
-          {error}
-        </p>
-      )}
-    </>
+    <DropdownMenuItem
+      disabled={!!pending || (!active && runtime?.state !== "running")}
+      onClick={() => {
+        void act("keep-awake", active ? 0 : 14_400);
+      }}
+    >
+      <ClockIcon />
+      <span className="shrink-0">{active ? "Cancel keep-awake" : "Keep awake 4h"}</span>
+      <span className="ml-auto flex items-center gap-1.5 whitespace-nowrap text-muted-foreground">
+        <span
+          className={`size-[5px] rounded-full ${runtime?.state === "running" ? "bg-green-500" : "bg-muted-foreground"}`}
+        />
+        {status}
+      </span>
+    </DropdownMenuItem>
   );
 }
 
 /** Explicit stop remains available independently of the machine summary. */
 export function StopMachineItem({ id }: { id: string }) {
-  const { pending, error, act } = useRuntime(id, false);
+  const { pending, act } = useRuntime(id, false);
   return (
-    <>
-      <DropdownMenuItem
-        disabled={!!pending}
-        closeOnClick={false}
-        onClick={() => {
-          void act("stop");
-        }}
-      >
-        <SquareIcon />
-        {pending ? "Stopping machine…" : "Stop machine"}
-      </DropdownMenuItem>
-      {error && (
-        <p role="alert" className="px-1.5 py-1 text-xs text-destructive">
-          {error}
-        </p>
-      )}
-    </>
+    <DropdownMenuItem
+      disabled={!!pending}
+      onClick={() => {
+        void act("stop");
+      }}
+    >
+      <SquareIcon />
+      {pending ? "Stopping machine…" : "Stop machine"}
+    </DropdownMenuItem>
   );
 }
