@@ -284,8 +284,9 @@ function ShellTerminal({
       disableStdin: true,
       screenReaderMode: true,
       allowProposedApi: false,
+      allowTransparency: true,
       theme: {
-        background: "#151515",
+        background: "#00000000",
         foreground: "#e5e5e5",
         cursor: "#e5e5e5",
         selectionBackground: "#555555",
@@ -544,7 +545,7 @@ function ShellTerminal({
       <div
         role="application"
         aria-label="Terminal keyboard controls"
-        className="min-h-0 flex-1 overflow-hidden bg-[#151515] p-3 sm:px-8"
+        className="min-h-0 flex-1 overflow-hidden bg-surface-canvas p-3 sm:px-8 [&_.xterm-viewport]:bg-transparent!"
       >
         <div ref={host} className="h-full w-full" />
       </div>
