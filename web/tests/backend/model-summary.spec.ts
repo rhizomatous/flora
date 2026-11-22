@@ -3,11 +3,33 @@ import { logIn, pageErrors } from "../helpers.ts";
 
 test.use({ scenario: "model-summary" });
 
-test("summaries follow the next-message model draft without relabeling saved calls", async ({ page, backend }) => {
+test("a failed model save preserves the choice and unsent message", async ({ page, backend }) => {
+  await logIn(page);
+  await page.goto(`/#chats/${backend.chatID}`);
+  await page.getByLabel("Follow-up", { exact: true }).fill("Keep this message");
+  let failSave: (() => void) | undefined;
+  const released = new Promise<void>((resolve) => { failSave = resolve; });
+  await page.route(`**/api/chats/${backend.chatID}/model`, async (route) => {
+    await released;
+    await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Cannot save this model right now." }) });
+  });
+  await page.getByRole("button", { name: "Model: Claude Haiku 4.5", exact: true }).click();
+  await page.getByRole("option", { name: "Claude Sonnet 4.6", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Model: Claude Haiku 4.5", exact: true })).toBeDisabled();
+  failSave?.();
+  await expect(page.getByText("Cannot save this model right now.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Model: Claude Haiku 4.5", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeEnabled();
+  await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this message");
+});
+
+test("one saved chat model applies before sending and survives a fresh browser session", async ({ page, backend, browser }) => {
   await logIn(page);
   await page.goto(`/#chats/${backend.chatID}`);
   await page.getByRole("button", { name: "Model: Claude Haiku 4.5", exact: true }).click();
   await page.getByRole("option", { name: "Claude Sonnet 4.6", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Model: Claude Sonnet 4.6", exact: true })).toBeFocused();
   await page.getByLabel("Follow-up", { exact: true }).fill("Keep this follow-up draft");
   const title = page.getByRole("button", { name: "Review keyboard navigation", exact: true });
   const label = "Chat model: anthropic / claude-sonnet-4-6";
@@ -24,7 +46,16 @@ test("summaries follow the next-message model draft without relabeling saved cal
   await title.focus();
   await expect(summary.getByRole("img", { name: label, exact: true })).toHaveText("Claude Sonnet 4.6");
   const detail = await (await page.request.get(`/api/chats/${backend.chatID}`)).json();
-  expect(detail.chat.Execution.model).toBe("claude-haiku-4-5");
+  expect(detail.chat.Execution.model).toBe("claude-sonnet-4-6");
+  expect(detail.messages).toHaveLength(2);
+  const otherContext = await browser.newContext({ storageState: await page.context().storageState(), ignoreHTTPSErrors: true });
+  try {
+    const otherPage = await otherContext.newPage();
+    await otherPage.goto(`${backend.url}/#chats/${backend.chatID}`);
+    await expect(otherPage.getByRole("button", { name: "Model: Claude Sonnet 4.6", exact: true })).toBeVisible();
+  } finally {
+    await otherContext.close();
+  }
   expect(detail.chat.reportedModel.latest.model).toBe("claude-haiku-4-5");
 });
 

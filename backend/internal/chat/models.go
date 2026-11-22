@@ -178,6 +178,22 @@ func providerOptions(providers runtimeProviders, fallback ModelOptions) ModelOpt
 	return result
 }
 
+// SetChatModel validates and saves the next-message choice without submitting a prompt.
+func (s *Service) SetChatModel(ctx context.Context, chatID string, selected storage.Execution, revision int64) (storage.Chat, error) {
+	unlock := s.lockOperation(chatID)
+	defer unlock()
+	c, err := s.Store.Chat(ctx, chatID)
+	if err != nil {
+		return storage.Chat{}, err
+	}
+	if c.Execution != selected {
+		if err := s.validateExecution(ctx, selected, nil, chatID); err != nil {
+			return storage.Chat{}, err
+		}
+	}
+	return s.Store.SetChatExecution(ctx, chatID, selected, revision)
+}
+
 func (s *Service) validateExecution(ctx context.Context, selected storage.Execution, attachments []string, chatIDs ...string) error {
 	credentials, err := s.Store.Credentials(ctx)
 	if err != nil {

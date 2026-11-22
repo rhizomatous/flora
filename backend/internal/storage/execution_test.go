@@ -80,6 +80,54 @@ func TestExecutionSnapshotsAndRetryAcrossRestart(t *testing.T) {
 	}
 }
 
+func TestCurrentChatModelSavesWithoutChangingAcceptedMessages(t *testing.T) {
+	root := t.TempDir()
+	s := openTest(t, root)
+	_, c := fixture(t, s)
+	must(t, s.SaveCredentials(ctx, Credentials{Provider: "anthropic", Model: "default", ProviderKey: "key", GitHubToken: "github"}))
+	first := Execution{Provider: "anthropic", Model: "claude-sonnet-4-6", Variant: "high"}
+	accepted, err := s.AcceptMessageWithExecution(ctx, c.ID, "first", "First message", &first)
+	must(t, err)
+	before, err := s.Chat(ctx, c.ID)
+	must(t, err)
+	second := Execution{Provider: "anthropic", Model: "claude-haiku-4-5"}
+	saved, err := s.SetChatExecution(ctx, c.ID, second, before.ExecutionRevision)
+	must(t, err)
+	if saved.Execution != second || saved.ExecutionRevision <= before.ExecutionRevision {
+		t.Fatalf("choice not saved: %+v", saved)
+	}
+	if saved.Status != before.Status || saved.ActiveMessageID != before.ActiveMessageID || saved.UpdatedAt != before.UpdatedAt || saved.ActivityRevision != before.ActivityRevision {
+		t.Fatal("changing a model altered execution state or unread activity")
+	}
+	retry, err := s.SetChatExecution(ctx, c.ID, second, before.ExecutionRevision)
+	must(t, err)
+	if retry.ExecutionRevision != saved.ExecutionRevision {
+		t.Fatal("identical retry changed the revision")
+	}
+	if _, err := s.SetChatExecution(ctx, c.ID, first, before.ExecutionRevision); !errors.Is(err, ErrStale) {
+		t.Fatalf("stale choice overwrote the current model: %v", err)
+	}
+	messages, err := s.Messages(ctx, c.ID)
+	must(t, err)
+	if len(messages) != 1 || MessageExecution(messages[0]) != first {
+		t.Fatal("changing a model altered the accepted turn")
+	}
+	must(t, s.CompleteTurn(ctx, c.ID, accepted.Message.ID, "Done"))
+	must(t, s.Close())
+	s = openTest(t, root)
+	defer s.Close()
+	c, err = s.Chat(ctx, c.ID)
+	must(t, err)
+	if c.Execution != second || c.ExecutionRevision != saved.ExecutionRevision {
+		t.Fatal("choice did not survive reopening the store")
+	}
+	next, err := s.AcceptMessage(ctx, c.ID, "next", "Next message")
+	must(t, err)
+	if MessageExecution(next.Message) != second {
+		t.Fatal("next message did not use the saved current model")
+	}
+}
+
 func TestExecutionUpgradePreservesLegacyRequests(t *testing.T) {
 	root := t.TempDir()
 	s := openTest(t, root)

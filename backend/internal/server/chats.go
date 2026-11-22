@@ -129,6 +129,29 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 		}
 		jsonResponse(w, 200, a.chats.Models(r.Context(), id))
 	})
+	mux.HandleFunc("PATCH /api/chats/{id}/model", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Execution storage.Execution `json:"execution"`
+			Revision  *int64            `json:"revision"`
+		}
+		if !decodeChat(w, r, &in) {
+			return
+		}
+		if in.Revision == nil || *in.Revision < 0 || !in.Execution.Valid() {
+			failure(w, 400, "Provide a model, provider, and saved model revision.")
+			return
+		}
+		if a.chats == nil {
+			failure(w, 503, "Chat runtime is not configured.")
+			return
+		}
+		c, err := a.chats.SetChatModel(r.Context(), r.PathValue("id"), in.Execution, *in.Revision)
+		if err != nil {
+			chatError(w, err)
+			return
+		}
+		jsonResponse(w, 200, a.chatView(r.Context(), c))
+	})
 	mux.HandleFunc("PATCH /api/chats/{id}", func(w http.ResponseWriter, r *http.Request) {
 		var in storage.ChatOrganization
 		if !decodeChat(w, r, &in) {

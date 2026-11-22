@@ -4,12 +4,12 @@ import { useModelDiscovery } from "./model-discovery";
 import { ModelIcon } from "./model-icon";
 import { modelChoiceLabel } from "./model-label";
 
-/** Show the same next-message model choice as the composer, including its saved browser draft. */
+/** Show the same next-message model choice as the composer, using its saved chat choice. */
 export function ChatModelSummary({ chat }: { chat: Chat }) {
   const scope = `chat:${chat.ID}`;
-  const { selected } = useModelChoice(scope);
+  const { selected } = useModelChoice(scope, chat.Execution, chat.ExecutionRevision);
   const { options } = useModelDiscovery(scope);
-  const choice = resolveModelChoice(selected, chat.Execution, options?.default);
+  const choice = resolveModelChoice(selected, options?.default);
   const model = options?.models.find(
     (entry) => entry.provider === choice?.provider && entry.id === choice.model,
   );

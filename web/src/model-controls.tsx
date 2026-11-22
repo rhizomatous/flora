@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+/* oxlint-disable import/max-dependencies -- Model controls combine saved choices, discovery, file policy, and picker UI. */
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import {
   Button,
@@ -20,20 +22,25 @@ import { useModelDiscovery } from "./model-discovery";
 import { ModelIcon } from "./model-icon";
 import { modelChoiceLabel } from "./model-label";
 import { ModelPicker } from "./model-picker";
+import { errorMessage } from "./request";
 
 const effortLabel = (value: string) =>
   value === "xhigh" ? "Extra high" : value.charAt(0).toUpperCase() + value.slice(1);
 
-/** Chat drafts save on message acceptance; controlled automation choices save with the form. */
+/** Chat choices save immediately; controlled automation choices save with their form. */
 export function ModelControls({
   scope,
   saved,
+  savedRevision,
+  onSaving,
   disabled,
   onPolicy,
   automation,
 }: {
   scope: string;
   saved?: Execution | undefined;
+  savedRevision?: number | undefined;
+  onSaving?: ((saving: boolean) => void) | undefined;
   disabled: boolean;
   onPolicy?: ((policy: AttachmentPolicy | undefined) => void) | undefined;
   automation?:
@@ -44,12 +51,14 @@ export function ModelControls({
       }
     | undefined;
 }) {
-  const { selected, choose: chooseDraft } = useModelChoice(scope);
+  const { selected, pending, choose: saveChoice } = useModelChoice(scope, saved, savedRevision);
   const { options, loading, error, retry } = useModelDiscovery(scope);
+  const modelTrigger = useRef<HTMLButtonElement>(null);
+  const effortTrigger = useRef<HTMLButtonElement>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const effective = automation
     ? (automation.value ?? undefined)
-    : resolveModelChoice(selected, saved, options?.default);
+    : resolveModelChoice(selected, options?.default);
   const current = options?.models.find(
     (model) => model.provider === effective?.provider && model.id === effective.model,
   );
@@ -70,26 +79,39 @@ export function ModelControls({
     effective !== undefined && effective.model !== ""
       ? modelChoiceLabel(effective, current?.name).text
       : (automation?.inheritedLabel ?? "Default model");
-  function choose(value: Execution) {
+  async function choose(value: Execution, focusTarget: HTMLButtonElement | null) {
     if (automation) {
       automation.onChange(value);
       return;
     }
-    chooseDraft(value);
+    onSaving?.(true);
+    try {
+      await saveChoice(value);
+    } catch (cause) {
+      toast.error(errorMessage(cause, "Could not save the model. Try again."), {
+        toasterId: "chat-organization",
+      });
+    } finally {
+      onSaving?.(false);
+      requestAnimationFrame(() => {
+        if (document.activeElement === document.body) focusTarget?.focus();
+      });
+    }
   }
   return (
     <>
-      {!automation && selected && (
+      {!automation && !scope.startsWith("chat:") && selected && (
         <input type="hidden" name="execution" value={JSON.stringify(selected)} />
       )}
       <Popover open={modelOpen} onOpenChange={setModelOpen}>
         <PopoverTrigger
           render={
             <DropdownButton
+              ref={modelTrigger}
               type="button"
               variant="ghost"
               size="compact"
-              disabled={disabled}
+              disabled={disabled || pending}
               aria-label={`Model: ${label}`}
               className="composer-model max-w-[min(220px,42vw)] min-w-0"
             >
@@ -121,7 +143,10 @@ export function ModelControls({
                 : undefined
             }
             onSelect={(model) => {
-              choose({ provider: model.provider, model: model.id, variant: "" });
+              void choose(
+                { provider: model.provider, model: model.id, variant: "" },
+                modelTrigger.current,
+              );
               setModelOpen(false);
             }}
           />
@@ -150,10 +175,11 @@ export function ModelControls({
           <DropdownMenuTrigger
             render={
               <DropdownButton
+                ref={effortTrigger}
                 type="button"
                 variant="ghost"
                 size="compact"
-                disabled={disabled || !effective || loading || !reasoningAvailable}
+                disabled={disabled || pending || !effective || loading || !reasoningAvailable}
                 aria-label={`Reasoning effort: ${(effective?.variant ?? "") !== "" && effective ? effortLabel(effective.variant) : "Default"}`}
               >
                 <span className="florets-control-label">
@@ -167,7 +193,7 @@ export function ModelControls({
           <DropdownMenuContent align="start" side="top" className="composer-menu w-[200px]!">
             <DropdownMenuItem
               onClick={() => {
-                if (effective) choose({ ...effective, variant: "" });
+                if (effective) void choose({ ...effective, variant: "" }, effortTrigger.current);
               }}
             >
               Default{(effective?.variant ?? "") === "" && <CheckIcon className="ml-auto" />}
@@ -176,7 +202,7 @@ export function ModelControls({
               <DropdownMenuItem
                 key={variant}
                 onClick={() => {
-                  if (effective) choose({ ...effective, variant });
+                  if (effective) void choose({ ...effective, variant }, effortTrigger.current);
                 }}
               >
                 {effortLabel(variant)}

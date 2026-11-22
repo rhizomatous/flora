@@ -21,6 +21,7 @@ const reportedModelSchema = z.object({
 export const chatSchema = z.object({
   reportedModel: reportedModelSchema.optional(),
   Execution: executionSchema.optional(),
+  ExecutionRevision: z.number().int().nonnegative().optional(),
   pulls: pullSummarySchema.optional(),
   subagents: z.array(subagentSummarySchema).optional(),
   ID: z.string(),
