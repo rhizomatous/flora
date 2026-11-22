@@ -10,11 +10,6 @@ import {
 import { z } from "zod";
 
 import {
-  Attachment,
-  AttachmentContent,
-  AttachmentTitle,
-  AttachmentDescription,
-  AttachmentActions,
   Button,
   FilesIcon,
   MessageSquareIcon,
@@ -28,7 +23,8 @@ import {
   PopoverContent,
 } from "@flora/florets";
 
-import { referenceSchema, referenceKey, referenceLocation } from "./context-schema";
+import { ContextReferenceIcon, ContextReferenceLabel } from "./context-reference";
+import { referenceSchema, referenceKey } from "./context-schema";
 import { request, errorMessage } from "./request";
 
 const sourceSchema = referenceSchema;
@@ -298,43 +294,33 @@ export function ContextPicker({
       ))}
       {references.length > 0 && (
         <div
-          className="composer-attachments flex w-full min-w-0 flex-wrap gap-1.5"
+          className="composer-attachments flex w-full min-w-0 flex-wrap gap-x-3 gap-y-1"
           aria-label="Draft context"
         >
-          {references.map((item) => {
-            const Icon = kinds.find((k) => k.kind === item.kind)?.icon ?? FilesIcon;
-            return (
-              <Attachment
-                key={referenceKey(item)}
-                size="xs"
-                className="max-w-full"
-                title={referenceLocation(item)}
+          {references.map((item) => (
+            <span
+              key={referenceKey(item)}
+              className="inline-flex max-w-full min-w-0 items-center gap-1 text-sm"
+            >
+              <ContextReferenceLabel reference={item} />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-compact"
+                className="size-6 shrink-0 text-muted-foreground"
+                disabled={disabled}
+                aria-label={`Remove context ${item.label}`}
+                onClick={() => {
+                  setReferences((current) =>
+                    current.filter((entry) => referenceKey(entry) !== referenceKey(item)),
+                  );
+                  textarea.current?.focus();
+                }}
               >
-                <Icon className="ml-2 size-3.5 shrink-0 self-center text-muted-foreground" />
-                <AttachmentContent>
-                  <AttachmentTitle>{item.label}</AttachmentTitle>
-                  <AttachmentDescription>{referenceLocation(item)}</AttachmentDescription>
-                </AttachmentContent>
-                <AttachmentActions>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-compact"
-                    disabled={disabled}
-                    aria-label={`Remove context ${item.label}`}
-                    onClick={() => {
-                      setReferences((current) =>
-                        current.filter((entry) => referenceKey(entry) !== referenceKey(item)),
-                      );
-                      textarea.current?.focus();
-                    }}
-                  >
-                    <XIcon />
-                  </Button>
-                </AttachmentActions>
-              </Attachment>
-            );
-          })}
+                <XIcon className="size-3" />
+              </Button>
+            </span>
+          ))}
         </div>
       )}
       <Popover
@@ -467,7 +453,6 @@ export function ContextPicker({
               </p>
             ) : (
               result?.items.map((source, index) => {
-                const Icon = kinds.find((k) => k.kind === source.kind)?.icon ?? FilesIcon;
                 return (
                   <button
                     key={referenceKey(source)}
@@ -488,7 +473,7 @@ export function ContextPicker({
                     }}
                     className="flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-left outline-none hover:bg-control-hover focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 aria-selected:bg-control-hover"
                   >
-                    <Icon className="size-4 shrink-0 text-muted-foreground" />
+                    <ContextReferenceIcon reference={source} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{source.label}</span>
                       {source.kind !== "chat" && (

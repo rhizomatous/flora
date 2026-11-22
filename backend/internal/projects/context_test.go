@@ -26,3 +26,21 @@ func TestPullReferenceDiscoveryKeepsCredentialsInHeaders(t *testing.T) {
 		t.Fatal("missing access error or credential leak", err)
 	}
 }
+
+func TestPullReferenceStatus(t *testing.T) {
+	merged := "2026-11-22T12:00:00Z"
+	for _, tc := range []struct {
+		pull PullContext
+		want string
+	}{
+		{PullContext{State: "open"}, "open"},
+		{PullContext{State: "open", Draft: true}, "draft"},
+		{PullContext{State: "closed"}, "closed"},
+		{PullContext{State: "closed", MergedAt: &merged}, "merged"},
+		{PullContext{}, "unknown"},
+	} {
+		if got := tc.pull.Status(); got != tc.want {
+			t.Errorf("status = %q, want %q", got, tc.want)
+		}
+	}
+}

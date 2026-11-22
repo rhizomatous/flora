@@ -20,6 +20,7 @@ type ContextReference struct {
 	Path       string `json:"path,omitempty"`
 	ChatID     string `json:"chatID,omitempty"`
 	Number     int    `json:"number,omitempty"`
+	Status     string `json:"status,omitempty"`
 }
 
 var contextChatID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
@@ -72,7 +73,7 @@ func validateReferences(ctx context.Context, tx *sql.Tx, config Configuration, c
 			if ref.Kind == "file" && (chat == "" || !ContextPathAllowed(ref.Path) || ref.Number != 0) {
 				return &AttachmentError{Reason: "Select an available workspace file. Credential paths cannot be referenced."}
 			}
-			if ref.Kind == "pr" && (ref.Number < 1 || ref.Path != "") {
+			if ref.Kind == "pr" && (ref.Number < 1 || ref.Path != "" || !slices.Contains([]string{"", "open", "draft", "closed", "merged", "unknown"}, ref.Status)) {
 				return ErrInvalid
 			}
 		case "chat":

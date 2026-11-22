@@ -59,6 +59,7 @@ test("context picker adds live references, restores drafts, and supports keyboar
   ).toContainText("#42");
   await search.press("Enter");
   await expect(page.getByLabel("Draft context")).toContainText("#42");
+  await expect(page.getByLabel("Draft context").getByRole("img", { name: "open pull request", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await expect(page.getByLabel("Sent context")).toContainText("#42");
   await expect(page.getByLabel("Sent context")).not.toContainText("Snapshot");

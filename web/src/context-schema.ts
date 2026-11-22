@@ -13,6 +13,7 @@ export const referenceSchema = z.discriminatedUnion("kind", [
     label: z.string(),
     repository: z.string(),
     number: z.number().int().positive(),
+    status: z.enum(["open", "draft", "closed", "merged", "unknown"]).optional(),
   }),
 ]);
 export type ContextReference = z.infer<typeof referenceSchema>;

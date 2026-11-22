@@ -20,7 +20,7 @@ import {
 
 import { AttachmentPreview } from "./attachment-preview";
 import { type Message, type Part, toolDisplayInputSchema } from "./chat-schemas";
-import { referenceKey, referenceLocation } from "./context-schema";
+import { SentContextReferences } from "./context-reference";
 import { PullEventCard } from "./pull-links";
 import type { Pull } from "./pull-schemas";
 import { subagentSession } from "./subagent-state";
@@ -89,21 +89,7 @@ export function ConversationMessage({
             </Bubble>
           )}
           {m.Payload.references && m.Payload.references.length > 0 && (
-            <div
-              data-slot="message-context"
-              className="flex max-w-full flex-wrap justify-end gap-2"
-              aria-label="Sent context"
-            >
-              {m.Payload.references.map((ref) => (
-                <span
-                  key={referenceKey(ref)}
-                  className="max-w-full truncate rounded-lg border border-border bg-surface-panel px-3 py-2 text-xs"
-                  title={referenceLocation(ref)}
-                >
-                  {ref.label}
-                </span>
-              ))}
-            </div>
+            <SentContextReferences references={m.Payload.references} />
           )}
           {pullEvents?.map(({ pull, opened }) => (
             <PullEventCard key={pull.url} pull={pull} opened={opened} />

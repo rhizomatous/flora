@@ -167,7 +167,7 @@ func (a *api) referenceRoutes(mux *http.ServeMux) {
 				for _, p := range pulls {
 					label := fmt.Sprintf("#%d %s", p.Number, p.Title)
 					if strings.Contains(strings.ToLower(label+" "+repo.Name), query) {
-						items = append(items, contextSource{Kind: kind, Repository: repo.Name, Number: p.Number, Label: label})
+						items = append(items, contextSource{Kind: kind, Repository: repo.Name, Number: p.Number, Label: label, Status: p.Status()})
 					}
 				}
 			}
@@ -244,7 +244,7 @@ func (a *api) referenceRoutes(mux *http.ServeMux) {
 				failure(w, 400, "Choose a pull request in this project's repositories.")
 				return
 			}
-			ref = storage.ContextReference{Kind: "pr", Label: source.Label, Repository: source.Repository, Number: source.Number}
+			ref = storage.ContextReference{Kind: "pr", Label: source.Label, Repository: source.Repository, Number: source.Number, Status: source.Status}
 		default:
 			failure(w, 400, "Choose a supported context source.")
 			return
