@@ -15,10 +15,20 @@ import {
   TabsTrigger,
   TabsContent,
   XIcon,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+  CloudIcon,
+  FlowerMark,
 } from "@flora/florets";
 
 import { useChatPanelState } from "./chat-panel-state";
+import { chatSchema } from "./chat-schemas";
 import { request, errorMessage, isExpired, RequestError } from "./request";
+import { useRuntime } from "./runtime-state";
 
 const shellSchema = z.object({
   id: z.string(),
@@ -247,9 +257,13 @@ function ShellTerminal({
   const [revision, setRevision] = useState(0);
   const [status, setStatus] = useState("Connecting…");
   const [error, setError] = useState("");
+  const [pendingAction, setPendingAction] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [, updatePanel] = useChatPanelState(chatID);
   const { shells, error: listingError } = useShells(chatID, active);
   const saved = shells?.find((item) => item.id === shell.id);
   const ended = shells !== undefined && (saved === undefined || saved.state === "ended");
+  const machine = useRuntime(chatID, active && (ended || status === "Disconnected"));
   const expire = useEffectEvent(onExpired);
   const url = `${shellURL(chatID)}/${encodeURIComponent(shell.id)}`;
   const connectionURL = `${url}/connect?attempt=${revision}`;
@@ -328,7 +342,7 @@ function ShellTerminal({
   }, [shell.title]);
 
   useEffect(() => {
-    if (!active || ended) return;
+    if (!active) return;
     const node = host.current;
     if (!node) return;
     let resizeTimer: ReturnType<typeof setTimeout>;
@@ -337,7 +351,15 @@ function ShellTerminal({
       resizeTimer = setTimeout(() => {
         fit.current?.fit();
         const term = terminal.current;
-        if (term === null || term.cols === 0 || term.rows === 0) return;
+        if (
+          term === null ||
+          term.cols === 0 ||
+          term.rows === 0 ||
+          ended ||
+          socket.current?.readyState !== WebSocket.OPEN
+        ) {
+          return;
+        }
         const { rows, cols } = term;
         async function sendSize() {
           try {
@@ -439,41 +461,86 @@ function ShellTerminal({
     };
   }, [ended, chatID, shell.id, connectionURL]);
 
+  const machineState = machine.runtime?.state;
+  const asleep = machineState === "stopped" || machineState === "failed";
+  const missing = machineState === "missing";
+  const verifying = ended && (machineState === undefined || machineState === "unknown");
+  const starting = machineState === "starting" || pendingAction === "wake";
+  const showPanel = ended || status !== "Connected" || error !== "" || listingError !== "";
+  let panelTitle = "Shell disconnected";
+  if (ended) panelTitle = "Shell ended";
+  else if (status === "Connecting…") panelTitle = "Connecting to shell…";
+  let description = ended
+    ? "Open a new shell to continue."
+    : "Reconnect to continue in this shell.";
+  if (status === "Connected") {
+    panelTitle = "Shell connection";
+    description = "";
+  }
+  if (verifying) {
+    panelTitle = "Checking machine state…";
+    description = "";
+  }
+  if (asleep) {
+    panelTitle = machineState === "failed" ? "Machine has stopped" : "Machine is asleep";
+    description = "Wake the machine to open a new shell.";
+  }
+  if (missing) {
+    panelTitle = "Machine is missing";
+    description = "Restore the saved machine to open a shell.";
+  }
+  if (starting) {
+    panelTitle = "Waking machine…";
+    description = "";
+  }
+  if (ended && machineState === "unknown") {
+    panelTitle = "Machine state unavailable";
+    description = "Refresh machine state to continue.";
+  }
+  const connecting = status === "Connecting…" && !ended;
+  const checking = verifying && machineState === undefined && machine.error === "";
+  const busy = pendingAction !== "" || starting || connecting || checking;
+  const connectionDiagnostic = asleep || missing || starting ? "" : error || listingError;
+  const diagnostic = actionError || connectionDiagnostic || (ended ? machine.error : "");
+
+  function reconnect() {
+    socket.current?.close();
+    socket.current = null;
+    setStatus("Connecting…");
+    setRevision((value) => value + 1);
+  }
+  async function openShell(wake: boolean) {
+    setPendingAction(wake ? "wake" : "create");
+    setActionError("");
+    setError("");
+    try {
+      if (wake) {
+        await request(chatSchema, `chats/${encodeURIComponent(chatID)}/wake`, {
+          method: "POST",
+          body: {},
+        });
+      }
+      const created = await request(shellSchema, shellURL(chatID), { method: "POST", body: {} });
+      updatePanel((current) => ({
+        shellTabs: [...current.shellTabs, { id: created.id, title: created.title }],
+        mainView: `shell:${created.id}`,
+      }));
+    } catch (e) {
+      setActionError(errorMessage(e, "Could not open a shell."));
+      if (isExpired(e)) onExpired();
+    } finally {
+      setPendingAction("");
+    }
+  }
+
   return (
     <section
       aria-label={`${shell.title} terminal`}
-      className="flex h-full min-h-0 min-w-0 flex-col"
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
     >
-      <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2 sm:px-8">
-        <span role="status" className="text-sm text-muted-foreground">
-          {ended ? "Shell ended" : status}
-        </span>
-        <Button
-          variant="ghost"
-          size="compact"
-          title="Reconnect to this shell and replay up to 2 MiB of recent output"
-          disabled={ended || status === "Connecting…"}
-          onClick={() => {
-            socket.current?.close();
-            socket.current = null;
-            setStatus("Connecting…");
-            setRevision((value) => value + 1);
-          }}
-        >
-          Reconnect
-        </Button>
-      </div>
-      {(error || listingError) && (
-        <p role="alert" className="shrink-0 px-4 py-2 text-sm text-destructive sm:px-8">
-          {error || listingError}
-        </p>
-      )}
-      {ended && (
-        <p className="shrink-0 px-4 py-3 text-sm text-muted-foreground sm:px-8">
-          This shell has exited or its machine stopped. Open a new shell from Chat views to
-          continue.
-        </p>
-      )}
+      <span role="status" className="sr-only">
+        {showPanel ? panelTitle : "Connected"}
+      </span>
       <div
         role="application"
         aria-label="Terminal keyboard controls"
@@ -481,6 +548,80 @@ function ShellTerminal({
       >
         <div ref={host} className="h-full w-full" />
       </div>
+      {showPanel && (
+        <Empty className="max-h-[55%] min-h-48 flex-none shrink-0 overflow-y-auto rounded-none border-t border-solid border-border py-6 sm:min-h-56">
+          <EmptyHeader>
+            <EmptyMedia className="text-muted-foreground">
+              {busy && <FlowerMark className="animate-pulse text-3xl" />}
+              {!busy && (asleep || missing) && <CloudIcon className="size-8" />}
+              {!busy && !asleep && !missing && <TerminalIcon className="size-8" />}
+            </EmptyMedia>
+            <EmptyTitle>{panelTitle}</EmptyTitle>
+            {description !== "" && !connecting && (
+              <EmptyDescription>{description}</EmptyDescription>
+            )}
+          </EmptyHeader>
+          <EmptyContent>
+            {diagnostic !== "" && (
+              <p role="alert" className="text-sm text-destructive">
+                {diagnostic}
+              </p>
+            )}
+            {asleep && (
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => {
+                  void openShell(true);
+                }}
+              >
+                Wake machine
+              </Button>
+            )}
+            {missing && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  updatePanel({ mainView: "chat" });
+                }}
+              >
+                Back to chat
+              </Button>
+            )}
+            {ended && machineState === "running" && (
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => {
+                  void openShell(false);
+                }}
+              >
+                {pendingAction === "create" ? "Opening shell…" : "New shell"}
+              </Button>
+            )}
+            {verifying && (
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => {
+                  void machine.refresh();
+                }}
+              >
+                Refresh
+              </Button>
+            )}
+            {!ended && !asleep && !missing && !starting && !connecting && (
+              <Button
+                variant="outline"
+                title="Reconnect to this shell and replay up to 2 MiB of recent output"
+                onClick={reconnect}
+              >
+                Reconnect
+              </Button>
+            )}
+          </EmptyContent>
+        </Empty>
+      )}
     </section>
   );
 }

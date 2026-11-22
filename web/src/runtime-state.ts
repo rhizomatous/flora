@@ -81,5 +81,5 @@ export function useRuntime(id: string, open: boolean) {
       }
     }
   }
-  return { runtime, pending, error: error || refreshError, now, act };
+  return { runtime, pending, error: error || refreshError, now, act, refresh };
 }
