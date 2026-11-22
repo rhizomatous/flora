@@ -20,6 +20,7 @@ import {
 
 import { AttachmentPreview } from "./attachment-preview";
 import { type Message, type Part, toolDisplayInputSchema } from "./chat-schemas";
+import { SentContextReferences } from "./context-reference";
 import { PullEventCard } from "./pull-links";
 import type { Pull } from "./pull-schemas";
 import { subagentSession } from "./subagent-state";
@@ -74,17 +75,22 @@ export function ConversationMessage({
           <span className="sr-only">
             {m.Role === "user" ? (delegated ? "Parent agent" : "You") : "Flora"}
           </span>
-          <Bubble variant={m.Role === "user" ? "muted" : "ghost"}>
-            <BubbleContent className="space-y-4 text-sm leading-6">
-              {parts.length > 0 ? (
-                parts.map((part, index) => (
-                  <MessagePart key={part.id ?? index} part={part} user={m.Role === "user"} />
-                ))
-              ) : (
-                <MessagePart part={{ type: "text", text: m.Text }} user={m.Role === "user"} />
-              )}
-            </BubbleContent>
-          </Bubble>
+          {(parts.length > 0 || m.Text !== "") && (
+            <Bubble variant={m.Role === "user" ? "muted" : "ghost"}>
+              <BubbleContent className="space-y-4 text-sm leading-6">
+                {parts.length > 0 ? (
+                  parts.map((part, index) => (
+                    <MessagePart key={part.id ?? index} part={part} user={m.Role === "user"} />
+                  ))
+                ) : (
+                  <MessagePart part={{ type: "text", text: m.Text }} user={m.Role === "user"} />
+                )}
+              </BubbleContent>
+            </Bubble>
+          )}
+          {m.Payload.references && m.Payload.references.length > 0 && (
+            <SentContextReferences references={m.Payload.references} />
+          )}
           {pullEvents?.map(({ pull, opened }) => (
             <PullEventCard key={pull.url} pull={pull} opened={opened} />
           ))}

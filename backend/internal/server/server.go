@@ -25,6 +25,7 @@ func New(assets fs.FS, authentication *auth.Service, credentials *settings.Servi
 	}
 	api.chatRoutes(mux)
 	api.attachmentRoutes(mux)
+	api.referenceRoutes(mux)
 	api.changesRoutes(mux)
 	api.workspaceRoutes(mux)
 	api.shellRoutes(mux)
