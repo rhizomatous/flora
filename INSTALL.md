@@ -193,7 +193,7 @@ keys and keep browser access restricted until recovery is checked.
 
 ## Credential storage and recovery
 
-Flora encrypts recoverable GitHub and model-provider credentials with AES-256-GCM,
+Flora encrypts recoverable GitHub and model-provider credentials and MCP secret headers with AES-256-GCM,
 using a fresh random 96-bit nonce per value and authenticated record/field identity.
 The versioned ciphertext lives in SQLite. Administrator passwords remain one-way
 hashes and browser session handling is unchanged. This protects credentials in a
@@ -243,7 +243,7 @@ sudo /opt/flora/flora -data-dir /var/lib/flora \
 
 The command requires no Docker or public URL. It takes the same exclusive lock
 as the server, creates the destination key if absent, authenticates the saved
-values, and re-encrypts both values and the key verifier in one transaction. An
+values, and re-encrypts credentials, MCP default and chat headers, and the key verifier in one transaction. An
 existing destination must be a valid private key file. It never overwrites the
 source key. On success, set `-credential-key-file /var/lib/flora-next.key` in the
 service's ExecStart, reload systemd and restart.
@@ -275,3 +275,37 @@ the archived bytes before publication without rebuilding. Prereleases cannot bec
 the latest stable release. A failed verification can leave an image tag but no
 release. Never retag or overwrite a published release. Build dependencies include
 floating Alpine packages, so archives are not claimed to be reproducible.
+
+## MCP servers
+
+Open **MCP servers** in the workspace menu to configure installation defaults for new
+chats. Flora supports Streamable HTTP endpoints with optional secret headers. Local
+stdio commands, legacy SSE-only endpoints, OAuth sign-in, URL credentials, query
+parameters, and OpenCode configuration substitutions are unavailable. MCP headers
+belong to their server record; they do not configure the container environment.
+Use HTTPS for remote servers and put tokens in secret headers rather than URLs.
+
+A new chat copies every server's endpoint, enabled state, timeout and encrypted
+headers. Editing or removing a default leaves existing chats unchanged, including
+after restart. Open **MCP servers** from a chat's summary to inspect its saved
+configuration. Header values are never returned to the browser. A blank saved
+header input preserves its value; remove its row to delete it from the default.
+
+**Check connection** initializes a temporary session from the Flora host and lists
+tools without invoking them. Each enabled chat connection is checked again before
+message delivery, followed by the runtime's own connection status inside the
+container. Both the host and container must be able to reach the endpoint. Failures
+block message delivery and identify the affected server. Checks distinguish rejected
+credentials, unreachable endpoints, timeouts, missing tools and normalized tool-name
+collisions, without displaying server response bodies or secret headers.
+
+Server names use lowercase letters, numbers and hyphens, starting with a letter.
+The name `new` is reserved. Tool names are prefixed with the server name. Flora
+rejects duplicate tool identities after OpenCode's normalization. Each connection
+has a 1 to 30 second timeout. Limit defaults to 16 servers and 16 headers per server.
+
+Connections belong to the chat runtime. Stop requests close the runtime's MCP
+connections before stopping its container; restart reconnects the saved snapshot.
+OpenCode 1.2.27 closes HTTP streams on disposal but does not explicitly terminate
+remote sessions. Servers should expire abandoned sessions. Flora's temporary
+connection checks send session termination requests on completion.

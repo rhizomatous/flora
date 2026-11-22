@@ -66,6 +66,14 @@ export function ChatSummary({
           <PullList summary={pulls} chatID={chat?.ID} />
         </section>
       )}
+      {chat && (
+        <a
+          href={`#mcps?chat=${encodeURIComponent(chat.ID)}`}
+          className="mt-3 inline-block rounded-sm text-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          MCP servers
+        </a>
+      )}
       {(chat?.subagents?.length ?? 0) > 0 && (
         <section aria-label="Subagents" className="chat-summary-section">
           <p className="chat-summary-section-label">Subagents</p>

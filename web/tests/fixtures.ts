@@ -13,6 +13,7 @@ type WorkerFixtures = { backendBinary: string };
 
 type Fixtures = {
   scenario:
+    | "mcps"
     | "compaction"
     | "context"
     | "shells"

@@ -252,6 +252,13 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 	}()
 	rt := newRuntime(endpoint)
 	defer rt.client.CloseIdleConnections()
+	if reason, err := s.checkMCPs(ctx, rt, chatID); err != nil || reason != "" {
+		if reason == "" {
+			reason = "MCP configuration unavailable."
+		}
+		fail(reason + " No message was delivered.")
+		return
+	}
 	setupCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	if c.SessionID != "" {
 		var statuses map[string]struct {

@@ -83,6 +83,9 @@ export function Installation({
         Choose one hosted provider and model for all chats. Once saved, the provider and model
         cannot be changed.
       </Text>
+      <a href="#mcps" className="mt-4 inline-block text-sm underline">
+        MCP servers
+      </a>
       <form className="mt-8 space-y-6" onSubmit={save}>
         <FieldSet disabled={busy}>
           <FieldLegend>GitHub</FieldLegend>

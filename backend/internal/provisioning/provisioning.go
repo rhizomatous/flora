@@ -397,6 +397,18 @@ func (m *Manager) start(ctx context.Context, chatID string, existingOnly bool) (
 				return Endpoint{}, err
 			}
 			spec := m.containerSpec(chat, paths, password, uid, gid)
+			runtimeConfig := map[string]any{}
+			servers, mcpErr := m.store.MCPServers(ctx, chatID)
+			if mcpErr != nil {
+				return Endpoint{}, mcpErr
+			}
+			connections := map[string]any{}
+			for _, server := range servers {
+				connections[server.Name] = map[string]any{"type": "remote", "url": server.URL, "enabled": server.Enabled, "timeout": server.Timeout, "headers": server.Headers, "oauth": false}
+			}
+			if len(connections) > 0 {
+				runtimeConfig["mcp"] = connections
+			}
 			credentials, credentialsErr := m.store.Credentials(ctx)
 			if credentialsErr == nil {
 				keyName := map[string]string{"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "google": "GOOGLE_GENERATIVE_AI_API_KEY"}[credentials.Provider]
@@ -412,10 +424,15 @@ func (m *Manager) start(ctx context.Context, chatID string, existingOnly bool) (
 					}
 				}
 				spec.Env = append(spec.Env, keyName+"="+credentials.ProviderKey)
-				config, _ := json.Marshal(map[string]any{"model": credentials.Provider + "/" + credentials.Model, "small_model": credentials.Provider + "/" + credentials.Model, "enabled_providers": []string{credentials.Provider}})
-				spec.Env = append(spec.Env, "OPENCODE_CONFIG_CONTENT="+string(config))
+				runtimeConfig["model"] = credentials.Provider + "/" + credentials.Model
+				runtimeConfig["small_model"] = credentials.Provider + "/" + credentials.Model
+				runtimeConfig["enabled_providers"] = []string{credentials.Provider}
 			} else if !errors.Is(credentialsErr, storage.ErrNotFound) {
 				return Endpoint{}, credentialsErr
+			}
+			if len(runtimeConfig) > 0 {
+				config, _ := json.Marshal(runtimeConfig)
+				spec.Env = append(spec.Env, "OPENCODE_CONFIG_CONTENT="+string(config))
 			}
 			// Hold the lock across the capacity check, creation, and start
 			// so concurrent starts cannot overbook the running-container limit.
@@ -831,6 +848,7 @@ func (m *Manager) Stop(ctx context.Context, chatID string) error {
 	if err := m.validateOwned(info, chat, paths, imageID); err != nil {
 		return err
 	}
+	m.disposeMCPs(ctx, chatID, info)
 	if m.access != nil {
 		revokeErr = m.access.Revoke(ctx, chatID)
 	}

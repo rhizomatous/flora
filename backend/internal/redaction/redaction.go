@@ -22,6 +22,13 @@ import (
 // its contents or errors to HTTP clients or logs.
 func Values(ctx context.Context, store *storage.Store, chatID string, extra ...string) []string {
 	values := append([]string{}, extra...)
+	if servers, err := store.MCPServers(ctx, chatID); err == nil {
+		for _, server := range servers {
+			for _, value := range server.Headers {
+				values = append(values, value)
+			}
+		}
+	}
 	if c, err := store.Credentials(ctx); err == nil {
 		values = append(values, c.GitHubToken, c.ProviderKey)
 	}

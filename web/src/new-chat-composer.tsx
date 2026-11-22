@@ -1,6 +1,7 @@
-import { useState, type SubmitEvent } from "react";
+import { useRef, useState, type SubmitEvent } from "react";
 
 import {
+  Button,
   DropdownButton,
   DropdownMenu,
   DropdownMenuTrigger,
@@ -17,7 +18,7 @@ import {
 } from "@flora/florets";
 
 import { ChatBranchPicker } from "./chat-branch-picker";
-import { Composer, PlaceholderMenu } from "./composer";
+import { Composer } from "./composer";
 
 export type ComposerProject = { id: string; name: string };
 
@@ -46,6 +47,7 @@ export function NewChatComposer({
   });
   const [search, setSearch] = useState("");
   const [projectOpen, setProjectOpen] = useState(false);
+  const settingsNavigated = useRef(false);
   return (
     <form
       onSubmit={onSend}
@@ -164,16 +166,45 @@ export function NewChatComposer({
         canSend={!busy}
         sendLabel={busy ? "Starting chat" : "Start chat"}
         settings={
-          <PlaceholderMenu
-            label="Chat settings"
-            iconOnly
-            items={[
-              { label: "Environment variables", icon: <KeyRoundIcon /> },
-              { label: "MCP servers", icon: <PuzzleIcon /> },
-            ]}
-          >
-            <SlidersHorizontalIcon />
-          </PlaceholderMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-compact"
+                  aria-label="Chat settings"
+                >
+                  <SlidersHorizontalIcon />
+                </Button>
+              }
+            />
+            <DropdownMenuContent
+              align="start"
+              finalFocus={() => {
+                const restore = !settingsNavigated.current;
+                settingsNavigated.current = false;
+                return restore;
+              }}
+            >
+              <DropdownMenuItem disabled>
+                <KeyRoundIcon />
+                Environment variables
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                nativeButton={false}
+                onClick={() => {
+                  settingsNavigated.current = true;
+                }}
+                render={
+                  <a href="#mcps">
+                    <PuzzleIcon />
+                    MCP servers
+                  </a>
+                }
+              />
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
     </form>

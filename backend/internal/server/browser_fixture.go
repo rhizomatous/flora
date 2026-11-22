@@ -42,7 +42,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		return newShellBrowserInstance()
 	}
 	switch scenario {
-	case "compaction", "model-summary", "models", "chat", "changes", "enrollment", "credential-setup", "notifications", "projects", "settings", "workspace", "branches", "context":
+	case "mcps", "compaction", "model-summary", "models", "chat", "changes", "enrollment", "credential-setup", "notifications", "projects", "settings", "workspace", "branches", "context":
 	default:
 		return nil, fmt.Errorf("unknown browser scenario %q", scenario)
 	}
@@ -135,6 +135,18 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		if _, err = store.CreateProject(ctx, "Flora workspace", storage.Configuration{Repositories: repos}); err != nil {
 			return nil, err
 		}
+	}
+	if scenario == "mcps" {
+		closeFixture, e := seedMCPBrowser(ctx, store)
+		if e != nil {
+			return nil, e
+		}
+		cleanup = append(cleanup, closeFixture)
+		saved, e := store.CreateChat(ctx, fixture.Project.ID, "MCP snapshot fixture", "flora@sha256:"+strings.Repeat("a", 64), "1.2.27")
+		if e != nil {
+			return nil, e
+		}
+		instance.ChatID = saved.ID
 	}
 	configuration := settings.New(store)
 	if scenario == "settings" || scenario == "credential-setup" {
@@ -321,7 +333,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}
 	srv := httptest.NewUnstartedServer(nil)
 	origin := "https://" + srv.Listener.Addr().String()
-	if scenario == "compaction" || scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
+	if scenario == "mcps" || scenario == "compaction" || scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
 		origin = "http://" + srv.Listener.Addr().String()
 		if scenario == "branches" {
 			origin = strings.Replace(origin, "127.0.0.1", "localhost", 1)
@@ -410,7 +422,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}
 	mux.Handle("/", app)
 	srv.Config.Handler = mux
-	if scenario == "compaction" || scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
+	if scenario == "mcps" || scenario == "compaction" || scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
 		srv.Start()
 	} else {
 		srv.StartTLS()

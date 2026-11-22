@@ -369,6 +369,8 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 	if title == "" || imageName == "" || !pinned || !hexHash(digest, 64) || harnessVersion == "" {
 		return Chat{}, ErrInvalid
 	}
+	s.secretMu.Lock()
+	defer s.secretMu.Unlock()
 	chatID := id()
 	err := s.write(ctx, func(tx *sql.Tx) error {
 		if requestID != "" {
@@ -426,6 +428,9 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 		config = string(encoded)
 		execution, err := resolveExecution(ctx, tx, "", selection)
 		if err != nil {
+			return err
+		}
+		if err := s.snapshotMCPs(ctx, tx, chatID); err != nil {
 			return err
 		}
 		stamp := now()
