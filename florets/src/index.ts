@@ -131,6 +131,7 @@ export {
   Settings2Icon,
   SlidersHorizontalIcon,
   SparklesIcon,
+  SparkleIcon,
   TagIcon,
   FlowerIcon,
   TerminalIcon,

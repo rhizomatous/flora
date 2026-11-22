@@ -10,7 +10,7 @@ import {
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { Popover, PopoverTrigger, PopoverContent, SearchIcon } from "@flora/florets";
+import { Popover, PopoverTrigger, PopoverContent, SparkleIcon } from "@flora/florets";
 
 import { autocompleteKey, commandQuery, type AutocompleteState } from "./composer-autocomplete";
 import type { ContextPickerHandle } from "./context-picker";
@@ -173,7 +173,7 @@ export function CommandPicker({
                 select(item);
               }}
             >
-              <SearchIcon className="size-4 shrink-0" />
+              <SparkleIcon className="size-4 shrink-0 text-muted-foreground" />
               <span className="min-w-0 flex-1 truncate" title={item.description}>
                 /{item.name}
               </span>
