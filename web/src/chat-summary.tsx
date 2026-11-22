@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
+import { ChatModelSummary } from "./chat-model-summary";
 import type { Chat } from "./chat-schemas";
 import { chatStatus } from "./chat-status";
 import { PullList } from "./pull-links";
 import type { PullSummary } from "./pull-schemas";
-import { ReportedModelSummary } from "./reported-model-summary";
 
 /** Title and sidebar previews show the same saved identity and useful related work. */
 export function ChatSummary({
@@ -44,7 +44,7 @@ export function ChatSummary({
             Chat {chat.ID.slice(0, 6)}
           </span>
         )}
-        <ReportedModelSummary summary={chat?.reportedModel} />
+        {chat && <ChatModelSummary key={chat.ID} chat={chat} />}
       </div>
       <p className="chat-summary-title">{title}</p>
       <div className="chat-summary-footer">

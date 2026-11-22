@@ -51,11 +51,11 @@ func seedModelSummaries(ctx context.Context, store *storage.Store, project stora
 			}
 		}
 		if i == 0 {
-			accepted, acceptErr := store.AcceptMessage(ctx, c.ID, "preview-task", "Review keyboard navigation in the chat view. Make actions easy to find and keep drafts intact.")
+			accepted, acceptErr := store.AcceptMessageWithExecution(ctx, c.ID, "preview-task", "Review keyboard navigation in the chat view. Make actions easy to find and keep drafts intact.", &storage.Execution{Provider: "anthropic", Model: "claude-haiku-4-5"})
 			if acceptErr != nil {
 				return "", "", acceptErr
 			}
-			text := "The chat view keeps the task in focus, with secondary details available when you need them.\n\n### Keyboard navigation\n\n- Tab through the sidebar and chat controls in reading order.\n- Focus a chat title to see its model and saved state.\n- Press Escape to close a summary and keep your place.\n\n### Drafts stay with the chat\n\nYour follow-up stays in the composer when you switch views or reload. Model choices apply to the next message; saved summaries show what handled earlier responses."
+			text := "The chat view keeps the task in focus, with secondary details available when you need them.\n\n### Keyboard navigation\n\n- Tab through the sidebar and chat controls in reading order.\n- Focus a chat title to see its model and saved state.\n- Press Escape to close a summary and keep your place.\n\n### Drafts stay with the chat\n\nYour follow-up stays in the composer when you switch views or reload. Model choices apply to the next message; the model shown with the chat matches the follow-up composer."
 			raw, marshalErr := json.Marshal(map[string]any{
 				"info":  map[string]any{"id": "preview-response", "role": "assistant", "providerID": "anthropic", "modelID": "claude-haiku-4-5", "time": map[string]int{"created": 5, "completed": 6}},
 				"parts": []map[string]any{{"type": "text", "text": text}},
@@ -65,6 +65,15 @@ func seedModelSummaries(ctx context.Context, store *storage.Store, project stora
 			}
 			if err = store.SaveRuntimeMessage(ctx, "preview-response", storage.Message{ChatID: c.ID, RuntimeMessageID: "preview-response", Role: "assistant", Text: text, Provider: "anthropic", Model: "claude-haiku-4-5", Payload: raw}); err != nil {
 				return "", "", err
+			}
+			if err = store.CompleteTurn(ctx, c.ID, accepted.Message.ID, "Review complete"); err != nil {
+				return "", "", err
+			}
+		}
+		if i == 3 {
+			accepted, acceptErr := store.AcceptMessageWithExecution(ctx, c.ID, "custom-task", "Review this model", &storage.Execution{Provider: "anthropic", Model: "custom-model-with-a-long-reported-identity-2026-11-22"})
+			if acceptErr != nil {
+				return "", "", acceptErr
 			}
 			if err = store.CompleteTurn(ctx, c.ID, accepted.Message.ID, "Review complete"); err != nil {
 				return "", "", err

@@ -3,15 +3,40 @@ import { logIn, pageErrors } from "../helpers.ts";
 
 test.use({ scenario: "model-summary" });
 
-test("saved main-session identity agrees across title and sidebar after reload", async ({ page, backend }) => {
+test("summaries follow the next-message model draft without relabeling saved calls", async ({ page, backend }) => {
+  await logIn(page);
+  await page.goto(`/#chats/${backend.chatID}`);
+  await page.getByRole("button", { name: "Model: Claude Haiku 4.5", exact: true }).click();
+  await page.getByRole("option", { name: "Claude Sonnet 4.6", exact: true }).click();
+  await page.getByLabel("Follow-up", { exact: true }).fill("Keep this follow-up draft");
+  const title = page.getByRole("button", { name: "Review keyboard navigation", exact: true });
+  const label = "Chat model: anthropic / claude-sonnet-4-6";
+  await title.focus();
+  const summary = page.getByLabel("Chat summary", { exact: true });
+  await expect(summary.getByRole("img", { name: label, exact: true })).toHaveText("Claude Sonnet 4.6");
+  await expect(summary).not.toContainText("2 models");
+  await page.keyboard.press("Escape");
+  await page.getByRole("link", { name: /Review keyboard navigation/ }).focus();
+  await expect(page.locator(".sidebar-chat-preview").getByRole("img", { name: label, exact: true })).toHaveText("Claude Sonnet 4.6");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Model: Claude Sonnet 4.6", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this follow-up draft");
+  await title.focus();
+  await expect(summary.getByRole("img", { name: label, exact: true })).toHaveText("Claude Sonnet 4.6");
+  const detail = await (await page.request.get(`/api/chats/${backend.chatID}`)).json();
+  expect(detail.chat.Execution.model).toBe("claude-haiku-4-5");
+  expect(detail.chat.reportedModel.latest.model).toBe("claude-haiku-4-5");
+});
+
+test("saved composer model agrees across title and sidebar after reload", async ({ page, backend }) => {
   const errors = pageErrors(page);
   await logIn(page);
   await page.goto(`/#chats/${backend.chatID}`);
   const title = page.getByRole("button", { name: "Review keyboard navigation", exact: true });
-  const label = "Latest main-session model: anthropic / claude-haiku-4-5. Main session used 2 reported models";
+  const label = "Chat model: anthropic / claude-haiku-4-5";
   await title.focus();
   await expect(page.getByRole("img", { name: label, exact: true })).toBeVisible();
-  await expect(page.getByRole("img", { name: label, exact: true })).toHaveText("Claude Haiku 4.5 · 2 models");
+  await expect(page.getByRole("img", { name: label, exact: true })).toHaveText("Claude Haiku 4.5");
   await page.keyboard.press("Escape");
   const link = page.getByRole("link", { name: /Review keyboard navigation/ });
   await link.focus();
@@ -26,7 +51,7 @@ test("saved main-session identity agrees across title and sidebar after reload",
   await page.keyboard.press("Escape");
   await page.goto(`/#chats/${backend.otherChatID}`);
   await page.getByRole("button", { name: "Plan the next task", exact: true }).focus();
-  await expect(page.getByRole("img", { name: "No completed main-session model calls", exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Chat model: anthropic / model", exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -41,7 +66,7 @@ test("long identities and unknown metadata fit summary cards in both themes", as
       await title.focus();
       const summary = page.getByLabel("Chat summary", { exact: true });
       await expect(summary).toBeVisible();
-      await expect(summary.getByRole("img", { name: /custom-provider \/ custom-model-with-a-long/ })).toBeVisible();
+      await expect(summary.getByRole("img", { name: /anthropic \/ custom-model-with-a-long/ })).toBeVisible();
       await expect.poll(async () => {
         const bounds = await summary.boundingBox();
         return bounds !== null && bounds.x >= 0 && bounds.x + bounds.width <= width;
@@ -55,6 +80,6 @@ test("long identities and unknown metadata fit summary cards in both themes", as
   await page.setViewportSize({ width: 1280, height: 812 });
   await page.getByRole("link", { name: /Check an older response/ }).click();
   await page.getByRole("button", { name: "Check an older response", exact: true }).focus();
-  await expect(page.getByLabel("Chat summary", { exact: true }).getByRole("img", { name: "Latest main-session model: Model not reported", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Chat summary", { exact: true }).getByRole("img", { name: "Chat model: anthropic / model", exact: true })).toBeVisible();
   await expect(page.getByText("No linked pull requests yet.", { exact: true })).toHaveCount(0);
 });

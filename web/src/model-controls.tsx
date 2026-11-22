@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { z } from "zod";
 
 import {
   Button,
@@ -15,17 +14,13 @@ import {
 } from "@flora/florets";
 
 import type { AttachmentPolicy } from "./attachments";
-import { executionSchema, type Execution } from "./chat-schemas";
+import type { Execution } from "./chat-schemas";
+import { resolveModelChoice, useModelChoice } from "./model-choice";
+import { useModelDiscovery } from "./model-discovery";
 import { ModelIcon } from "./model-icon";
-import { modelOptionSchema } from "./model-options";
+import { modelChoiceLabel } from "./model-label";
 import { ModelPicker } from "./model-picker";
-import { errorMessage, request } from "./request";
 
-const modelsSchema = z.object({
-  default: executionSchema,
-  models: z.array(modelOptionSchema),
-  error: z.string(),
-});
 const effortLabel = (value: string) =>
   value === "xhigh" ? "Extra high" : value.charAt(0).toUpperCase() + value.slice(1);
 
@@ -49,49 +44,15 @@ export function ModelControls({
       }
     | undefined;
 }) {
-  const [selected, setSelected] = useState<Execution | null>(() => {
-    if (automation) return null;
-    try {
-      const draft = executionSchema.safeParse(
-        JSON.parse(sessionStorage.getItem(`flora-model:${scope}`) ?? "null"),
-      );
-      if (draft.success) return draft.data;
-    } catch {
-      // Storage may be disabled.
-    }
-    return null;
-  });
-  const [options, setOptions] = useState<z.infer<typeof modelsSchema>>();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [attempt, setAttempt] = useState(0);
+  const { selected, choose: chooseDraft } = useModelChoice(scope);
+  const { options, loading, error, retry } = useModelDiscovery(scope);
   const [modelOpen, setModelOpen] = useState(false);
-  const discoveryPath = scope.startsWith("chat:")
-    ? `models?chat=${encodeURIComponent(scope.slice(5))}`
-    : "models";
-  useEffect(() => {
-    const controller = new AbortController();
-    async function load() {
-      try {
-        const result = await request(modelsSchema, discoveryPath, { signal: controller.signal });
-        setOptions(result);
-        setError(result.error);
-      } catch (e) {
-        if (!controller.signal.aborted) setError(errorMessage(e, "Could not load models."));
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    }
-    void load();
-    return () => {
-      controller.abort();
-    };
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Retrying starts a fresh discovery request.
-  }, [attempt, discoveryPath]);
   const effective = automation
     ? (automation.value ?? undefined)
-    : (selected ?? (saved?.model !== undefined && saved.model !== "" ? saved : options?.default));
-  const current = options?.models.find((model) => model.id === effective?.model);
+    : resolveModelChoice(selected, saved, options?.default);
+  const current = options?.models.find(
+    (model) => model.provider === effective?.provider && model.id === effective.model,
+  );
   useEffect(() => {
     onPolicy?.(
       current && current.id !== options?.default.model && options?.error === ""
@@ -105,18 +66,16 @@ export function ModelControls({
   }, [current, options, onPolicy]);
   const reasoningAvailable =
     (current?.variants.length ?? 0) > 0 || (effective?.variant ?? "") !== "";
-  const label = current?.name ?? effective?.model ?? automation?.inheritedLabel ?? "Default model";
+  const label =
+    effective !== undefined && effective.model !== ""
+      ? modelChoiceLabel(effective, current?.name).text
+      : (automation?.inheritedLabel ?? "Default model");
   function choose(value: Execution) {
     if (automation) {
       automation.onChange(value);
       return;
     }
-    setSelected(value);
-    try {
-      sessionStorage.setItem(`flora-model:${scope}`, JSON.stringify(value));
-    } catch {
-      // Storage may be disabled.
-    }
+    chooseDraft(value);
   }
   return (
     <>
@@ -177,8 +136,7 @@ export function ModelControls({
                 size="compact"
                 disabled={loading}
                 onClick={() => {
-                  setLoading(true);
-                  setAttempt((value) => value + 1);
+                  retry();
                 }}
               >
                 Retry discovery
