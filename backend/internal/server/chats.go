@@ -16,15 +16,19 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/agentfiles"
 	"github.com/rhizomatous/flora/backend/internal/changes"
 	"github.com/rhizomatous/flora/backend/internal/chat"
+	"github.com/rhizomatous/flora/backend/internal/commands"
 	"github.com/rhizomatous/flora/backend/internal/provisioning"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
 func chatError(w http.ResponseWriter, err error) {
+	var command *commands.Error
 	var capacity *provisioning.CapacityError
 	var control *chat.ControlError
 	var attachment *storage.AttachmentError
 	switch {
+	case errors.As(err, &command):
+		failure(w, 400, command.Reason)
 	case errors.As(err, &capacity):
 		failure(w, 409, capacity.Error())
 	case errors.As(err, &attachment):
@@ -97,6 +101,27 @@ func (a *api) chatViews(ctx context.Context, chats []storage.Chat) []chatView {
 func (a *api) chatRoutes(mux *http.ServeMux) {
 	store := a.settings.Store
 	a.folderRoutes(mux)
+	mux.HandleFunc("GET /api/commands", func(w http.ResponseWriter, r *http.Request) {
+		harness := ""
+		if a.chats != nil {
+			harness = a.chats.CommandHarness()
+		}
+		active := false
+		if id := r.URL.Query().Get("chat"); id != "" {
+			c, err := store.Chat(r.Context(), id)
+			if err != nil {
+				chatError(w, err)
+				return
+			}
+			harness = c.HarnessVersion
+			active = c.ActiveMessageID != "" || c.Status == storage.Working || c.Status == storage.Waiting
+		}
+		items := []map[string]any{}
+		for _, command := range commands.Registry {
+			items = append(items, map[string]any{"name": command.Name, "label": command.Label, "available": a.chats != nil && commands.Supported(harness) && !active})
+		}
+		jsonResponse(w, 200, map[string]any{"items": items})
+	})
 	mux.HandleFunc("POST /api/chats/read", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			Observed []storage.ViewedRevision `json:"observed"`

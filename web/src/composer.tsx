@@ -29,6 +29,8 @@ import {
   type AttachmentPolicy,
 } from "./attachments";
 import type { Execution } from "./chat-schemas";
+import { CommandPicker, type CommandPickerHandle } from "./command-picker";
+import { composingKey } from "./composer-autocomplete";
 import { ContextPicker, type ContextPickerHandle } from "./context-picker";
 import { ModelControls } from "./model-controls";
 
@@ -122,6 +124,12 @@ export function Composer({
   const [modelPolicy, setModelPolicy] = useState<AttachmentPolicy>();
   const attachments = useAttachments(draftScope ?? id, projectID ?? "", modelPolicy);
   const context = useRef<ContextPickerHandle>(null);
+  const command = useRef<CommandPickerHandle>(null);
+  const [commandActive, setCommandActive] = useState<{
+    open: boolean;
+    listID: string;
+    activeID: string | undefined;
+  }>({ open: false, listID: "", activeID: undefined });
   const textarea = useRef<HTMLTextAreaElement>(null);
   const [referenceCount, setReferenceCount] = useState(0);
   const [contextActive, setContextActive] = useState<{
@@ -129,7 +137,12 @@ export function Composer({
     listID: string;
     activeID: string | undefined;
   }>({ open: false, listID: "", activeID: undefined });
+  const autocomplete = commandActive.open ? commandActive : contextActive;
   const composing = useRef(false);
+  function detect(value: string, caret: number) {
+    command.current?.detect(value, caret);
+    context.current?.detect(value, caret);
+  }
   const picker = useRef<HTMLInputElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -231,12 +244,16 @@ export function Composer({
         role="combobox"
         aria-autocomplete="list"
         aria-haspopup="listbox"
-        aria-expanded={contextActive.open}
-        aria-controls={contextActive.open ? contextActive.listID : undefined}
-        aria-activedescendant={contextActive.open ? contextActive.activeID : undefined}
+        aria-expanded={autocomplete.open}
+        aria-controls={autocomplete.open ? autocomplete.listID : undefined}
+        aria-activedescendant={autocomplete.open ? autocomplete.activeID : undefined}
         className="composer-textarea"
         rows={1}
-        placeholder={label === "Follow-up" ? "Ask a follow-up…" : "Describe a task…"}
+        placeholder={
+          label === "Follow-up"
+            ? "Ask a follow-up, / for commands, @ for context…"
+            : "Describe a task, / for commands, @ for context…"
+        }
         value={message}
         onChange={(event) => {
           onChange(event.target.value);
@@ -244,19 +261,36 @@ export function Composer({
             !composing.current &&
             !(event.nativeEvent instanceof InputEvent && event.nativeEvent.isComposing)
           ) {
-            context.current?.detect(event.target.value, event.target.selectionStart);
+            detect(event.target.value, event.target.selectionStart);
+          }
+        }}
+        onKeyUp={(event) => {
+          if (
+            ["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key) &&
+            !composing.current
+          ) {
+            detect(event.currentTarget.value, event.currentTarget.selectionStart);
+          }
+        }}
+        onClick={(event) => {
+          if (!composing.current) {
+            detect(event.currentTarget.value, event.currentTarget.selectionStart);
           }
         }}
         onCompositionStart={() => {
           composing.current = true;
           context.current?.close();
+          command.current?.close();
         }}
         onCompositionEnd={(event) => {
           composing.current = false;
-          context.current?.detect(event.currentTarget.value, event.currentTarget.selectionStart);
+          detect(event.currentTarget.value, event.currentTarget.selectionStart);
         }}
         onKeyDown={(event) => {
-          if (composing.current || event.nativeEvent.isComposing) return;
+          if (composing.current || composingKey(event)) {
+            return;
+          }
+          if (command.current?.keydown(event) === true) return;
           if (context.current?.keydown(event) === true) return;
           if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
@@ -264,6 +298,16 @@ export function Composer({
           }
         }}
         disabled={disabled}
+      />
+      <CommandPicker
+        key={`commands:${draftScope ?? id}`}
+        ref={command}
+        scope={draftScope ?? id}
+        textarea={textarea}
+        onText={onChange}
+        disabled={disabled}
+        activeTurn={activeTurn}
+        onActive={setCommandActive}
       />
       <ContextPicker
         key={draftScope ?? id}

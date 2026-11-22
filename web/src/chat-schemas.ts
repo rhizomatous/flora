@@ -87,6 +87,7 @@ export const partSchema = z.looseObject({
 export type Part = z.infer<typeof partSchema>;
 const messageInfoSchema = z.object({ error: z.unknown().optional() });
 const payloadSchema = z.object({
+  command: z.object({ name: z.string(), arguments: z.string(), version: z.number() }).optional(),
   references: z.array(referenceSchema).optional(),
   parts: z.array(partSchema).default([]),
   info: messageInfoSchema.optional(),

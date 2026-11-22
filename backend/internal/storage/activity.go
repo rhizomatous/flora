@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/rhizomatous/flora/backend/internal/commands"
 )
 
 type Message struct {
@@ -68,12 +70,16 @@ func (s *Store) AcceptMessageWithContext(ctx context.Context, chatID, requestID,
 			return ErrInvalid
 		}
 		var status Status
-		var active string
-		if err := tx.QueryRowContext(ctx, "SELECT status,coalesce(active_message_id,'') FROM chats WHERE id=?", chatID).Scan(&status, &active); err != nil {
+		var active, harness string
+		if err := tx.QueryRowContext(ctx, "SELECT status,coalesce(active_message_id,''),harness_version FROM chats WHERE id=?", chatID).Scan(&status, &active, &harness); err != nil {
 			return found(err)
 		}
 		if active != "" || status == Working || status == Waiting {
 			return ErrActive
+		}
+		command, runtimeText, err := commands.Resolve(text, harness)
+		if err != nil {
+			return err
 		}
 		execution, err := resolveExecution(ctx, tx, chatID, selection)
 		if err != nil {
@@ -114,6 +120,10 @@ func (s *Store) AcceptMessageWithContext(ctx context.Context, chatID, requestID,
 		if len(references) > 0 {
 			payloadFields["references"], _ = json.Marshal(references)
 		}
+		if command != nil {
+			payloadFields["command"], _ = json.Marshal(command)
+		}
+		payloadFields["runtimeText"], _ = json.Marshal(runtimeText)
 		payloadFields["execution"] = json.RawMessage(selectionJSON(&execution))
 		payloadFields["selection"] = json.RawMessage(selectionJSON(selection))
 		m.Payload, _ = json.Marshal(payloadFields)

@@ -621,7 +621,7 @@ func (s *Service) captureHistory(ctx context.Context, rt *runtime, c storage.Cha
 		}
 		for _, saved := range messages {
 			if saved.ID == messageID {
-				acceptedText = saved.Text
+				acceptedText = storage.MessageInputText(saved)
 				var payload struct {
 					Attachments []storage.Attachment       `json:"attachments"`
 					References  []storage.ContextReference `json:"references"`
@@ -871,4 +871,13 @@ func (s *Service) Reply(ctx context.Context, chatID, questionID string, answers 
 	// capture worker. Its previous question wait must no longer pause timeout.
 	s.provisioner.BeginActivity(c.ContainerID)
 	return &ControlError{Reason: reason}
+}
+
+// CommandHarness returns the pinned runtime identity for new conversations.
+func (s *Service) CommandHarness() string {
+	if s.provisioner == nil {
+		return ""
+	}
+	_, harness := s.provisioner.Identity()
+	return harness
 }

@@ -81,8 +81,8 @@ func (s *Service) runtimeParts(ctx context.Context, rt *runtime, message storage
 		return nil, err
 	}
 	parts := []map[string]string{}
-	if message.Text != "" {
-		parts = append(parts, map[string]string{"type": "text", "text": message.Text})
+	if text := storage.MessageInputText(message); text != "" {
+		parts = append(parts, map[string]string{"type": "text", "text": text})
 	}
 	var configuration storage.Configuration
 	if len(payload.References) > 0 {

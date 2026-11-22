@@ -19,6 +19,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/rhizomatous/flora/backend/internal/commands"
+
 	_ "modernc.org/sqlite"
 )
 
@@ -386,6 +388,11 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 				return nil
 			}
 			if !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+		}
+		if requestID != "" {
+			if _, _, err := commands.Resolve(text, harnessVersion); err != nil {
 				return err
 			}
 		}

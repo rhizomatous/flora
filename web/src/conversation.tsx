@@ -89,6 +89,11 @@ export function ConversationMessage({
               </BubbleContent>
             </Bubble>
           )}
+          {m.Payload.command && (
+            <span aria-label="Sent command" className="text-xs text-muted-foreground">
+              Command /{m.Payload.command.name}
+            </span>
+          )}
           {m.Payload.references && m.Payload.references.length > 0 && (
             <SentContextReferences references={m.Payload.references} />
           )}

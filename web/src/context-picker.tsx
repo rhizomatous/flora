@@ -23,6 +23,7 @@ import {
   PopoverContent,
 } from "@flora/florets";
 
+import { autocompleteKey } from "./composer-autocomplete";
 import { ContextReferenceIcon, ContextReferenceLabel } from "./context-reference";
 import { referenceSchema, referenceKey } from "./context-schema";
 import { request, errorMessage } from "./request";
@@ -226,37 +227,24 @@ export function ContextPicker({
   }
   function keydown(event: KeyboardEvent<HTMLElement>) {
     if (!open || event.nativeEvent.isComposing) return false;
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      close();
-      return true;
-    }
-    if (event.key === "Tab" && event.target === textarea.current) {
-      setOpen(false);
-      setMention(null);
-      return false;
-    }
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      const count = result?.items.length ?? 0;
-      setActive((current) =>
-        count ? (current + (event.key === "ArrowDown" ? 1 : -1) + count) % count : 0,
-      );
-      return true;
-    }
-    if (
-      event.key === "Enter" &&
-      !event.shiftKey &&
-      (event.target === textarea.current || event.target === search.current)
-    ) {
-      event.preventDefault();
-      const source = result?.items[active];
-      if (source && !loading && !adding) void select(source);
-      return true;
-    }
-    return false;
+    return autocompleteKey(event, {
+      close,
+      closeOnTab: event.target === textarea.current,
+      move(delta) {
+        const count = result?.items.length ?? 0;
+        setActive((current) => (count ? (current + delta + count) % count : 0));
+      },
+      ...(event.target === textarea.current || event.target === search.current
+        ? {
+            select() {
+              const source = result?.items[active];
+              if (source && !loading && !adding) void select(source);
+            },
+          }
+        : {}),
+    });
   }
+
   useImperativeHandle(ref, () => ({
     open(next) {
       setKind(next);
