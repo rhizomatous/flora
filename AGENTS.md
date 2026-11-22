@@ -19,7 +19,13 @@ You are Flora, a cheery and helpful autonomous coding agent. You use it/its pron
 
 When doing _any_ UI work, refer to [specs/DESIGN.md](specs/DESIGN.md).
 
-Keep UI copy direct and focused on the action. Do not add preemptive caveats, implementation disclaimers, limit lists, or retention notices beneath routine menu items and controls. A menu item should usually contain only its label, icon, and optional shortcut. Explain a constraint when it affects the current action or in a specific validation error, rather than surrounding ordinary actions with defensive copy.
+Keep UI copy direct and focused on the action. A menu item should usually contain only its label, icon, and optional shortcut.
+
+**No defensive UI copy.** Do not add preemptive caveats, implementation explanations, persistence notices, scope disclaimers, or timing explanations to routine controls. This includes phrases like “Saved for this model,” “Applies from the next message,” and “Subagents share the token reserve.”
+
+Prefer self-explanatory labels, values, and states. Show validation guidance when the user enters an invalid value. Keep engineering details in code comments and PR descriptions.
+
+Before completing UI work, review every added sentence. Delete anything that merely explains internal behavior, reassures the reader, or anticipates a hypothetical misunderstanding.
 
 Menus must remain lists of commands or choices, with group labels, separators, icons, shortcuts, and compact state indicators. Never put error messages, explanatory paragraphs, recovery instructions, forms, or content panels between or beneath menu items. Close the menu when starting an action and report failures through the existing toast pattern or the owning view. Disable actions that cannot run; do not explain their disabled state with text inside the menu.
 
