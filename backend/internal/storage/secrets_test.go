@@ -15,30 +15,6 @@ import (
 
 var fixtureCredentials = Credentials{Provider: "anthropic", Model: "fixture-model", GitHubToken: "github_pat_fixture_only_31817", ProviderKey: "sk_fixture_only_67182"}
 
-func legacySecrets(t *testing.T) (string, *sql.DB) {
-	t.Helper()
-	root := filepath.Join(t.TempDir(), "data")
-	must(t, os.Mkdir(root, 0700))
-	db, err := sql.Open("sqlite", filepath.Join(root, "flora.db"))
-	must(t, err)
-	entries, err := migrations.ReadDir("migrations")
-	must(t, err)
-	for _, entry := range entries[:len(entries)-1] {
-		body, err := migrations.ReadFile("migrations/" + entry.Name())
-		must(t, err)
-		_, err = db.Exec(string(body))
-		must(t, err)
-	}
-	// Use the actual preceding version as duplicate numeric migration prefixes
-	// are ordered by filename, just as they are in the storage opener.
-	_, err = db.Exec("PRAGMA user_version=" + fmt.Sprint(len(entries)-1))
-	must(t, err)
-	c := fixtureCredentials
-	_, err = db.Exec("INSERT INTO installation_credentials VALUES(1,?,?,?,?)", c.Provider, c.Model, c.GitHubToken, c.ProviderKey)
-	must(t, err)
-	return root, db
-}
-
 func assertFixtureCredentials(t *testing.T, s *Store) {
 	t.Helper()
 	c, err := s.Credentials(ctx)
@@ -59,64 +35,13 @@ func assertEncryptedRecords(t *testing.T, s *Store) {
 	}
 }
 
-func TestCredentialMigrationRetryAndRemnants(t *testing.T) {
-	root, db := legacySecrets(t)
-	_, err := db.Exec("PRAGMA secure_delete=OFF; CREATE TABLE discarded(value TEXT)")
-	must(t, err)
-	_, err = db.Exec("INSERT INTO discarded VALUES(?)", strings.Repeat(fixtureCredentials.ProviderKey, 4096))
-	must(t, err)
-	_, err = db.Exec("DROP TABLE discarded")
-	must(t, err)
-	var free int
-	must(t, db.QueryRow("PRAGMA freelist_count").Scan(&free))
-	if free == 0 {
-		t.Fatal("fixture did not leave free pages")
-	}
-	// Fail after the credential UPDATE, before the marker commits.
-	_, err = db.Exec("CREATE TABLE credential_encryption(id INTEGER PRIMARY KEY,verifier TEXT NOT NULL,cleanup_pending INTEGER NOT NULL); CREATE TRIGGER fail_encryption BEFORE INSERT ON credential_encryption BEGIN SELECT RAISE(ABORT,'injected interruption'); END")
-	must(t, err)
-	must(t, db.Close())
+func TestCredentialsEncryptedFromFirstSave(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "data")
 	s, err := Open(ctx, root)
-	if err == nil {
-		s.Close()
-		t.Fatal("migration should fail")
-	}
-	db, err = sql.Open("sqlite", filepath.Join(root, "flora.db"))
 	must(t, err)
-	var saved string
-	must(t, db.QueryRow("SELECT github_token FROM installation_credentials").Scan(&saved))
-	if saved != fixtureCredentials.GitHubToken {
-		t.Fatal("failed conversion lost original")
-	}
-	var count int
-	must(t, db.QueryRow("SELECT count(*) FROM credential_encryption").Scan(&count))
-	if count != 0 {
-		t.Fatal("failed conversion advanced marker")
-	}
-	_, err = db.Exec("DROP TRIGGER fail_encryption")
-	must(t, err)
-	must(t, db.Close())
-	s, err = Open(ctx, root)
-	must(t, err)
-	assertFixtureCredentials(t, s)
+	must(t, s.SaveCredentials(ctx, fixtureCredentials))
 	assertEncryptedRecords(t, s)
-	must(t, s.db.QueryRow("PRAGMA freelist_count").Scan(&free))
-	if free != 0 {
-		t.Fatal("migration did not compact free pages")
-	}
-	// A committed conversion with unfinished cleanup is safe to repeat on reopen.
-	_, err = s.db.Exec("UPDATE credential_encryption SET cleanup_pending=1")
-	must(t, err)
-	must(t, s.Close())
-	s, err = Open(ctx, root)
-	must(t, err)
 	assertFixtureCredentials(t, s)
-	var pending int
-	must(t, s.db.QueryRow("SELECT cleanup_pending FROM credential_encryption").Scan(&pending))
-	if pending != 0 {
-		t.Fatal("cleanup was not retried")
-	}
-	must(t, s.Close())
 	for _, name := range []string{"flora.db", "flora.db-wal", "flora.db-journal"} {
 		raw, err := os.ReadFile(filepath.Join(root, name))
 		if os.IsNotExist(err) {
@@ -124,8 +49,66 @@ func TestCredentialMigrationRetryAndRemnants(t *testing.T) {
 		}
 		must(t, err)
 		if bytes.Contains(raw, []byte(fixtureCredentials.GitHubToken)) || bytes.Contains(raw, []byte(fixtureCredentials.ProviderKey)) {
-			t.Fatalf("fixture plaintext remains in %s", name)
+			t.Fatalf("fixture plaintext in %s", name)
 		}
+	}
+	must(t, s.Close())
+	must(t, os.Chmod(root+".key", 0400))
+	s, err = Open(ctx, root)
+	must(t, err)
+	defer s.Close()
+	assertFixtureCredentials(t, s)
+	must(t, s.SaveCredentials(ctx, fixtureCredentials))
+	info, err := os.Stat(root + ".key")
+	must(t, err)
+	if info.Mode().Perm() != 0400 {
+		t.Fatal("opening storage changed the read-only key permissions")
+	}
+}
+
+func TestPlaintextCredentialsRequireFreshStorage(t *testing.T) {
+	for _, missingKey := range []bool{false, true} {
+		t.Run(fmt.Sprint("missing-key-", missingKey), func(t *testing.T) {
+			root := filepath.Join(t.TempDir(), "data")
+			s, err := Open(ctx, root)
+			must(t, err)
+			c := fixtureCredentials
+			_, err = s.db.Exec("DELETE FROM credential_encryption; INSERT INTO installation_credentials VALUES(1,?,?,?,?)", c.Provider, c.Model, c.GitHubToken, c.ProviderKey)
+			must(t, err)
+			must(t, s.Close())
+			key, err := os.ReadFile(root + ".key")
+			must(t, err)
+			if missingKey {
+				must(t, os.Remove(root+".key"))
+			}
+			s, err = Open(ctx, root)
+			if err == nil {
+				s.Close()
+				t.Fatal("plaintext credentials were accepted")
+			}
+			if !strings.Contains(err.Error(), "fresh development data directory") {
+				t.Fatal("missing fresh-storage instruction")
+			}
+			db, err := sql.Open("sqlite", filepath.Join(root, "flora.db"))
+			must(t, err)
+			defer db.Close()
+			var github, provider string
+			must(t, db.QueryRow("SELECT github_token,provider_key FROM installation_credentials").Scan(&github, &provider))
+			if github != c.GitHubToken || provider != c.ProviderKey {
+				t.Fatal("unsupported credentials were rewritten")
+			}
+			savedKey, err := os.ReadFile(root + ".key")
+			if missingKey {
+				if !os.IsNotExist(err) {
+					t.Fatal("key generated for unsupported credential storage")
+				}
+			} else {
+				must(t, err)
+				if !bytes.Equal(savedKey, key) {
+					t.Fatal("saved key was replaced")
+				}
+			}
+		})
 	}
 }
 
@@ -299,34 +282,45 @@ func TestCredentialKeyLocationAndPermissions(t *testing.T) {
 	}
 }
 
-func TestCredentialCleanupFailureAfterCommit(t *testing.T) {
-	root, db := legacySecrets(t)
-	_, err := db.Exec("CREATE TABLE credential_encryption(id INTEGER PRIMARY KEY,verifier TEXT NOT NULL,cleanup_pending INTEGER NOT NULL); CREATE TRIGGER interrupt_cleanup BEFORE UPDATE OF cleanup_pending ON credential_encryption WHEN NEW.cleanup_pending=0 BEGIN SELECT RAISE(ABORT,'interrupted cleanup'); END")
+func TestCredentialRotationCleanupRetry(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "data")
+	next := root + "-next.key"
+	s, err := Open(ctx, root)
 	must(t, err)
-	must(t, db.Close())
+	must(t, s.SaveCredentials(ctx, fixtureCredentials))
+	_, err = s.db.Exec("CREATE TRIGGER interrupt_cleanup BEFORE UPDATE OF cleanup_pending ON credential_encryption WHEN NEW.cleanup_pending=0 BEGIN SELECT RAISE(ABORT,'interrupted cleanup'); END")
+	must(t, err)
+	if err := s.RotateCredentialKey(ctx, next); err == nil {
+		t.Fatal("cleanup should fail")
+	}
+	assertFixtureCredentials(t, s)
+	var pending int
+	must(t, s.db.QueryRow("SELECT cleanup_pending FROM credential_encryption").Scan(&pending))
+	if pending != 1 {
+		t.Fatal("rotation cleanup was not marked pending")
+	}
+	must(t, s.Close())
 	failed, err := Open(ctx, root)
 	if err == nil {
 		failed.Close()
-		t.Fatal("cleanup failure should prevent startup")
+		t.Fatal("source key opened rotated storage")
 	}
-	db, err = sql.Open("sqlite", filepath.Join(root, "flora.db"))
+	failed, err = OpenWithKeyFile(ctx, root, next)
+	if err == nil {
+		failed.Close()
+		t.Fatal("unfinished cleanup should prevent startup")
+	}
+	db, err := sql.Open("sqlite", filepath.Join(root, "flora.db"))
 	must(t, err)
-	var token string
-	var pending int
-	must(t, db.QueryRow("SELECT github_token FROM installation_credentials").Scan(&token))
-	must(t, db.QueryRow("SELECT cleanup_pending FROM credential_encryption").Scan(&pending))
-	if !strings.HasPrefix(token, "flora:v1:") || pending != 1 {
-		t.Fatal("committed encryption was not retained for cleanup retry")
-	}
 	_, err = db.Exec("DROP TRIGGER interrupt_cleanup")
 	must(t, err)
 	must(t, db.Close())
-	s, err := Open(ctx, root)
+	s, err = OpenWithKeyFile(ctx, root, next)
 	must(t, err)
 	defer s.Close()
 	assertFixtureCredentials(t, s)
 	must(t, s.db.QueryRow("SELECT cleanup_pending FROM credential_encryption").Scan(&pending))
 	if pending != 0 {
-		t.Fatal("cleanup did not finish")
+		t.Fatal("rotation cleanup did not finish")
 	}
 }

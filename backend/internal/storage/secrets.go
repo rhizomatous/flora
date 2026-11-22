@@ -106,7 +106,7 @@ func loadSecretBox(path string, create bool) (*secretBox, error) {
 		}
 	}
 	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Size() != 32 {
+	if err != nil || !info.Mode().IsRegular() || (info.Mode().Perm() != 0600 && info.Mode().Perm() != 0400) || info.Size() != 32 {
 		return nil, ErrSecrets
 	}
 	owner, ok := info.Sys().(*syscall.Stat_t)
@@ -171,54 +171,34 @@ func (s *Store) initializeSecrets(ctx context.Context, file string) error {
 	var verifier string
 	var pending int
 	err = s.db.QueryRowContext(ctx, "SELECT verifier,cleanup_pending FROM credential_encryption WHERE id=1").Scan(&verifier, &pending)
-	legacy := errors.Is(err, sql.ErrNoRows)
-	if err != nil && !legacy {
+	fresh := errors.Is(err, sql.ErrNoRows)
+	if err != nil && !fresh {
 		return ErrSecrets
 	}
-	if legacy {
-		var github, provider string
-		err := s.db.QueryRowContext(ctx, "SELECT github_token,provider_key FROM installation_credentials WHERE id=1").Scan(&github, &provider)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if fresh {
+		var exists bool
+		if err := s.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM installation_credentials)").Scan(&exists); err != nil {
 			return ErrSecrets
 		}
-		if strings.HasPrefix(github, "flora:v1:") || strings.HasPrefix(provider, "flora:v1:") {
-			return ErrSecrets
+		if exists {
+			return errors.New("credentials have no encryption verifier; use a fresh development data directory")
 		}
 	}
-	box, err := loadSecretBox(path, legacy)
+	box, err := loadSecretBox(path, fresh)
 	if err != nil {
 		return err
 	}
-	if legacy {
-		err = s.write(ctx, func(tx *sql.Tx) error {
-			// Both fields and the format marker commit together. A rollback leaves the
-			// original plaintext readable by the next migration attempt.
-			var c Credentials
-			err := tx.QueryRowContext(ctx, "SELECT provider,model,github_token,provider_key FROM installation_credentials WHERE id=1").Scan(&c.Provider, &c.Model, &c.GitHubToken, &c.ProviderKey)
-			if err != nil && !errors.Is(err, sql.ErrNoRows) {
-				return ErrSecrets
-			}
-			if err == nil {
-				if strings.HasPrefix(c.GitHubToken, "flora:v1:") || strings.HasPrefix(c.ProviderKey, "flora:v1:") {
-					return ErrSecrets
-				}
-				if _, err := tx.ExecContext(ctx, "UPDATE installation_credentials SET github_token=?,provider_key=? WHERE id=1", box.seal(c.GitHubToken, credentialContext(c, "github")), box.seal(c.ProviderKey, credentialContext(c, "provider"))); err != nil {
-					return ErrSecrets
-				}
-			}
-			_, err = tx.ExecContext(ctx, "INSERT INTO credential_encryption VALUES(1,?,1)", box.seal("flora-key-check", "key-check"))
-			return err
-		})
-		if err != nil {
+	if fresh {
+		if _, err := s.db.ExecContext(ctx, "INSERT INTO credential_encryption VALUES(1,?,0)", box.seal("flora-key-check", "key-check")); err != nil {
 			return err
 		}
-		pending = 1
 	} else {
 		check, err := box.open(verifier, "key-check")
 		if err != nil || check != "flora-key-check" {
 			return ErrSecrets
 		}
 	}
+
 	s.secrets = box
 	if _, err := readCredentials(ctx, s.db, box); err != nil && !errors.Is(err, ErrNotFound) {
 		return err
@@ -229,7 +209,7 @@ func (s *Store) initializeSecrets(ctx context.Context, file string) error {
 	return nil
 }
 
-// cleanupSecretRemnants is retried after a committed migration or rotation. This
+// cleanupSecretRemnants is retried after a committed key rotation. This
 // rewrites SQLite's current files, not filesystem snapshots or storage media.
 func (s *Store) cleanupSecretRemnants(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, "VACUUM"); err != nil {

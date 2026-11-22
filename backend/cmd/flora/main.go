@@ -300,7 +300,7 @@ func serveGitHub(ctx context.Context, broker *githubbroker.Broker, addr string, 
 	return listener.Addr(), nil
 }
 
-// openCredentialStore excludes other Flora processes before schema conversion or
+// openCredentialStore excludes other Flora processes before schema initialization or
 // rotation touches SQLite. Storage errors release the deployment lock.
 func openCredentialStore(ctx context.Context, root, keyFile string) (*storage.Store, func(), error) {
 	if root == "" {

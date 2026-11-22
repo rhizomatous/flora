@@ -81,7 +81,7 @@ is outside the data directory, at `data-dir.key` by default. Set
 `-credential-key-file /private/path/key` to choose another location. Keep key
 backups separate from database backups. Missing or wrong keys prevent startup.
 See [credential storage and recovery](INSTALL.md#credential-storage-and-recovery)
-for migration, rotation, backup and lost-key limits. Never mount the storage
+for rotation, backup and lost-key limits. Never mount the storage
 directory or encryption key into agents.
 
 Installation settings also control container capacity, CPU/memory/process limits,

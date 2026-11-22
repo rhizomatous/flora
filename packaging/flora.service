@@ -16,7 +16,7 @@ CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_CHOWN CAP_DAC_OVERRID
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/flora /var/lib/flora.key
+ReadWritePaths=/var/lib/flora
 PrivateTmp=true
 
 [Install]

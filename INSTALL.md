@@ -155,13 +155,13 @@ or GitHub writes. See [agent transport limits](agent/README.md).
 The installer creates and enables the service for you. For a manual installation,
 copy the verified binary to `/opt/flora/flora`. Adapt `flora.service` with your
 canonical URL and install it yourself at `/etc/systemd/system/flora.service`.
-The example runs as root and restricts writes to the data directory and key file.
+The example runs as root and restricts writes to the data directory.
 Before its first start on a fresh installation, provision the key as root with
 `sudo sh -c 'umask 077; set -C; head -c 32 /dev/urandom > /var/lib/flora.key'`.
 This refuses to overwrite an existing key. Restore an existing installation's
-matching key instead. If using another key path, update both ExecStart and
-ReadWritePaths. A non-root service needs Docker socket access, the two
-network capabilities above and writable private storage; Docker remains root
+matching key instead. If using another key path, update ExecStart. The service
+only needs to read the key. A non-root service needs Docker socket access, the
+two network capabilities above and writable private storage; Docker remains root
 authority. The binary itself never installs, enables or changes host services.
 
 ```sh
@@ -204,9 +204,9 @@ On first startup, Flora generates a random 32-byte key at `data-dir.key`, outsid
 the data directory. With the installer default this is `/var/lib/flora.key`.
 Use `-credential-key-file /private/path/key` to select a different path. Its parent
 must already exist and be controlled by the service owner. The key must be a
-regular file owned by that user with mode 0600. Flora rejects symlinks and paths
-inside the data directory. Data directories stay mode 0700 and SQLite files mode
-0600. Do not mount the key or storage directory into agents. Configure the same
+regular file owned by that user with mode 0400 or 0600. Flora rejects symlinks and
+paths inside the data directory. Data directories stay mode 0700 and SQLite files
+mode 0600. Do not mount the key or storage directory into agents. Configure the same
 key path on every service start. An existing key file must contain exactly 32 raw
 random bytes; text, hex and base64 encodings are not accepted.
 
@@ -218,25 +218,9 @@ copy of a key is lost, the encrypted credentials cannot be recovered. Keep the
 original data intact; provision a new installation and supply replacement upstream
 credentials rather than editing the database to bypass its encryption marker.
 
-### Migrating older data
-
-Stop chats and the service, and make a protected cold backup before upgrading.
-The first startup converts both plaintext credential fields and records the
-verified encryption format in one SQLite transaction. A failure before commit
-leaves the original records intact; retry with the same key file. A failure after
-commit uses the encrypted records and retries pending cleanup on the next startup.
-Do not run another SQLite client during conversion or cleanup. The app does not
-listen until conversion, authentication and cleanup succeed. Allow free disk space
-for SQLite to rewrite the database.
-
-Flora enables SQLite secure_delete, runs VACUUM after conversion, and truncates
-the WAL before marking cleanup complete. This reduces plaintext in current free
-pages and journal/WAL files. These operations do not guarantee secure deletion
-on SSDs, copy-on-write filesystems, filesystem journals, snapshots or underlying
-media. Old backups can still contain plaintext, as can older copies of rollback
-journals or WAL files. Restrict access to these copies, expire them according to
-your backup policy, and replace upstream tokens if historical exposure matters.
-Do not treat a successful migration as proof that old plaintext has been erased.
+Credentials are encrypted from their first save. Plaintext development databases
+are unsupported; start with a fresh data directory. Existing development databases
+and backups may contain plaintext and are not rewritten.
 
 ### Backups, restore and rotation
 
@@ -244,9 +228,9 @@ With chats and Flora stopped, back up the complete data directory and deployment
 state using the procedure above. Save the matching encryption key in a separate
 protected store with a reference identifying its database backup. A database
 archive containing its key defeats the separation. Test restore on an isolated
-host with the same release, the matching key, mode 0600, and the configured key
-path. Never start a restored production copy beside the original. Keep historical
-keys for as long as corresponding backups must be recoverable.
+host with the same release, the matching key, mode 0400 or 0600, and the configured
+key path. Never start a restored production copy beside the original. Keep
+historical keys for as long as corresponding backups must be recoverable.
 
 To rotate the at-rest encryption key, first stop chats and Flora and retain a cold
 backup and its key. Run as the service owner:
@@ -262,9 +246,10 @@ as the server, creates the destination key if absent, authenticates the saved
 values, and re-encrypts both values and the key verifier in one transaction. An
 existing destination must be a valid private key file. It never overwrites the
 source key. On success, set `-credential-key-file /var/lib/flora-next.key` in the
-service's ExecStart and any ReadWritePaths restriction, reload systemd and restart.
-Verify settings and dependencies before removing any old key from active storage. This changes encryption at rest;
-it does not replace upstream tokens or keys already in container environments.
+service's ExecStart, reload systemd and restart.
+Verify settings and dependencies before removing any old key from active storage.
+This changes encryption at rest; it does not replace upstream tokens or keys
+already in container environments.
 
 If interrupted, retain both keys. Before the transaction commits, the source key
 still opens the database; after commit, only the destination does. Retry with the
@@ -273,6 +258,12 @@ the destination, which also finishes any pending SQLite cleanup. Wrong-key opens
 fail without rewriting secrets. Backups made before rotation still need the old
 key. Rotation cannot revoke access to an old database and old key already copied
 by someone else; replace the upstream credentials to revoke that access.
+
+After rotation, Flora runs VACUUM and truncates the WAL to remove old-key
+ciphertext from the current SQLite files, retrying unfinished cleanup on startup.
+This does not guarantee secure deletion from SSDs, filesystem journals, snapshots
+or underlying media. Historical backups still require their original key and
+remain readable to anyone who has both copies.
 
 ## Maintainer release control
 
