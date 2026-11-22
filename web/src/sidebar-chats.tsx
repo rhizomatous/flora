@@ -10,8 +10,6 @@ import {
   EllipsisIcon,
   PinIcon,
   FolderIcon,
-  ListIcon,
-  Settings2Icon,
   CheckIcon,
   DropdownMenu,
   DropdownMenuTrigger,
@@ -27,11 +25,13 @@ import { FolderActions } from "./chat-folders";
 import { pinnedChats } from "./chat-organization";
 import { ChatOrganizationActions } from "./chat-organization-actions";
 import type { Chat } from "./chat-schemas";
-import { chatStatus } from "./chat-status";
+import { chatStatus, chatStatuses } from "./chat-status";
 import { useFolders } from "./folder-state";
 import { UnreadDot } from "./mark-chats-read";
 import { PullCount, PullList } from "./pull-links";
+import { useSidebarPreferences } from "./sidebar-preferences";
 import { isChatSeen, useMarkChatsRead } from "./sidebar-status";
+import { SidebarViewOptions } from "./sidebar-view-options";
 
 type Project = { id: string; name: string };
 
@@ -51,6 +51,7 @@ function ChatRow({
   now,
   seen,
   projectName,
+  details,
 }: {
   chat: Chat;
   path: string;
@@ -58,6 +59,7 @@ function ChatRow({
   now: number;
   seen: boolean;
   projectName?: string | undefined;
+  details: boolean;
 }) {
   const status = chatStatus(chat, seen);
   return (
@@ -70,29 +72,42 @@ function ChatRow({
               href={`#chats/${chat.ID}`}
               aria-current={path === `chats/${chat.ID}` ? "page" : undefined}
               className="florets-navigation-link"
+              aria-label={
+                details
+                  ? undefined
+                  : `${chat.Title || "Chat"}, ${status.label}${seen ? "" : ", unread activity"}`
+              }
               onClick={close}
             >
-              <span
-                className="florets-navigation-icon sidebar-status"
-                aria-hidden="true"
-                data-tone={status.tone}
-                data-filled={status.filled || undefined}
-                data-pulse={status.pulse || undefined}
-              >
-                <span />
-              </span>
+              {details && (
+                <span
+                  className="florets-navigation-icon sidebar-status"
+                  aria-hidden="true"
+                  data-tone={status.tone}
+                  data-filled={status.filled || undefined}
+                  data-pulse={status.pulse || undefined}
+                >
+                  <span />
+                </span>
+              )}
               <span className="min-w-0 flex-1">
                 <span className="flex min-w-0 items-center gap-2">
-                  <span className="florets-navigation-title">{chat.Title || "Chat"}</span>
-                  <UnreadDot seen={seen} />
+                  <span
+                    className={`florets-navigation-title${!details && !seen ? " text-foreground" : ""}`}
+                  >
+                    {chat.Title || "Chat"}
+                  </span>
+                  {details && <UnreadDot seen={seen} />}
                 </span>
-                <span className="florets-navigation-meta flex! flex-wrap items-center gap-x-2">
-                  {projectName !== undefined && (
-                    <span className="max-w-28 truncate">{projectName}</span>
-                  )}
-                  <span>{status.label}</span>
-                  <PullCount pulls={chat.pulls?.items ?? []} />
-                </span>
+                {details && (
+                  <span className="florets-navigation-meta flex! flex-wrap items-center gap-x-2">
+                    {projectName !== undefined && (
+                      <span className="max-w-28 truncate">{projectName}</span>
+                    )}
+                    <span>{status.label}</span>
+                    <PullCount pulls={chat.pulls?.items ?? []} />
+                  </span>
+                )}
               </span>
               <time
                 className="florets-navigation-age"
@@ -144,6 +159,7 @@ function ChatRow({
 
 export function SidebarChats({
   projects,
+  projectsReady,
   chats,
   path,
   close,
@@ -151,6 +167,7 @@ export function SidebarChats({
   setSearching,
 }: {
   projects: Project[];
+  projectsReady: boolean;
   chats: Chat[] | undefined;
   path: string;
   close: () => void;
@@ -158,12 +175,21 @@ export function SidebarChats({
   setSearching: (value: boolean) => void;
 }) {
   const folderTrigger = useRef<HTMLButtonElement>(null);
+  const searchTrigger = useRef<HTMLButtonElement>(null);
+  const wasSearching = useRef(searching);
+  useEffect(() => {
+    if (wasSearching.current && !searching) searchTrigger.current?.focus();
+    wasSearching.current = searching;
+  }, [searching]);
   const focusSearch = useCallback((node: HTMLInputElement | null) => {
     node?.focus();
   }, []);
   const [query, setQuery] = useState("");
-  const [collapsed, setCollapsed] = useState<string[]>([]);
-  const [sort, setSort] = useState<"updated" | "title">("updated");
+  const [preferences, update] = useSidebarPreferences();
+  const { collapsed, grouping, status, project: selectedProject, unread, details } = preferences;
+  const setCollapsed = (value: string[] | ((ids: string[]) => string[])) => {
+    update({ collapsed: typeof value === "function" ? value(collapsed) : value });
+  };
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => {
@@ -175,11 +201,37 @@ export function SidebarChats({
   }, []);
   const { folders, error: folderError, openFolder } = useFolders();
   const filter = query.trim().toLowerCase();
+  const projectFilter =
+    projectsReady && !projects.some((p) => p.id === selectedProject) ? "" : selectedProject;
+  const activeFilters = status !== "all" || projectFilter !== "" || unread;
+  const resetFilters = () => {
+    update({ status: "all", project: "", unread: false });
+  };
+  useEffect(() => {
+    if (!projectsReady || folders === undefined) return;
+    const valid = new Set([
+      "pinned",
+      "all",
+      ...projects.map((p) => p.id),
+      ...folders.map((f) => `folder:${f.id}`),
+      ...chatStatuses.map((s) => `status:${s.id}`),
+    ]);
+    const kept = collapsed.filter((id) => valid.has(id));
+    if (kept.length !== collapsed.length || projectFilter !== selectedProject) {
+      update({ collapsed: kept, project: projectFilter });
+    }
+  }, [projectsReady, projects, folders, collapsed, projectFilter, selectedProject, update]);
+  const matches = (chat: Chat) =>
+    chat.Archived !== true &&
+    (status === "all" || chatStatus(chat).id === status) &&
+    (!projectFilter || chat.ProjectID === projectFilter) &&
+    (!unread || !isChatSeen(chat));
+  const available = (chats ?? []).filter((chat) => matches(chat));
   const folderGroups = (folders ?? [])
     .map((folder) => ({
       project: { id: `folder:${folder.id}`, name: folder.name },
       folder,
-      rows: (chats ?? [])
+      rows: available
         .filter(
           (chat) =>
             chat.Archived !== true &&
@@ -190,17 +242,13 @@ export function SidebarChats({
                 .toLowerCase()
                 .includes(filter)),
         )
-        .toSorted((a, b) =>
-          sort === "title"
-            ? a.Title.localeCompare(b.Title)
-            : b.UpdatedAt.localeCompare(a.UpdatedAt),
-        ),
+        .toSorted((a, b) => b.UpdatedAt.localeCompare(a.UpdatedAt)),
     }))
-    .filter(({ rows }) => !filter || rows.length > 0);
+    .filter(({ rows }) => (!filter && !activeFilters) || rows.length > 0);
   const projectGroups = projects
     .map((project) => ({
       project,
-      rows: (chats ?? [])
+      rows: available
         .filter(
           (chat) =>
             chat.Archived !== true &&
@@ -210,24 +258,41 @@ export function SidebarChats({
               folders?.some((folder) => folder.id === chat.FolderID) !== true) &&
             (!filter || `${chat.Title} ${project.name} ${chat.ID}`.toLowerCase().includes(filter)),
         )
-        .toSorted((a, b) =>
-          sort === "title"
-            ? a.Title.localeCompare(b.Title)
-            : b.UpdatedAt.localeCompare(a.UpdatedAt),
-        ),
+        .toSorted((a, b) => b.UpdatedAt.localeCompare(a.UpdatedAt)),
     }))
-    .filter(({ rows }) => !filter || rows.length > 0);
-  const groups = [
+    .filter(({ rows }) => (!filter && !activeFilters) || rows.length > 0);
+  const organizedGroups = [
     ...folderGroups,
     ...projectGroups.map((group) => ({ ...group, folder: undefined })),
   ];
-  const pinned = pinnedChats(chats ?? []).filter(
-    (chat) =>
-      !filter ||
-      `${chat.Title} ${chat.ID} ${folders?.find((f) => f.id === chat.FolderID)?.name ?? ""} ${projects.find((project) => project.id === chat.ProjectID)?.name ?? ""}`
-        .toLowerCase()
-        .includes(filter),
-  );
+  const unfiled = projectGroups
+    .flatMap((group) => group.rows)
+    .toSorted((a, b) => b.UpdatedAt.localeCompare(a.UpdatedAt));
+  const groups =
+    grouping === "project"
+      ? organizedGroups
+      : [
+          ...folderGroups,
+          ...(grouping === "none"
+            ? [{ project: { id: "all", name: "All chats" }, rows: unfiled, folder: undefined }]
+            : chatStatuses.map((s) => ({
+                project: { id: `status:${s.id}`, name: s.label },
+                rows: unfiled.filter((chat) => chatStatus(chat).id === s.id),
+                folder: undefined,
+              }))),
+        ].filter(
+          (group) =>
+            group.rows.length > 0 || (!filter && !activeFilters && group.folder !== undefined),
+        );
+  const pinned = pinnedChats(available)
+    .filter(
+      (chat) =>
+        !filter ||
+        `${chat.Title} ${chat.ID} ${folders?.find((f) => f.id === chat.FolderID)?.name ?? ""} ${projects.find((project) => project.id === chat.ProjectID)?.name ?? ""}`
+          .toLowerCase()
+          .includes(filter),
+    )
+    .toSorted((a, b) => b.UpdatedAt.localeCompare(a.UpdatedAt));
   const {
     mark: markRead,
     disabled: readDisabled,
@@ -274,6 +339,7 @@ export function SidebarChats({
             <Button
               variant="ghost"
               size="icon-sm"
+              ref={searchTrigger}
               aria-label="Search chats"
               onClick={() => {
                 setSearching(true);
@@ -305,37 +371,41 @@ export function SidebarChats({
               <FolderIcon />
               New folder
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                setSort(sort === "updated" ? "title" : "updated");
-              }}
-            >
-              <ListIcon />
-              Sort: {sort === "updated" ? "Updated" : "Title"}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                setCollapsed(
-                  collapsed.length === groups.length ? [] : groups.map((group) => group.project.id),
-                );
-              }}
-            >
-              <InboxIcon />
-              {collapsed.length === groups.length ? "Expand" : "Collapse"} all groups
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled>
-              <Settings2Icon />
-              Display and filters
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
             <DropdownMenuItem disabled={readDisabled} aria-busy={readBusy} onClick={markRead}>
               <CheckIcon />
               Mark all as read
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <SidebarViewOptions
+              preferences={preferences}
+              update={update}
+              projects={projects}
+              onSearch={() => {
+                setSearching(true);
+              }}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      {activeFilters && (
+        <div
+          className="flex flex-wrap items-center gap-x-2 px-2 py-1 text-xs text-muted-foreground"
+          role="status"
+        >
+          <span className="max-w-full break-words">
+            {[
+              chatStatuses.find((s) => s.id === status)?.label ?? "",
+              projectFilter ? projects.find((p) => p.id === projectFilter)?.name : "",
+              unread ? "Unread" : "",
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+          <Button variant="link" size="sm" className="h-7 px-0 text-xs" onClick={resetFilters}>
+            Clear filters
+          </Button>
+        </div>
+      )}
       {folderError && (
         <p role="status" className="px-4 py-1.5 text-xs text-destructive">
           {folderError}
@@ -354,19 +424,42 @@ export function SidebarChats({
               <span className="truncate">Pinned</span>
               <span className="florets-navigation-count">{pinned.length}</span>
             </span>
-          </div>
-          <ul>
-            {pinned.map((chat) => (
-              <ChatRow
-                key={chat.ID}
-                chat={chat}
-                seen={isChatSeen(chat)}
-                path={path}
-                close={close}
-                now={now}
+            <button
+              type="button"
+              aria-label={`${filter || !collapsed.includes("pinned") ? "Collapse" : "Expand"} pinned chats`}
+              aria-expanded={!!filter || !collapsed.includes("pinned")}
+              disabled={!!filter}
+              onClick={() => {
+                if (!filter) {
+                  setCollapsed((ids) =>
+                    ids.includes("pinned")
+                      ? ids.filter((id) => id !== "pinned")
+                      : [...ids, "pinned"],
+                  );
+                }
+              }}
+            >
+              <ChevronRightIcon
+                className={filter || !collapsed.includes("pinned") ? "rotate-90" : ""}
               />
-            ))}
-          </ul>
+            </button>
+          </div>
+          {(filter || !collapsed.includes("pinned")) && (
+            <ul>
+              {pinned.map((chat) => (
+                <ChatRow
+                  key={chat.ID}
+                  chat={chat}
+                  details={details}
+                  projectName={projects.find((p) => p.id === chat.ProjectID)?.name}
+                  seen={isChatSeen(chat)}
+                  path={path}
+                  close={close}
+                  now={now}
+                />
+              ))}
+            </ul>
+          )}
         </section>
       )}
       {groups.map(({ project, rows, folder }) => {
@@ -381,14 +474,16 @@ export function SidebarChats({
             <div
               className={`florets-navigation-group-heading${folder ? " sidebar-folder-heading" : ""}`}
             >
-              {folder ? (
+              {folder || grouping !== "project" ? (
                 <div className="min-w-0 flex-1">
                   <button
                     type="button"
                     className="flex min-h-7 w-full min-w-0 cursor-pointer items-center gap-[9px] text-left hover:text-foreground"
-                    aria-label={`${expanded ? "Collapse" : "Expand"} folder ${folder.name}`}
+                    aria-label={`${expanded ? "Collapse" : "Expand"} ${folder ? "folder " : ""}${project.name}`}
                     aria-expanded={expanded}
+                    disabled={!!filter}
                     onClick={() => {
+                      if (filter) return;
                       setCollapsed((ids) =>
                         ids.includes(project.id)
                           ? ids.filter((id) => id !== project.id)
@@ -397,7 +492,7 @@ export function SidebarChats({
                     }}
                   >
                     <FolderIcon className="size-3.5 shrink-0" />
-                    <span className="min-w-0 truncate">{folder.name}</span>
+                    <span className="min-w-0 truncate">{project.name}</span>
                     <span className="florets-navigation-count">{rows.length}</span>
                     <ChevronRightIcon
                       className={expanded ? "size-2.5 shrink-0 rotate-90" : "size-2.5 shrink-0"}
@@ -411,16 +506,19 @@ export function SidebarChats({
                   <span className="florets-navigation-count">{rows.length}</span>
                 </a>
               )}
-              {folder ? (
+              {folder && (
                 <span className="sidebar-folder-actions">
                   <FolderActions folder={folder} />
                 </span>
-              ) : (
+              )}
+              {!folder && grouping === "project" && (
                 <button
                   type="button"
                   aria-label={`${expanded ? "Collapse" : "Expand"} ${project.name}`}
                   aria-expanded={expanded}
+                  disabled={!!filter}
                   onClick={() => {
+                    if (filter) return;
                     setCollapsed((ids) =>
                       ids.includes(project.id)
                         ? ids.filter((id) => id !== project.id)
@@ -439,8 +537,11 @@ export function SidebarChats({
                     key={chat.ID}
                     chat={chat}
                     projectName={
-                      folder ? projects.find((p) => p.id === chat.ProjectID)?.name : undefined
+                      folder || grouping !== "project"
+                        ? projects.find((p) => p.id === chat.ProjectID)?.name
+                        : undefined
                     }
+                    details={details}
                     seen={isChatSeen(chat)}
                     path={path}
                     close={close}
@@ -476,11 +577,14 @@ export function SidebarChats({
           </section>
         );
       })}
-      {filter && groups.length === 0 && pinned.length === 0 && (
-        <p className="sidebar-empty px-4 py-1.5 text-xs text-muted-foreground" role="status">
-          No chats found.
-        </p>
-      )}
+      {chats !== undefined &&
+        (filter || activeFilters) &&
+        groups.every((g) => g.rows.length === 0) &&
+        pinned.length === 0 && (
+          <p className="sidebar-empty px-4 py-1.5 text-xs text-muted-foreground" role="status">
+            No chats found.
+          </p>
+        )}
     </section>
   );
 }

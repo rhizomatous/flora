@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"unicode/utf8"
 )
@@ -35,7 +36,11 @@ func (s *Store) AcceptMessage(ctx context.Context, chatID, requestID, text strin
 }
 
 func (s *Store) AcceptMessageWithExecution(ctx context.Context, chatID, requestID, text string, selection *Execution, attachments ...string) (Acceptance, error) {
-	if requestID == "" || len(requestID) > 200 || (strings.TrimSpace(text) == "" && len(attachments) == 0) || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
+	return s.AcceptMessageWithContext(ctx, chatID, requestID, text, selection, nil, attachments...)
+}
+
+func (s *Store) AcceptMessageWithContext(ctx context.Context, chatID, requestID, text string, selection *Execution, references []ContextReference, attachments ...string) (Acceptance, error) {
+	if requestID == "" || len(requestID) > 200 || (strings.TrimSpace(text) == "" && len(attachments) == 0 && len(references) == 0) || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
 		return Acceptance{}, ErrInvalid
 	}
 	var a Acceptance
@@ -46,7 +51,7 @@ func (s *Store) AcceptMessageWithExecution(ctx context.Context, chatID, requestI
 				Selection *Execution `json:"selection"`
 			}
 			_ = json.Unmarshal(m.Payload, &saved)
-			if selectionJSON(saved.Selection) != selectionJSON(selection) || m.Text != text || !sameAttachmentIDs(attachmentIDs(m.Payload), attachments) {
+			if !slices.Equal(References(m.Payload), references) || selectionJSON(saved.Selection) != selectionJSON(selection) || m.Text != text || !sameAttachmentIDs(attachmentIDs(m.Payload), attachments) {
 				return ErrConflict
 			}
 			a = Acceptance{Message: m, Duplicate: true}
@@ -79,6 +84,17 @@ func (s *Store) AcceptMessageWithExecution(ctx context.Context, chatID, requestI
 		if err := tx.QueryRowContext(ctx, "SELECT project_id FROM chats WHERE id=?", chatID).Scan(&project); err != nil {
 			return found(err)
 		}
+		var config string
+		if err := tx.QueryRowContext(ctx, "SELECT config FROM chats WHERE id=?", chatID).Scan(&config); err != nil {
+			return err
+		}
+		var configuration Configuration
+		if err := json.Unmarshal([]byte(config), &configuration); err != nil {
+			return err
+		}
+		if err := validateReferences(ctx, tx, configuration, chatID, references); err != nil {
+			return err
+		}
 		// Insert the message before binding its foreign-key attachment references.
 		if err := insertMessage(ctx, tx, m); err != nil {
 			return err
@@ -95,6 +111,9 @@ func (s *Store) AcceptMessageWithExecution(ctx context.Context, chatID, requestI
 		}
 		var payloadFields map[string]json.RawMessage
 		_ = json.Unmarshal(m.Payload, &payloadFields)
+		if len(references) > 0 {
+			payloadFields["references"], _ = json.Marshal(references)
+		}
 		payloadFields["execution"] = json.RawMessage(selectionJSON(&execution))
 		payloadFields["selection"] = json.RawMessage(selectionJSON(selection))
 		m.Payload, _ = json.Marshal(payloadFields)
