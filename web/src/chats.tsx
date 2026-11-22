@@ -540,6 +540,7 @@ export function Chats({
                 )}
                 {existingChat && (
                   <ChatHeaderActions
+                    pulls={pulls}
                     chat={currentChat}
                     sideOpen={sideOpen}
                     onSideToggle={() => {
