@@ -55,8 +55,8 @@ const publicIDs = new Map<string, string>();
 function publicID(id: string, projectName: string) {
   const prefix =
     projectName
+      .replaceAll(/[^A-Za-z]/gu, "")
       .toUpperCase()
-      .replaceAll(/[^A-Z]/gu, "")
       .slice(0, 4) || "CHAT";
   if (!publicIDs.has(id)) publicIDs.set(id, `${prefix}-${publicIDs.size + 1}`);
   return present(publicIDs.get(id));
