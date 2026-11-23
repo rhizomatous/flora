@@ -72,14 +72,19 @@ const requestKey = (scope: string) => `flora-request:${scope}`;
 
 // Keep the accepted identity across ambiguous responses and page reloads.
 // A changed input is a new request, never an edit to an accepted turn.
-function identity(scope: string, input: unknown) {
+async function identity(scope: string, input: unknown) {
   const key = requestKey(scope);
-  const body = JSON.stringify(input);
+  const serialized = JSON.stringify(input);
+  // Creation inputs can contain secrets, so browser storage retains only their digest.
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(serialized));
+  const body = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
   try {
     const saved = requestIdentitySchema.safeParse(
       JSON.parse(sessionStorage.getItem(key) ?? "null"),
     );
-    if (saved.success && saved.data.body === body) return saved.data.id;
+    if (saved.success && (saved.data.body === body || saved.data.body === serialized)) {
+      return saved.data.id;
+    }
   } catch {
     /* Invalid or unavailable session storage does not prevent sending. */
   }
@@ -291,6 +296,7 @@ export function Chats({
     const chatTitle = [...titleInput].slice(0, 45).join("");
     const rawExecution = text(fields, "execution");
     const execution = rawExecution ? (JSON.parse(rawExecution) as unknown) : undefined;
+    const environment: unknown = JSON.parse(text(fields, "environment") || "[]");
     const input = isNew
       ? {
           title: chatTitle,
@@ -299,11 +305,12 @@ export function Chats({
           references,
           execution,
           branches: JSON.parse(text(fields, "branches") || "{}") as unknown,
+          ...(Array.isArray(environment) && environment.length > 0 ? { environment } : {}),
         }
       : { text: message, attachments, references, execution };
     const scope = isNew ? `project:${project}` : `chat:${id}`;
     try {
-      const requestID = identity(scope, input);
+      const requestID = await identity(scope, input);
       if (isNew) {
         const chat = await request(chatSchema, `projects/${encodeURIComponent(project)}/chats`, {
           method: "POST",

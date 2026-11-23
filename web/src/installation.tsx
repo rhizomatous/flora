@@ -12,6 +12,7 @@ import {
   Text,
 } from "@flora/florets";
 
+import { EnvironmentEditor } from "./environment";
 import { readPreferences } from "./preferences";
 import { request } from "./request";
 import { PreferenceFields } from "./settings";
@@ -163,6 +164,9 @@ export function Installation({
           {busy ? "Saving…" : "Validate and save"}
         </Button>
       </form>
+      <div className="mt-10">
+        <EnvironmentEditor path="settings/environment" />
+      </div>
       <section
         className="mt-10 space-y-4 border-t border-border pt-6"
         aria-labelledby="diagnostics-heading"

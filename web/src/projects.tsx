@@ -14,6 +14,7 @@ import {
   Textarea,
 } from "@flora/florets";
 
+import { EnvironmentEditor } from "./environment";
 import { projectSchema, type Project, type Repository } from "./project-schemas";
 import { errorMessage, isExpired, request } from "./request";
 import { text, texts } from "./ui";
@@ -338,6 +339,14 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
             {submitLabel}
           </Button>
         </form>
+      )}
+      {project && (
+        <div className="mt-10">
+          <EnvironmentEditor
+            key={project.id}
+            path={`projects/${encodeURIComponent(project.id)}/environment`}
+          />
+        </div>
       )}
     </section>
   );
