@@ -44,16 +44,20 @@ func (e *metadataEngine) ContainerRemove(ctx context.Context, id string, force b
 func TestMetadataContainerIsolationAndCleanup(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, password, ok := r.BasicAuth()
-		if !ok || user != "opencode" || password == "" || r.URL.Path != "/provider" || r.Method != "GET" {
+		if !ok || user != "opencode" || password == "" || (r.URL.Path != "/provider" && r.URL.Path != "/command") || r.Method != "GET" {
 			t.Error("unexpected metadata request")
 			w.WriteHeader(400)
+			return
+		}
+		if r.URL.Path == "/command" {
+			w.Write([]byte(`[]`))
 			return
 		}
 		w.Write([]byte(`{"all":[],"connected":[]}`))
 	}))
 	defer server.Close()
 	_, port, _ := net.SplitHostPort(server.Listener.Addr().String())
-	for _, mode := range []string{"success", "start failure", "canceled readiness"} {
+	for _, mode := range []string{"success", "commands", "start failure", "canceled readiness"} {
 		t.Run(mode, func(t *testing.T) {
 			base := newFakeEngine()
 			m, store := newTestManager(t, base, Config{}, nil)
@@ -66,8 +70,12 @@ func TestMetadataContainerIsolationAndCleanup(t *testing.T) {
 				defer cancel()
 				m.health = func(context.Context, string, string) bool { return false }
 			}
-			raw, err := m.ModelMetadata(ctx, storage.Credentials{Provider: "anthropic", Model: "model", ProviderKey: "provider-key", GitHubToken: "github-must-not-appear"})
-			if mode == "success" {
+			discover := m.ModelMetadata
+			if mode == "commands" {
+				discover = m.CommandMetadata
+			}
+			raw, err := discover(ctx, storage.Credentials{Provider: "anthropic", Model: "model", ProviderKey: "provider-key", GitHubToken: "github-must-not-appear"})
+			if mode == "success" || mode == "commands" {
 				if err != nil || len(raw) == 0 {
 					t.Fatal(err)
 				}

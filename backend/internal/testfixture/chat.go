@@ -116,6 +116,8 @@ func New(ctx context.Context, directory string, interactive bool, compaction ...
 		}
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
+		case "/command":
+			fmt.Fprint(w, `[{"name":"review","description":"Review changes","source":"command"},{"name":"init","description":"Create or update AGENTS.md","source":"command"},{"name":"audit","description":"Custom runtime command","source":"command"}]`)
 		case "/provider":
 			metadata := `{"connected":["anthropic"],"all":[{"id":"anthropic","models":{"model":{"name":"Installation default","limit":{"context":200000,"output":64000},"variants":{},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}},"claude-sonnet-4-6":{"name":"Claude Sonnet 4.6","cost":{"input":3,"output":15},"variants":{"low":{},"medium":{},"high":{},"max":{}},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}},"claude-haiku-4-5":{"name":"Claude Haiku 4.5","cost":{"input":1,"output":5},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}}}}]}`
 			if len(compaction) > 0 && compaction[0] {
@@ -178,7 +180,7 @@ func New(ctx context.Context, directory string, interactive bool, compaction ...
 					w.(http.Flusher).Flush()
 				}
 			}
-		case "/session/ses_browser/message":
+		case "/session/ses_browser/message", "/session/ses_browser/command":
 			if r.Method == "GET" {
 				mu.Lock()
 				defer mu.Unlock()
@@ -186,12 +188,12 @@ func New(ctx context.Context, directory string, interactive bool, compaction ...
 				return
 			}
 			var input struct {
-				Model struct {
-					Provider string `json:"providerID"`
-					ID       string `json:"modelID"`
-				} `json:"model"`
-				Variant string `json:"variant"`
-				Parts   []struct {
+				Model     json.RawMessage `json:"model"`
+				Command   string          `json:"command"`
+				Arguments string          `json:"arguments"`
+				MessageID string          `json:"messageID"`
+				Variant   string          `json:"variant"`
+				Parts     []struct {
 					Type     string `json:"type"`
 					Text     string `json:"text"`
 					Filename string `json:"filename,omitempty"`
@@ -203,17 +205,36 @@ func New(ctx context.Context, directory string, interactive bool, compaction ...
 				w.WriteHeader(400)
 				return
 			}
+			var model struct {
+				ID string `json:"modelID"`
+			}
+			_ = json.Unmarshal(input.Model, &model)
+			if input.Command != "" {
+				var selected string
+				_ = json.Unmarshal(input.Model, &selected)
+				_, model.ID, _ = strings.Cut(selected, "/")
+				input.Parts = append(input.Parts, struct {
+					Type     string `json:"type"`
+					Text     string `json:"text"`
+					Filename string `json:"filename,omitempty"`
+					MIME     string `json:"mime,omitempty"`
+					URL      string `json:"url,omitempty"`
+				}{Type: "text", Text: "Runtime expanded " + input.Command + ": " + input.Arguments})
+			}
 			mu.Lock()
 			turn++
 			n := turn
-			user, _ := json.Marshal(map[string]any{"info": map[string]string{"id": fmt.Sprintf("user_%d", n), "role": "user"}, "parts": input.Parts})
+			if input.MessageID == "" {
+				input.MessageID = fmt.Sprintf("user_%d", n)
+			}
+			user, _ := json.Marshal(map[string]any{"info": map[string]string{"id": input.MessageID, "role": "user"}, "parts": input.Parts})
 			history = append(history, user)
 			ask := interactive && n == 1
 			if ask {
 				pending = true
 			}
 			mu.Unlock()
-			if strings.Contains(input.Parts[0].Text, "control work") {
+			if strings.Contains(input.Arguments, "control work") || strings.Contains(input.Parts[0].Text, "control work") {
 				<-r.Context().Done()
 				return
 			}
@@ -230,7 +251,7 @@ func New(ctx context.Context, directory string, interactive bool, compaction ...
 				return
 			case <-time.After(750 * time.Millisecond):
 			}
-			response := json.RawMessage(fmt.Sprintf(`{"info":{"id":"assistant_%d","parentID":"user_%d","role":"assistant","providerID":"anthropic","modelID":%q},"parts":[{"type":"text","text":"Saved response %d"},{"type":"tool","tool":"bash","state":{"status":"completed","input":{"command":"pwd"},"output":"/workspace\nprovider-test-secret"}}]}`, n, n, input.Model.ID, n))
+			response := json.RawMessage(fmt.Sprintf(`{"info":{"id":"assistant_%d","parentID":%q,"role":"assistant","providerID":"anthropic","modelID":%q},"parts":[{"type":"text","text":"Saved response %d"},{"type":"tool","tool":"bash","state":{"status":"completed","input":{"command":"pwd"},"output":"/workspace\nprovider-test-secret"}}]}`, n, input.MessageID, model.ID, n))
 			mu.Lock()
 			history = append(history, response)
 			mu.Unlock()
@@ -247,6 +268,21 @@ func New(ctx context.Context, directory string, interactive bool, compaction ...
 
 func (p *Provisioner) ModelMetadata(ctx context.Context, _ storage.Credentials) (json.RawMessage, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", p.url+"/provider", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.SetBasicAuth("opencode", "test-runtime-password")
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	raw, err := io.ReadAll(response.Body)
+	return json.RawMessage(raw), err
+}
+
+func (p *Provisioner) CommandMetadata(ctx context.Context, _ storage.Credentials) (json.RawMessage, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", p.url+"/command", nil)
 	if err != nil {
 		return nil, err
 	}

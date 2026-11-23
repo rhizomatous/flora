@@ -97,6 +97,18 @@ func (a *api) chatViews(ctx context.Context, chats []storage.Chat) []chatView {
 func (a *api) chatRoutes(mux *http.ServeMux) {
 	store := a.settings.Store
 	a.folderRoutes(mux)
+	mux.HandleFunc("GET /api/commands", func(w http.ResponseWriter, r *http.Request) {
+		if a.chats == nil {
+			failure(w, 503, "Chat runtime is not configured.")
+			return
+		}
+		items, err := a.chats.Commands(r.Context(), r.URL.Query().Get("chat"))
+		if err != nil {
+			failure(w, 503, "Could not load OpenCode commands. Try again.")
+			return
+		}
+		jsonResponse(w, 200, map[string]any{"items": items})
+	})
 	mux.HandleFunc("POST /api/chats/read", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			Observed []storage.ViewedRevision `json:"observed"`

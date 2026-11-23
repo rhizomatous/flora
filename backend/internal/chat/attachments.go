@@ -81,7 +81,7 @@ func (s *Service) runtimeParts(ctx context.Context, rt *runtime, message storage
 		return nil, err
 	}
 	parts := []map[string]string{}
-	if message.Text != "" {
+	if storage.MessageCommand(message) == nil && message.Text != "" {
 		parts = append(parts, map[string]string{"type": "text", "text": message.Text})
 	}
 	var configuration storage.Configuration
@@ -136,7 +136,7 @@ func (s *Service) runtimeParts(ctx context.Context, rt *runtime, message storage
 		if err != nil {
 			return nil, err
 		}
-		if a.MIME == "text/plain" {
+		if a.MIME == "text/plain" && storage.MessageCommand(message) == nil {
 			parts = append(parts, map[string]string{"type": "text", "text": "Attached document: " + a.Name + "\n\n" + string(data)})
 			continue
 		}

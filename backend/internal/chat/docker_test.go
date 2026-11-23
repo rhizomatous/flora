@@ -122,6 +122,15 @@ func TestChatDocker(t *testing.T) {
 		if strings.Contains(string(body), "followup marker") && strings.Contains(string(body), "initial marker") {
 			followupContext.Store(true)
 		}
+		if strings.Contains(string(body), "native command marker") {
+			var request struct {
+				System json.RawMessage `json:"system"`
+			}
+			_ = json.Unmarshal(body, &request)
+			if !strings.Contains(string(request.System), ".flora-repositories.json") {
+				t.Error("native command lost Flora's configured instructions")
+			}
+		}
 		n := calls.Add(1)
 		if n == 3 {
 			select {
@@ -477,6 +486,50 @@ func TestChatDocker(t *testing.T) {
 		t.Fatal(err)
 	}
 	wait()
+	commands, err := svc.Commands(ctx, c.ID)
+	if err != nil || len(commands) < 2 {
+		t.Fatal("native command discovery failed", commands, err)
+	}
+	for i, input := range []string{"/init native command marker", "/review native command marker"} {
+		file, err := store.PutAttachment(ctx, project.ID, fmt.Sprintf("native-attachment-%d", i), "context.txt", []byte("native document marker"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		accepted, err := svc.Submit(ctx, c.ID, fmt.Sprintf("native-command-%d", i), input, file.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wait()
+		saved, err := store.MessageRequest(ctx, c.ID, accepted.Message.RequestID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		command := storage.MessageCommand(saved)
+		if command == nil || command.MessageID != saved.RuntimeMessageID {
+			t.Fatal("native command was not linked to expanded history", saved)
+		}
+		commandEndpoint, err := manager.Endpoint(ctx, c.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		commandRuntime := newRuntime(commandEndpoint)
+		defer commandRuntime.client.CloseIdleConnections()
+		var history []json.RawMessage
+		if err := commandRuntime.call(ctx, "GET", sessionPath(second.SessionID)+"/message", nil, &history); err != nil {
+			t.Fatal(err)
+		}
+		for _, raw := range history {
+			var message runtimeMessage
+			_ = json.Unmarshal(raw, &message)
+			if message.Info.ID == saved.RuntimeMessageID && strings.Contains(string(raw), "native document marker") != (i == 0) {
+				t.Fatal("attachment handling differs from the native command path")
+			}
+		}
+		duplicate, err := svc.Submit(ctx, c.ID, saved.RequestID, input, file.ID)
+		if err != nil || !duplicate.Duplicate {
+			t.Fatal("native command retry failed", err)
+		}
+	}
 	// Observe the live error schema independently of the prompt worker's terminal
 	// snapshot. Its final HTTP response can race the asynchronous SSE notification.
 	endpoint, err = manager.Endpoint(ctx, c.ID)

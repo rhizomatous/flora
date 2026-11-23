@@ -18,8 +18,6 @@ import (
 	sse "github.com/tmaxmax/go-sse"
 )
 
-const SystemPrompt = `You are Flora, a helpful autonomous coding agent. Use simple, down-to-earth English and it/its pronouns. Work in /workspace. Read /home/flora/.flora-repositories.json for this chat's repository identities, roles, base branches, and checkout paths. Core repositories are already checked out on their own branches. Fetch an extra repository with /home/flora/bin/flora-repository OWNER/REPO before editing it; this records its starting commit for review. Identify repositories when describing changes and run Git commands in the correct checkout. Execute commands and edit files without per-action approval. You have Git, gh, and passwordless sudo for installing tools. Use the question tool when genuine user input is needed. Make and verify code changes, then commit them locally. Only push or open a draft pull request when the user asks. Use normal git and gh commands for GitHub access. Never print credentials, read credential files into output, or include secrets in commits. Preserve unrelated work.`
-
 type runtime struct {
 	endpoint provisioning.Endpoint
 	client   *http.Client
@@ -168,12 +166,13 @@ type runtimeMessage struct {
 		} `json:"time"`
 	} `json:"info"`
 	Parts []struct {
-		Type     string `json:"type"`
-		Text     string `json:"text"`
-		Filename string `json:"filename"`
-		MIME     string `json:"mime"`
-		URL      string `json:"url"`
-		State    struct {
+		Synthetic bool   `json:"synthetic"`
+		Type      string `json:"type"`
+		Text      string `json:"text"`
+		Filename  string `json:"filename"`
+		MIME      string `json:"mime"`
+		URL       string `json:"url"`
+		State     struct {
 			Status string `json:"status"`
 		} `json:"state"`
 	} `json:"parts"`

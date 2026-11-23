@@ -40,6 +40,12 @@ func (s *Store) AcceptMessageWithExecution(ctx context.Context, chatID, requestI
 }
 
 func (s *Store) AcceptMessageWithContext(ctx context.Context, chatID, requestID, text string, selection *Execution, references []ContextReference, attachments ...string) (Acceptance, error) {
+	return s.AcceptMessageWithCommand(ctx, chatID, requestID, text, selection, references, nil, attachments...)
+}
+
+// AcceptMessageWithCommand saves a runtime-resolved command with the same atomic
+// admission and retry identity as ordinary text. Only a new acceptance may run.
+func (s *Store) AcceptMessageWithCommand(ctx context.Context, chatID, requestID, text string, selection *Execution, references []ContextReference, command *Command, attachments ...string) (Acceptance, error) {
 	if requestID == "" || len(requestID) > 200 || (strings.TrimSpace(text) == "" && len(attachments) == 0 && len(references) == 0) || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
 		return Acceptance{}, ErrInvalid
 	}
@@ -113,6 +119,14 @@ func (s *Store) AcceptMessageWithContext(ctx context.Context, chatID, requestID,
 		_ = json.Unmarshal(m.Payload, &payloadFields)
 		if len(references) > 0 {
 			payloadFields["references"], _ = json.Marshal(references)
+		}
+		if command != nil {
+			saved := *command
+			saved.MessageID, err = commandMessageID(ctx, tx, chatID)
+			if err != nil {
+				return err
+			}
+			payloadFields["command"], _ = json.Marshal(saved)
 		}
 		payloadFields["execution"] = json.RawMessage(selectionJSON(&execution))
 		payloadFields["selection"] = json.RawMessage(selectionJSON(selection))
