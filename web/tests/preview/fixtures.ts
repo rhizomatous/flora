@@ -1,8 +1,10 @@
 // oxlint-disable react-hooks/rules-of-hooks -- Playwright fixture callbacks are not React hooks.
 import { fileURLToPath } from "node:url";
 
-import { test as base } from "@playwright/test";
+import { test as base, expect, type Page } from "@playwright/test";
 import { createServer } from "vite";
+
+import { detailSchema } from "../../src/chat-schemas.ts";
 
 // oxlint-disable-next-line typescript/ban-types, typescript/no-empty-object-type -- Only worker-scoped fixtures are added.
 export const test = base.extend<{}, { previewServer: boolean }>({
@@ -31,3 +33,14 @@ export const test = base.extend<{}, { previewServer: boolean }>({
 });
 
 export { expect } from "@playwright/test";
+
+/** Resolve the fixture's internal key through the API before checking canonical navigation. */
+export async function publicChatID(page: Page, id: string, origin = page.url()) {
+  const response = await page.request.get(
+    new URL(`/api/chats/${encodeURIComponent(id)}`, origin).href,
+  );
+  await expect(response).toBeOK();
+  const { chat } = detailSchema.parse(await response.json());
+  expect(chat.ID).toBe(id);
+  return chat.PublicID;
+}

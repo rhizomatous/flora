@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures.ts";
+import { test, expect, publicChatID } from "./fixtures.ts";
 
 test("sidebar searches, collapses projects, and preserves navigation on narrow screens", async ({
   page,
@@ -38,7 +38,7 @@ test("sidebar searches, collapses projects, and preserves navigation on narrow s
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await expect(nav).toBeVisible();
   await nav.getByRole("link", { name: /Keep the cart after signing in/ }).click();
-  await expect(page).toHaveURL(`${base}/#chats/checkout`);
+  await expect(page).toHaveURL(`${base}/#chats/${await publicChatID(page, "checkout")}`);
   await expect(nav).not.toBeVisible();
   const heading = page.getByRole("heading", {
     name: "Keep the cart after signing in",

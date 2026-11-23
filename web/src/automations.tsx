@@ -42,6 +42,7 @@ import {
   type Automation,
   type AutomationDetail,
 } from "./automation-schemas";
+import { useChatReference } from "./chat-identity";
 import { ModelControls } from "./model-controls";
 import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
 import { errorMessage, isExpired, request } from "./request";
@@ -217,6 +218,7 @@ function AutomationForm({
   toggleActive: () => void;
   cancel: () => void;
 }) {
+  const reference = useChatReference();
   const [value, setValue] = useState(initial);
   const [preview, setPreview] = useState("");
   const [previewError, setPreviewError] = useState("");
@@ -331,7 +333,12 @@ function AutomationForm({
                 size="sm"
                 nativeButton={false}
                 role="link"
-                render={<a href={`#chats/${initial.chatID}`} aria-label="Open chat" />}
+                render={
+                  <a
+                    href={`#chats/${initial.publicChatID ?? reference(initial.chatID)}`}
+                    aria-label="Open chat"
+                  />
+                }
               >
                 Open chat
               </Button>
@@ -600,6 +607,7 @@ export function Automations({
   const [pending, setPending] = useState<"save" | "run" | "active" | null>(null);
   const busy = pending !== null;
   const [error, setError] = useState("");
+  const reference = useChatReference();
   const manualID = useRef<string | null>(null);
   const isNew = path === "automations/new";
   const id = isNew ? "" : (path.split("/")[1] ?? "");
@@ -662,7 +670,7 @@ export function Automations({
           ? {
               label: "Open chat",
               onClick: () => {
-                window.location.hash = `chats/${run.chatID}?run=${encodeURIComponent(run.messageID)}`;
+                window.location.hash = `chats/${run.publicChatID ?? reference(run.chatID)}?run=${encodeURIComponent(run.messageID)}`;
               },
             }
           : undefined,
@@ -763,7 +771,7 @@ export function Automations({
                     {run.chatID && (
                       <Link
                         className="mt-2 inline-block text-sm"
-                        href={`#chats/${run.chatID}?run=${encodeURIComponent(run.messageID)}`}
+                        href={`#chats/${run.publicChatID ?? reference(run.chatID)}?run=${encodeURIComponent(run.messageID)}`}
                       >
                         Open chat
                       </Link>

@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures.ts";
+import { test, expect, publicChatID } from "./fixtures.ts";
 
 test("usage ranges, breakdowns, metrics and chat links", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
@@ -30,7 +30,7 @@ test("usage ranges, breakdowns, metrics and chat links", async ({ page }) => {
   await page.getByRole("button", { name: "7d", exact: true }).click();
   await expect(rows).toHaveCount(4);
   await page.getByRole("link", { name: "Review the workspace changes", exact: true }).click();
-  await expect(page).toHaveURL(/#chats\/completed$/);
+  await expect(page).toHaveURL(`${base}/#chats/${await publicChatID(page, "completed")}`);
 });
 
 test("usage failure can be retried", async ({ page }) => {

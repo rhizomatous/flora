@@ -1,10 +1,12 @@
-import { test, expect } from "./fixtures.ts";
+import { test, expect, publicChatID } from "./fixtures.ts";
 
 test("linked PRs appear in the sidebar, hover cards, and composer", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
   await page.goto(`${base}/#chats/pagination`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
-  const row = page.locator(".florets-navigation-link[href='#chats/pagination']");
+  const row = page.locator(
+    `.florets-navigation-link[href='#chats/${await publicChatID(page, "pagination")}']`,
+  );
   await expect(row.getByLabel("1 open pull request", { exact: true })).toBeVisible();
   await expect(row.getByLabel("1 closed pull request", { exact: true })).toBeVisible();
   await row.hover();
@@ -85,7 +87,9 @@ test("linked PRs refresh from the feed without reloading the chat", async ({ pag
   await expect(
     inline.getByRole("link", { name: "example/fieldnotes #19 Merged", exact: true }),
   ).toBeVisible();
-  const row = page.locator(".florets-navigation-link[href='#chats/pagination']");
+  const row = page.locator(
+    `.florets-navigation-link[href='#chats/${await publicChatID(page, "pagination")}']`,
+  );
   await expect(row.getByLabel("1 merged pull request", { exact: true })).toBeVisible();
 });
 

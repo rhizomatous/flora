@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { test, expect } from "./fixtures.ts";
+import { test, expect, publicChatID } from "./fixtures.ts";
 
 test("chat drafts, activity, and responsive layout", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -175,7 +175,9 @@ test("title summary opens independently of the plus menu", async ({ page }) => {
   await title.hover();
   await expect(summary).toBeVisible();
   await expect(summary.getByText("Idle", { exact: true })).toBeVisible();
-  await expect(summary.getByLabel("Chat ID: completed", { exact: true })).toBeVisible();
+  await expect(
+    summary.getByLabel(`Chat ID: ${await publicChatID(page, "completed")}`, { exact: true }),
+  ).toBeVisible();
   await expect(summary.locator("time")).toHaveAttribute("datetime", /.+/);
   await page.keyboard.press("Escape");
   await expect(summary).toBeHidden();

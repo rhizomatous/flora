@@ -129,7 +129,17 @@ export function Chats({
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
-  const id = path.startsWith("chats/") ? (path.slice(6).split("?")[0] ?? "") : "";
+  const reference = path.startsWith("chats/") ? (path.slice(6).split("?")[0] ?? "") : "";
+  const known = list?.find((chat) => chat.ID === reference || chat.PublicID === reference);
+  const id = known?.ID ?? (detail?.chat.PublicID === reference ? detail.chat.ID : reference);
+  useEffect(() => {
+    const chat = detail?.chat;
+    if (!chat || (chat.ID !== id && chat.PublicID !== id)) return;
+    if (reference === chat.PublicID) return;
+    const query = path.includes("?") ? `?${path.split("?")[1]}` : "";
+    window.history.replaceState(null, "", `#chats/${chat.PublicID}${query}`);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  }, [detail, id, reference, path]);
   const readError = useMarkViewed(detail?.chat.ID === id ? detail.chat : undefined);
   const isNew = id === "new" || id.startsWith("new?");
   const projectID = new URLSearchParams(path.split("?")[1]).get("project") ?? "";
@@ -325,7 +335,7 @@ export function Chats({
         } catch {
           /* Storage may be disabled. */
         }
-        window.location.hash = `chats/${chat.ID}`;
+        window.location.hash = `chats/${chat.PublicID}`;
       } else {
         await request(acceptanceSchema, `${chatPath}/messages`, {
           method: "POST",
@@ -388,7 +398,7 @@ export function Chats({
       )
     : undefined;
   const pulls = list?.find((chat) => chat.ID === id)?.pulls ?? detail?.chat.pulls;
-  const existingChat = !isNew && id !== "";
+  const existingChat = !isNew && id !== "" && (known !== undefined || detail?.chat.ID === id);
   const headerLayout = existingChat
     ? "florets-topbar chat-header [&_h1]:flex-[0_1_auto] max-[560px]:gap-0.5 max-[560px]:[&_h1]:flex-1 max-[560px]:[&>[aria-disabled=true]]:hidden -mx-4 flex shrink-0 items-center gap-1 border-b px-3 sm:-mx-8"
     : "mx-auto flex w-full max-w-[880px] shrink-0 items-center justify-between gap-4 pb-3";
@@ -417,6 +427,7 @@ export function Chats({
       value={{ chatID: id, agents: detail?.chat.ID === id ? detail.subagents : [] }}
     >
       <ResizablePanelGroup
+        key={id}
         orientation="horizontal"
         defaultLayout={{ conversation: 100 - panelState.width, review: panelState.width }}
         onLayoutChanged={(layout, meta) => {

@@ -26,6 +26,7 @@ export const chatSchema = z.object({
   pulls: pullSummarySchema.optional(),
   subagents: z.array(subagentSummarySchema).optional(),
   ID: z.string(),
+  PublicID: z.string().regex(/^[A-Z]+-[1-9]\d*$/u),
   ProjectID: z.string(),
   Title: z.string(),
   PinnedAt: z.string().optional(),

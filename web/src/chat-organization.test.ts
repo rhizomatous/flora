@@ -6,6 +6,7 @@ import { chatSchema } from "./chat-schemas";
 function chat(id: string, pin = "") {
   return chatSchema.parse({
     ID: id,
+    PublicID: "FLOR-1",
     Title: id,
     ProjectID: "project",
     Status: "idle",
