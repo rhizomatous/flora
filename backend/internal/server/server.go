@@ -21,6 +21,7 @@ func New(assets fs.FS, authentication *auth.Service, credentials *settings.Servi
 	api.routes(mux)
 	api.mcpRoutes(mux)
 	api.projectRoutes(mux)
+	api.environmentRoutes(mux)
 	if len(chats) > 0 {
 		api.chats = chats[0]
 	}

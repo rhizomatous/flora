@@ -92,6 +92,9 @@ func TestMCPDockerLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
+	if err = store.SaveEnvironment(ctx, "installation", "", []storage.EnvironmentChange{{Name: "SERVICE_TOKEN", Action: "replace", Value: "fake-environment-token", Secret: true}}); err != nil {
+		t.Fatal(err)
+	}
 	access := checkoutFunc(func(ctx context.Context, _ storage.Chat, _ storage.Paths, id string) error {
 		_, err := engine.Exec(ctx, id, "0", []string{"sh", "-c", ": > /home/flora/.flora-github.env; touch /var/lib/flora-checkout.ready"}, nil, io.Discard, io.Discard)
 		return err
@@ -116,6 +119,13 @@ func TestMCPDockerLifecycle(t *testing.T) {
 	endpoint, err := manager.Start(ctx, chat.ID)
 	if err != nil {
 		t.Fatal(err)
+	}
+	info, err := engine.ContainerInspect(ctx, endpoint.ContainerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.EnvValue("SERVICE_TOKEN") != "fake-environment-token" {
+		t.Fatal("MCP provisioning lost the environment secret")
 	}
 	defer func() {
 		clean, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -162,10 +172,20 @@ func TestMCPDockerLifecycle(t *testing.T) {
 	if closed.Load() < 1 {
 		t.Fatal("runtime did not close its MCP connection")
 	}
+	if err = store.SaveEnvironment(ctx, "installation", "", []storage.EnvironmentChange{{Name: "SERVICE_TOKEN", Action: "replace", Value: "fake-updated-environment-token", Secret: true}}); err != nil {
+		t.Fatal(err)
+	}
 	credential.Store("Bearer changed-fake-secret")
 	endpoint, err = manager.Start(ctx, chat.ID)
 	if err != nil {
 		t.Fatal(err)
+	}
+	info, err = engine.ContainerInspect(ctx, endpoint.ContainerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.EnvValue("SERVICE_TOKEN") != "fake-environment-token" {
+		t.Fatal("MCP refresh changed the saved environment")
 	}
 	statuses = nil
 	call("/mcp", &statuses)

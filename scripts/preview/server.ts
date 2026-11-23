@@ -352,6 +352,10 @@ export function chatPreview(): Plugin {
       });
       return;
     }
+    if (url.pathname === "/api/settings/environment") {
+      json(res, []);
+      return;
+    }
     if (url.pathname === "/api/folders") {
       json(res, []);
       return;
@@ -364,6 +368,14 @@ export function chatPreview(): Plugin {
     }
     if (url.pathname === "/api/projects") {
       json(res, projects);
+      return;
+    }
+    const projectEnvironment = /^\/api\/projects\/([^/]+)\/environment(?:\/effective)?$/.exec(
+      url.pathname,
+    );
+    if (projectEnvironment) {
+      const project = projects.find((p) => p.id === projectEnvironment[1]);
+      json(res, project ? [] : { error: "Unknown preview project." }, project ? 200 : 404);
       return;
     }
     const projectMatch = /^\/api\/projects\/([^/]+)$/.exec(url.pathname);
@@ -395,6 +407,10 @@ export function chatPreview(): Plugin {
     const replay = present(playback.get(id));
     const frame = present(replay.frames[i]);
     const endpoint = match?.[2];
+    if (endpoint === "environment") {
+      json(res, []);
+      return;
+    }
     if (endpoint === undefined) {
       json(res, {
         chat: currentChat(scenario, frame, i === scenario.frames.length - 1),

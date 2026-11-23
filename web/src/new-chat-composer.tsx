@@ -19,10 +19,14 @@ import {
 
 import { ChatBranchPicker } from "./chat-branch-picker";
 import { Composer } from "./composer";
+import { EnvironmentDialog } from "./environment-dialog";
+import type { EnvironmentChange } from "./environment-import";
+
+const environmentDrafts = new Map<string, EnvironmentChange[]>();
 
 export type ComposerProject = { id: string; name: string };
 
-/** Selects the saved project and submits text; unfinished controls expose their availability in menus. */
+/** Keeps project drafts and submits the first message with runtime overrides. */
 export function NewChatComposer({
   projects,
   selectedProject,
@@ -45,6 +49,16 @@ export function NewChatComposer({
       return "";
     }
   });
+  const [environmentOpen, setEnvironmentOpen] = useState(false);
+  const settingsButton = useRef<HTMLButtonElement>(null);
+  const scope = selectedProject?.id ?? "";
+  const [environment, setEnvironment] = useState<EnvironmentChange[]>(
+    () => environmentDrafts.get(scope) ?? [],
+  );
+  function editEnvironment(changes: EnvironmentChange[]) {
+    setEnvironment(changes);
+    environmentDrafts.set(scope, changes);
+  }
   const [search, setSearch] = useState("");
   const [projectOpen, setProjectOpen] = useState(false);
   const settingsNavigated = useRef(false);
@@ -53,6 +67,8 @@ export function NewChatComposer({
       onSubmit={onSend}
       onReset={() => {
         setMessage("");
+        setEnvironment([]);
+        environmentDrafts.delete(scope);
         try {
           sessionStorage.removeItem(`flora-draft:new:${selectedProject?.id ?? ""}`);
         } catch {
@@ -61,6 +77,16 @@ export function NewChatComposer({
       }}
       className="chat-composer new-chat-composer"
     >
+      <input type="hidden" name="environment" value={JSON.stringify(environment)} />
+      <EnvironmentDialog
+        open={environmentOpen}
+        onOpenChange={setEnvironmentOpen}
+        path={`projects/${encodeURIComponent(scope)}/environment/effective`}
+        projectPath={`projects/${encodeURIComponent(scope)}/environment`}
+        draft={environment}
+        onDraft={editEnvironment}
+        finalFocus={settingsButton}
+      />
       <div className="composer-topbar">
         <input type="hidden" name="project" value={selectedProject?.id ?? ""} />
         <DropdownMenu
@@ -173,7 +199,9 @@ export function NewChatComposer({
                   type="button"
                   variant="ghost"
                   size="icon-compact"
+                  ref={settingsButton}
                   aria-label="Chat settings"
+                  disabled={busy}
                 >
                   <SlidersHorizontalIcon />
                 </Button>
@@ -181,13 +209,19 @@ export function NewChatComposer({
             />
             <DropdownMenuContent
               align="start"
+              side="top"
+              className="composer-menu w-[260px]! max-w-[calc(100vw-24px)]"
               finalFocus={() => {
                 const restore = !settingsNavigated.current;
                 settingsNavigated.current = false;
                 return restore;
               }}
             >
-              <DropdownMenuItem disabled>
+              <DropdownMenuItem
+                onClick={() => {
+                  setEnvironmentOpen(true);
+                }}
+              >
                 <KeyRoundIcon />
                 Environment variables
               </DropdownMenuItem>

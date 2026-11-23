@@ -339,7 +339,7 @@ func (s *Store) UpdateProject(ctx context.Context, projectID, name string, c Con
 }
 
 func (s *Store) CreateChat(ctx context.Context, projectID, title, imageDigest, harnessVersion string) (Chat, error) {
-	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, "", "", nil, nil, nil, nil)
+	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, "", "", nil, nil, nil, nil, nil)
 }
 
 // CreateChatRequest reserves a creation identity with the immutable first input.
@@ -358,13 +358,22 @@ func (s *Store) CreateChatRequestWithBranches(ctx context.Context, projectID, ti
 	return s.CreateChatRequestWithContext(ctx, projectID, title, imageDigest, harnessVersion, requestID, text, selection, branches, nil, attachments...)
 }
 func (s *Store) CreateChatRequestWithContext(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, selection *Execution, branches map[string]string, references []ContextReference, attachments ...string) (Chat, error) {
+	return s.CreateChatRequestWithEnvironment(ctx, projectID, title, imageDigest, harnessVersion, requestID, text, selection, branches, references, nil, attachments...)
+}
+func (s *Store) CreateChatRequestWithEnvironment(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, selection *Execution, branches map[string]string, references []ContextReference, environment []EnvironmentChange, attachments ...string) (Chat, error) {
+	if err := ValidateEnvironment(environment); err != nil {
+		return Chat{}, err
+	}
+
 	if requestID == "" || len(requestID) > 200 || (strings.TrimSpace(text) == "" && len(attachments) == 0 && len(references) == 0) || !utf8.ValidString(text) || len(text) > MaxAllowedMessageBytes {
 		return Chat{}, ErrInvalid
 	}
-	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, requestID, text, attachments, selection, branches, references)
+	return s.createChat(ctx, projectID, title, imageDigest, harnessVersion, requestID, text, attachments, selection, branches, references, environment)
 }
 
-func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, attachments []string, selection *Execution, branches map[string]string, references []ContextReference) (Chat, error) {
+func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, harnessVersion, requestID, text string, attachments []string, selection *Execution, branches map[string]string, references []ContextReference, environment []EnvironmentChange) (Chat, error) {
+	s.secretMu.Lock()
+	defer s.secretMu.Unlock()
 	imageName, digest, pinned := strings.Cut(imageDigest, "@sha256:")
 	if title == "" || imageName == "" || !pinned || !hexHash(digest, 64) || harnessVersion == "" {
 		return Chat{}, ErrInvalid
@@ -375,6 +384,23 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 			var savedTitle, savedText, savedAttachments, savedSelection, savedBranches, savedReferences string
 			err := tx.QueryRowContext(ctx, "SELECT chat_id,title,text,attachments,selection,branches,context_references FROM chat_requests WHERE project_id=? AND request_id=?", projectID, requestID).Scan(&chatID, &savedTitle, &savedText, &savedAttachments, &savedSelection, &savedBranches, &savedReferences)
 			if err == nil {
+				var input string
+				err := tx.QueryRowContext(ctx, "SELECT input FROM chat_environment_requests WHERE chat_id=?", chatID).Scan(&input)
+				if errors.Is(err, sql.ErrNoRows) {
+					if len(environment) != 0 {
+						return ErrConflict
+					}
+				} else if err != nil {
+					return err
+				} else {
+					saved, err := s.secrets.open(input, environmentIdentity("request", chatID, ""))
+					if err != nil {
+						return err
+					}
+					if saved != s.environmentRequestJSON(environment) {
+						return ErrConflict
+					}
+				}
 				var savedIDs []string
 				_ = json.Unmarshal([]byte(savedAttachments), &savedIDs)
 				if savedReferences != ReferencesJSON(references) {
@@ -431,6 +457,9 @@ func (s *Store) createChat(ctx context.Context, projectID, title, imageDigest, h
 		stamp := now()
 		_, err = tx.ExecContext(ctx, `INSERT INTO chats (id,project_id,title,config,image_digest,harness_version,execution,status,status_reason,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'stopped','Not started',?,?)`, chatID, projectID, title, config, imageDigest, harnessVersion, selectionJSON(&execution), stamp, stamp)
 		if err != nil {
+			return err
+		}
+		if err := s.snapshotEnvironment(ctx, tx, projectID, chatID, environment); err != nil {
 			return err
 		}
 		if requestID != "" {

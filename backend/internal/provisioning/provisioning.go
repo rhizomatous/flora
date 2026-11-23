@@ -396,7 +396,12 @@ func (m *Manager) start(ctx context.Context, chatID string, existingOnly bool) (
 			if err != nil {
 				return Endpoint{}, err
 			}
+			environment, _, err := m.store.RuntimeEnvironment(ctx, chat.ID)
+			if err != nil {
+				return Endpoint{}, err
+			}
 			spec := m.containerSpec(chat, paths, password, uid, gid)
+			spec.Env = append(spec.Env, environment...)
 			runtimeConfig := map[string]any{}
 			credentials, credentialsErr := m.store.Credentials(ctx)
 			if credentialsErr == nil {

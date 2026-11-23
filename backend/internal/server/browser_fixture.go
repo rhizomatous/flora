@@ -38,6 +38,10 @@ func (f browserTransport) RoundTrip(r *http.Request) (*http.Response, error) { r
 // NewBrowserInstance starts one scenario. The caller must close it after the test.
 // This code is compiled only into the fixture executable.
 func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
+	environmentPreview := scenario == "environment"
+	if environmentPreview {
+		scenario = "branches"
+	}
 	if scenario == "shells" {
 		return newShellBrowserInstance()
 	}
@@ -326,6 +330,21 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		}()
 		cleanup = append(cleanup, func() { stopGap(); <-gapDone })
 	}
+	if environmentPreview {
+		if err := store.SaveEnvironment(ctx, "installation", "", []storage.EnvironmentChange{{Name: "TASK_REGION", Action: "set", Value: "preview-region"}, {Name: "SERVICE_TOKEN", Action: "replace", Value: "fixture_preview_secret_124", Secret: true}}); err != nil {
+			return nil, err
+		}
+		projects, err := store.Projects(ctx)
+		if err != nil {
+			return nil, err
+		}
+		description := "Staging deployment credentials"
+		for _, project := range projects {
+			if err := store.SaveEnvironment(ctx, "project", project.ID, []storage.EnvironmentChange{{Name: "DEPLOY_TOKEN", Action: "replace", Value: "fixture_preview_deploy_token", Secret: true, Description: &description}, {Name: "DEPLOY_REGION", Action: "set", Value: "staging"}}); err != nil {
+				return nil, err
+			}
+		}
+	}
 	srv := httptest.NewUnstartedServer(nil)
 	origin := "https://" + srv.Listener.Addr().String()
 	if scenario == "mcps" || scenario == "compaction" || scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
@@ -376,6 +395,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		a := &api{auth: authentication, projects: validation, settings: configuration, chats: fixture.Service, origin: origin}
 		mux := http.NewServeMux()
 		a.projectRoutes(mux)
+		a.environmentRoutes(mux)
 		a.chatRoutes(mux)
 		a.attachmentRoutes(mux)
 		a.referenceRoutes(mux)

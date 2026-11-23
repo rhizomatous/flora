@@ -59,7 +59,7 @@ func TestCompactionUpgradePreservesEncryptedCredentials(t *testing.T) {
 	must(t, s.SaveCredentials(ctx, credentials))
 	entries, err := migrations.ReadDir("migrations")
 	must(t, err)
-	_, err = s.db.Exec("DROP TABLE compaction_choices")
+	_, err = s.db.Exec("DROP TABLE chat_environment_requests; DROP TABLE environment_variables; DROP TABLE compaction_choices")
 	must(t, err)
 	_, err = s.db.Exec(fmt.Sprintf("PRAGMA user_version=%d", migrationIndex(entries, "021_compaction.sql")))
 	must(t, err)

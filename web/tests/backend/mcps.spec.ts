@@ -68,3 +68,20 @@ test("MCP connections, failures, secret edits and drafts", async ({ page }) => {
   await expect(garden).toHaveCount(0);
   assert.deepEqual(errors, []);
 });
+
+test("chat settings retains environment editing and MCP navigation", async ({ page }) => {
+  await logIn(page);
+  await page.getByLabel("Message", { exact: true }).fill("Keep this draft");
+  const trigger = page.getByRole("button", { name: "Chat settings", exact: true });
+  await trigger.click();
+  await page.getByRole("menuitem", { name: "Environment variables", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await page.getByRole("menuitem", { name: "MCP servers", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "MCP servers", exact: true })).toBeFocused();
+  await page.goto("/#chats/new");
+  await expect(page.getByLabel("Message", { exact: true })).toHaveValue("Keep this draft");
+});

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +14,7 @@ func TestMCPEncryptionRotationAndRestart(t *testing.T) {
 	server := MCPServer{Name: "fixture", URL: "https://example.com/mcp", Enabled: true, Timeout: 1000, HeaderNames: []string{"Authorization"}, Headers: map[string]string{"Authorization": "Bearer fake-secret-123"}}
 	must(t, s.SaveMCP(ctx, server, true))
 	wantError(t, s.SaveMCP(ctx, server, true), ErrConflict)
+	must(t, s.SaveEnvironment(ctx, "installation", "", []EnvironmentChange{{Name: "SERVICE_TOKEN", Action: "replace", Value: "fake-environment-secret", Secret: true}}))
 	_, chat := fixture(t, s)
 	var count int
 	must(t, s.db.QueryRow("SELECT COUNT(*) FROM mcp_servers").Scan(&count))
@@ -48,8 +50,10 @@ func TestMCPEncryptionRotationAndRestart(t *testing.T) {
 	if saved[0].Headers["Authorization"] != "Bearer rotated-fake-secret" {
 		t.Fatal("rotation lost header")
 	}
-	if _, err = s.Chat(ctx, chat.ID); err != nil {
-		t.Fatal(err)
+	environment, secrets, err := s.RuntimeEnvironment(ctx, chat.ID)
+	must(t, err)
+	if len(environment) != 1 || environment[0] != "SERVICE_TOKEN=fake-environment-secret" || len(secrets) != 1 || secrets[0] != "fake-environment-secret" {
+		t.Fatal("MCP key rotation lost environment credentials")
 	}
 	must(t, s.DeleteMCP(ctx, "fixture"))
 	saved, err = s.MCPServers(ctx)
@@ -93,5 +97,30 @@ func TestMCPConfigIntegrityAndMissingVerifier(t *testing.T) {
 				t.Fatal("startup accepted modified MCP configuration or missing key verifier")
 			}
 		})
+	}
+}
+
+func TestMCPMigrationPreservesEnvironment(t *testing.T) {
+	root := t.TempDir()
+	s := openTest(t, root)
+	must(t, s.SaveEnvironment(ctx, "installation", "", []EnvironmentChange{{Name: "SERVICE_TOKEN", Action: "replace", Value: "fake-upgrade-secret", Secret: true}}))
+	_, chat := fixture(t, s)
+	entries, err := migrations.ReadDir("migrations")
+	must(t, err)
+	_, err = s.db.Exec("DROP TABLE mcp_servers")
+	must(t, err)
+	_, err = s.db.Exec(fmt.Sprintf("PRAGMA user_version=%d", migrationIndex(entries, "024_mcps.sql")))
+	must(t, err)
+	must(t, s.Close())
+	s = openTest(t, root)
+	servers, err := s.MCPServers(ctx)
+	must(t, err)
+	if len(servers) != 0 {
+		t.Fatal("MCP migration created server records")
+	}
+	environment, _, err := s.RuntimeEnvironment(ctx, chat.ID)
+	must(t, err)
+	if len(environment) != 1 || environment[0] != "SERVICE_TOKEN=fake-upgrade-secret" {
+		t.Fatal("MCP migration changed environment credentials")
 	}
 }
