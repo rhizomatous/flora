@@ -123,6 +123,20 @@ test("preview serves isolated fixtures and replays saved events with resumable I
       const detail = await fetch(`${base}/api/projects/${project.id}`);
       assert.equal(detail.status, 200);
       assert.deepEqual(await detail.json(), project);
+      for (const suffix of ["environment", "environment/effective"]) {
+        const environment = await fetch(`${base}/api/projects/${project.id}/${suffix}`);
+        assert.equal(environment.status, 200);
+        assert.deepEqual(await environment.json(), []);
+        const missingEnvironment = await fetch(`${base}/api/projects/missing/${suffix}`);
+        assert.equal(missingEnvironment.status, 404);
+      }
+    }
+    for (const path of ["settings/environment", "chats/completed/environment"]) {
+      const environment = await fetch(`${base}/api/${path}`);
+      assert.equal(environment.status, 200);
+      assert.deepEqual(await environment.json(), []);
+      const mutation = await fetch(`${base}/api/${path}`, { method: "PATCH", body: "[]" });
+      assert.equal(mutation.status, 405);
     }
     const missingProject = await fetch(`${base}/api/projects/missing`);
     assert.equal(missingProject.status, 404);
