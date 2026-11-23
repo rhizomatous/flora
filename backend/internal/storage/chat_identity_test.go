@@ -127,8 +127,12 @@ func TestPublicChatIDBackfillPreservesRecordsAndPaths(t *testing.T) {
 	_, err = s.OrganizeChat(ctx, c.ID, ChatOrganization{Title: &title, Archived: &archived, Revision: &revision})
 	must(t, err)
 	must(t, s.UpdateProject(ctx, p.ID, "Renamed project", p.Configuration))
+	otherProject, err := s.CreateProject(ctx, "Renamed project", p.Configuration)
+	must(t, err)
+	otherChat, err := s.CreateChat(ctx, otherProject.ID, "Other project", image, "1")
+	must(t, err)
 	// Remove only the additive identity objects to reproduce the previous schema.
-	_, err = s.db.Exec("DROP TRIGGER allocate_chat_public_id; DROP TRIGGER immutable_chat_public_id; DROP TRIGGER retain_chat_public_id; DROP TABLE chat_public_ids; DROP VIEW chat_project_prefixes;")
+	_, err = s.db.Exec("DROP TRIGGER allocate_chat_public_id; DROP TRIGGER immutable_chat_public_id; DROP TRIGGER retain_chat_public_id; DROP TABLE chat_public_ids; DROP TABLE project_chat_ids;")
 	must(t, err)
 	entries, err := migrations.ReadDir("migrations")
 	must(t, err)
@@ -144,6 +148,11 @@ func TestPublicChatIDBackfillPreservesRecordsAndPaths(t *testing.T) {
 	must(t, err)
 	if saved.PublicID != "RENA-2" || saved.Title != title || !saved.Archived {
 		t.Fatalf("incorrect backfill: %+v", saved)
+	}
+	otherSaved, err := s.Chat(ctx, otherChat.ID)
+	must(t, err)
+	if otherSaved.PublicID != "RENAM-1" {
+		t.Fatalf("backfill did not distinguish matching project names: %s", otherSaved.PublicID)
 	}
 	byPublic, err := s.Chat(ctx, saved.PublicID)
 	must(t, err)
@@ -173,7 +182,7 @@ func TestPublicChatIDBackfillPreservesRecordsAndPaths(t *testing.T) {
 
 func recordSnapshot(t *testing.T, db *sql.DB) map[string]string {
 	t.Helper()
-	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name <> 'chat_public_ids' ORDER BY name")
+	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('chat_public_ids','project_chat_ids') ORDER BY name")
 	must(t, err)
 	var names []string
 	for rows.Next() {
@@ -232,12 +241,12 @@ func TestPublicAndLegacyContextReferences(t *testing.T) {
 	}
 }
 
-func TestProjectChatPrefixesRemainStableAndAllowCollisions(t *testing.T) {
+func TestProjectChatPrefixesRemainStableAndUnique(t *testing.T) {
 	s := openTest(t, t.TempDir())
 	config := Configuration{Repositories: []Repository{{Name: "core", URL: "https://github.com/example/core", BaseBranch: "main", Role: "core"}}}
 	cases := []struct{ name, prefix string }{
-		{"Flora", "FLOR"}, {"Floral tools", "FLOR"}, {"  My website!", "MYWE"},
-		{"Go", "GO"}, {"123 日本語 🌱", "CHAT"}, {"a-b.c_d", "ABCD"},
+		{"Flora", "FLOR"}, {"Floral tools", "FLORA"}, {"  My website!", "MYWE"},
+		{"Go", "GO"}, {"123 日本語 🌱", "CHAT"}, {"a-b.c_d", "ABCD"}, {"Flora", "FLORB"}, {"Go", "GOA"}, {"123", "CHATA"},
 	}
 	ids := map[string]bool{}
 	for _, example := range cases {
@@ -245,7 +254,7 @@ func TestProjectChatPrefixesRemainStableAndAllowCollisions(t *testing.T) {
 		must(t, err)
 		chat, err := s.CreateChat(ctx, project.ID, "First", image, "1")
 		must(t, err)
-		if !strings.HasPrefix(chat.PublicID, example.prefix+"-") {
+		if chat.PublicID != example.prefix+"-1" {
 			t.Fatalf("%q: got %s, want prefix %s", example.name, chat.PublicID, example.prefix)
 		}
 		if ids[chat.PublicID] {
@@ -255,7 +264,7 @@ func TestProjectChatPrefixesRemainStableAndAllowCollisions(t *testing.T) {
 		must(t, s.UpdateProject(ctx, project.ID, "Renamed project", config))
 		later, err := s.CreateChat(ctx, project.ID, "Later", image, "1")
 		must(t, err)
-		if !strings.HasPrefix(later.PublicID, example.prefix+"-") {
+		if later.PublicID != example.prefix+"-2" {
 			t.Fatalf("rename changed project prefix: %s", later.PublicID)
 		}
 		saved, err := s.Chat(ctx, chat.PublicID)
@@ -263,5 +272,58 @@ func TestProjectChatPrefixesRemainStableAndAllowCollisions(t *testing.T) {
 		if saved.ID != chat.ID || saved.PublicID != chat.PublicID {
 			t.Fatal("rename changed chat ID")
 		}
+	}
+}
+
+func TestConcurrentProjectsReserveUniquePrefixes(t *testing.T) {
+	root := t.TempDir()
+	first := openTest(t, root)
+	second := openTest(t, root)
+	config := Configuration{Repositories: []Repository{{Name: "core", URL: "https://github.com/example/core", BaseBranch: "main", Role: "core"}}}
+	results := make(chan Chat, 32)
+	failures := make(chan error, 32)
+	var wg sync.WaitGroup
+	for n := range 32 {
+		wg.Go(func() {
+			store := first
+			if n%2 == 0 {
+				store = second
+			}
+			project, err := store.CreateProject(ctx, "Flora", config)
+			if err != nil {
+				failures <- err
+				return
+			}
+			chat, err := store.CreateChat(ctx, project.ID, "First", image, "1")
+			if err != nil {
+				failures <- err
+				return
+			}
+			results <- chat
+		})
+	}
+	wg.Wait()
+	close(results)
+	close(failures)
+	for err := range failures {
+		t.Fatal(err)
+	}
+	ids := map[string]bool{}
+	for chat := range results {
+		if !strings.HasSuffix(chat.PublicID, "-1") || ids[chat.PublicID] {
+			t.Fatalf("project prefix collision: %s", chat.PublicID)
+		}
+		ids[chat.PublicID] = true
+		_, err := first.db.Exec("UPDATE project_chat_ids SET prefix='CHANGED' WHERE project_id=?", chat.ProjectID)
+		if err == nil {
+			t.Fatal("project prefix can change")
+		}
+		_, err = first.db.Exec("UPDATE project_chat_ids SET last_number=0 WHERE project_id=?", chat.ProjectID)
+		if err == nil {
+			t.Fatal("project counter can decrease")
+		}
+	}
+	if len(ids) != 32 {
+		t.Fatalf("got %d projects, want 32", len(ids))
 	}
 }

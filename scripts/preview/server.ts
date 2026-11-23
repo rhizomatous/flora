@@ -52,14 +52,39 @@ function replayFrames(frames: Frame[]) {
 
 const epoch = "2026-01-01T12:00:00.000Z";
 const publicIDs = new Map<string, string>();
-function publicID(id: string, projectName: string) {
-  const prefix =
-    projectName
-      .replaceAll(/[^A-Za-z]/gu, "")
-      .toUpperCase()
-      .slice(0, 4) || "CHAT";
-  if (!publicIDs.has(id)) publicIDs.set(id, `${prefix}-${publicIDs.size + 1}`);
-  return present(publicIDs.get(id));
+const projectPrefixes = new Map<string, string>();
+const projectCounters = new Map<string, number>();
+function publicID(id: string, projectID: string, projectName: string) {
+  const saved = publicIDs.get(id);
+  if (saved !== undefined) return saved;
+  let prefix = projectPrefixes.get(projectID);
+  if (prefix === undefined) {
+    const letters = projectName.replaceAll(/[^A-Za-z]/gu, "").toUpperCase() || "CHAT";
+    const base = letters.slice(0, 4);
+    const extra = Math.min(8, letters.length) - base.length;
+    const taken = new Set(projectPrefixes.values());
+    for (let attempt = 0; ; attempt++) {
+      let candidate = letters.slice(0, base.length + attempt);
+      if (attempt > extra) {
+        let suffix = "";
+        for (let number = attempt - extra; number > 0; number = Math.floor(number / 26)) {
+          number--;
+          suffix = String.fromCodePoint(65 + (number % 26)) + suffix;
+        }
+        candidate = base + suffix;
+      }
+      if (!taken.has(candidate)) {
+        prefix = candidate;
+        projectPrefixes.set(projectID, prefix);
+        break;
+      }
+    }
+  }
+  const number = (projectCounters.get(projectID) ?? 0) + 1;
+  projectCounters.set(projectID, number);
+  const canonical = `${prefix}-${number}`;
+  publicIDs.set(id, canonical);
+  return canonical;
 }
 
 /** Projects captured OpenCode history into the same saved-message fields as captureHistory and AcceptMessage. */
@@ -150,7 +175,7 @@ export function chatAt(scenario: (typeof demoScenarios)[number], frame: Frame, f
       checkedAt: epoch,
     },
     ID: id,
-    PublicID: publicID(id, project.name),
+    PublicID: publicID(id, project.id, project.name),
     ProjectID: project.id,
     Title: scenario.title,
     Configuration: project.configuration,
@@ -261,6 +286,7 @@ export function chatPreview(): Plugin {
     for (const scenario of scenarios) {
       const canonical = publicID(
         scenario.id,
+        scenario.projectID,
         present(projects.find((project) => project.id === scenario.projectID)).name,
       );
       if (

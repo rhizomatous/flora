@@ -10,7 +10,7 @@ test("canonical links preserve legacy drafts, panel state, and chat identity aft
   await expect(page.getByRole("link", { name: "New chat", exact: true })).toBeVisible();
   const detail = detailSchema.parse(await (await page.request.get(`/api/chats/${backend.chatID}`)).json());
   const { ID: internal, PublicID: canonical, Title: title } = detail.chat;
-  expect(canonical).toMatch(/^[A-Z]{1,4}-[1-9]\d*$/u);
+  expect(canonical).toMatch(/^[A-Z]+-[1-9]\d*$/u);
   await page.evaluate((id) => {
     sessionStorage.setItem(`flora-draft:${id}`, "Keep this draft across old and public links");
     sessionStorage.setItem(`flora-panel:${id}`, JSON.stringify({ open: true, view: "overview", width: 40 }));

@@ -163,6 +163,11 @@ func (s *Store) migrate(ctx context.Context) error {
 			if _, err := tx.ExecContext(ctx, string(body)); err != nil {
 				return err
 			}
+			if entries[i].Name() == "022_public_chat_ids.sql" {
+				if err := backfillChatIdentities(ctx, tx); err != nil {
+					return err
+				}
+			}
 			if _, err := tx.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", i+1)); err != nil {
 				return err
 			}
@@ -267,7 +272,12 @@ func (s *Store) CreateProject(ctx context.Context, name string, c Configuration)
 	if err != nil || name == "" {
 		return Project{}, ErrInvalid
 	}
-	_, err = s.db.ExecContext(ctx, "INSERT INTO projects VALUES (?,?,?,?)", p.ID, p.Name, string(b), p.CreatedAt)
+	err = s.write(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, "INSERT INTO projects VALUES (?,?,?,?)", p.ID, p.Name, string(b), p.CreatedAt); err != nil {
+			return err
+		}
+		return reserveProjectChatPrefix(ctx, tx, p.ID, p.Name)
+	})
 	return p, err
 }
 
