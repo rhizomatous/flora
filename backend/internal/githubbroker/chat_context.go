@@ -35,6 +35,12 @@ func (b *Broker) readChat(w http.ResponseWriter, r *http.Request, reader, creden
 		http.Error(w, "Chat is missing or was not referenced in this conversation", 404)
 		return
 	}
+	c, err := b.store.Chat(r.Context(), target)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	target = c.ID
 	secrets := redaction.Values(r.Context(), b.store, reader, credential)
 	secrets = append(secrets, redaction.Values(r.Context(), b.store, target)...)
 	raw, err := json.Marshal(page)

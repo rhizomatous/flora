@@ -48,12 +48,14 @@ function matchesFilter(row: TrackedPull, filter: Filter) {
 function ChatLink({ chat, expanded = false }: { chat: Chat; expanded?: boolean }) {
   const link = (
     <a
-      href={`#chats/${chat.ID}`}
-      aria-label={`Open chat: ${chat.Title || chat.ID}`}
+      href={`#chats/${chat.PublicID}`}
+      aria-label={`Open chat: ${chat.Title || chat.PublicID}`}
       className={`inline-flex min-h-7 min-w-0 items-center gap-1.5 rounded-sm text-xs text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring ${expanded ? "w-full" : "max-w-32"}`}
     >
       <MessageSquareIcon className="size-3 shrink-0" aria-hidden="true" />
-      <span className={expanded ? "break-words" : "truncate"}>{chat.Title || chat.ID}</span>
+      <span className={expanded ? "break-words" : "truncate"}>
+        {chat.PublicID} · {chat.Title || "Untitled chat"}
+      </span>
     </a>
   );
   return expanded ? (
@@ -61,7 +63,7 @@ function ChatLink({ chat, expanded = false }: { chat: Chat; expanded?: boolean }
   ) : (
     <Tooltip>
       <TooltipTrigger render={link} />
-      <TooltipContent>{chat.Title || chat.ID}</TooltipContent>
+      <TooltipContent>{chat.Title || chat.PublicID}</TooltipContent>
     </Tooltip>
   );
 }
@@ -160,7 +162,7 @@ export function PullRequests({
     (row) =>
       matchesFilter(row, filter) &&
       (repository === "" || row.repository === repository) &&
-      `${row.pull.title ?? ""} ${row.repository} #${row.pull.number} ${row.chats.map((chat) => `${chat.Title} ${chat.ID}`).join(" ")}`
+      `${row.pull.title ?? ""} ${row.repository} #${row.pull.number} ${row.chats.map((chat) => `${chat.Title} ${chat.PublicID}`).join(" ")}`
         .toLowerCase()
         .includes(searchText),
   );
@@ -211,8 +213,8 @@ export function PullRequests({
           <ul className="mt-2 space-y-1">
             {unavailable.map((chat) => (
               <li key={chat.ID}>
-                <a className="underline" href={`#chats/${chat.ID}`}>
-                  {chat.Title || chat.ID}
+                <a className="underline" href={`#chats/${chat.PublicID}`}>
+                  {chat.Title || chat.PublicID}
                 </a>
                 : {chat.pulls?.error}
               </li>

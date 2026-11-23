@@ -1,6 +1,4 @@
-import assert from "node:assert/strict";
-
-import { test, expect } from "./fixtures.ts";
+import { test, expect, publicChatID } from "./fixtures.ts";
 
 test("preview navigation and pauseable chat replay", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
@@ -26,6 +24,7 @@ test("preview navigation and pauseable chat replay", async ({ page }) => {
     ["focus", "Restore focus after removing a repository", "#73 Merged"],
   ] as const) {
     await page.goto(`${base}/#chats/${id}`);
+    await expect(page).toHaveURL(`${base}/#chats/${await publicChatID(page, id)}`);
     await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
     await expect(
       page
@@ -46,7 +45,7 @@ test("preview navigation and pauseable chat replay", async ({ page }) => {
     page.waitForEvent("load"),
     page.getByRole("button", { name: "Replay chat", exact: true }).click(),
   ]);
-  await expect(page).toHaveURL(`${base}/#chats/recovery`);
+  await expect(page).toHaveURL(`${base}/#chats/${await publicChatID(page, "recovery")}`);
   await expect(
     page.getByRole("heading", { name: "Fix the workspace checks", exact: true }),
   ).toBeVisible();
@@ -67,14 +66,14 @@ test("preview navigation and pauseable chat replay", async ({ page }) => {
       .locator('[data-slot="work-summary"]')
       .getByRole("button", { name: /Worked for.*2 steps.*1 failed/ }),
   ).toBeVisible({ timeout: 15_000 });
-  assert.equal(new URL(page.url()).hash, "#chats/recovery");
+  await expect(page).toHaveURL(`${base}/#chats/${await publicChatID(page, "recovery")}`);
   await page.goto(`${base}/#chats/waiting`);
   await Promise.all([
     page.waitForEvent("load"),
     page.getByRole("button", { name: "Replay chat", exact: true }).click(),
   ]);
   await expect(page.getByRole("form", { name: "Questions", exact: true })).toBeVisible();
-  assert.equal(new URL(page.url()).hash, "#chats/waiting");
+  await expect(page).toHaveURL(`${base}/#chats/${await publicChatID(page, "waiting")}`);
   await page.goto(`${base}/#chats/new`);
   await expect(page.getByRole("button", { name: "Replay chat", exact: true })).toBeDisabled();
 });

@@ -399,7 +399,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		a.chatRoutes(mux)
 		a.attachmentRoutes(mux)
 		a.referenceRoutes(mux)
-		projectHandler := a.protect(mux)
+		projectHandler := a.protect(a.chatReferences(mux))
 		original := app
 		app = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(r.URL.Path, "/api/projects") {

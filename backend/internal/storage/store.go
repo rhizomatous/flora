@@ -163,6 +163,11 @@ func (s *Store) migrate(ctx context.Context) error {
 			if _, err := tx.ExecContext(ctx, string(body)); err != nil {
 				return err
 			}
+			if entries[i].Name() == "024_public_chat_ids.sql" {
+				if err := backfillChatIdentities(ctx, tx); err != nil {
+					return err
+				}
+			}
 			if _, err := tx.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", i+1)); err != nil {
 				return err
 			}
@@ -238,7 +243,7 @@ type Chat struct {
 	PinnedAt                                            string
 	Archived                                            bool
 	OrganizationRevision                                int64
-	ID, ProjectID, Title                                string
+	ID, PublicID, ProjectID, Title                      string
 	Configuration                                       Configuration
 	ImageDigest, HarnessVersion, ContainerID, SessionID string
 	Status                                              Status
@@ -267,7 +272,12 @@ func (s *Store) CreateProject(ctx context.Context, name string, c Configuration)
 	if err != nil || name == "" {
 		return Project{}, ErrInvalid
 	}
-	_, err = s.db.ExecContext(ctx, "INSERT INTO projects VALUES (?,?,?,?)", p.ID, p.Name, string(b), p.CreatedAt)
+	err = s.write(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, "INSERT INTO projects VALUES (?,?,?,?)", p.ID, p.Name, string(b), p.CreatedAt); err != nil {
+			return err
+		}
+		return reserveProjectChatPrefix(ctx, tx, p.ID, p.Name)
+	})
 	return p, err
 }
 
@@ -487,7 +497,7 @@ func (s *Store) Chat(ctx context.Context, chatID string) (Chat, error) {
 	var config, execution string
 	// Read the row and starting commits in one snapshot.
 	err := s.write(ctx, func(tx *sql.Tx) error {
-		err := tx.QueryRowContext(ctx, `SELECT id,project_id,title,config,image_digest,harness_version,coalesce(container_id,''),coalesce(session_id,''),status,status_reason,coalesce(active_message_id,''),created_at,updated_at,pinned_at,archived,organization_revision,coalesce(folder_id,''),execution,coalesce((SELECT max(sequence) FROM activity WHERE chat_id=chats.id AND kind IN ('model.choice','message.accepted')),0),coalesce((SELECT max(sequence) FROM activity WHERE chat_id=chats.id AND kind NOT IN ('organization','model.choice')),0),coalesce((SELECT revision FROM chat_read_state WHERE chat_id=chats.id),0) FROM chats WHERE id=?`, chatID).Scan(&c.ID, &c.ProjectID, &c.Title, &config, &c.ImageDigest, &c.HarnessVersion, &c.ContainerID, &c.SessionID, &c.Status, &c.StatusReason, &c.ActiveMessageID, &c.CreatedAt, &c.UpdatedAt, &c.PinnedAt, &c.Archived, &c.OrganizationRevision, &c.FolderID, &execution, &c.ExecutionRevision, &c.ActivityRevision, &c.LastViewedRevision)
+		err := tx.QueryRowContext(ctx, `SELECT id,(SELECT public_id FROM chat_public_ids WHERE chat_id=chats.id),project_id,title,config,image_digest,harness_version,coalesce(container_id,''),coalesce(session_id,''),status,status_reason,coalesce(active_message_id,''),created_at,updated_at,pinned_at,archived,organization_revision,coalesce(folder_id,''),execution,coalesce((SELECT max(sequence) FROM activity WHERE chat_id=chats.id AND kind IN ('model.choice','message.accepted')),0),coalesce((SELECT max(sequence) FROM activity WHERE chat_id=chats.id AND kind NOT IN ('organization','model.choice')),0),coalesce((SELECT revision FROM chat_read_state WHERE chat_id=chats.id),0) FROM chats WHERE id=? OR id=(SELECT chat_id FROM chat_public_ids WHERE public_id=?)`, chatID, chatID).Scan(&c.ID, &c.PublicID, &c.ProjectID, &c.Title, &config, &c.ImageDigest, &c.HarnessVersion, &c.ContainerID, &c.SessionID, &c.Status, &c.StatusReason, &c.ActiveMessageID, &c.CreatedAt, &c.UpdatedAt, &c.PinnedAt, &c.Archived, &c.OrganizationRevision, &c.FolderID, &execution, &c.ExecutionRevision, &c.ActivityRevision, &c.LastViewedRevision)
 		if err != nil {
 			return found(err)
 		}
@@ -495,7 +505,7 @@ func (s *Store) Chat(ctx context.Context, chatID string) (Chat, error) {
 		if err := json.Unmarshal([]byte(config), &c.Configuration); err != nil {
 			return err
 		}
-		rows, err := tx.QueryContext(ctx, "SELECT repository,commit_sha FROM starting_commits WHERE chat_id=?", chatID)
+		rows, err := tx.QueryContext(ctx, "SELECT repository,commit_sha FROM starting_commits WHERE chat_id=?", c.ID)
 		if err != nil {
 			return err
 		}
@@ -531,9 +541,11 @@ func (s *Store) Paths(ctx context.Context, chatID string) (Paths, error) {
 // SavedPaths returns a chat's storage locations without recreating missing
 // directories. Read-only callers can distinguish lost storage from an empty folder.
 func (s *Store) SavedPaths(ctx context.Context, chatID string) (Paths, error) {
-	if _, err := s.Chat(ctx, chatID); err != nil {
+	c, err := s.Chat(ctx, chatID)
+	if err != nil {
 		return Paths{}, err
 	}
+	chatID = c.ID
 	// IDs are generated internally, but validate before joining any path.
 	if filepath.Base(chatID) != chatID || chatID == "." || chatID == ".." || strings.ContainsAny(chatID, "/\\") {
 		return Paths{}, ErrInvalid

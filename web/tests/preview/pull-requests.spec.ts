@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures.ts";
+import { test, expect, publicChatID } from "./fixtures.ts";
 
 const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
 
@@ -51,7 +51,7 @@ test("pull requests page filters, searches, and links back to chats", async ({ p
     .getByRole("list", { name: "Closed pull requests" })
     .getByRole("link", { name: "Open chat: Fix duplicate notes between pages", exact: true })
     .click();
-  await expect(page).toHaveURL(/#chats\/pagination$/);
+  await expect(page).toHaveURL(`${base}/#chats/${await publicChatID(page, "pagination")}`);
 });
 
 test("pull request groups update when saved statuses change", async ({ page }) => {

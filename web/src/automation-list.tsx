@@ -17,6 +17,7 @@ import {
 } from "@flora/florets";
 
 import type { Automation } from "./automation-schemas";
+import { useChatReference } from "./chat-identity";
 import { ListPage, ListFilters, ListEmpty } from "./list-page";
 import type { ProjectSummary } from "./project-schemas";
 
@@ -41,6 +42,7 @@ export function AutomationList({
   projects: ProjectSummary[];
   error: string;
 }) {
+  const reference = useChatReference();
   const [filter, setFilter] = useState<(typeof filters)[number]["id"]>("all");
   const [query, setQuery] = useState("");
   const [project, setProject] = useState("");
@@ -205,7 +207,7 @@ export function AutomationList({
                           <a
                             className="capitalize hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
                             aria-label={`Open latest run for ${a.name}: ${a.latestRun.status}`}
-                            href={`#chats/${a.latestRun.chatID}?run=${encodeURIComponent(a.latestRun.messageID)}`}
+                            href={`#chats/${a.latestRun.publicChatID ?? reference(a.latestRun.chatID)}?run=${encodeURIComponent(a.latestRun.messageID)}`}
                           >
                             {a.latestRun.status}
                           </a>

@@ -80,11 +80,14 @@ func validateReferences(ctx context.Context, tx *sql.Tx, config Configuration, c
 			if !contextChatID.MatchString(ref.ChatID) || ref.ChatID == chat || ref.Repository != "" || ref.Path != "" || ref.Number != 0 {
 				return ErrInvalid
 			}
-			var exists int
-			if err := tx.QueryRowContext(ctx, "SELECT count(*) FROM chats WHERE id=?", ref.ChatID).Scan(&exists); err != nil {
-				return err
+			var target string
+			if err := tx.QueryRowContext(ctx, "SELECT id FROM chats WHERE id=? OR id=(SELECT chat_id FROM chat_public_ids WHERE public_id=?)", ref.ChatID, ref.ChatID).Scan(&target); err != nil {
+				if err != sql.ErrNoRows {
+					return err
+				}
+				return &AttachmentError{Reason: "The referenced chat is missing. Remove it or choose another chat."}
 			}
-			if exists == 0 {
+			if target == chat {
 				return &AttachmentError{Reason: "The referenced chat is missing. Remove it or choose another chat."}
 			}
 		default:
@@ -111,8 +114,13 @@ type ChatContextPage struct {
 // Pages run newest first; before retrieves older messages. A single long message is marked truncated.
 func (s *Store) ReadReferencedChat(ctx context.Context, reader, target string, before int64) (ChatContextPage, error) {
 	page := ChatContextPage{Messages: []ContextMessage{}}
+	c, err := s.Chat(ctx, target)
+	if err != nil {
+		return page, err
+	}
+	target = c.ID
 	var allowed int
-	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM messages,json_each(messages.payload,'$.references') WHERE chat_id=? AND role='user' AND json_extract(value,'$.kind')='chat' AND json_extract(value,'$.chatID')=? AND EXISTS(SELECT 1 FROM chats WHERE id=?)`, reader, target, target).Scan(&allowed)
+	err = s.db.QueryRowContext(ctx, `SELECT count(*) FROM messages,json_each(messages.payload,'$.references') WHERE chat_id=? AND role='user' AND json_extract(value,'$.kind')='chat' AND json_extract(value,'$.chatID') IN (?,?) AND EXISTS(SELECT 1 FROM chats WHERE id=?)`, reader, target, c.PublicID, target).Scan(&allowed)
 	if err != nil {
 		return page, err
 	}

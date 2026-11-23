@@ -109,7 +109,7 @@ func TestMCPMigrationPreservesEnvironment(t *testing.T) {
 	must(t, err)
 	_, err = s.db.Exec("DROP TABLE mcp_servers")
 	must(t, err)
-	_, err = s.db.Exec(fmt.Sprintf("PRAGMA user_version=%d", migrationIndex(entries, "024_mcps.sql")))
+	_, err = s.db.Exec(fmt.Sprintf("PRAGMA user_version=%d", migrationIndex(entries, "025_mcps.sql")))
 	must(t, err)
 	must(t, s.Close())
 	s = openTest(t, root)

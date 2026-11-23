@@ -41,6 +41,7 @@ describe("chat status presentation", () => {
 it("retains acknowledged positions in stale feeds while newer activity remains unread", () => {
   const chat = chatSchema.parse({
     ID: "one",
+    PublicID: "FLOR-1",
     ProjectID: "project",
     Title: "Chat",
     Status: "idle",

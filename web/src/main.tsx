@@ -19,6 +19,7 @@ import {
 import { statusSchema, authenticatedSchema, type Status } from "./auth-schemas";
 import { Automations } from "./automations";
 import { FolderProvider } from "./chat-folders";
+import { ChatIdentityContext } from "./chat-identity";
 import { Chats } from "./chats";
 import { Installation } from "./installation";
 import { MCPs } from "./mcps";
@@ -330,7 +331,13 @@ function App() {
             path !== "usage" &&
             (path.startsWith("chats") ? (
               <Chats
-                key={path}
+                key={
+                  notifications.chats?.find(
+                    (chat) =>
+                      `chats/${chat.ID}` === path.split("?")[0] ||
+                      `chats/${chat.PublicID}` === path.split("?")[0],
+                  )?.ID ?? path
+                }
                 path={path}
                 list={notifications.chats}
                 listError={notifications.error}
@@ -344,7 +351,11 @@ function App() {
       </Content>
     </Layout>
   );
-  return <FolderProvider enabled={ready}>{layout}</FolderProvider>;
+  return (
+    <ChatIdentityContext value={notifications.chats}>
+      <FolderProvider enabled={ready}>{layout}</FolderProvider>
+    </ChatIdentityContext>
+  );
 }
 
 const root = document.querySelector("#root");

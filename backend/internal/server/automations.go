@@ -128,6 +128,14 @@ func (a *api) automationRoutes(mux *http.ServeMux) {
 			automationError(w, err)
 			return
 		}
+		if run.ChatID != "" && run.PublicChatID == "" {
+			c, err := store.Chat(r.Context(), run.ChatID)
+			if err != nil {
+				automationError(w, err)
+				return
+			}
+			run.PublicChatID = c.PublicID
+		}
 		jsonResponse(w, 202, run)
 	})
 }
