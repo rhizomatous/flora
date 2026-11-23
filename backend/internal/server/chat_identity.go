@@ -10,7 +10,7 @@ import (
 func (a *api) chatReferences(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resolve := func(reference string) (string, bool) {
-			if !strings.HasPrefix(reference, "FLORA-") {
+			if !strings.Contains(reference, "-") {
 				return reference, true
 			}
 			c, err := a.settings.Store.Chat(r.Context(), reference)

@@ -51,7 +51,7 @@ func TestPublicChatReferencesAndLegacyAPI(t *testing.T) {
 	if err := json.Unmarshal(raw, &c); err != nil {
 		t.Fatal(err)
 	}
-	if c.PublicID != "FLORA-1" || headers.Get("Location") != "/api/chats/FLORA-1" {
+	if c.PublicID != "BROW-1" || headers.Get("Location") != "/api/chats/BROW-1" {
 		t.Fatalf("missing canonical response: %s %v", raw, headers)
 	}
 	_, raw = call("POST", "/api/projects/"+project.ID+"/chats", body, 202)
@@ -81,11 +81,11 @@ func TestPublicChatReferencesAndLegacyAPI(t *testing.T) {
 		t.Fatal("organization changed identity")
 	}
 	call("POST", "/api/chats/read", fmt.Sprintf(`{"observed":[{"chatID":%q,"revision":0}]}`, c.PublicID), 200)
-	_, raw = call("GET", "/api/projects/"+project.ID+"/context?kind=chat&query=flora-1", "", 200)
+	_, raw = call("GET", "/api/projects/"+project.ID+"/context?kind=chat&query=brow-1", "", 200)
 	if !strings.Contains(string(raw), c.PublicID) {
 		t.Fatalf("public search missing chat: %s", raw)
 	}
-	call("GET", "/api/chats/FLORA-01", "", 404)
-	call("GET", "/api/chats/FLORA-999999", "", 404)
-	call("GET", "/api/chats/FLORA-1/unknown", "", 404)
+	call("GET", "/api/chats/BROW-01", "", 404)
+	call("GET", "/api/chats/BROW-999999", "", 404)
+	call("GET", "/api/chats/BROW-1/unknown", "", 404)
 }

@@ -114,7 +114,7 @@ func (c AutomationConfig) Next(after time.Time) (time.Time, error) {
 	return time.Time{}, ErrInvalid
 }
 
-const automationSelect = `SELECT id,project_id,config,enabled,next_run,chat_id,revision,coalesce((SELECT 'FLORA-' || number FROM chat_public_ids WHERE chat_id=automations.chat_id),'') FROM automations`
+const automationSelect = `SELECT id,project_id,config,enabled,next_run,chat_id,revision,coalesce((SELECT public_id FROM chat_public_ids WHERE chat_id=automations.chat_id),'') FROM automations`
 
 func scanAutomation(row scanner) (Automation, error) {
 	var a Automation
@@ -213,7 +213,7 @@ func equalDays(a, b []int) bool {
 	return true
 }
 
-const runSelect = `SELECT id,automation_id,scheduled_at,status,reason,chat_id,message_id,released,coalesce((SELECT 'FLORA-' || number FROM chat_public_ids WHERE chat_id=automation_runs.chat_id),'') FROM automation_runs`
+const runSelect = `SELECT id,automation_id,scheduled_at,status,reason,chat_id,message_id,released,coalesce((SELECT public_id FROM chat_public_ids WHERE chat_id=automation_runs.chat_id),'') FROM automation_runs`
 
 func scanRun(row scanner) (AutomationRun, error) {
 	var r AutomationRun

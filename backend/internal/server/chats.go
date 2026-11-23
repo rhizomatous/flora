@@ -121,7 +121,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			return
 		}
 		for i := range in.Observed {
-			if !strings.HasPrefix(in.Observed[i].ChatID, "FLORA-") {
+			if !strings.Contains(in.Observed[i].ChatID, "-") {
 				continue
 			}
 			c, err := store.Chat(r.Context(), in.Observed[i].ChatID)

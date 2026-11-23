@@ -128,7 +128,7 @@ func TestPublicChatIDBackfillPreservesRecordsAndPaths(t *testing.T) {
 	must(t, err)
 	must(t, s.UpdateProject(ctx, p.ID, "Renamed project", p.Configuration))
 	// Remove only the additive identity objects to reproduce the previous schema.
-	_, err = s.db.Exec("DROP TRIGGER allocate_chat_public_id; DROP TRIGGER immutable_chat_public_id; DROP TRIGGER retain_chat_public_id; DROP TABLE chat_public_ids;")
+	_, err = s.db.Exec("DROP TRIGGER allocate_chat_public_id; DROP TRIGGER immutable_chat_public_id; DROP TRIGGER retain_chat_public_id; DROP TABLE chat_public_ids; DROP VIEW chat_project_prefixes;")
 	must(t, err)
 	entries, err := migrations.ReadDir("migrations")
 	must(t, err)
@@ -142,7 +142,7 @@ func TestPublicChatIDBackfillPreservesRecordsAndPaths(t *testing.T) {
 	}
 	saved, err := s.Chat(ctx, c.ID)
 	must(t, err)
-	if saved.PublicID != "FLORA-2" || saved.Title != title || !saved.Archived {
+	if saved.PublicID != "RENA-2" || saved.Title != title || !saved.Archived {
 		t.Fatalf("incorrect backfill: %+v", saved)
 	}
 	byPublic, err := s.Chat(ctx, saved.PublicID)
@@ -228,6 +228,40 @@ func TestPublicAndLegacyContextReferences(t *testing.T) {
 		_, err = s.AcceptMessageWithContext(ctx, reader.ID, "self", "Read", nil, []ContextReference{{Kind: "chat", ChatID: reader.PublicID, Label: "Self"}})
 		if err == nil {
 			t.Fatal("public reference bypassed self-reference check")
+		}
+	}
+}
+
+func TestProjectChatPrefixesRemainStableAndAllowCollisions(t *testing.T) {
+	s := openTest(t, t.TempDir())
+	config := Configuration{Repositories: []Repository{{Name: "core", URL: "https://github.com/example/core", BaseBranch: "main", Role: "core"}}}
+	cases := []struct{ name, prefix string }{
+		{"Flora", "FLOR"}, {"Floral tools", "FLOR"}, {"  My website!", "MYWE"},
+		{"Go", "GO"}, {"123 日本語 🌱", "CHAT"}, {"a-b.c_d", "ABCD"},
+	}
+	ids := map[string]bool{}
+	for _, example := range cases {
+		project, err := s.CreateProject(ctx, example.name, config)
+		must(t, err)
+		chat, err := s.CreateChat(ctx, project.ID, "First", image, "1")
+		must(t, err)
+		if !strings.HasPrefix(chat.PublicID, example.prefix+"-") {
+			t.Fatalf("%q: got %s, want prefix %s", example.name, chat.PublicID, example.prefix)
+		}
+		if ids[chat.PublicID] {
+			t.Fatal("matching project prefixes produced duplicate IDs")
+		}
+		ids[chat.PublicID] = true
+		must(t, s.UpdateProject(ctx, project.ID, "Renamed project", config))
+		later, err := s.CreateChat(ctx, project.ID, "Later", image, "1")
+		must(t, err)
+		if !strings.HasPrefix(later.PublicID, example.prefix+"-") {
+			t.Fatalf("rename changed project prefix: %s", later.PublicID)
+		}
+		saved, err := s.Chat(ctx, chat.PublicID)
+		must(t, err)
+		if saved.ID != chat.ID || saved.PublicID != chat.PublicID {
+			t.Fatal("rename changed chat ID")
 		}
 	}
 }
