@@ -22,6 +22,7 @@ import { FolderProvider } from "./chat-folders";
 import { ChatIdentityContext } from "./chat-identity";
 import { Chats } from "./chats";
 import { Installation } from "./installation";
+import { MCPs } from "./mcps";
 import { useNotifications } from "./notifications";
 import { Projects } from "./projects";
 import { PullRequests } from "./pull-requests-page";
@@ -213,15 +214,17 @@ function App() {
   const conversation = ready && path.startsWith("chats/") && !newChat;
   const pullsPage = ready && path === "pulls";
   const chatsPage = ready && path.split("?")[0] === "chats";
+  const mcpPage = ready && path.startsWith("mcps");
   const automationsPage = ready && path === "automations";
   const automationEditor = ready && path.startsWith("automations/");
   let contentLayout = "mx-auto w-full max-w-6xl p-4 sm:p-8";
-  if (pullsPage || chatsPage || automationsPage) contentLayout = "flex min-h-0 flex-1 flex-col";
-  else if (automationEditor) {
+  if (mcpPage || pullsPage || chatsPage || automationsPage) {
+    contentLayout = "flex min-h-0 flex-1 flex-col";
+  } else if (automationEditor) {
     contentLayout = "min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-8";
   } else if (conversation) contentLayout = "flex min-h-0 flex-1 flex-col px-4 pb-2 sm:px-8";
   const frameLayout =
-    conversation || pullsPage || chatsPage || automationsPage || automationEditor
+    mcpPage || conversation || pullsPage || chatsPage || automationsPage || automationEditor
       ? "h-dvh min-h-0 min-w-0 overflow-hidden md:h-[calc(100dvh-1rem)]"
       : "min-w-0";
   const Content = ready ? SidebarInset : "main";
@@ -250,14 +253,20 @@ function App() {
         </header>
       )}
       <Content id="main-content" tabIndex={-1} className={ready ? frameLayout : undefined}>
-        {ready && !newChat && !conversation && !pullsPage && !chatsPage && !automationsPage && (
-          <header className="florets-topbar flex shrink-0 items-center gap-2 border-b px-3">
-            <span className="sidebar-toggle-space" aria-hidden="true" />
-            {path.startsWith("automations") && (
-              <div ref={setAutomationTopbar} className="flex min-w-0 flex-1 items-center gap-2" />
-            )}
-          </header>
-        )}
+        {ready &&
+          !mcpPage &&
+          !newChat &&
+          !conversation &&
+          !pullsPage &&
+          !chatsPage &&
+          !automationsPage && (
+            <header className="florets-topbar flex shrink-0 items-center gap-2 border-b px-3">
+              <span className="sidebar-toggle-space" aria-hidden="true" />
+              {path.startsWith("automations") && (
+                <div ref={setAutomationTopbar} className="flex min-w-0 flex-1 items-center gap-2" />
+              )}
+            </header>
+          )}
         <div className={ready ? contentLayout : undefined}>
           {error !== "" && (
             <Alert variant="destructive" role="alert" className="mb-6">
@@ -303,6 +312,7 @@ function App() {
               onLogin={refresh}
             />
           )}
+          {mcpPage && <MCPs path={path} onExpired={onExpired} />}
           {ready && path === "settings" && (
             <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
           )}
@@ -314,6 +324,7 @@ function App() {
             <PullRequests chats={notifications.chats} disconnected={notifications.error !== ""} />
           )}
           {ready &&
+            !path.startsWith("mcps") &&
             !path.startsWith("automations") &&
             path !== "settings" &&
             path !== "pulls" &&

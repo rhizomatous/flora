@@ -3,6 +3,7 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"testing"
 )
 
@@ -60,14 +61,7 @@ func TestCompactionUpgradePreservesEncryptedCredentials(t *testing.T) {
 	must(t, err)
 	_, err = s.db.Exec("DROP TABLE chat_environment_requests; DROP TABLE environment_variables; DROP TABLE compaction_choices")
 	must(t, err)
-	version := 0
-	for i, entry := range entries {
-		if entry.Name() == "021_compaction.sql" {
-			version = i
-			break
-		}
-	}
-	_, err = s.db.Exec(fmt.Sprintf("PRAGMA user_version=%d", version))
+	_, err = s.db.Exec(fmt.Sprintf("PRAGMA user_version=%d", migrationIndex(entries, "021_compaction.sql")))
 	must(t, err)
 	must(t, s.Close())
 	s = openTest(t, root)
@@ -78,4 +72,14 @@ func TestCompactionUpgradePreservesEncryptedCredentials(t *testing.T) {
 	}
 	threshold := int64(25000)
 	must(t, s.SetCompactionThreshold(ctx, c.ID, Execution{Provider: credentials.Provider, Model: credentials.Model}, &threshold))
+}
+
+// migrationIndex returns the schema version immediately before a named migration.
+func migrationIndex(entries []fs.DirEntry, name string) int {
+	for index, entry := range entries {
+		if entry.Name() == name {
+			return index
+		}
+	}
+	panic("migration missing: " + name)
 }

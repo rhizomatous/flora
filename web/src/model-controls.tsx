@@ -1,5 +1,5 @@
 /* oxlint-disable import/max-dependencies -- Model controls combine saved choices, discovery, file policy, and picker UI. */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -51,8 +51,6 @@ export function ModelControls({
 }) {
   const { selected, pending, choose: saveChoice } = useModelChoice(scope, saved, savedRevision);
   const { options, loading, error, retry } = useModelDiscovery(scope);
-  const modelTrigger = useRef<HTMLButtonElement>(null);
-  const effortTrigger = useRef<HTMLButtonElement>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const effective = automation
     ? (automation.value ?? undefined)
@@ -77,7 +75,7 @@ export function ModelControls({
     effective !== undefined && effective.model !== ""
       ? modelChoiceLabel(effective, current?.name).text
       : (automation?.inheritedLabel ?? "Default model");
-  async function choose(value: Execution, focusTarget: HTMLButtonElement | null) {
+  async function choose(value: Execution) {
     if (automation) {
       automation.onChange(value);
       return;
@@ -91,9 +89,6 @@ export function ModelControls({
       });
     } finally {
       onSaving?.(false);
-      requestAnimationFrame(() => {
-        if (document.activeElement === document.body) focusTarget?.focus();
-      });
     }
   }
   return (
@@ -118,13 +113,13 @@ export function ModelControls({
         <DropdownMenuTrigger
           render={
             <DropdownButton
-              ref={modelTrigger}
               type="button"
               variant="ghost"
               size="compact"
               disabled={disabled || pending}
+              focusableWhenDisabled
               aria-label={`Model: ${label}`}
-              className="composer-model max-w-[min(220px,42vw)] min-w-0"
+              className="composer-model max-w-[min(220px,42vw)] min-w-0 aria-disabled:pointer-events-none aria-disabled:opacity-50"
             >
               <ModelIcon provider={effective?.provider} model={effective?.model} />
               <span className="florets-control-label truncate">{label}</span>
@@ -154,10 +149,7 @@ export function ModelControls({
                 : undefined
             }
             onSelect={(model) => {
-              void choose(
-                { provider: model.provider, model: model.id, variant: "" },
-                modelTrigger.current,
-              );
+              void choose({ provider: model.provider, model: model.id, variant: "" });
               setModelOpen(false);
             }}
           />
@@ -191,11 +183,12 @@ export function ModelControls({
           <DropdownMenuTrigger
             render={
               <DropdownButton
-                ref={effortTrigger}
                 type="button"
                 variant="ghost"
                 size="compact"
                 disabled={disabled || pending || !effective || loading || !reasoningAvailable}
+                focusableWhenDisabled={pending || disabled}
+                className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
                 aria-label={`Reasoning effort: ${(effective?.variant ?? "") !== "" && effective ? effortLabel(effective.variant) : "Default"}`}
               >
                 <span className="florets-control-label">
@@ -209,7 +202,7 @@ export function ModelControls({
           <DropdownMenuContent align="start" side="top" className="composer-menu w-[200px]!">
             <DropdownMenuItem
               onClick={() => {
-                if (effective) void choose({ ...effective, variant: "" }, effortTrigger.current);
+                if (effective) void choose({ ...effective, variant: "" });
               }}
             >
               Default{(effective?.variant ?? "") === "" && <CheckIcon className="ml-auto" />}
@@ -218,7 +211,7 @@ export function ModelControls({
               <DropdownMenuItem
                 key={variant}
                 onClick={() => {
-                  if (effective) void choose({ ...effective, variant }, effortTrigger.current);
+                  if (effective) void choose({ ...effective, variant });
                 }}
               >
                 {effortLabel(variant)}

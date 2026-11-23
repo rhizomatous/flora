@@ -61,6 +61,7 @@ export function NewChatComposer({
   }
   const [search, setSearch] = useState("");
   const [projectOpen, setProjectOpen] = useState(false);
+  const settingsNavigated = useRef(false);
   return (
     <form
       onSubmit={onSend}
@@ -210,6 +211,11 @@ export function NewChatComposer({
               align="start"
               side="top"
               className="composer-menu w-[260px]! max-w-[calc(100vw-24px)]"
+              finalFocus={() => {
+                const restore = !settingsNavigated.current;
+                settingsNavigated.current = false;
+                return restore;
+              }}
             >
               <DropdownMenuItem
                 onClick={() => {
@@ -219,10 +225,18 @@ export function NewChatComposer({
                 <KeyRoundIcon />
                 Environment variables
               </DropdownMenuItem>
-              <DropdownMenuItem disabled>
-                <PuzzleIcon />
-                MCP servers
-              </DropdownMenuItem>
+              <DropdownMenuItem
+                nativeButton={false}
+                onClick={() => {
+                  settingsNavigated.current = true;
+                }}
+                render={
+                  <a href="#mcps">
+                    <PuzzleIcon />
+                    MCP servers
+                  </a>
+                }
+              />
             </DropdownMenuContent>
           </DropdownMenu>
         }

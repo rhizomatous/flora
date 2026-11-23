@@ -19,6 +19,7 @@ func New(assets fs.FS, authentication *auth.Service, credentials *settings.Servi
 	api := &api{auth: authentication, settings: credentials, origin: origin, passwordSlots: make(chan struct{}, 2)}
 	api.projects = projects.New(credentials.Store)
 	api.routes(mux)
+	api.mcpRoutes(mux)
 	api.projectRoutes(mux)
 	api.environmentRoutes(mux)
 	if len(chats) > 0 {

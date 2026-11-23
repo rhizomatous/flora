@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS mcp_servers (
+ name TEXT PRIMARY KEY,
+ config TEXT NOT NULL,
+ headers TEXT NOT NULL
+);

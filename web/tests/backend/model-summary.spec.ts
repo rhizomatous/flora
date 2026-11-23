@@ -125,3 +125,37 @@ test("long identities and unknown metadata fit summary cards in both themes", as
   await expect(page.getByLabel("Chat summary", { exact: true }).getByRole("img", { name: "Chat model: anthropic / model", exact: true })).toBeVisible();
   await expect(page.getByText("No linked pull requests yet.", { exact: true })).toHaveCount(0);
 });
+
+test("model selection restores focus while saving and stays disabled", async ({
+  page,
+  backend,
+}) => {
+  await logIn(page);
+  await page.goto(`/#chats/${backend.chatID}`);
+  let release: (() => void) | undefined;
+  const saved = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let requests = 0;
+  await page.route(`**/api/chats/${backend.chatID}/model`, async (route) => {
+    requests++;
+    await saved;
+    await route.continue();
+  });
+  try {
+    const trigger = page.getByRole("button", { name: "Model: Claude Haiku 4.5", exact: true });
+    await trigger.click();
+    await page.getByRole("menuitem", { name: "Claude Sonnet 4.6", exact: true }).click();
+    await expect(trigger).toBeDisabled();
+    await expect(trigger).toBeFocused();
+    await trigger.press("Enter");
+    await expect(page.getByRole("menu", { name: "Choose model", exact: true })).toHaveCount(0);
+    expect(requests).toBe(1);
+    release?.();
+    const selected = page.getByRole("button", { name: "Model: Claude Sonnet 4.6", exact: true });
+    await expect(selected).toBeEnabled();
+    await expect(selected).toBeFocused();
+  } finally {
+    release?.();
+  }
+});

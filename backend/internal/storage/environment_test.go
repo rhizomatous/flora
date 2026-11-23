@@ -217,14 +217,7 @@ func TestEnvironmentDescriptionMigrationPreservesSnapshots(t *testing.T) {
 	must(t, err)
 	_, err = s.db.Exec("ALTER TABLE environment_variables DROP COLUMN description")
 	must(t, err)
-	version := 0
-	for i, entry := range entries {
-		if entry.Name() == "023_environment_descriptions.sql" {
-			version = i
-			break
-		}
-	}
-	_, err = s.db.Exec(fmt.Sprintf("PRAGMA user_version=%d", version))
+	_, err = s.db.Exec(fmt.Sprintf("PRAGMA user_version=%d", migrationIndex(entries, "023_environment_descriptions.sql")))
 	must(t, err)
 	must(t, s.Close())
 	s = openTest(t, root)

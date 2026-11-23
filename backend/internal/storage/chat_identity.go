@@ -65,7 +65,7 @@ func prefixSuffix(number int) string {
 // backfillChatIdentities adds public references without changing existing chat
 // rows or their related records. All assignments share the migration transaction.
 func backfillChatIdentities(ctx context.Context, tx *sql.Tx) error {
-	rows, err := tx.QueryContext(ctx, "SELECT id,name FROM projects ORDER BY julianday(created_at),id")
+	rows, err := tx.QueryContext(ctx, "SELECT id,name FROM projects ORDER BY julianday(created_at),created_at,id")
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func backfillChatIdentities(ctx context.Context, tx *sql.Tx) error {
 			return err
 		}
 	}
-	rows, err = tx.QueryContext(ctx, "SELECT id,project_id FROM chats WHERE id NOT IN (SELECT chat_id FROM chat_public_ids) ORDER BY julianday(created_at),id")
+	rows, err = tx.QueryContext(ctx, "SELECT id,project_id FROM chats WHERE id NOT IN (SELECT chat_id FROM chat_public_ids) ORDER BY julianday(created_at),created_at,id")
 	if err != nil {
 		return err
 	}

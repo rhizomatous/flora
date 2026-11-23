@@ -83,6 +83,18 @@ export function WorkspaceMenu({
             navigated.current = window.location.hash !== "#projects";
           }}
         />
+        <DropdownMenuItem
+          render={
+            <a href="#mcps">
+              <GearIcon aria-hidden="true" />
+              MCP servers
+            </a>
+          }
+          nativeButton={false}
+          onClick={() => {
+            navigated.current = window.location.hash !== "#mcps";
+          }}
+        />
         {sound && (
           <DropdownMenuItem
             closeOnClick={false}

@@ -402,6 +402,7 @@ func (m *Manager) start(ctx context.Context, chatID string, existingOnly bool) (
 			}
 			spec := m.containerSpec(chat, paths, password, uid, gid)
 			spec.Env = append(spec.Env, environment...)
+			runtimeConfig := map[string]any{}
 			credentials, credentialsErr := m.store.Credentials(ctx)
 			if credentialsErr == nil {
 				keyName := map[string]string{"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "google": "GOOGLE_GENERATIVE_AI_API_KEY"}[credentials.Provider]
@@ -417,10 +418,15 @@ func (m *Manager) start(ctx context.Context, chatID string, existingOnly bool) (
 					}
 				}
 				spec.Env = append(spec.Env, keyName+"="+credentials.ProviderKey)
-				config, _ := json.Marshal(map[string]any{"model": credentials.Provider + "/" + credentials.Model, "small_model": credentials.Provider + "/" + credentials.Model, "enabled_providers": []string{credentials.Provider}})
-				spec.Env = append(spec.Env, "OPENCODE_CONFIG_CONTENT="+string(config))
+				runtimeConfig["model"] = credentials.Provider + "/" + credentials.Model
+				runtimeConfig["small_model"] = credentials.Provider + "/" + credentials.Model
+				runtimeConfig["enabled_providers"] = []string{credentials.Provider}
 			} else if !errors.Is(credentialsErr, storage.ErrNotFound) {
 				return Endpoint{}, credentialsErr
+			}
+			if len(runtimeConfig) > 0 {
+				config, _ := json.Marshal(runtimeConfig)
+				spec.Env = append(spec.Env, "OPENCODE_CONFIG_CONTENT="+string(config))
 			}
 			// Hold the lock across the capacity check, creation, and start
 			// so concurrent starts cannot overbook the running-container limit.
@@ -430,8 +436,10 @@ func (m *Manager) start(ctx context.Context, chatID string, existingOnly bool) (
 				return Endpoint{}, lockErr
 			}
 			if err = m.checkCapacity(ctx); err == nil {
-				if id, err = m.engine.ContainerCreate(ctx, spec); err == nil {
-					err = m.engine.ContainerStart(ctx, id)
+				if err = m.prepareMCPs(ctx, paths, uid, gid); err == nil {
+					if id, err = m.engine.ContainerCreate(ctx, spec); err == nil {
+						err = m.engine.ContainerStart(ctx, id)
+					}
 				}
 			}
 			release()
@@ -468,6 +476,9 @@ func (m *Manager) start(ctx context.Context, chatID string, existingOnly bool) (
 			return Endpoint{}, lockErr
 		}
 		err = m.checkCapacity(ctx)
+		if err == nil {
+			err = m.prepareMCPs(ctx, paths, uid, gid)
+		}
 		if err == nil {
 			err = m.engine.ContainerStart(ctx, containerID)
 		}
@@ -836,6 +847,7 @@ func (m *Manager) Stop(ctx context.Context, chatID string) error {
 	if err := m.validateOwned(info, chat, paths, imageID); err != nil {
 		return err
 	}
+	m.disposeMCPs(ctx, chatID, info)
 	if m.access != nil {
 		revokeErr = m.access.Revoke(ctx, chatID)
 	}

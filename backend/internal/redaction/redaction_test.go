@@ -119,3 +119,38 @@ func TestCapabilityFileCannotEscapeRuntimeRoot(t *testing.T) {
 		t.Fatal("followed an agent symlink outside its root")
 	}
 }
+
+func TestMCPRotationStillRedactsRunningCredentials(t *testing.T) {
+	ctx := context.Background()
+	store, err := storage.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	project, err := store.CreateProject(ctx, "fixture", storage.Configuration{Repositories: []storage.Repository{{Name: "core", URL: "https://github.com/example/core", BaseBranch: "main", Role: "core"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	chat, err := store.CreateChat(ctx, project.ID, "fixture", "flora@sha256:"+strings.Repeat("a", 64), "1.2.27")
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths, err := store.Paths(ctx, chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.MkdirAll(filepath.Join(paths.RuntimeState, ".config/opencode"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	raw := []byte(`{"mcp":{"tools":{"type":"remote","url":"https://example.com/mcp","enabled":true,"timeout":5000,"headers":{"Authorization":"Bearer retired-fixture-secret"},"oauth":false}}}`)
+	if err = os.WriteFile(filepath.Join(paths.RuntimeState, storage.MCPRuntimeFile), raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err = store.SaveMCP(ctx, storage.MCPServer{Name: "tools", URL: "https://example.com/mcp", Enabled: true, Timeout: 5000, HeaderNames: []string{"Authorization"}, Headers: map[string]string{"Authorization": "Bearer current-fixture-secret"}}, true); err != nil {
+		t.Fatal(err)
+	}
+	clean := Text("Bearer retired-fixture-secret and Bearer current-fixture-secret", Values(ctx, store, chat.ID)...)
+	if strings.Contains(clean, "fixture-secret") {
+		t.Fatal("active or current MCP secret leaked")
+	}
+}
