@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures.ts";
+import { test, expect, publicChatID } from "./fixtures.ts";
 
 test("selected PR overview matches the compact chat and flat checks layout", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -146,7 +146,9 @@ test("PR icons follow checks across the feed, sidebar, inline links, and control
   const inline = page.locator(
     '[data-inline-pr][href="https://github.com/example/fieldnotes/pull/19"]',
   );
-  const row = page.locator(".florets-navigation-link[href='#chats/pagination']");
+  const row = page.locator(
+    `.florets-navigation-link[href='#chats/${await publicChatID(page, "pagination")}']`,
+  );
   for (const [next, tone] of [
     ["failure", "failure"],
     ["pending", "pending"],
@@ -195,7 +197,7 @@ test("PR collection rows open the selected PR beside its chat", async ({ page })
   await page.goto(`${base}/#pulls`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await page.getByRole("link", { name: /example\/fieldnotes #19:/ }).click();
-  await expect(page).toHaveURL(/#chats\/pagination$/);
+  await expect(page).toHaveURL(`${base}/#chats/${await publicChatID(page, "pagination")}`);
   const side = page.getByRole("complementary", { name: "Side panel" });
   await expect(side.getByRole("tab", { name: "PR #19", exact: true })).toHaveAttribute(
     "aria-selected",

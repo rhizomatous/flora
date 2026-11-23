@@ -163,7 +163,7 @@ func (s *Store) migrate(ctx context.Context) error {
 			if _, err := tx.ExecContext(ctx, string(body)); err != nil {
 				return err
 			}
-			if entries[i].Name() == "022_public_chat_ids.sql" {
+			if entries[i].Name() == "024_public_chat_ids.sql" {
 				if err := backfillChatIdentities(ctx, tx); err != nil {
 					return err
 				}
