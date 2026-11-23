@@ -398,17 +398,6 @@ func (m *Manager) start(ctx context.Context, chatID string, existingOnly bool) (
 			}
 			spec := m.containerSpec(chat, paths, password, uid, gid)
 			runtimeConfig := map[string]any{}
-			servers, mcpErr := m.store.MCPServers(ctx, chatID)
-			if mcpErr != nil {
-				return Endpoint{}, mcpErr
-			}
-			connections := map[string]any{}
-			for _, server := range servers {
-				connections[server.Name] = map[string]any{"type": "remote", "url": server.URL, "enabled": server.Enabled, "timeout": server.Timeout, "headers": server.Headers, "oauth": false}
-			}
-			if len(connections) > 0 {
-				runtimeConfig["mcp"] = connections
-			}
 			credentials, credentialsErr := m.store.Credentials(ctx)
 			if credentialsErr == nil {
 				keyName := map[string]string{"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "google": "GOOGLE_GENERATIVE_AI_API_KEY"}[credentials.Provider]
@@ -442,8 +431,10 @@ func (m *Manager) start(ctx context.Context, chatID string, existingOnly bool) (
 				return Endpoint{}, lockErr
 			}
 			if err = m.checkCapacity(ctx); err == nil {
-				if id, err = m.engine.ContainerCreate(ctx, spec); err == nil {
-					err = m.engine.ContainerStart(ctx, id)
+				if err = m.prepareMCPs(ctx, paths, uid, gid); err == nil {
+					if id, err = m.engine.ContainerCreate(ctx, spec); err == nil {
+						err = m.engine.ContainerStart(ctx, id)
+					}
 				}
 			}
 			release()
@@ -480,6 +471,9 @@ func (m *Manager) start(ctx context.Context, chatID string, existingOnly bool) (
 			return Endpoint{}, lockErr
 		}
 		err = m.checkCapacity(ctx)
+		if err == nil {
+			err = m.prepareMCPs(ctx, paths, uid, gid)
+		}
 		if err == nil {
 			err = m.engine.ContainerStart(ctx, containerID)
 		}

@@ -13,7 +13,7 @@ import (
 // checkMCPs verifies original tool identities before the runtime normalizes them,
 // then checks the runtime's own connections from inside the chat container.
 func (s *Service) checkMCPs(ctx context.Context, rt *runtime, chatID string) (string, error) {
-	servers, err := s.Store.MCPServers(ctx, chatID)
+	servers, err := s.Store.RuntimeMCPServers(ctx, chatID)
 	if err != nil {
 		return "MCP credentials unavailable.", err
 	}

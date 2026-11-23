@@ -66,14 +66,14 @@ func (m MCPServer) Validate() error {
 	}
 	return nil
 }
-func mcpIdentity(scope, name, config string) string {
-	b, _ := json.Marshal([]string{"mcp_servers", scope, name, config})
+func mcpIdentity(name, config string) string {
+	b, _ := json.Marshal([]string{"mcp_servers", name, config})
 	return string(b)
 }
 func readMCPs(ctx context.Context, db interface {
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
-}, box *secretBox, scope string) ([]MCPServer, error) {
-	rows, err := db.QueryContext(ctx, "SELECT name,config,headers FROM mcp_servers WHERE scope=? ORDER BY name", scope)
+}, box *secretBox) ([]MCPServer, error) {
+	rows, err := db.QueryContext(ctx, "SELECT name,config,headers FROM mcp_servers ORDER BY name")
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func readMCPs(ctx context.Context, db interface {
 		if m.Name != name || m.Validate() != nil {
 			return nil, ErrSecrets
 		}
-		plain, e := box.open(sealed, mcpIdentity(scope, name, config))
+		plain, e := box.open(sealed, mcpIdentity(name, config))
 		if e != nil {
 			return nil, e
 		}
@@ -102,19 +102,15 @@ func readMCPs(ctx context.Context, db interface {
 	}
 	return result, rows.Err()
 }
-func (s *Store) MCPServers(ctx context.Context, chatID string) ([]MCPServer, error) {
+func (s *Store) MCPServers(ctx context.Context) ([]MCPServer, error) {
 	s.secretMu.Lock()
 	defer s.secretMu.Unlock()
-	scope := "defaults"
-	if chatID != "" {
-		scope = "chat:" + chatID
-	}
-	return readMCPs(ctx, s.db, s.secrets, scope)
+	return readMCPs(ctx, s.db, s.secrets)
 }
-func writeMCP(ctx context.Context, tx *sql.Tx, box *secretBox, scope string, m MCPServer) error {
+func writeMCP(ctx context.Context, tx *sql.Tx, box *secretBox, m MCPServer) error {
 	raw, _ := json.Marshal(m)
 	headers, _ := json.Marshal(m.Headers)
-	_, err := tx.ExecContext(ctx, `INSERT INTO mcp_servers(scope,name,config,headers) VALUES(?,?,?,?) ON CONFLICT(scope,name) DO UPDATE SET config=excluded.config,headers=excluded.headers`, scope, m.Name, string(raw), box.seal(string(headers), mcpIdentity(scope, m.Name, string(raw))))
+	_, err := tx.ExecContext(ctx, `INSERT INTO mcp_servers(name,config,headers) VALUES(?,?,?) ON CONFLICT(name) DO UPDATE SET config=excluded.config,headers=excluded.headers`, m.Name, string(raw), box.seal(string(headers), mcpIdentity(m.Name, string(raw))))
 	return err
 }
 
@@ -127,7 +123,7 @@ func (s *Store) SaveMCP(ctx context.Context, m MCPServer, create bool) error {
 	s.secretMu.Lock()
 	defer s.secretMu.Unlock()
 	return s.write(ctx, func(tx *sql.Tx) error {
-		all, err := readMCPs(ctx, tx, s.secrets, "defaults")
+		all, err := readMCPs(ctx, tx, s.secrets)
 		if err != nil {
 			return err
 		}
@@ -159,74 +155,26 @@ func (s *Store) SaveMCP(ctx context.Context, m MCPServer, create bool) error {
 				return ErrMCPHeaders
 			}
 		}
-		return writeMCP(ctx, tx, s.secrets, "defaults", m)
+		return writeMCP(ctx, tx, s.secrets, m)
 	})
 }
 func (s *Store) DeleteMCP(ctx context.Context, name string) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM mcp_servers WHERE scope='defaults' AND name=?", name)
+	_, err := s.db.ExecContext(ctx, "DELETE FROM mcp_servers WHERE name=?", name)
 	return err
 }
 
-// Snapshot MCP configuration and credentials inside the chat creation transaction.
-func (s *Store) snapshotMCPs(ctx context.Context, tx *sql.Tx, chatID string) error {
-	all, err := readMCPs(ctx, tx, s.secrets, "defaults")
+func (s *Store) validateMCPSecrets(ctx context.Context) error {
+	_, err := readMCPs(ctx, s.db, s.secrets)
+	return err
+}
+func rotateMCPs(ctx context.Context, tx *sql.Tx, old, next *secretBox) error {
+	all, err := readMCPs(ctx, tx, old)
 	if err != nil {
 		return err
 	}
 	for _, m := range all {
-		if err = writeMCP(ctx, tx, s.secrets, "chat:"+chatID, m); err != nil {
+		if err = writeMCP(ctx, tx, next, m); err != nil {
 			return err
-		}
-	}
-	return nil
-}
-
-type mcpReader interface {
-	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
-}
-
-func mcpScopes(ctx context.Context, db mcpReader) ([]string, error) {
-	rows, err := db.QueryContext(ctx, "SELECT DISTINCT scope FROM mcp_servers")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var scopes []string
-	for rows.Next() {
-		var scope string
-		if err = rows.Scan(&scope); err != nil {
-			return nil, err
-		}
-		scopes = append(scopes, scope)
-	}
-	return scopes, rows.Err()
-}
-func (s *Store) validateMCPSecrets(ctx context.Context) error {
-	scopes, err := mcpScopes(ctx, s.db)
-	if err != nil {
-		return err
-	}
-	for _, scope := range scopes {
-		if _, err = readMCPs(ctx, s.db, s.secrets, scope); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-func rotateMCPs(ctx context.Context, tx *sql.Tx, old, next *secretBox) error {
-	scopes, err := mcpScopes(ctx, tx)
-	if err != nil {
-		return err
-	}
-	for _, scope := range scopes {
-		all, err := readMCPs(ctx, tx, old, scope)
-		if err != nil {
-			return err
-		}
-		for _, m := range all {
-			if err = writeMCP(ctx, tx, next, scope, m); err != nil {
-				return err
-			}
 		}
 	}
 	return nil

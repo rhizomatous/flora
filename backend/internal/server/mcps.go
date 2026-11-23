@@ -10,7 +10,7 @@ import (
 
 func (a *api) mcpRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/mcps", func(w http.ResponseWriter, r *http.Request) {
-		servers, err := a.settings.Store.MCPServers(r.Context(), "")
+		servers, err := a.settings.Store.MCPServers(r.Context())
 		if err != nil {
 			failure(w, 500, "MCP settings unavailable.")
 			return
@@ -58,7 +58,7 @@ func (a *api) mcpRoutes(mux *http.ServeMux) {
 		jsonResponse(w, 200, map[string]bool{"ok": true})
 	})
 	check := func(w http.ResponseWriter, r *http.Request) {
-		servers, err := a.settings.Store.MCPServers(r.Context(), r.PathValue("id"))
+		servers, err := a.settings.Store.MCPServers(r.Context())
 		if err != nil {
 			failure(w, 500, "MCP settings unavailable.")
 			return
@@ -73,17 +73,4 @@ func (a *api) mcpRoutes(mux *http.ServeMux) {
 	}
 
 	mux.HandleFunc("POST /api/mcps/{name}/check", check)
-	mux.HandleFunc("POST /api/chats/{id}/mcps/{name}/check", check)
-	mux.HandleFunc("GET /api/chats/{id}/mcps", func(w http.ResponseWriter, r *http.Request) {
-		if _, err := a.settings.Store.Chat(r.Context(), r.PathValue("id")); err != nil {
-			failure(w, 404, "Chat not found.")
-			return
-		}
-		servers, err := a.settings.Store.MCPServers(r.Context(), r.PathValue("id"))
-		if err != nil {
-			failure(w, 500, "MCP snapshot unavailable.")
-			return
-		}
-		jsonResponse(w, 200, servers)
-	})
 }

@@ -1,7 +1,5 @@
 CREATE TABLE IF NOT EXISTS mcp_servers (
- scope TEXT NOT NULL,
- name TEXT NOT NULL,
+ name TEXT PRIMARY KEY,
  config TEXT NOT NULL,
- headers TEXT NOT NULL,
- PRIMARY KEY(scope,name)
+ headers TEXT NOT NULL
 );

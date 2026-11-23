@@ -1,4 +1,4 @@
-// Package agentfiles reads diagnostic files from agent-owned directories without
+// Package agentfiles reads regular files from agent-owned directories without
 // letting symlinks escape the mount or special files block the application.
 package agentfiles
 

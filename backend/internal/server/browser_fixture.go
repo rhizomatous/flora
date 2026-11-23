@@ -142,11 +142,6 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 			return nil, e
 		}
 		cleanup = append(cleanup, closeFixture)
-		saved, e := store.CreateChat(ctx, fixture.Project.ID, "MCP snapshot fixture", "flora@sha256:"+strings.Repeat("a", 64), "1.2.27")
-		if e != nil {
-			return nil, e
-		}
-		instance.ChatID = saved.ID
 	}
 	configuration := settings.New(store)
 	if scenario == "settings" || scenario == "credential-setup" {

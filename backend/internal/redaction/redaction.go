@@ -22,7 +22,14 @@ import (
 // its contents or errors to HTTP clients or logs.
 func Values(ctx context.Context, store *storage.Store, chatID string, extra ...string) []string {
 	values := append([]string{}, extra...)
-	if servers, err := store.MCPServers(ctx, chatID); err == nil {
+	if servers, err := store.MCPServers(ctx); err == nil {
+		for _, server := range servers {
+			for _, value := range server.Headers {
+				values = append(values, value)
+			}
+		}
+	}
+	if servers, err := store.RuntimeMCPServers(ctx, chatID); err == nil {
 		for _, server := range servers {
 			for _, value := range server.Headers {
 				values = append(values, value)

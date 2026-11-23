@@ -57,15 +57,13 @@ export function MCPs({ path, onExpired }: { path: string; onExpired: () => void 
   const [diagnostics, setDiagnostics] = useState<Record<string, MCPDiagnostic>>({});
   const [checking, setChecking] = useState<string[]>([]);
 
-  const chatID = new URLSearchParams(path.split("?")[1]).get("chat") ?? "";
-  const apiPath = chatID === "" ? "mcps" : `chats/${encodeURIComponent(chatID)}/mcps`;
   const selected = path.split("?")[0]?.split("/")[1];
   const load = useCallback(
     async (signal?: AbortSignal) => {
       try {
         const next = await request(
           mcpSchema.array(),
-          apiPath,
+          "mcps",
           signal === undefined ? {} : { signal },
         );
         setServers(next);
@@ -75,7 +73,7 @@ export function MCPs({ path, onExpired }: { path: string; onExpired: () => void 
         else setError(errorMessage(cause, "Could not load MCP servers."));
       }
     },
-    [onExpired, apiPath],
+    [onExpired],
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -89,14 +87,10 @@ export function MCPs({ path, onExpired }: { path: string; onExpired: () => void 
     setChecking((value) => [...value, name]);
     setError("");
     try {
-      const result = await request(
-        mcpDiagnosticSchema,
-        `${apiPath}/${encodeURIComponent(name)}/check`,
-        {
-          method: "POST",
-          body: {},
-        },
-      );
+      const result = await request(mcpDiagnosticSchema, `mcps/${encodeURIComponent(name)}/check`, {
+        method: "POST",
+        body: {},
+      });
       setDiagnostics((value) => ({ ...value, [name]: result }));
     } catch (cause) {
       if (isExpired(cause)) onExpired();
@@ -153,22 +147,16 @@ export function MCPs({ path, onExpired }: { path: string; onExpired: () => void 
   );
   return (
     <ListPage
-      title={chatID === "" ? "MCP servers" : "Chat MCP servers"}
+      title="MCP servers"
       query={query}
       onQueryChange={setQuery}
       searchLabel="Search MCP servers"
       searchPlaceholder="Search by name or endpoint"
       closeSearchLabel="Close search"
       actions={
-        chatID === "" ? (
-          <a href="#mcps/new" className={buttonVariants({ size: "sm" })}>
-            Add server
-          </a>
-        ) : (
-          <a href={`#chats/${chatID}`} className={buttonVariants({ size: "sm", variant: "ghost" })}>
-            Back to chat
-          </a>
-        )
+        <a href="#mcps/new" className={buttonVariants({ size: "sm" })}>
+          Add server
+        </a>
       }
       filters={
         <ListFilters
@@ -185,7 +173,7 @@ export function MCPs({ path, onExpired }: { path: string; onExpired: () => void 
           ]}
         >
           <Text size="xs" tone="muted">
-            {chatID === "" ? "Defaults for new chats" : "Saved chat configuration"}
+            All chats
           </Text>
         </ListFilters>
       }
@@ -217,16 +205,12 @@ export function MCPs({ path, onExpired }: { path: string; onExpired: () => void 
               <Item key={server.name} size="list" render={<li />} className="flex-wrap">
                 <ItemContent className="min-w-0 basis-full flex-col! items-start! gap-1! sm:basis-0">
                   <ItemTitle>
-                    {chatID === "" ? (
-                      <a
-                        href={`#mcps/${server.name}`}
-                        className="rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-                      >
-                        {server.name}
-                      </a>
-                    ) : (
-                      server.name
-                    )}
+                    <a
+                      href={`#mcps/${server.name}`}
+                      className="rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                    >
+                      {server.name}
+                    </a>
                   </ItemTitle>
                   <Text size="xs" tone="muted" className="break-all">
                     {server.url}
@@ -272,18 +256,14 @@ export function MCPs({ path, onExpired }: { path: string; onExpired: () => void 
                   >
                     {pending ? "Checking…" : "Check connection"}
                   </Button>
-                  {chatID === "" && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      render={
-                        <a href={`#mcps/${server.name}`} aria-label={`Edit ${server.name}`} />
-                      }
-                      nativeButton={false}
-                    >
-                      Edit
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    render={<a href={`#mcps/${server.name}`} aria-label={`Edit ${server.name}`} />}
+                    nativeButton={false}
+                  >
+                    Edit
+                  </Button>
                 </ItemActions>
               </Item>
             );
@@ -581,7 +561,7 @@ function MCPEditor({
             </div>
             {deleting && (
               <Alert role="alert">
-                <Text>Remove {server.name} from new chats?</Text>
+                <Text>Remove {server.name}?</Text>
                 <div className="mt-3 flex gap-2">
                   <Button
                     type="button"

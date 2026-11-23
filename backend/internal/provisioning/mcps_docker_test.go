@@ -10,7 +10,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"runtime"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -27,8 +26,10 @@ func TestMCPDockerLifecycle(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 	var initialized, closed atomic.Int32
+	var credential atomic.Value
+	credential.Store("Bearer fake-container-secret")
 	fixture := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer fake-container-secret" {
+		if r.Header.Get("Authorization") != credential.Load().(string) {
 			w.WriteHeader(403)
 			return
 		}
@@ -142,18 +143,14 @@ func TestMCPDockerLifecycle(t *testing.T) {
 	if statuses["garden"].Status != "connected" {
 		t.Fatalf("runtime did not connect: %+v", statuses)
 	}
-	server.URL = "http://unreachable.invalid/mcp"
+	server.URL = fmt.Sprintf("http://%s:%d/updated", host, port)
 	server.Headers["Authorization"] = "Bearer changed-fake-secret"
 	if err = store.SaveMCP(ctx, server, false); err != nil {
 		t.Fatal(err)
 	}
-	info, err := engine.ContainerInspect(ctx, endpoint.ContainerID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	content := info.EnvValue("OPENCODE_CONFIG_CONTENT")
-	if !strings.Contains(content, "fake-container-secret") || strings.Contains(content, "changed-fake-secret") {
-		t.Fatal("container did not retain snapshot")
+	active, err := store.RuntimeMCPServers(ctx, chat.ID)
+	if err != nil || len(active) != 1 || active[0].Headers["Authorization"] != "Bearer fake-container-secret" {
+		t.Fatal("running connection changed before restart", err)
 	}
 	if err = manager.Stop(ctx, chat.ID); err != nil {
 		t.Fatal(err)
@@ -165,13 +162,34 @@ func TestMCPDockerLifecycle(t *testing.T) {
 	if closed.Load() < 1 {
 		t.Fatal("runtime did not close its MCP connection")
 	}
+	credential.Store("Bearer changed-fake-secret")
 	endpoint, err = manager.Start(ctx, chat.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
+	statuses = nil
 	call("/mcp", &statuses)
 	if statuses["garden"].Status != "connected" || initialized.Load() < 2 {
-		t.Fatal("restart did not reconnect saved MCP snapshot")
+		t.Fatal("restart did not load updated MCP credentials")
+	}
+	active, err = store.RuntimeMCPServers(ctx, chat.ID)
+	if err != nil || len(active) != 1 || active[0].URL != server.URL || active[0].Headers["Authorization"] != "Bearer changed-fake-secret" {
+		t.Fatal("restart did not load updated endpoint and headers", err)
+	}
+	if err = store.DeleteMCP(ctx, server.Name); err != nil {
+		t.Fatal(err)
+	}
+	if err = manager.Stop(ctx, chat.ID); err != nil {
+		t.Fatal(err)
+	}
+	endpoint, err = manager.Start(ctx, chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	statuses = nil
+	call("/mcp", &statuses)
+	if len(statuses) != 0 {
+		t.Fatal("restart retained removed MCP server")
 	}
 	if err = manager.Stop(ctx, chat.ID); err != nil {
 		t.Fatal(err)

@@ -311,9 +311,7 @@ function App() {
               onLogin={refresh}
             />
           )}
-          {mcpPage && (
-            <MCPs key={path.split("?")[1] ?? "defaults"} path={path} onExpired={onExpired} />
-          )}
+          {mcpPage && <MCPs path={path} onExpired={onExpired} />}
           {ready && path === "settings" && (
             <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
           )}

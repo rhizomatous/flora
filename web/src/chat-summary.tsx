@@ -68,7 +68,7 @@ export function ChatSummary({
       )}
       {chat && (
         <a
-          href={`#mcps?chat=${encodeURIComponent(chat.ID)}`}
+          href="#mcps"
           className="mt-3 inline-block rounded-sm text-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
         >
           MCP servers

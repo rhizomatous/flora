@@ -5,7 +5,7 @@ import { logIn, assertFitsPhone, pageErrors } from "../helpers.ts";
 
 test.use({ scenario: "mcps" });
 
-test("MCP connections, failures, secret edits and drafts", async ({ page, backend }) => {
+test("MCP connections, failures, secret edits and drafts", async ({ page }) => {
   const errors = pageErrors(page);
   await logIn(page);
   await page.goto("/#mcps");
@@ -30,14 +30,6 @@ test("MCP connections, failures, secret edits and drafts", async ({ page, backen
   await page.getByRole("button", { name: "Save server", exact: true }).click();
   await garden.getByRole("button", { name: "Check connection", exact: true }).click();
   await expect(garden.getByRole("status")).toContainText("Server unreachable");
-  await page.goto(`/#mcps?chat=${backend.chatID}`);
-  await expect(page.getByRole("heading", { name: "Chat MCP servers", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Add server", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /^Edit / })).toHaveCount(0);
-  await expect(page.getByRole("list", { name: "MCP servers", exact: true })).not.toContainText(
-    "unreachable",
-  );
-  await page.goto("/#mcps");
   await page.getByRole("link", { name: "Add server", exact: true }).click();
   await page.getByLabel("Name", { exact: true }).fill("draft-fixture");
   await page.getByLabel("Endpoint URL").fill("https://example.com/mcp");
@@ -74,9 +66,5 @@ test("MCP connections, failures, secret edits and drafts", async ({ page, backen
   await page.getByRole("alert").getByRole("button", { name: "Remove server", exact: true }).click();
   await expect(page.getByRole("heading", { name: "MCP servers", exact: true })).toBeVisible();
   await expect(garden).toHaveCount(0);
-  await page.goto(`/#mcps?chat=${backend.chatID}`);
-  await expect(page.getByRole("list", { name: "MCP servers", exact: true })).toContainText(
-    "garden-fixture",
-  );
   assert.deepEqual(errors, []);
 });
