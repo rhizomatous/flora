@@ -137,7 +137,9 @@ export function CommandPicker({
     >
       <PopoverTrigger
         render={
-          <span
+          <button
+            type="button"
+            tabIndex={-1}
             className="pointer-events-none absolute top-0 left-3 h-px w-px"
             aria-hidden="true"
           />
