@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import type { Message, Part } from "../../src/chat-schemas.ts";
-import { test, expect } from "./fixtures.ts";
+import { test, expect, publicChatID } from "./fixtures.ts";
 
 function message(id: string, parts: Part[], role = "assistant"): Message {
   return { ID: id, Role: role, Text: "", Provider: "", Model: "", Payload: { parts } };
@@ -12,6 +12,7 @@ test("live work grouping, disclosure state, and focus", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  const canonical = await publicChatID(page, "working", base);
   let phase = 0;
   let sequence = 0;
   await page.route("**/api/chats/working/events", (route) => {
@@ -66,6 +67,7 @@ test("live work grouping, disclosure state, and focus", async ({ page }) => {
       json: {
         chat: {
           ID: "working",
+          PublicID: canonical,
           Title: "Work summaries",
           ProjectID: "preview",
           Status: phase >= 2 ? "idle" : "working",

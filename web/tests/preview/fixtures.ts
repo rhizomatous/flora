@@ -35,9 +35,9 @@ export const test = base.extend<{}, { previewServer: boolean }>({
 export { expect } from "@playwright/test";
 
 /** Resolve the fixture's internal key through the API before checking canonical navigation. */
-export async function publicChatID(page: Page, id: string) {
+export async function publicChatID(page: Page, id: string, origin = page.url()) {
   const response = await page.request.get(
-    new URL(`/api/chats/${encodeURIComponent(id)}`, page.url()).href,
+    new URL(`/api/chats/${encodeURIComponent(id)}`, origin).href,
   );
   await expect(response).toBeOK();
   const { chat } = detailSchema.parse(await response.json());
