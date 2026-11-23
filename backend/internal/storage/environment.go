@@ -17,11 +17,14 @@ type EnvironmentChange struct {
 	Action string `json:"action"`
 	Value  string `json:"value,omitempty"`
 	Secret bool   `json:"secret"`
+	// Nil preserves the description; an empty string clears it.
+	Description *string `json:"description,omitempty"`
 }
 type EnvironmentVariable struct {
-	Name   string `json:"name"`
-	Value  string `json:"value,omitempty"`
-	Secret bool   `json:"secret"`
+	Name        string `json:"name"`
+	Value       string `json:"value,omitempty"`
+	Secret      bool   `json:"secret"`
+	Description string `json:"description,omitempty"`
 }
 type EnvironmentError struct{ Message string }
 
@@ -58,6 +61,9 @@ func ValidateEnvironment(changes []EnvironmentChange) error {
 			return environmentInvalid("Configure each environment variable only once.")
 		}
 		seen[c.Name] = true
+		if c.Description != nil && (!utf8.ValidString(*c.Description) || strings.ContainsRune(*c.Description, 0) || len(*c.Description) > 512) {
+			return environmentInvalid("Descriptions must be UTF-8, at most 512 bytes, without NUL characters.")
+		}
 		if !utf8.ValidString(c.Value) || strings.ContainsRune(c.Value, 0) || len(c.Value) > 8192 {
 			return environmentInvalid("Variable values must be UTF-8, at most 8192 bytes, without NUL characters.")
 		}
@@ -89,7 +95,7 @@ func environmentIdentity(scope, owner, name string) string {
 	return string(b)
 }
 func readEnvironment(ctx context.Context, tx *sql.Tx, box *secretBox, scope, owner string) (map[string]EnvironmentVariable, error) {
-	rows, err := tx.QueryContext(ctx, "SELECT name,value,secret FROM environment_variables WHERE scope=? AND owner_id=?", scope, owner)
+	rows, err := tx.QueryContext(ctx, "SELECT name,value,secret,description FROM environment_variables WHERE scope=? AND owner_id=?", scope, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +103,7 @@ func readEnvironment(ctx context.Context, tx *sql.Tx, box *secretBox, scope, own
 	result := map[string]EnvironmentVariable{}
 	for rows.Next() {
 		var v EnvironmentVariable
-		if err := rows.Scan(&v.Name, &v.Value, &v.Secret); err != nil {
+		if err := rows.Scan(&v.Name, &v.Value, &v.Secret, &v.Description); err != nil {
 			return nil, err
 		}
 		if v.Secret {
@@ -121,7 +127,12 @@ func applyEnvironment(values map[string]EnvironmentVariable, changes []Environme
 		case "remove":
 			delete(values, c.Name)
 		default:
-			values[c.Name] = EnvironmentVariable{c.Name, c.Value, c.Secret}
+			values[c.Name] = EnvironmentVariable{Name: c.Name, Value: c.Value, Secret: c.Secret, Description: values[c.Name].Description}
+		}
+		if c.Action != "remove" && c.Description != nil {
+			v := values[c.Name]
+			v.Description = *c.Description
+			values[c.Name] = v
 		}
 	}
 	checks := []EnvironmentChange{}
@@ -130,7 +141,7 @@ func applyEnvironment(values map[string]EnvironmentVariable, changes []Environme
 		if v.Secret {
 			action = "replace"
 		}
-		checks = append(checks, EnvironmentChange{v.Name, action, v.Value, v.Secret})
+		checks = append(checks, EnvironmentChange{v.Name, action, v.Value, v.Secret, &v.Description})
 	}
 	return ValidateEnvironment(checks)
 }
@@ -143,7 +154,7 @@ func writeEnvironment(ctx context.Context, tx *sql.Tx, box *secretBox, scope, ow
 		if v.Secret {
 			value = box.seal(value, environmentIdentity(scope, owner, v.Name))
 		}
-		if _, err := tx.ExecContext(ctx, "INSERT INTO environment_variables VALUES(?,?,?,?,?)", scope, owner, v.Name, value, v.Secret); err != nil {
+		if _, err := tx.ExecContext(ctx, "INSERT INTO environment_variables(scope,owner_id,name,value,secret,description) VALUES(?,?,?,?,?,?)", scope, owner, v.Name, value, v.Secret, v.Description); err != nil {
 			return err
 		}
 	}
@@ -155,14 +166,14 @@ func writeEnvironment(ctx context.Context, tx *sql.Tx, box *secretBox, scope, ow
 func (s *Store) Environment(ctx context.Context, scope, owner string) ([]EnvironmentVariable, error) {
 	values := []EnvironmentVariable{}
 	err := s.write(ctx, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, "SELECT name,CASE WHEN secret=1 THEN '' ELSE value END,secret FROM environment_variables WHERE scope=? AND owner_id=? ORDER BY name", scope, owner)
+		rows, err := tx.QueryContext(ctx, "SELECT name,CASE WHEN secret=1 THEN '' ELSE value END,secret,description FROM environment_variables WHERE scope=? AND owner_id=? ORDER BY name", scope, owner)
 		if err != nil {
 			return err
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var v EnvironmentVariable
-			if err := rows.Scan(&v.Name, &v.Value, &v.Secret); err != nil {
+			if err := rows.Scan(&v.Name, &v.Value, &v.Secret, &v.Description); err != nil {
 				return err
 			}
 			values = append(values, v)

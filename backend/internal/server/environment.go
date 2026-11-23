@@ -15,7 +15,7 @@ func (a *api) environmentRoutes(mux *http.ServeMux) {
 				return
 			}
 			var changes []storage.EnvironmentChange
-			if method == "POST" && !decodeLimit(w, r, &changes, 256<<10) {
+			if method == "POST" && !decodeLimit(w, r, &changes, 512<<10) {
 				return
 			}
 			values, err := a.settings.Store.PreviewEnvironment(r.Context(), r.PathValue("id"), changes)
@@ -48,7 +48,7 @@ func (a *api) environmentRoutes(mux *http.ServeMux) {
 				}
 				if method == "PATCH" {
 					var changes []storage.EnvironmentChange
-					if !decodeLimit(w, r, &changes, 256<<10) {
+					if !decodeLimit(w, r, &changes, 512<<10) {
 						return
 					}
 					if err := a.settings.Store.SaveEnvironment(r.Context(), route.scope, owner, changes); err != nil {

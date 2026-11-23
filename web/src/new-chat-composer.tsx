@@ -2,9 +2,6 @@ import { useRef, useState, type SubmitEvent } from "react";
 
 import {
   Button,
-  Dialog,
-  DialogContent,
-  DialogTitle,
   DropdownButton,
   DropdownMenu,
   DropdownMenuTrigger,
@@ -22,7 +19,8 @@ import {
 
 import { ChatBranchPicker } from "./chat-branch-picker";
 import { Composer } from "./composer";
-import { EnvironmentEditor, type EnvironmentChange } from "./environment";
+import { EnvironmentDialog } from "./environment-dialog";
+import type { EnvironmentChange } from "./environment-import";
 
 const environmentDrafts = new Map<string, EnvironmentChange[]>();
 
@@ -79,23 +77,15 @@ export function NewChatComposer({
       className="chat-composer new-chat-composer"
     >
       <input type="hidden" name="environment" value={JSON.stringify(environment)} />
-      <Dialog open={environmentOpen} onOpenChange={setEnvironmentOpen}>
-        <DialogContent
-          finalFocus={settingsButton}
-          className="max-h-[85dvh] overflow-y-auto sm:max-w-xl"
-        >
-          <DialogTitle>Environment variables</DialogTitle>
-          <EnvironmentEditor
-            path={`projects/${encodeURIComponent(selectedProject?.id ?? "")}/environment/effective`}
-            draft={environment}
-            onEditing={editEnvironment}
-            onDraft={(changes) => {
-              editEnvironment(changes);
-              setEnvironmentOpen(false);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
+      <EnvironmentDialog
+        open={environmentOpen}
+        onOpenChange={setEnvironmentOpen}
+        path={`projects/${encodeURIComponent(scope)}/environment/effective`}
+        projectPath={`projects/${encodeURIComponent(scope)}/environment`}
+        draft={environment}
+        onDraft={editEnvironment}
+        finalFocus={settingsButton}
+      />
       <div className="composer-topbar">
         <input type="hidden" name="project" value={selectedProject?.id ?? ""} />
         <DropdownMenu

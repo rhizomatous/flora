@@ -327,6 +327,16 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		if err := store.SaveEnvironment(ctx, "installation", "", []storage.EnvironmentChange{{Name: "TASK_REGION", Action: "set", Value: "preview-region"}, {Name: "SERVICE_TOKEN", Action: "replace", Value: "fixture_preview_secret_124", Secret: true}}); err != nil {
 			return nil, err
 		}
+		projects, err := store.Projects(ctx)
+		if err != nil {
+			return nil, err
+		}
+		description := "Staging deployment credentials"
+		for _, project := range projects {
+			if err := store.SaveEnvironment(ctx, "project", project.ID, []storage.EnvironmentChange{{Name: "DEPLOY_TOKEN", Action: "replace", Value: "fixture_preview_deploy_token", Secret: true, Description: &description}, {Name: "DEPLOY_REGION", Action: "set", Value: "staging"}}); err != nil {
+				return nil, err
+			}
+		}
 	}
 	srv := httptest.NewUnstartedServer(nil)
 	origin := "https://" + srv.Listener.Addr().String()
