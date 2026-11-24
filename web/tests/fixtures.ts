@@ -25,6 +25,7 @@ type Fixtures = {
     | "changes"
     | "enrollment"
     | "credential-setup"
+    | "passkeys"
     | "notifications"
     | "projects"
     | "settings";

@@ -25,9 +25,12 @@ try {
   const base = server.resolvedUrls?.local[0];
   assert.ok(base !== undefined && base !== "");
   const page = await browser.newPage();
+  page.setDefaultTimeout(15_000);
+  page.setDefaultNavigationTimeout(30_000);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const openExample = async (name: string) => {
+    console.log(`Florets: checking ${name}`);
     await page.goto(`${base}example.html?component=${name}`, { waitUntil: "domcontentloaded" });
     await expect(
       page.locator(name.startsWith("sidebar") ? "main" : '[data-slot="example"]').first(),
@@ -207,6 +210,7 @@ try {
     await page.keyboard.press("Escape");
   }
 
+  console.log("Florets: checking editable text, textarea, and input-group focus");
   for (const theme of ["dark", "light"]) {
     await page.goto(`${base}example.html?component=editable-text&theme=${theme}`, {
       waitUntil: "domcontentloaded",

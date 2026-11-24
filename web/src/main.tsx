@@ -1,21 +1,18 @@
 /* oxlint-disable import/max-dependencies -- App composes workspace navigation alongside its routed views. */
-import { StrictMode, useEffect, useEffectEvent, useRef, useState } from "react";
+import { StrictMode, useEffect, useEffectEvent, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import {
   Alert,
   Button,
-  FieldLabel,
-  Heading,
-  Input,
   LoadingStatus,
-  Text,
   Toaster,
   Wordmark,
   SidebarProvider,
   SidebarInset,
 } from "@flora/florets";
 
+import { Account } from "./account";
 import { statusSchema, authenticatedSchema, type Status } from "./auth-schemas";
 import { Automations } from "./automations";
 import { FolderProvider } from "./chat-folders";
@@ -32,7 +29,6 @@ import { settingsSchema, type Settings } from "./settings-schemas";
 import { redeemSetupLink } from "./setup-link";
 import { Sidebar } from "./sidebar";
 import { CompletionToasts } from "./toasts";
-import { text } from "./ui";
 
 import "./styles.css";
 
@@ -51,86 +47,6 @@ let setupExchange = openSetupLink();
 
 const currentPath = () => window.location.hash.slice(1) || "chats/new";
 
-/** Creates the administrator on first run, otherwise logs in. */
-function Account({
-  setupRequired,
-  setupAuthorized,
-  busy,
-  run,
-  onLogin,
-}: {
-  setupRequired: boolean;
-  setupAuthorized?: boolean;
-  busy: boolean;
-  run: (task: () => Promise<void>, fallback: string) => Promise<void>;
-  onLogin: () => Promise<void>;
-}) {
-  const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => {
-    heading.current?.focus();
-  }, []);
-  if (setupRequired && setupAuthorized !== true) {
-    return (
-      <section aria-labelledby="account-heading">
-        <Heading level={1} ref={heading} tabIndex={-1} id="account-heading">
-          Open your setup link
-        </Heading>
-        <Text tone="muted" className="mt-3">
-          Use the Flora setup URL from your installer terminal or ask the host owner for a new link.
-        </Text>
-      </section>
-    );
-  }
-  const action = setupRequired ? "Create administrator" : "Log in";
-
-  function submit(event: React.SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const password = text(new FormData(form), "password");
-    void run(async () => {
-      await request(authenticatedSchema, `auth/${setupRequired ? "bootstrap" : "login"}`, {
-        method: "POST",
-        body: {
-          password,
-        },
-      });
-      form.reset();
-      await onLogin();
-    }, "Request failed. Try again.");
-  }
-
-  return (
-    <section aria-labelledby="account-heading">
-      <Heading level={1} ref={heading} tabIndex={-1} id="account-heading">
-        {action}
-      </Heading>
-      <Text tone="muted" className="mt-3">
-        {setupRequired
-          ? "Choose a unique password of at least 12 characters."
-          : "Enter your administrator password."}
-      </Text>
-      <form className="mt-8 space-y-6" onSubmit={submit}>
-        <FieldLabel className="w-full flex-col items-start">
-          Password
-          <Input
-            className="mt-2"
-            type="password"
-            name="password"
-            autoComplete={setupRequired ? "new-password" : "current-password"}
-            minLength={setupRequired ? 12 : undefined}
-            maxLength={1024}
-            required
-            disabled={busy}
-          />
-        </FieldLabel>
-        <Button type="submit" disabled={busy}>
-          {busy ? "Please wait…" : action}
-        </Button>
-      </form>
-    </section>
-  );
-}
-
 function App() {
   const [status, setStatus] = useState<Status>();
   const [settings, setSettings] = useState<Settings>();
@@ -139,7 +55,8 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [path, setPath] = useState(currentPath);
   const [automationTopbar, setAutomationTopbar] = useState<HTMLDivElement | null>(null);
-  const ready = status?.authenticated === true && settings !== undefined;
+  const ready =
+    status?.authenticated === true && !status.recoveryAuthorized && settings !== undefined;
 
   // Re-reads the session so an expired one shows the login screen. A failure here keeps the
   // current view; the action that prompted the check has already reported its own error.
@@ -173,7 +90,10 @@ function App() {
   const loadOnMount = useEffectEvent(load);
   useEffect(() => {
     const changed = () => {
-      if (window.location.hash.startsWith("#setup/")) {
+      if (
+        window.location.hash.startsWith("#setup/") ||
+        window.location.hash.startsWith("#recover/")
+      ) {
         setupExchange = openSetupLink();
         void loadOnMount();
       }
@@ -322,11 +242,10 @@ function App() {
                 Retry loading Flora
               </Button>
             ))}
-          {status?.authenticated === false && (
+          {status && (!status.authenticated || status.recoveryAuthorized) && (
             <Account
-              key={`${String(status.setupRequired)}-${String(status.setupAuthorized)}`}
-              setupRequired={status.setupRequired}
-              setupAuthorized={status.setupAuthorized}
+              key={`${String(status.setupRequired)}-${String(status.setupAuthorized)}-${String(status.recoveryAuthorized)}`}
+              status={status}
               busy={busy}
               run={run}
               onLogin={refresh}

@@ -1,3 +1,5 @@
+import type { Route } from "@playwright/test";
+
 import { test, expect } from "../fixtures.ts";
 import { logIn, pageErrors } from "../helpers.ts";
 
@@ -68,14 +70,17 @@ test("compaction row opens a focused dialog with saved settings and draft recove
   await expect(page.getByText("This model has no explicit input limit.", { exact: false })).toHaveCount(0);
   const restored = await page.request.patch(`/api/chats/${backend.chatID}/model`, { headers: { Origin: origin }, data: { execution: { provider: "anthropic", model: "compaction-fixture", variant: "" }, revision: (await changed.json()).ExecutionRevision } });
   expect(restored.status()).toBe(200);
-  await page.route("**/api/chats/*/compaction", async (route) => {
+  const missingLimit = async (route: Route) => {
     const response = await route.fetch();
     const body = await response.json();
     await route.fulfill({ response, json: { ...body, maximum: null } });
-  }, { times: 1 });
+  };
+  // Model discovery can cancel the first request and reload these settings.
+  await page.route("**/api/chats/*/compaction", missingLimit);
   await page.reload(); await trigger.click(); await row.click();
   await expect(field).toHaveValue("25,000");
   await expect(field).toBeDisabled();
+  await page.unroute("**/api/chats/*/compaction", missingLimit);
   await page.getByRole("button", { name: "Reset to default", exact: true }).click();
   await expect(field).toHaveValue("82,000");
   await page.getByRole("button", { name: "Save", exact: true }).click();

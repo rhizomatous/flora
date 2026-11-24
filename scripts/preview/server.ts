@@ -356,6 +356,16 @@ export function chatPreview(): Plugin {
       json(res, { authenticated: true, setupRequired: false });
       return;
     }
+    if (url.pathname === "/api/auth/passkeys") {
+      json(res, {
+        passkeys: [],
+        recent: false,
+        passwordAvailable: false,
+        origin: "https://flora.example.com",
+        available: false,
+      });
+      return;
+    }
     if (url.pathname === "/api/models") {
       const chatID = url.searchParams.get("chat");
       if (chatID !== null && !scenarios.some((scenario) => scenario.id === chatID)) {

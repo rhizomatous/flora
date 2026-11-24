@@ -55,8 +55,11 @@ func (s *Store) bootstrap(ctx context.Context, passwordHash, tokenHash string, e
 		if _, err := tx.ExecContext(ctx, "DELETE FROM setup_access"); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, "INSERT INTO browser_sessions VALUES(?,?)", tokenHash, expires.Unix())
-		return err
+		at := time.Now()
+		if setup != nil {
+			at = setup.at
+		}
+		return insertSession(ctx, tx, tokenHash, expires, at)
 	})
 }
 
@@ -65,8 +68,7 @@ func (s *Store) CreateSession(ctx context.Context, tokenHash string, expires tim
 		if _, err := tx.ExecContext(ctx, "DELETE FROM browser_sessions WHERE expires_at<=?", time.Now().Unix()); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, "INSERT INTO browser_sessions VALUES(?,?)", tokenHash, expires.Unix())
-		return err
+		return insertSession(ctx, tx, tokenHash, expires, time.Now())
 	})
 }
 

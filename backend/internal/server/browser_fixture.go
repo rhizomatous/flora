@@ -46,7 +46,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		return newShellBrowserInstance()
 	}
 	switch scenario {
-	case "mcps", "compaction", "model-summary", "models", "chat", "changes", "enrollment", "credential-setup", "notifications", "projects", "settings", "workspace", "branches", "context":
+	case "mcps", "compaction", "model-summary", "models", "chat", "changes", "enrollment", "credential-setup", "passkeys", "notifications", "projects", "settings", "workspace", "branches", "context":
 	default:
 		return nil, fmt.Errorf("unknown browser scenario %q", scenario)
 	}
@@ -70,7 +70,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}()
 	var authentication *auth.Service
 	var fixture *testfixture.Fixture
-	if scenario == "enrollment" || scenario == "credential-setup" {
+	if scenario == "enrollment" || scenario == "credential-setup" || scenario == "passkeys" {
 		store, err = storage.Open(ctx, filepath.Join(directory, "data"))
 		if err != nil {
 			return nil, err
@@ -347,11 +347,18 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}
 	srv := httptest.NewUnstartedServer(nil)
 	origin := "https://" + srv.Listener.Addr().String()
+	if scenario == "passkeys" {
+		origin = strings.Replace(origin, "127.0.0.1", "localhost", 1)
+	}
 	if scenario == "mcps" || scenario == "compaction" || scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
 		origin = "http://" + srv.Listener.Addr().String()
 		if scenario == "branches" {
 			origin = strings.Replace(origin, "127.0.0.1", "localhost", 1)
 		}
+	}
+	var authAge atomic.Int64
+	if scenario == "passkeys" {
+		authentication.Now = func() time.Time { return time.Now().Add(time.Duration(authAge.Load()) * time.Second) }
 	}
 	var app http.Handler
 	if fixture == nil {
@@ -435,6 +442,17 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 			w.WriteHeader(204)
 		})
 	}
+	if scenario == "passkeys" {
+		mux.HandleFunc("POST /__fixture/auth-age", func(w http.ResponseWriter, r *http.Request) { authAge.Store(360); w.WriteHeader(204) })
+		mux.HandleFunc("POST /__fixture/recovery", func(w http.ResponseWriter, r *http.Request) {
+			proof := auth.NewSetupToken()
+			if err := store.SaveRecoveryLink(r.Context(), auth.TokenHash(proof), time.Now().Add(15*time.Minute)); err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
+			jsonResponse(w, 200, map[string]string{"link": origin + "/#recover/" + proof})
+		})
+	}
 	mux.Handle("/", app)
 	srv.Config.Handler = mux
 	if scenario == "mcps" || scenario == "compaction" || scenario == "model-summary" || scenario == "models" || scenario == "workspace" || scenario == "branches" || scenario == "context" {
@@ -444,7 +462,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}
 	cleanup = append(cleanup, func() { srv.CloseClientConnections(); srv.Close() })
 	instance.URL = srv.URL
-	if scenario == "branches" {
+	if scenario == "branches" || scenario == "passkeys" {
 		instance.URL = strings.Replace(instance.URL, "127.0.0.1", "localhost", 1)
 	}
 	return instance, nil

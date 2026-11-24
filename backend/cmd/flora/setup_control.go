@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rhizomatous/flora/backend/internal/auth"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
@@ -43,7 +44,7 @@ func serveSetupControl(store *storage.Store, dir, origin string) (func(), error)
 	}
 	var mu sync.Mutex
 	mux := http.NewServeMux()
-	for _, action := range []string{"show", "replace"} {
+	for _, action := range []string{"show", "replace", "recover"} {
 		mux.HandleFunc("POST /"+action, func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Cache-Control", "no-store")
 			if r.Header.Get("Origin") != origin {
@@ -52,7 +53,13 @@ func serveSetupControl(store *storage.Store, dir, origin string) (func(), error)
 			}
 			mu.Lock()
 			defer mu.Unlock()
-			link, err := deploymentSetup(r.Context(), store, dir, origin, action == "replace")
+			var link string
+			var err error
+			if action == "recover" {
+				link, err = accountRecoveryLink(r.Context(), store, origin)
+			} else {
+				link, err = deploymentSetup(r.Context(), store, dir, origin, action == "replace")
+			}
 			if err != nil {
 				http.Error(w, "Could not prepare setup link.", http.StatusInternalServerError)
 				return
@@ -108,7 +115,7 @@ func requestSetupLink(ctx context.Context, dir, origin, action string) (string, 
 }
 
 func setupLinkCommand(ctx context.Context, root, keyFile, origin, action string) error {
-	if action != "show" && action != "replace" {
+	if action != "show" && action != "replace" && action != "recover" {
 		return errors.New("use -setup-link show or -setup-link replace")
 	}
 	// Open the terminal before changing state. Never print ownership proof to
@@ -127,7 +134,11 @@ func setupLinkCommand(ctx context.Context, root, keyFile, origin, action string)
 		}
 		defer unlock()
 		defer store.Close()
-		link, err = deploymentSetup(ctx, store, dir, origin, action == "replace")
+		if action == "recover" {
+			link, err = accountRecoveryLink(ctx, store, origin)
+		} else {
+			link, err = deploymentSetup(ctx, store, dir, origin, action == "replace")
+		}
 	}
 	if err != nil {
 		return err
@@ -135,7 +146,17 @@ func setupLinkCommand(ctx context.Context, root, keyFile, origin, action string)
 	if link == "" {
 		_, err = fmt.Fprintln(tty, "No active setup link. An administrator exists or the link expired.")
 	} else {
-		_, err = fmt.Fprintf(tty, "Flora setup URL: %s\n", link)
+		_, err = fmt.Fprintf(tty, "Flora account URL: %s\n", link)
 	}
 	return err
+}
+
+// accountRecoveryLink is called only through private host control or while holding
+// the deployment lock offline. Replacing the proof invalidates all older links.
+func accountRecoveryLink(ctx context.Context, store *storage.Store, origin string) (string, error) {
+	secret := auth.NewSetupToken()
+	if err := store.SaveRecoveryLink(ctx, auth.TokenHash(secret), time.Now().Add(15*time.Minute)); err != nil {
+		return "", err
+	}
+	return origin + "/#recover/" + secret, nil
 }
