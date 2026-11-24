@@ -469,7 +469,7 @@ func TestFirstConnectionDiscoversDefaultAndFailuresSaveNothing(t *testing.T) {
 	}
 }
 
-func TestAppConnectionSurvivesIndependentProviderAndPATSaves(t *testing.T) {
+func TestAppConnectionSurvivesProviderChanges(t *testing.T) {
 	ctx := context.Background()
 	store, err := storage.Open(ctx, t.TempDir())
 	if err != nil {
@@ -484,7 +484,6 @@ func TestAppConnectionSurvivesIndependentProviderAndPATSaves(t *testing.T) {
 	service.Validate = func(context.Context, storage.Credentials) error { return nil }
 	for _, input := range []Input{
 		{Provider: "openai", Model: "model-one", ProviderKey: "openai-fixture-key"},
-		{GitHubToken: "github_pat_fixture"},
 		{Provider: "google", Model: "model-two", ProviderKey: "google-fixture-key"},
 		{Provider: "openai", Model: "model-three"},
 	} {
@@ -501,7 +500,7 @@ func TestAppConnectionSurvivesIndependentProviderAndPATSaves(t *testing.T) {
 		t.Fatal(view, err)
 	}
 	credentials, err := store.Credentials(ctx)
-	if err != nil || credentials.GitHubToken != "github_pat_fixture" || credentials.ProviderKey != "openai-fixture-key" {
+	if err != nil || credentials.GitHubToken != "" || credentials.ProviderKey != "openai-fixture-key" {
 		t.Fatal("independent credentials changed", err)
 	}
 }

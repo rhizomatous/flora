@@ -9,7 +9,7 @@ import (
 )
 
 // GitHubApp contains host-only credentials. Never serialize it to browser or
-// container responses. Enabled installations take precedence over a saved PAT.
+// container responses. An inactive App retains its registration but denies access.
 type GitHubApp struct {
 	ID             int64
 	Slug           string
@@ -25,13 +25,17 @@ type GitHubApp struct {
 func (s *Store) GitHubApp(ctx context.Context) (GitHubApp, error) {
 	s.secretMu.Lock()
 	defer s.secretMu.Unlock()
+	return readGitHubApp(ctx, s.db, s.secrets)
+}
+
+func readGitHubApp(ctx context.Context, reader settingsReader, box *secretBox) (GitHubApp, error) {
 	var app GitHubApp
 	var raw string
-	err := s.db.QueryRowContext(ctx, "SELECT credentials FROM github_app WHERE id=1").Scan(&raw)
+	err := reader.QueryRowContext(ctx, "SELECT credentials FROM github_app WHERE id=1").Scan(&raw)
 	if err != nil {
 		return app, found(err)
 	}
-	raw, err = s.secrets.open(raw, "github_app:1")
+	raw, err = box.open(raw, "github_app:1")
 	if err == nil {
 		err = json.Unmarshal([]byte(raw), &app)
 	}
@@ -51,6 +55,26 @@ func (s *Store) SaveGitHubApp(ctx context.Context, app GitHubApp) error {
 	s.secretMu.Lock()
 	defer s.secretMu.Unlock()
 	return s.write(ctx, func(tx *sql.Tx) error { return s.saveGitHubApp(ctx, tx, app) })
+}
+
+// UnlinkGitHubInstallation clears repository access and pending callbacks together.
+// The encrypted App registration remains available for a later reconnection.
+func (s *Store) UnlinkGitHubInstallation(ctx context.Context) error {
+	s.secretMu.Lock()
+	defer s.secretMu.Unlock()
+	return s.write(ctx, func(tx *sql.Tx) error {
+		app, err := readGitHubApp(ctx, tx, s.secrets)
+		if err != nil {
+			return err
+		}
+		app.Enabled, app.Pending = false, false
+		app.InstallationID, app.Account = 0, ""
+		if err := s.saveGitHubApp(ctx, tx, app); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, "DELETE FROM github_setup")
+		return err
+	})
 }
 
 // BeginGitHubSetup replaces the previous attempt. Only digests are persisted;
@@ -112,8 +136,8 @@ func (s *Store) GitHubConfigured(ctx context.Context) (bool, error) {
 	if err != nil && !errors.Is(err, ErrNotFound) {
 		return false, err
 	}
-	if app.Enabled && app.InstallationID > 0 {
-		return true, nil
+	if err == nil {
+		return app.Enabled && app.InstallationID > 0, nil
 	}
 	c, err := s.Credentials(ctx)
 	if errors.Is(err, ErrNotFound) {

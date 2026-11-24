@@ -56,7 +56,7 @@ func TestGitHubRoutesRequireLiveInitiatingSession(t *testing.T) {
 		t.Fatal("manifest submission blocked")
 	}
 	landing := call("GET", "/github/callback?code=code&state=untrusted", "", "", "")
-	if landing.Code != 303 || !strings.HasSuffix(landing.Header().Get("Location"), "#settings") {
+	if landing.Code != 303 || !strings.HasSuffix(landing.Header().Get("Location"), "#connections/github") {
 		t.Fatal(landing.Code, landing.Body)
 	}
 	if _, err := store.GitHubApp(ctx); err != storage.ErrNotFound {

@@ -1,20 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
-import {
-  Button,
-  Section,
-  SectionHeader,
-  SectionStack,
-  SettingsGroup,
-  SettingsRow,
-  Heading,
-  Input,
-  Text,
-} from "@flora/florets";
+import { Button, Section, SectionStack, Heading, Text } from "@flora/florets";
 
 import { AccountSettings } from "./account-settings";
 import { EnvironmentEditor } from "./environment";
-import { GitHubConnection } from "./github-connection";
 import { readPreferences } from "./preferences";
 import { request } from "./request";
 import { PreferenceFields } from "./settings";
@@ -24,9 +13,8 @@ import {
   type Settings,
   type Diagnostic,
 } from "./settings-schemas";
-import { text } from "./ui";
 
-/** Edits provider connections, the default model, and installation preferences. */
+/** Edits account settings and installation preferences. */
 export function Installation({
   settings,
   busy,
@@ -38,28 +26,24 @@ export function Installation({
   run: (task: () => Promise<void>, fallback: string) => Promise<void>;
   onSaved: (settings: Settings) => void;
 }) {
-  const [githubRevision, setGithubRevision] = useState(0);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus();
   }, []);
 
-  function save(connection: "github" | "preferences", event: React.SubmitEvent<HTMLFormElement>) {
+  function save(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const fields = new FormData(form);
+    const fields = new FormData(event.currentTarget);
     void run(async () => {
-      const body =
-        connection === "github"
-          ? { githubToken: text(fields, "githubToken") }
-          : { preferences: readPreferences(fields) };
-      const next = await request(settingsSchema, "settings", { method: "PUT", body });
-      onSaved(next);
-      if (connection === "github") setGithubRevision((value) => value + 1);
+      onSaved(
+        await request(settingsSchema, "settings", {
+          method: "PUT",
+          body: { preferences: readPreferences(fields) },
+        }),
+      );
       setDiagnostics(undefined);
-      form.reset();
-    }, "Request failed. Try again.");
+    }, "Could not save preferences.");
   }
 
   function diagnose() {
@@ -78,7 +62,10 @@ export function Installation({
       <Heading level={1} ref={heading} tabIndex={-1} id="settings-heading">
         Installation settings
       </Heading>
-      <nav aria-label="Settings pages" className="mt-4 flex gap-4 text-sm">
+      <nav aria-label="Settings pages" className="mt-4 flex flex-wrap gap-4 text-sm">
+        <a href="#connections" className="underline">
+          Connections
+        </a>
         <a href="#models" className="underline">
           Models
         </a>
@@ -89,49 +76,11 @@ export function Installation({
       <SectionStack className="mt-8">
         <AccountSettings busy={busy} run={run} />
         <Section>
-          <GitHubConnection key={githubRevision} busy={busy} run={run} onSaved={onSaved} />
-        </Section>
-        <Section>
-          <SectionHeader inset>
-            <Heading level={2}>Personal access token</Heading>
-          </SectionHeader>
-          <form
-            aria-label="GitHub connection"
-            className="space-y-4"
-            onSubmit={(event) => {
-              save("github", event);
-            }}
-          >
-            <SettingsGroup>
-              <SettingsRow
-                label="Fine-grained personal access token"
-                htmlFor="github-token"
-                description="Restrict the token to the repositories Flora will use"
-                descriptionId="github-help"
-              >
-                <Input
-                  id="github-token"
-                  type="password"
-                  name="githubToken"
-                  autoComplete="off"
-                  disabled={busy}
-                  required
-                  maxLength={4096}
-                  aria-describedby="github-help"
-                />
-              </SettingsRow>
-            </SettingsGroup>
-            <Button type="submit" disabled={busy}>
-              Validate and save GitHub
-            </Button>
-          </form>
-        </Section>
-        <Section>
           <form
             aria-label="Installation preferences"
             className="space-y-4"
             onSubmit={(event) => {
-              save("preferences", event);
+              save(event);
             }}
           >
             <PreferenceFields

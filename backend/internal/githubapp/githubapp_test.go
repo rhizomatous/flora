@@ -95,10 +95,8 @@ func TestManifestBindingAndResumption(t *testing.T) {
 	if saved.PrivateKey != app.PrivateKey || saved.Enabled {
 		t.Fatal("partial app not retained")
 	}
-	token, err := s.Token(ctx)
-	require(t, err)
-	if token != "github_pat_fixture" {
-		t.Fatal("PAT replaced before installation")
+	if _, err := s.Token(ctx); !errors.Is(err, storage.ErrNotFound) {
+		t.Fatal("unfinished app allowed repository access", err)
 	}
 	// A new browser session can resume the saved app without another conversion.
 	resume, err := s.Start(ctx, "new-session", "https://flora.test")
@@ -182,7 +180,7 @@ func TestInstallationApprovalAndRecovery(t *testing.T) {
 	}
 }
 
-func TestTokenRenewalAndPATCompatibility(t *testing.T) {
+func TestTokenRenewalAndInstallationChanges(t *testing.T) {
 	ctx := context.Background()
 	s, app := fixture(t)
 	app.Enabled = true
@@ -221,18 +219,21 @@ func TestTokenRenewalAndPATCompatibility(t *testing.T) {
 	if count != 3 {
 		t.Fatal("did not renew rejected token")
 	}
-	require(t, s.Store.SaveCredentials(ctx, storage.Credentials{GitHubToken: "github_pat_saved", Provider: "openai", Model: "model", ProviderKey: "provider-key"}))
-	require(t, s.UsePAT(ctx))
+	app.InstallationID = 41
+	require(t, s.Store.SaveGitHubApp(ctx, app))
+	s.Client.Transport = transport(func(r *http.Request) (*http.Response, error) {
+		count++
+		if r.URL.Path != "/app/installations/41/access_tokens" {
+			t.Fatal("old installation cached", r.URL)
+		}
+		return reply(201, map[string]any{"token": "ghs_new_installation", "expires_at": time.Now().Add(time.Hour)}), nil
+	})
 	token, err := s.Token(ctx)
 	require(t, err)
-	if token != "github_pat_saved" || count != 3 {
-		t.Fatal("PAT fallback failed")
+	if token != "ghs_new_installation" || count != 4 {
+		t.Fatal("installation change did not renew token")
 	}
-	saved, err := s.Store.GitHubApp(ctx)
-	require(t, err)
-	if saved.PrivateKey != app.PrivateKey {
-		t.Fatal("PAT switch discarded reusable app")
-	}
+
 }
 
 func TestRepositoriesAndPrivateFailures(t *testing.T) {
@@ -269,5 +270,44 @@ func TestRepositoriesAndPrivateFailures(t *testing.T) {
 	})
 	if _, err := s.Repositories(ctx, 1); err != ErrRemote {
 		t.Fatal("redirect accepted", err)
+	}
+}
+
+func TestDisconnectRetainsAppAndRejectsLateCallbacks(t *testing.T) {
+	ctx := context.Background()
+	s, app := fixture(t)
+	app.Enabled = true
+	app.InstallationID = 40
+	app.Account = "garden"
+	require(t, s.Store.SaveGitHubApp(ctx, app))
+	require(t, s.Store.SaveCredentials(ctx, storage.Credentials{GitHubToken: "github_pat_unused_fixture"}))
+	s.Client.Transport = transport(func(r *http.Request) (*http.Response, error) {
+		return reply(201, map[string]any{"token": "ghs_fixture_token", "expires_at": time.Now().Add(time.Hour)}), nil
+	})
+	_, err := s.Token(ctx)
+	require(t, err)
+	start, err := s.Start(ctx, "admin", "https://flora.test")
+	require(t, err)
+	require(t, s.Disconnect(ctx))
+	configured, err := s.Store.GitHubConfigured(ctx)
+	require(t, err)
+	if configured {
+		t.Fatal("disconnected App reports repository access")
+	}
+	if _, err := s.Token(ctx); !errors.Is(err, storage.ErrNotFound) {
+		t.Fatal("disconnected App reused a credential", err)
+	}
+	if err := s.Complete(ctx, "admin", Callback{State: setupState(t, start), InstallationID: 40}); !errors.Is(err, ErrSetup) {
+		t.Fatal("late callback restored access", err)
+	}
+	saved, err := s.Store.GitHubApp(ctx)
+	require(t, err)
+	if saved.PrivateKey != app.PrivateKey || saved.ID != app.ID || saved.Slug != app.Slug || saved.InstallationID != 0 || saved.Enabled {
+		t.Fatal("App registration was lost or access retained")
+	}
+	next, err := s.Start(ctx, "admin", "https://flora.test")
+	require(t, err)
+	if next.Manifest != "" || !strings.Contains(next.URL, "/apps/flora-fixture/installations/new") {
+		t.Fatal("reconnect created a second App")
 	}
 }

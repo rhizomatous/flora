@@ -26,7 +26,7 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
-var ErrSetup = errors.New("GitHub setup expired or belongs to another session. Resume Connect GitHub from installation settings.")
+var ErrSetup = errors.New("GitHub setup expired or belongs to another session. Resume GitHub setup from the Connections page.")
 var ErrRemote = errors.New("GitHub connection unavailable. Check GitHub access and host networking, then retry.")
 var slugPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]{0,99}$`)
 var codePattern = regexp.MustCompile(`^[a-zA-Z0-9_\-]{1,200}$`)
@@ -107,8 +107,8 @@ func appJWT(app storage.GitHubApp, now time.Time) (string, error) {
 	return raw + "." + base64.RawURLEncoding.EncodeToString(sig), nil
 }
 
-// Token chooses the active App installation or the saved PAT. Cached tokens are
-// renewed before expiry; changing the installation or key invalidates the cache.
+// Token reads the active host credential for each request and renews App tokens
+// before expiry. An App without an active installation grants no repository access.
 func (s *Service) Token(ctx context.Context) (string, error) {
 	return s.TokenWithClient(ctx, s.Client)
 }
@@ -121,7 +121,7 @@ func (s *Service) TokenWithClient(ctx context.Context, client *http.Client) (str
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return "", err
 	}
-	if !app.Enabled {
+	if errors.Is(err, storage.ErrNotFound) {
 		c, err := s.Store.Credentials(ctx)
 		if err != nil {
 			return "", err
@@ -131,7 +131,7 @@ func (s *Service) TokenWithClient(ctx context.Context, client *http.Client) (str
 		}
 		return c.GitHubToken, nil
 	}
-	if app.InstallationID <= 0 {
+	if !app.Enabled || app.InstallationID <= 0 {
 		return "", storage.ErrNotFound
 	}
 	identity := sha256.Sum256([]byte(fmt.Sprintf("%d:%d:%s", app.ID, app.InstallationID, app.PrivateKey)))
@@ -260,8 +260,9 @@ func (s *Service) Complete(ctx context.Context, session string, in Callback) err
 }
 
 type Installation struct {
-	ID      int64 `json:"id"`
-	AppID   int64 `json:"app_id"`
+	HTMLURL string `json:"html_url,omitempty"`
+	ID      int64  `json:"id"`
+	AppID   int64  `json:"app_id"`
 	Account struct {
 		Login string `json:"login"`
 	} `json:"account"`
@@ -286,21 +287,12 @@ type View struct {
 	Slug           string         `json:"slug"`
 	Account        string         `json:"account"`
 	InstallationID int64          `json:"installationID"`
-	PAT            bool           `json:"pat"`
 	Active         string         `json:"active"`
 	Installations  []Installation `json:"installations"`
 }
 
 func (s *Service) View(ctx context.Context) (View, error) {
 	view := View{State: "disconnected", Active: "none", Installations: []Installation{}}
-	c, err := s.Store.Credentials(ctx)
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
-		return view, err
-	}
-	view.PAT = c.GitHubToken != ""
-	if view.PAT {
-		view.Active = "pat"
-	}
 	app, err := s.Store.GitHubApp(ctx)
 	if errors.Is(err, storage.ErrNotFound) {
 		return view, nil
@@ -371,23 +363,15 @@ func (s *Service) Select(ctx context.Context, id int64) error {
 	s.token = ""
 	return s.Store.SaveGitHubApp(ctx, app)
 }
-func (s *Service) UsePAT(ctx context.Context) error {
+
+func (s *Service) Disconnect(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	c, err := s.Store.Credentials(ctx)
-	if err != nil || c.GitHubToken == "" {
-		return storage.ErrNotFound
-	}
-	app, err := s.Store.GitHubApp(ctx)
-	if errors.Is(err, storage.ErrNotFound) {
-		return nil
-	}
-	if err != nil {
+	if err := s.Store.UnlinkGitHubInstallation(ctx); err != nil {
 		return err
 	}
-	app.Enabled = false
 	s.token = ""
-	return s.Store.SaveGitHubApp(ctx, app)
+	return nil
 }
 
 type Repository struct {

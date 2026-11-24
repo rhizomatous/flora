@@ -40,7 +40,7 @@ func (a *api) githubRoutes(mux *http.ServeMux) {
 		}
 		query.Set("github_callback", "1")
 		w.Header().Set("Cache-Control", "no-store")
-		http.Redirect(w, r, "/?"+query.Encode()+"#settings", http.StatusSeeOther)
+		http.Redirect(w, r, "/?"+query.Encode()+"#connections/github", http.StatusSeeOther)
 	})
 	mux.HandleFunc("GET /api/github/connection", func(w http.ResponseWriter, r *http.Request) {
 		view, err := connection.View(r.Context())
@@ -86,8 +86,8 @@ func (a *api) githubRoutes(mux *http.ServeMux) {
 		}
 		jsonResponse(w, 200, map[string]bool{"ok": true})
 	})
-	mux.HandleFunc("POST /api/github/pat", func(w http.ResponseWriter, r *http.Request) {
-		if err := connection.UsePAT(r.Context()); err != nil {
+	mux.HandleFunc("POST /api/github/disconnect", func(w http.ResponseWriter, r *http.Request) {
+		if err := connection.Disconnect(r.Context()); err != nil {
 			githubError(w, err)
 			return
 		}

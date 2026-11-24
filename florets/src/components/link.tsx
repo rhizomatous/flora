@@ -17,10 +17,18 @@ export function Link({ className, children, ...props }: ComponentProps<"a">) {
   );
 }
 
-export function ButtonLink({ className, children, ...props }: ComponentProps<"a">) {
+export function ButtonLink({
+  className,
+  children,
+  variant,
+  size,
+  ...props
+}: ComponentProps<"a"> & Pick<ComponentProps<typeof Button>, "variant" | "size">) {
   return (
     <Button
       role="link"
+      variant={variant}
+      size={size}
       render={<a {...props}>{children}</a>}
       nativeButton={false}
       className={className}

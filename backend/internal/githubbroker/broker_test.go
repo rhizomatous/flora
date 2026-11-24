@@ -314,4 +314,12 @@ func TestAppTokensStayBehindBrokerAndRenewAfterRejection(t *testing.T) {
 	if next.Code != 200 || renewals != 2 || forwards != 2 || strings.Contains(next.Body.String(), "ghs_host_fixture") {
 		t.Fatal("token not renewed safely", next.Code, renewals, forwards)
 	}
+	if err := s.UnlinkGitHubInstallation(ctx); err != nil {
+		t.Fatal(err)
+	}
+	denied := request(b, "GET", "/api/v3/repos/octo/demo", "", fixtureCapability)
+	if denied.Code != 503 || forwards != 2 {
+		t.Fatal("unlink did not stop existing broker access", denied.Code, forwards)
+	}
+
 }

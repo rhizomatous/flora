@@ -88,7 +88,7 @@ func (s *Service) Diagnose(ctx context.Context) []Diagnostic {
 		d := Diagnostic{"GitHub", true, "GitHub installation repositories are accessible."}
 		if _, err := s.GitHub.Repositories(ctx, 1); err != nil {
 			d.OK = false
-			d.Message = "GitHub access is unavailable. Check the installation and selected repositories in installation settings."
+			d.Message = "GitHub access is unavailable. Check the installation and selected repositories on the Connections page."
 		}
 		result = append(result, d)
 	}

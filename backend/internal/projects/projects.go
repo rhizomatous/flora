@@ -148,7 +148,7 @@ func (s *Service) Validate(ctx context.Context, in Input) (Input, error) {
 func (s *Service) githubGet(ctx context.Context, name, endpoint string, branch bool, out any) error {
 	token, err := s.connection.TokenWithClient(ctx, s.Client)
 	if errors.Is(err, storage.ErrNotFound) || (err == nil && token == "") {
-		return invalid("Connect GitHub in installation settings before connecting a project.")
+		return invalid("Connect GitHub on the Connections page before connecting a project.")
 	}
 	if err != nil {
 		return err
@@ -176,7 +176,7 @@ func (s *Service) githubGet(ctx context.Context, name, endpoint string, branch b
 		return nil
 	case 401:
 		s.connection.Invalidate()
-		return invalid("GitHub rejected the connection credential. Check the App installation or token expiry in installation settings.")
+		return invalid("GitHub rejected the connection credential. Check the App installation on the Connections page.")
 	case 403:
 		return invalid("GitHub denied access or rate limited the request. Check connection permissions and try again later.")
 	case 404:

@@ -153,7 +153,7 @@ func TestMissingCredentialsAndEmptyRepository(t *testing.T) {
 	}
 	defer store.Close()
 	s = New(store)
-	if _, err := s.Validate(context.Background(), input("a/b", "main")); err == nil || !strings.Contains(err.Error(), "installation settings") {
+	if _, err := s.Validate(context.Background(), input("a/b", "main")); err == nil || !strings.Contains(err.Error(), "Connections page") {
 		t.Fatal(err)
 	}
 }

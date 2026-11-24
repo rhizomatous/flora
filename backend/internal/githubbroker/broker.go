@@ -121,7 +121,7 @@ func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// without restarting containers or replacing their broker credentials.
 	upstreamToken, err := b.connection.Token(r.Context())
 	if err != nil || upstreamToken == "" {
-		http.Error(w, "GitHub credential unavailable; check installation settings", http.StatusServiceUnavailable)
+		http.Error(w, "GitHub connection unavailable; check the Connections page", http.StatusServiceUnavailable)
 		return
 	}
 	upstream, _ := url.Parse(origin)

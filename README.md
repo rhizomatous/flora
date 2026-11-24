@@ -99,12 +99,11 @@ For an address change, restart Flora with the new `-public-url`, then issue a
 recovery link using that address and enroll a passkey there. Existing passwords
 still work after an address change.
 
-Choose **Connect GitHub** in Settings to create an App you own, then install it
+Open **Connections → GitHub** and choose **Connect GitHub** to create an App you own, then install it
 and select repositories on GitHub. Flora supplies the URLs and saves credentials
-automatically. Settings shows pending organization approvals and available
+automatically. The GitHub page shows pending organization approvals and available
 repositories. App tokens renew on the host; webhooks and a central service are
-not required. Existing fine-grained PAT connections keep working and can switch
-to the App or back to the saved token.
+not required.
 
 Models accepts OpenAI, Anthropic, and Google API keys and discovers their
 available models automatically. Configure multiple providers and choose the
@@ -214,7 +213,7 @@ Every app startup manages an owned private Docker bridge and broker CA, independ
 of browser HTTPS. The broker uses the bridge gateway on TCP 443 and binds to the
 bridge device, requiring root or CAP_NET_RAW plus CAP_NET_BIND_SERVICE. Agents
 receive the private hostname mapping and public CA automatically. The
-App private key, installation tokens, and saved PAT stay on the host. See the installation guide.
+App private key and installation tokens stay on the host. See the installation guide.
 
 After saving installation credentials and connecting a project with one core
 repository, choose **Start chat**. New containers receive the chat's saved model and its provider's key. Replacing a saved key does not change an existing

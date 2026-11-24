@@ -4,7 +4,11 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -148,14 +152,47 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	if scenario == "credential-setup" {
 		configuration.DiscoverModel = func(context.Context, storage.Credentials) (string, error) { return "fixture-model", nil }
 	}
-	configuration.GitHub.Client.Transport = browserTransport(func(r *http.Request) (*http.Response, error) {
-		body := `[{"full_name":"flora/fixture","html_url":"https://github.com/flora/fixture","default_branch":"main"}]`
-		code := 200
-		if r.URL.Path != "/user/repos" {
-			code = 503
-			body = `{}`
+	var appInstalled atomic.Bool
+	var appKey string
+	if scenario == "credential-setup" {
+		key, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			return nil, err
 		}
-		return &http.Response{StatusCode: code, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body))}, nil
+		appKey = string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
+	}
+	configuration.GitHub.Client.Transport = browserTransport(func(r *http.Request) (*http.Response, error) {
+		body := `{}`
+		status := 200
+		installation := map[string]any{"id": 40, "app_id": 12, "account": map[string]string{"login": "flora-fixture"}, "suspended_at": nil, "html_url": "https://github.com/settings/installations/40"}
+		repositories := []map[string]string{{"full_name": "flora/fixture", "html_url": "https://github.com/flora/fixture", "default_branch": "main"}}
+		var result any
+		switch r.URL.Path {
+		case "/user/repos":
+			result = repositories
+		case "/app-manifests/fixture-code/conversions":
+			result = map[string]any{"id": 12, "slug": "flora-fixture", "pem": appKey}
+		case "/app/installations":
+			if appInstalled.Load() {
+				result = []any{installation}
+			} else {
+				result = []any{}
+			}
+		case "/app/installations/40":
+			appInstalled.Store(true)
+			result = installation
+		case "/app/installations/40/access_tokens":
+			result = map[string]any{"token": "fixture-installation-token", "expires_at": time.Now().Add(time.Hour)}
+		case "/installation/repositories":
+			result = map[string]any{"repositories": repositories}
+		default:
+			status = 503
+		}
+		if result != nil {
+			raw, _ := json.Marshal(result)
+			body = string(raw)
+		}
+		return &http.Response{StatusCode: status, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body))}, nil
 	})
 	if scenario == "settings" || scenario == "credential-setup" {
 		configuration.MaxRunningOverride = 4
