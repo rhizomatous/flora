@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { z } from "zod";
 
 import {
+  Alert,
   Button,
   ButtonLink,
   Heading,
@@ -18,7 +19,7 @@ import {
   repositoryPageSchema,
   type GitHubRepository,
 } from "./github-schemas";
-import { request } from "./request";
+import { errorMessage, request } from "./request";
 import { settingsSchema, type Settings } from "./settings-schemas";
 
 function activeLabel(connection: z.infer<typeof connectionSchema>) {
@@ -69,6 +70,7 @@ export function GitHubConnection({
   const [callback, setCallback] = useState(readCallback);
   const [repositories, setRepositories] = useState<GitHubRepository[]>();
   const [nextPage, setNextPage] = useState(0);
+  const [loadError, setLoadError] = useState("");
   const initialized = useRef(false);
 
   async function load() {
@@ -80,6 +82,7 @@ export function GitHubConnection({
       setRepositories(page.repositories);
       setNextPage(page.nextPage);
     }
+    setLoadError("");
   }
   async function complete() {
     if (!callback) return;
@@ -89,14 +92,20 @@ export function GitHubConnection({
     onSaved(await request(settingsSchema, "settings"));
     await load();
   }
-  const initialize = useEffectEvent(() =>
-    run(async () => {
-      if (callback) {
+  const initialize = useEffectEvent(async () => {
+    if (callback) {
+      await run(async () => {
         setConnection(await request(connectionSchema, "github/connection"));
         await complete();
-      } else await load();
-    }, "Could not load GitHub connection."),
-  );
+      }, "Could not finish GitHub setup.");
+    } else {
+      try {
+        await load();
+      } catch (error) {
+        setLoadError(errorMessage(error, "Could not load GitHub connection."));
+      }
+    }
+  });
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
@@ -151,6 +160,11 @@ export function GitHubConnection({
           {connection ? messages[connection.state] : "Loading GitHub connection…"}
         </Text>
       </SectionHeader>
+      {loadError !== "" && (
+        <Alert variant="destructive" role="alert">
+          {loadError}
+        </Alert>
+      )}
       {callback && (
         <Button
           type="button"
