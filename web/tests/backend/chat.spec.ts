@@ -53,13 +53,9 @@ test("chat creation, recovery, controls, and logout", async ({ page, context }) 
   await expect(page.locator('[data-slot="message"]').first()).toBeVisible();
   await expect(page.locator('[data-slot="trace"]').first()).toBeVisible();
   await expect(page.locator('[data-slot="markdown"]').first()).toBeVisible();
-  assert.equal(
-    await page
-      .getByLabel("Conversation")
-      .getByText("First browser prompt 🌸", { exact: true })
-      .count(),
-    1,
-  );
+  await expect(
+    page.getByLabel("Conversation").getByText("First browser prompt 🌸", { exact: true }),
+  ).toHaveCount(1);
   await page
     .getByRole("button", { name: /Work details|Worked for/ })
     .first()
@@ -87,10 +83,9 @@ test("chat creation, recovery, controls, and logout", async ({ page, context }) 
   await expect(page.getByText("Disconnected. Reconnecting…", { exact: true })).toHaveCount(0);
   await page.reload();
   await page.getByText("Saved response 2", { exact: true }).waitFor();
-  assert.equal(
-    await page.getByLabel("Conversation").getByText("Saved response 2", { exact: true }).count(),
-    1,
-  );
+  await expect(
+    page.getByLabel("Conversation").getByText("Saved response 2", { exact: true }),
+  ).toHaveCount(1);
   await page.getByRole("note").filter({ hasText: "transient output may be missing" }).waitFor();
   await page.getByLabel("Follow-up", { exact: true }).fill("interrupt control work");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
@@ -117,13 +112,9 @@ test("chat creation, recovery, controls, and logout", async ({ page, context }) 
   await page.getByLabel("Follow-up", { exact: true }).fill("New explicit work after stop");
   await page.getByRole("button", { name: "Resume", exact: true }).click();
   await page.getByText("Saved response 6", { exact: true }).waitFor();
-  assert.equal(
-    await page
-      .getByLabel("Conversation")
-      .getByText("First browser prompt 🌸", { exact: true })
-      .count(),
-    1,
-  );
+  await expect(
+    page.getByLabel("Conversation").getByText("First browser prompt 🌸", { exact: true }),
+  ).toHaveCount(1);
   await assertFitsPhone(page);
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Sidebar", exact: true })).toBeVisible();
