@@ -187,7 +187,7 @@ func (s *Service) Start(ctx context.Context, session, origin string) (Start, err
 		return Start{URL: "https://github.com/apps/" + app.Slug + "/installations/new?state=" + url.QueryEscape(state)}, nil
 	}
 	manifest, _ := json.Marshal(map[string]any{
-		"name": "Flora", "url": origin, "redirect_url": origin + "/github/callback",
+		"name": "Flora-" + rand.Text()[:12], "url": origin, "redirect_url": origin + "/github/callback",
 		"setup_url": origin + "/github/callback", "setup_on_update": false,
 		"public": true, "request_oauth_on_install": false,
 		"hook_attributes":     map[string]any{"url": origin + "/github/events", "active": false},

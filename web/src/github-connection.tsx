@@ -91,7 +91,10 @@ export function GitHubConnection({
   }
   const initialize = useEffectEvent(() =>
     run(async () => {
-      await (callback ? complete() : load());
+      if (callback) {
+        setConnection(await request(connectionSchema, "github/connection"));
+        await complete();
+      } else await load();
     }, "Could not load GitHub connection."),
   );
   useEffect(() => {
@@ -262,7 +265,7 @@ export function GitHubConnection({
                 description={
                   repositories.length === 0
                     ? "No repositories selected. Choose repositories on GitHub"
-                    : `${repositories.length} repositories`
+                    : `${repositories.length} ${repositories.length === 1 ? "repository" : "repositories"}`
                 }
               >
                 <ButtonLink id="github-connect-project" href="#projects/new">

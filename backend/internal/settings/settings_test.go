@@ -468,3 +468,40 @@ func TestFirstConnectionDiscoversDefaultAndFailuresSaveNothing(t *testing.T) {
 		})
 	}
 }
+
+func TestAppConnectionSurvivesIndependentProviderAndPATSaves(t *testing.T) {
+	ctx := context.Background()
+	store, err := storage.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	app := storage.GitHubApp{ID: 12, Slug: "flora-fixture", PrivateKey: "fixture-host-key", InstallationID: 40, Account: "garden", Enabled: true}
+	if err := store.SaveGitHubApp(ctx, app); err != nil {
+		t.Fatal(err)
+	}
+	service := New(store)
+	service.Validate = func(context.Context, storage.Credentials) error { return nil }
+	for _, input := range []Input{
+		{Provider: "openai", Model: "model-one", ProviderKey: "openai-fixture-key"},
+		{GitHubToken: "github_pat_fixture"},
+		{Provider: "google", Model: "model-two", ProviderKey: "google-fixture-key"},
+		{Provider: "openai", Model: "model-three"},
+	} {
+		if err := service.Save(ctx, input); err != nil {
+			t.Fatal(err)
+		}
+		saved, err := store.GitHubApp(ctx)
+		if err != nil || saved != app {
+			t.Fatal("connection save replaced App credentials", err)
+		}
+	}
+	view, err := service.View(ctx)
+	if err != nil || !view.GitHubConfigured || len(view.Providers) != 2 || view.Provider != "openai" || view.Model != "model-three" {
+		t.Fatal(view, err)
+	}
+	credentials, err := store.Credentials(ctx)
+	if err != nil || credentials.GitHubToken != "github_pat_fixture" || credentials.ProviderKey != "openai-fixture-key" {
+		t.Fatal("independent credentials changed", err)
+	}
+}
