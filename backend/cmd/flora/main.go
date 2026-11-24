@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -37,6 +38,7 @@ func main() {
 	dockerSocket := flag.String("docker-socket", docker.DefaultSocket, "Docker Engine socket on this host")
 	keyFile := flag.String("credential-key-file", "", "private encryption key file outside data-dir (defaults to data-dir.key)")
 	rotateKey := flag.String("rotate-credential-key-to", "", "offline: re-encrypt credentials using this separate key file, then exit")
+	setupLink := flag.String("setup-link", "", "offline: show or replace first-run setup link, then exit (stop Flora first)")
 	flag.Parse()
 	if *keyFile == "" {
 		*keyFile = filepath.Clean(*dataDir) + ".key"
@@ -76,7 +78,7 @@ func main() {
 		slog.Error("Set -public-url to the public HTTPS origin, for example https://flora.example.com; configure your reverse proxy to forward to -listen")
 		os.Exit(1)
 	}
-	if *agentImage == "" {
+	if *agentImage == "" && *setupLink == "" {
 		slog.Error("An agent image is required for the managed private runtime")
 		os.Exit(1)
 	}
@@ -93,13 +95,40 @@ func main() {
 			slog.Error("Storage close failed", "error", err)
 		}
 	}()
+	if *setupLink != "" {
+		if *setupLink != "show" && *setupLink != "replace" {
+			slog.Error("Use -setup-link show or -setup-link replace")
+			os.Exit(1)
+		}
+		// Never write the ownership secret to redirected stdout or service logs.
+		tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
+		if err != nil {
+			slog.Error("Setup link requires an interactive terminal")
+			os.Exit(1)
+		}
+		defer tty.Close()
+		link, err := deploymentSetup(ctx, store, filepath.Join(*dataDir, "deployment"), origin, *setupLink == "replace")
+		if err != nil {
+			slog.Error("Cannot prepare setup link", "error", err)
+			os.Exit(1)
+		}
+		if link == "" {
+			slog.Info("No unused setup link available; an administrator exists or access was consumed or expired")
+			return
+		}
+		if _, err := fmt.Fprintf(tty, "Flora setup URL: %s\n", link); err != nil {
+			slog.Error("Cannot display setup link")
+			os.Exit(1)
+		}
+		return
+	}
 	var chats *chat.Service
 	configuration := settings.New(store)
 	configuration.MaxRunningOverride = maxOverride
 	var automatic deployment
 	var brokerOption brokerListenerConfig
 	var automaticCA []byte
-	var enrollmentFile, networkID, brokerGateway, githubHost, githubListen string
+	var networkID, brokerGateway, githubHost, githubListen string
 	{
 		engine, err := docker.New(*dockerSocket)
 		if err != nil {
@@ -143,12 +172,11 @@ func main() {
 			slog.Error("Cannot persist broker trust identity", "error", err)
 			os.Exit(1)
 		}
-		enrollmentFile, err = deploymentEnrollment(dir)
-		if err != nil {
-			slog.Error("Cannot prepare private administrator enrollment", "error", err)
+		if _, err := deploymentSetup(ctx, store, dir, origin, false); err != nil {
+			slog.Error("Cannot prepare private setup link", "error", err)
 			os.Exit(1)
 		}
-		slog.Info("Administrator enrollment code is in a private file; it is accepted only before the first account exists", "file", filepath.Join(dir, "enrollment-code"))
+		slog.Info("First-run setup link is in the private deployment/setup-link file")
 		automatic, automaticCA = d, ca
 		networkID, brokerGateway = d.NetworkID, d.Gateway
 		githubHost, githubListen = brokerName, net.JoinHostPort(d.Gateway, "443")
@@ -229,10 +257,6 @@ func main() {
 		}()
 	}
 	authentication := auth.New(store)
-	if err := authentication.RequireEnrollment(enrollmentFile); err != nil {
-		slog.Error("Cannot load enrollment digest; check file ownership, permissions and format")
-		os.Exit(1)
-	}
 	handler := server.New(webassets.FS(), authentication, configuration, origin, chats)
 	srv := &http.Server{
 		Addr:              *addr,

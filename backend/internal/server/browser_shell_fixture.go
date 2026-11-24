@@ -17,6 +17,7 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/provisioning"
 	"github.com/rhizomatous/flora/backend/internal/settings"
 	"github.com/rhizomatous/flora/backend/internal/storage"
+	"github.com/rhizomatous/flora/backend/internal/testfixture"
 	"github.com/rhizomatous/flora/backend/internal/webassets"
 )
 
@@ -49,7 +50,7 @@ func newShellBrowserInstance() (_ *BrowserInstance, err error) {
 	}
 	cleanup = append(cleanup, func() { store.Close() })
 	authentication := auth.New(store)
-	if _, _, err = authentication.Bootstrap(ctx, "browser test password"); err != nil {
+	if _, _, err = testfixture.Bootstrap(ctx, authentication, "browser test password"); err != nil {
 		return nil, err
 	}
 	engine, err := docker.New(os.Getenv("FLORA_SHELL_PREVIEW_SOCKET"))

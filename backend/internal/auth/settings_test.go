@@ -17,7 +17,7 @@ func TestSessionLifetimeChangesOnlyNewSessions(t *testing.T) {
 	s := New(store)
 	now := time.Now().Truncate(time.Second)
 	s.Now = func() time.Time { return now }
-	old, expires, err := s.Bootstrap(ctx, "a long test password")
+	old, expires, err := s.Bootstrap(ctx, "a long test password", setupSession(t, s))
 	if err != nil {
 		t.Fatal(err)
 	}

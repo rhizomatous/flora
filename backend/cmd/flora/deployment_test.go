@@ -5,12 +5,14 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/rhizomatous/flora/backend/internal/auth"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
@@ -107,20 +109,120 @@ func TestPrivateBrokerTrust(t *testing.T) {
 	if strings.Contains(string(public), "PRIVATE KEY") {
 		t.Error("private key in container trust")
 	}
-	hash, err := deploymentEnrollment(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	before, _ := os.ReadFile(hash)
-	_, err = deploymentEnrollment(dir)
-	after, _ := os.ReadFile(hash)
-	if err != nil || !bytes.Equal(before, after) {
-		t.Fatal("enrollment changed on restart", err)
-	}
 	if err := os.Chmod(filepath.Join(dir, "broker-ca.pem"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, _, err := brokerAuthority(dir); err == nil {
 		t.Error("accepted world-readable CA key")
+	}
+}
+
+func TestDeploymentSetupRecovery(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	store, err := storage.Open(ctx, filepath.Join(root, "data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	dir := filepath.Join(root, "deployment")
+	if err := privateDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	origin := "https://flora.example.com"
+	first, err := deploymentSetup(ctx, store, dir, origin, false)
+	if err != nil || !strings.HasPrefix(first, origin+"/#setup/") {
+		t.Fatal(first, err)
+	}
+	info, err := os.Lstat(filepath.Join(dir, "setup-link"))
+	if err != nil || info.Mode().Perm() != 0600 {
+		t.Fatal("unsafe link file", err)
+	}
+	again, err := deploymentSetup(ctx, store, dir, origin, false)
+	if err != nil || again != first {
+		t.Fatal("restart replaced link", err)
+	}
+	service := auth.New(store)
+	session, _, err := service.RedeemSetup(ctx, strings.Split(first, "#setup/")[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if shown, err := deploymentSetup(ctx, store, dir, origin, false); err != nil || shown != "" {
+		t.Fatal("show resurrected consumed link", err)
+	}
+	replacement, err := deploymentSetup(ctx, store, dir, origin, true)
+	if err != nil || replacement == first {
+		t.Fatal("replacement failed", err)
+	}
+	if valid, _ := service.SetupValid(ctx, session); valid {
+		t.Fatal("replacement retained session")
+	}
+	if _, _, err := service.RedeemSetup(ctx, strings.Split(first, "#setup/")[1]); !errors.Is(err, auth.ErrSetup) {
+		t.Fatal("replacement retained old link", err)
+	}
+	// A lost file must not replace durable access implicitly after a restart.
+	if err := os.Remove(filepath.Join(dir, "setup-link")); err != nil {
+		t.Fatal(err)
+	}
+	if shown, err := deploymentSetup(ctx, store, dir, origin, false); err != nil || shown != "" {
+		t.Fatal("missing file reset access", err)
+	}
+	replacement, err = deploymentSetup(ctx, store, dir, origin, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, _, err = service.RedeemSetup(ctx, strings.Split(replacement, "#setup/")[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := service.Bootstrap(ctx, "a unique long password", session); err != nil {
+		t.Fatal(err)
+	}
+	if shown, err := deploymentSetup(ctx, store, dir, origin, true); err != nil || shown != "" {
+		t.Fatal("replaced administrator", err)
+	}
+	raw, err := privateRead(filepath.Join(dir, "setup-link"))
+	if err != nil || string(raw) != replacement {
+		t.Fatal("changed link after account creation", err)
+	}
+}
+
+func TestDeploymentSetupRejectsUnsafeFile(t *testing.T) {
+	ctx := context.Background()
+	store, err := storage.Open(ctx, filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "setup-link")
+	if err := os.WriteFile(path, []byte("damaged"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := deploymentSetup(ctx, store, dir, "https://flora.example.com", false); err == nil {
+		t.Fatal("accepted damaged link")
+	}
+	link, err := deploymentSetup(ctx, store, dir, "https://flora.example.com", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := deploymentSetup(ctx, store, dir, "https://flora.example.com", false); err == nil {
+		t.Fatal("accepted public link file")
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(dir, "target")
+	if err := os.WriteFile(target, []byte(link), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := deploymentSetup(ctx, store, dir, "https://flora.example.com", false); err == nil {
+		t.Fatal("accepted symlink")
 	}
 }

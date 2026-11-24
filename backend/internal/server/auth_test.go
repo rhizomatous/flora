@@ -57,13 +57,20 @@ func TestAuthenticationBoundaries(t *testing.T) {
 		expect(call("POST", "/api/auth/bootstrap", password, origin, "", ""), 403)
 	}
 	expect(call("POST", "/api/auth/bootstrap", password, "https://flora.test", "cross-site", ""), 403)
-	setup := call("POST", "/api/auth/bootstrap", password, "https://flora.test", "same-origin", "")
+	secret := auth.NewSetupToken()
+	if err := store.SaveSetupLink(ctx, auth.TokenHash(secret), time.Now().Add(time.Hour), false); err != nil {
+		t.Fatal(err)
+	}
+	redeemed := call("POST", "/api/auth/setup", `{"secret":"`+secret+`"}`, "https://flora.test", "same-origin", "")
+	expect(redeemed, 200)
+	sc := redeemed.Result().Cookies()[0]
+	setup := call("POST", "/api/auth/bootstrap", password, "https://flora.test", "same-origin", sc.Name+"="+sc.Value)
 	expect(setup, 200)
 	cookies := setup.Result().Cookies()
-	if len(cookies) != 1 {
+	if len(cookies) != 2 {
 		t.Fatal("missing cookie")
 	}
-	c := cookies[0]
+	c := cookies[1]
 	if c.Name != cookieName || !c.HttpOnly || !c.Secure || c.Path != "/" || c.Domain != "" || c.SameSite != http.SameSiteStrictMode || c.MaxAge < 604798 || c.MaxAge > 604800 {
 		t.Fatalf("unsafe cookie: %+v", c)
 	}

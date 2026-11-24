@@ -153,14 +153,16 @@ with tempfile.TemporaryDirectory(prefix='flora-release-') as tmp:
         assert engine('POST', '/containers/' + probe + '/wait')['StatusCode'] == 0, 'private CA/SAN or unauthenticated broker rejection failed'
         engine('DELETE', '/containers/' + probe)
         probe = None
-        code = (data / 'deployment/enrollment-code').read_text()
+        secret = (data / 'deployment/setup-link').read_text().split('#setup/')[1]
         password = secrets.token_urlsafe(24)
-        body = {'password': password, 'enrollmentCode': code}
+        body = {'password': password}
         request('/api/auth/bootstrap', body, origin='https://attacker.test', expected=403)
         request('/api/auth/bootstrap', {'password': password}, expected=403)
-        _, headers = request('/api/auth/bootstrap', body)
-        assert all(s in headers['Set-Cookie'] for s in ('Secure', 'HttpOnly', 'SameSite=Strict'))
-        cookie = headers['Set-Cookie'].split(';')[0]
+        _, setup_headers = request('/api/auth/setup', {'secret': secret})
+        setup_cookie = setup_headers['Set-Cookie'].split(';')[0]
+        _, headers = request('/api/auth/bootstrap', body, cookie=setup_cookie)
+        assert all(all(s in value for s in ('Secure', 'HttpOnly', 'SameSite=Strict')) for value in headers.get_all('Set-Cookie'))
+        cookie = next(value.split(';')[0] for value in headers.get_all('Set-Cookie') if value.startswith('__Host-flora='))
         assert json.loads(request('/api/auth/status', cookie=cookie)[0])['authenticated']
         stop(process)
         process = start()
@@ -172,7 +174,7 @@ with tempfile.TemporaryDirectory(prefix='flora-release-') as tmp:
         assert 'Secure' in login['Set-Cookie']
         assert (data / 'flora.db').stat().st_mode & 0o777 == 0o600
         print(json.dumps({'result': 'passed', 'identity': identity,
-                          'checks': ['archive HTTP backend through HTTPS proxy', 'protected enrollment',
+                          'checks': ['archive HTTP backend through HTTPS proxy', 'one-time setup exchange',
                                      'secure login', 'owned bridge private TLS and broker rejection',
                                      'restart keeps account, network and private trust']}))
     finally:

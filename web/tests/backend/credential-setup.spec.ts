@@ -4,9 +4,8 @@ import { openSettings, assertFitsPhone } from "../helpers.ts";
 test.use({ scenario: "credential-setup" });
 
 test("first credential save and blank-field preservation use encrypted storage", async ({ page, backend, request }) => {
-  await page.goto(backend.url);
+  await page.goto(`${backend.url}/#setup/fixture-installer-setup-secret-000000000000`);
   await page.getByLabel("Password", { exact: true }).fill("browser test password");
-  await page.getByLabel("Enrollment code", { exact: false }).fill("fixture-installer-enrollment-code");
   await page.getByRole("button", { name: "Create administrator", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Connect your first project", exact: true })).toBeVisible();
   await openSettings(page);

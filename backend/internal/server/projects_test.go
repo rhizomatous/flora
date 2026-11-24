@@ -12,6 +12,7 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/auth"
 	"github.com/rhizomatous/flora/backend/internal/projects"
 	"github.com/rhizomatous/flora/backend/internal/storage"
+	"github.com/rhizomatous/flora/backend/internal/testfixture"
 )
 
 type projectTransport func(*http.Request) (*http.Response, error)
@@ -26,7 +27,7 @@ func TestProjectAPIAndChatSnapshots(t *testing.T) {
 	}
 	defer store.Close()
 	authentication := auth.New(store)
-	token, _, err := authentication.Bootstrap(ctx, "a long unique password")
+	token, _, err := testfixture.Bootstrap(ctx, authentication, "a long unique password")
 	if err != nil {
 		t.Fatal(err)
 	}
