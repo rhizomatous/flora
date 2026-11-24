@@ -1,15 +1,19 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { createChat } from "@shadcn/helpers/ai-sdk";
 import type { UIMessage } from "ai";
 import { TerminalIcon } from "lucide-react";
 import { useState } from "react";
 
-import { Bubble, BubbleContent } from "../../../../src/components/bubble";
-import { Button } from "../../../../src/components/button";
-import { CodeBlock, CodeBlockContent } from "../../../../src/components/code-block";
-import { Message, MessageContent } from "../../../../src/components/message";
 import {
+  Bubble,
+  BubbleContent,
+  Button,
+  CodeBlock,
+  CodeBlockContent,
+  Message,
+  MessageContent,
   Trace,
   TraceCollapsible,
   TraceCollapsibleContent,
@@ -17,8 +21,9 @@ import {
   TraceIcon,
   TraceLine,
   TraceTitle,
-} from "../../../../src/components/trace";
-import { createChat, getMessageText } from "../lib/ai";
+} from "@flora/florets/ai";
+
+import { getMessageText } from "../lib/message-text";
 
 type ChatMessage = UIMessage<
   unknown,

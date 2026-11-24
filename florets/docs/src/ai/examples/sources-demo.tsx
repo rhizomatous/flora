@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { createChat } from "@shadcn/helpers/ai-sdk";
 import type { UIMessage } from "ai";
 import { ArrowUpRightIcon, GlobeIcon } from "lucide-react";
 
@@ -16,7 +17,7 @@ import {
   TraceLine,
   TraceTitle,
 } from "../../../../src/components/trace";
-import { createChat, getMessageText } from "../lib/ai";
+import { getMessageText } from "../lib/message-text";
 
 const chat = createChat()
   .user("How do I start an Astro project with pnpm?")

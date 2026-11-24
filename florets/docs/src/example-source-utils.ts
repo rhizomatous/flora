@@ -52,19 +52,8 @@ export function sourceForExample(source: string, title: string | undefined) {
 export function standaloneSource(source: string, animationSource?: string) {
   let result = source.replaceAll(/from "(?:\.\.\/)+src\//g, 'from "@flora/florets/');
   result = result.replaceAll(
-    /import \{([^}]+)\} from "(?:(?:\.\.\/)+ai\/lib\/ai|\.\.\/lib\/ai)";/g,
-    (_, bindings: string) => {
-      const names = bindings.split(",").map((name) => name.trim());
-      const publicNames = names.filter((name) => name !== "getMessageText");
-      const imported =
-        publicNames.length === 0
-          ? ""
-          : `import { ${publicNames.join(", ")} } from "@shadcn/helpers/ai-sdk";`;
-      const helper = names.includes("getMessageText")
-        ? '\n\nfunction getMessageText(message: { parts: readonly { type: string; text?: string }[] }) {\n  return message.parts.flatMap((part) => part.type === "text" ? [part.text ?? ""] : []).join("");\n}'
-        : "";
-      return imported + helper;
-    },
+    /import \{ getMessageText \} from "(?:(?:\.\.\/)+ai\/lib\/message-text|\.\.\/lib\/message-text)";/g,
+    'function getMessageText(message: { parts: readonly { type: string; text?: string }[] }) {\n  return message.parts.flatMap((part) => part.type === "text" ? [part.text ?? ""] : []).join("");\n}',
   );
   if (animationSource !== undefined) {
     result = result.replaceAll(

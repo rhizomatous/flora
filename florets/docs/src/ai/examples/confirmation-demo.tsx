@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { createChat } from "@shadcn/helpers/ai-sdk";
 import {
   lastAssistantMessageIsCompleteWithApprovalResponses,
   type UIDataTypes,
@@ -9,18 +10,18 @@ import {
 import { CircleCheckIcon, LoaderCircleIcon, TerminalIcon } from "lucide-react";
 import { useState } from "react";
 
-import { Bubble, BubbleContent } from "../../../../src/components/bubble";
-import { Button } from "../../../../src/components/button";
 import {
+  Bubble,
+  BubbleContent,
+  Button,
   Item,
   ItemActions,
   ItemContent,
   ItemDescription,
   ItemMedia,
   ItemTitle,
-} from "../../../../src/components/item";
-import { Message, MessageContent } from "../../../../src/components/message";
-import {
+  Message,
+  MessageContent,
   Trace,
   TraceCollapsible,
   TraceCollapsibleContent,
@@ -28,8 +29,9 @@ import {
   TraceIcon,
   TraceLine,
   TraceTitle,
-} from "../../../../src/components/trace";
-import { createChat, getMessageText } from "../lib/ai";
+} from "@flora/florets/ai";
+
+import { getMessageText } from "../lib/message-text";
 
 type ChatMessage = UIMessage<
   unknown,

@@ -122,9 +122,6 @@ case $identity in
     '{"version":"'"$version"'","commit":'*'"os":"linux","arch":"'"$arch"'"}') ;;
     *) die 'Binary version or platform differs from requested release' ;;
 esac
-if "$work/unpacked/flora" -help 2>&1 | sed -n '/^  -public-url /p' | cmp -s - /dev/null; then
-    die 'This release predates the installer; select a newer release with --version'
-fi
 printf 'Verified release: %s\n' "$identity"
 
 # mkdir and exclusive unit creation protect against concurrent installer runs.

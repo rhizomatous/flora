@@ -8,6 +8,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { createChat } from "@shadcn/helpers/ai-sdk";
 // Adapted from https://ui.shadcn.com/r/styles/radix-nova/trace-example.json
 import {
   isToolUIPart,
@@ -74,7 +75,6 @@ import {
   TraceTitle,
 } from "@flora/florets/components/trace";
 
-import { createChat } from "../../ai/lib/ai";
 import { Example, ExampleWrapper } from "../example";
 
 const REASONING = `The user wants to know why the checkout deploy is slow, so I should start from the build log instead of guessing.

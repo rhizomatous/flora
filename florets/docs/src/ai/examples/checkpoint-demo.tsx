@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { createChat } from "@shadcn/helpers/ai-sdk";
 import type { UIMessage } from "ai";
 import { Fragment } from "react";
 
@@ -8,7 +9,7 @@ import { Bubble, BubbleContent } from "../../../../src/components/bubble";
 import { Button } from "../../../../src/components/button";
 import { Marker, MarkerContent } from "../../../../src/components/marker";
 import { Message, MessageContent } from "../../../../src/components/message";
-import { createChat, getMessageText } from "../lib/ai";
+import { getMessageText } from "../lib/message-text";
 
 type ChatMessage = UIMessage<
   unknown,

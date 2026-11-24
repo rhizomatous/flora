@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { createChat } from "@shadcn/helpers/ai-sdk";
 import type { UIDataTypes, UIMessage } from "ai";
 import {
   ArrowUpIcon,
@@ -58,8 +59,8 @@ import {
   TraceTitle,
 } from "@flora/florets/ai";
 
-import { createChat, getMessageText } from "../lib/ai";
 import { MESSAGE_ANIMATIONS } from "../lib/message-animations";
+import { getMessageText } from "../lib/message-text";
 
 type ChatMessage = UIMessage<
   unknown,
