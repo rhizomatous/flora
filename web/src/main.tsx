@@ -23,6 +23,7 @@ import { ChatIdentityContext } from "./chat-identity";
 import { Chats } from "./chats";
 import { Installation } from "./installation";
 import { MCPs } from "./mcps";
+import { ModelsPage } from "./models-page";
 import { useNotifications } from "./notifications";
 import { Projects } from "./projects";
 import { PullRequests } from "./pull-requests-page";
@@ -226,15 +227,24 @@ function App() {
   const chatsPage = ready && path.split("?")[0] === "chats";
   const mcpPage = ready && path.startsWith("mcps");
   const automationsPage = ready && path === "automations";
+  const modelsPage = ready && path === "models";
   const automationEditor = ready && path.startsWith("automations/");
   let contentLayout = "mx-auto w-full max-w-6xl p-4 sm:p-8";
   if (mcpPage || pullsPage || chatsPage || automationsPage) {
     contentLayout = "flex min-h-0 flex-1 flex-col";
+  } else if (modelsPage) {
+    contentLayout = "min-h-0 flex-1 overflow-y-auto";
   } else if (automationEditor) {
     contentLayout = "min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-8";
   } else if (conversation) contentLayout = "flex min-h-0 flex-1 flex-col px-4 pb-2 sm:px-8";
   const frameLayout =
-    mcpPage || conversation || pullsPage || chatsPage || automationsPage || automationEditor
+    mcpPage ||
+    conversation ||
+    pullsPage ||
+    chatsPage ||
+    automationsPage ||
+    automationEditor ||
+    modelsPage
       ? "h-dvh min-h-0 min-w-0 overflow-hidden md:h-[calc(100dvh-1rem)]"
       : "min-w-0";
   const Content = ready ? SidebarInset : "main";
@@ -323,6 +333,9 @@ function App() {
             />
           )}
           {mcpPage && <MCPs path={path} onExpired={onExpired} />}
+          {modelsPage && (
+            <ModelsPage settings={settings} onSaved={setSettings} onExpired={onExpired} />
+          )}
           {ready && path === "settings" && (
             <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
           )}
@@ -336,6 +349,7 @@ function App() {
           {ready &&
             !path.startsWith("mcps") &&
             !path.startsWith("automations") &&
+            path !== "models" &&
             path !== "settings" &&
             path !== "pulls" &&
             path !== "usage" &&

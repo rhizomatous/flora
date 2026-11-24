@@ -159,9 +159,10 @@ work when Flora is stopped; in that case, use its credential key options too.
 Links appear only in the controlling terminal. Replacement invalidates previous
 links and browser setup cookies. Keep setup links out of logs and service arguments.
 
-In Settings, save hosted model and GitHub credentials. The provider and installation
-default model are fixed after first save. Individual chat turns can select other
-models from the installed provider and use their supported reasoning options. Use
+In Settings, connect GitHub. On the Models page, connect hosted providers with
+their API keys and choose the default model. Flora discovers models automatically. New chats can select a configured provider and model;
+existing chats keep their saved choice across default changes and restarts. Individual
+chat turns can select other models from that chat's provider and use their supported reasoning options. Use
 a fine-grained GitHub token limited to intended repositories, with Contents and Pull requests read/write and Metadata read. Add
 Workflows write only if needed. Chat capabilities can use all permissions of that
 token. Run Check dependencies, then create a project and chat. Metadata checks do

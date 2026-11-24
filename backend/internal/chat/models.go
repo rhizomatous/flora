@@ -34,8 +34,11 @@ type ModelOptions struct {
 	Error   string            `json:"error"`
 }
 type modelCache struct {
-	mu       sync.Mutex
-	expires  time.Time
+	mu      sync.Mutex
+	expires time.Time
+	values  map[string]cachedModels
+}
+type cachedModels struct {
 	value    ModelOptions
 	identity [32]byte
 }
@@ -43,7 +46,8 @@ type modelCache struct {
 // runtimeProviders contains only public metadata. Keys and provider options never
 // enter the browser response or the model cache.
 type runtimeProviders struct {
-	All []struct {
+	Default map[string]string `json:"default"`
+	All     []struct {
 		ID     string `json:"id"`
 		Models map[string]struct {
 			Limit struct {
@@ -78,6 +82,33 @@ func (s *Service) Models(ctx context.Context, chatIDs ...string) ModelOptions {
 	if err != nil || credentials.ProviderKey == "" || credentials.Model == "" {
 		return ModelOptions{Models: []ModelOption{}, Error: "Configure a model provider in installation settings."}
 	}
+	if len(chatIDs) > 0 && chatIDs[0] != "" {
+		c, err := s.Store.Chat(ctx, chatIDs[0])
+		if err != nil {
+			return ModelOptions{Models: []ModelOption{}, Error: "Chat is unavailable."}
+		}
+		credentials, err = s.Store.ProviderCredentials(ctx, c.Execution)
+		if err != nil {
+			return ModelOptions{Models: []ModelOption{}, Error: "Configure this chat's model provider in installation settings."}
+		}
+		return s.modelsForProvider(ctx, credentials, chatIDs...)
+	}
+	connections, err := s.Store.Providers(ctx)
+	if err != nil {
+		return ModelOptions{Models: []ModelOption{}, Error: "Model provider configuration is unavailable."}
+	}
+	result := ModelOptions{Default: storage.Execution{Provider: credentials.Provider, Model: credentials.Model}, Models: []ModelOption{}}
+	for _, c := range connections {
+		options := s.modelsForProvider(ctx, c)
+		result.Models = append(result.Models, options.Models...)
+		if options.Error != "" {
+			result.Error = options.Error
+		}
+	}
+	return result
+}
+
+func (s *Service) modelsForProvider(ctx context.Context, credentials storage.Credentials, chatIDs ...string) ModelOptions {
 	fallback := ModelOptions{Default: storage.Execution{Provider: credentials.Provider, Model: credentials.Model}, Models: []ModelOption{{Provider: credentials.Provider, ID: credentials.Model, Name: credentials.Model, Variants: []string{}}}, Error: "Model discovery is unavailable. You can use the installation default or retry."}
 	if s.provisioner == nil {
 		return fallback
@@ -112,8 +143,12 @@ func (s *Service) Models(ctx context.Context, chatIDs ...string) ModelOptions {
 	identity := sha256.Sum256([]byte(credentials.Provider + "\x00" + credentials.Model + "\x00" + credentials.ProviderKey + "\x00" + image + "\x00" + version))
 	s.models.mu.Lock()
 	defer s.models.mu.Unlock()
-	if time.Now().Before(s.models.expires) && s.models.identity == identity {
-		return s.models.value
+	if !time.Now().Before(s.models.expires) {
+		s.models.values = map[string]cachedModels{}
+		s.models.expires = time.Now().Add(5 * time.Minute)
+	}
+	if cached, ok := s.models.values[credentials.Provider]; ok && cached.identity == identity {
+		return cached.value
 	}
 	raw, err := s.provisioner.ModelMetadata(lookup, credentials)
 	if err != nil {
@@ -125,7 +160,7 @@ func (s *Service) Models(ctx context.Context, chatIDs ...string) ModelOptions {
 	}
 	result := providerOptions(providers, fallback)
 	if result.Error == "" {
-		s.models.value, s.models.expires, s.models.identity = result, time.Now().Add(5*time.Minute), identity
+		s.models.values[credentials.Provider] = cachedModels{value: result, identity: identity}
 	}
 	return result
 }
@@ -203,17 +238,40 @@ func (s *Service) SetChatModel(ctx context.Context, chatID string, selected stor
 }
 
 func (s *Service) validateExecution(ctx context.Context, selected storage.Execution, attachments []string, chatIDs ...string) error {
-	credentials, err := s.Store.Credentials(ctx)
+	credentials, err := s.Store.ProviderCredentials(ctx, selected)
 	if err != nil || credentials.ProviderKey == "" || credentials.Model == "" {
-		return &ControlError{Reason: "Configure a model provider in installation settings."}
+		return &ControlError{Reason: "Configure this model provider in installation settings."}
 	}
-	if !selected.Valid() || selected.Provider != credentials.Provider {
-		return &ControlError{Reason: "Choose a model from the installed provider."}
+	if !selected.Valid() {
+		return &ControlError{Reason: "Choose an available model."}
+	}
+	if len(chatIDs) > 0 && chatIDs[0] != "" {
+		c, err := s.Store.Chat(ctx, chatIDs[0])
+		if err != nil {
+			return err
+		}
+		if c.Execution.Provider != "" && c.Execution.Provider != selected.Provider {
+			return &ControlError{Reason: "Choose a model from this chat's provider."}
+		}
+		if c.Execution == selected && selected.Variant == "" {
+			return nil
+		}
+	}
+	// The provider's saved model is usable even when runtime discovery is offline.
+	connections, err := s.Store.Providers(ctx)
+	if err != nil {
+		return err
+	}
+	for _, c := range connections {
+		if c.Provider == selected.Provider {
+			credentials = c
+			break
+		}
 	}
 	if selected.Model == credentials.Model && selected.Variant == "" {
 		return nil
 	}
-	options := s.Models(ctx, chatIDs...)
+	options := s.modelsForProvider(ctx, credentials, chatIDs...)
 	if options.Error != "" {
 		return &ControlError{Reason: options.Error}
 	}
@@ -263,4 +321,30 @@ func validModelRate(value *float64) *float64 {
 		return nil
 	}
 	return value
+}
+
+// DiscoverProviderModel uses only metadata from the pinned runtime. Provider
+// authentication is checked separately before this model becomes a connection.
+func (s *Service) DiscoverProviderModel(ctx context.Context, c storage.Credentials) (string, error) {
+	if s.provisioner == nil {
+		return "", errors.New("runtime unavailable")
+	}
+	raw, err := s.provisioner.ModelMetadata(ctx, c)
+	if err != nil {
+		return "", err
+	}
+	var providers runtimeProviders
+	if err := json.Unmarshal(raw, &providers); err != nil {
+		return "", err
+	}
+	options := providerOptions(providers, ModelOptions{Default: storage.Execution{Provider: c.Provider}, Error: "Models unavailable"})
+	if options.Error != "" || len(options.Models) == 0 {
+		return "", errors.New("models unavailable")
+	}
+	for _, model := range options.Models {
+		if model.ID == providers.Default[c.Provider] {
+			return model.ID, nil
+		}
+	}
+	return options.Models[0].ID, nil
 }

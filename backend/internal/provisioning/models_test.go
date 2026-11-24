@@ -57,7 +57,7 @@ func TestMetadataContainerIsolationAndCleanup(t *testing.T) {
 	}))
 	defer server.Close()
 	_, port, _ := net.SplitHostPort(server.Listener.Addr().String())
-	for _, mode := range []string{"success", "commands", "start failure", "canceled readiness"} {
+	for _, mode := range []string{"success", "connection discovery", "commands", "start failure", "canceled readiness"} {
 		t.Run(mode, func(t *testing.T) {
 			base := newFakeEngine()
 			m, store := newTestManager(t, base, Config{}, nil)
@@ -74,8 +74,12 @@ func TestMetadataContainerIsolationAndCleanup(t *testing.T) {
 			if mode == "commands" {
 				discover = m.CommandMetadata
 			}
-			raw, err := discover(ctx, storage.Credentials{Provider: "anthropic", Model: "model", ProviderKey: "provider-key", GitHubToken: "github-must-not-appear"})
-			if mode == "success" || mode == "commands" {
+			model := "model"
+			if mode == "connection discovery" {
+				model = ""
+			}
+			raw, err := discover(ctx, storage.Credentials{Provider: "anthropic", Model: model, ProviderKey: "provider-key", GitHubToken: "github-must-not-appear"})
+			if mode == "success" || mode == "commands" || mode == "connection discovery" {
 				if err != nil || len(raw) == 0 {
 					t.Fatal(err)
 				}
@@ -94,6 +98,13 @@ func TestMetadataContainerIsolationAndCleanup(t *testing.T) {
 			}
 			if strings.Join(spec.Entrypoint, " ") != "timeout -k 5 45 opencode" || strings.Join(spec.Command, " ") != "serve --hostname 0.0.0.0 --port 4096" {
 				t.Fatal("metadata ran a different process")
+			}
+			if mode == "connection discovery" {
+				for _, env := range spec.Env {
+					if strings.HasPrefix(env, "OPENCODE_CONFIG_CONTENT=") && strings.Contains(env, `"model"`) {
+						t.Fatal("connection discovery forced a model before discovery")
+					}
+				}
 			}
 			for _, env := range spec.Env {
 				if strings.Contains(env, "github-must-not-appear") || strings.HasPrefix(env, "SETUP_") || strings.HasPrefix(env, "FLORA_CHECKOUT") {

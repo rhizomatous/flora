@@ -222,7 +222,7 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 	if err != nil {
 		return
 	}
-	credentials, err := s.Store.Credentials(ctx)
+	credentials, err := s.Store.ProviderCredentials(ctx, c.Execution)
 	if err != nil {
 		fail("Configure GitHub and model-provider credentials in installation settings.")
 		return
@@ -317,8 +317,8 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 		Model string `json:"model"`
 	}
 	err = rt.call(setupCtx, "GET", "/config", nil, &configuration)
-	if err == nil && configuration.Model != credentials.Provider+"/"+credentials.Model {
-		err = errors.New("runtime model differs from installation settings")
+	if err == nil && !strings.HasPrefix(configuration.Model, credentials.Provider+"/") {
+		err = errors.New("runtime provider differs from saved chat")
 	}
 	if err == nil && c.SessionID == "" {
 		var session struct {
@@ -340,9 +340,12 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 	}
 	execution := storage.MessageExecution(message)
 	if execution.Model == "" {
-		execution = storage.Execution{Provider: credentials.Provider, Model: credentials.Model}
+		execution = c.Execution
+		if execution.Model == "" {
+			execution = storage.Execution{Provider: credentials.Provider, Model: credentials.Model}
+		}
 	}
-	if execution.Model != credentials.Model || execution.Variant != "" {
+	if configuration.Model != execution.Provider+"/"+execution.Model || execution.Variant != "" {
 		checkCtx, checkCancel := context.WithTimeout(ctx, 10*time.Second)
 		checkErr := validateRuntimeExecution(checkCtx, rt, execution)
 		checkCancel()

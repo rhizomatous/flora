@@ -14,6 +14,7 @@ import {
   ChevronUpIcon,
   ClockIcon,
   FolderIcon,
+  SparklesIcon,
 } from "@flora/florets";
 
 /** Keeps installation actions in one menu; sound activation stays inside the user's gesture. */
@@ -69,6 +70,18 @@ export function WorkspaceMenu({
           nativeButton={false}
           onClick={() => {
             navigated.current = window.location.hash !== "#settings";
+          }}
+        />
+        <DropdownMenuItem
+          render={
+            <a href="#models">
+              <SparklesIcon aria-hidden="true" />
+              Models
+            </a>
+          }
+          nativeButton={false}
+          onClick={() => {
+            navigated.current = window.location.hash !== "#models";
           }}
         />
         <DropdownMenuItem

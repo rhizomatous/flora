@@ -177,7 +177,7 @@ func (s *Store) initializeSecrets(ctx context.Context, file string) error {
 	}
 	if fresh {
 		var exists bool
-		if err := s.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM installation_credentials) OR EXISTS(SELECT 1 FROM environment_variables WHERE secret=1) OR EXISTS(SELECT 1 FROM chat_environment_requests) OR EXISTS(SELECT 1 FROM mcp_servers)").Scan(&exists); err != nil {
+		if err := s.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM installation_credentials) OR EXISTS(SELECT 1 FROM environment_variables WHERE secret=1) OR EXISTS(SELECT 1 FROM chat_environment_requests) OR EXISTS(SELECT 1 FROM mcp_servers) OR EXISTS(SELECT 1 FROM model_providers)").Scan(&exists); err != nil {
 			return ErrSecrets
 		}
 		if exists {
@@ -201,6 +201,9 @@ func (s *Store) initializeSecrets(ctx context.Context, file string) error {
 
 	s.secrets = box
 	if _, err := readCredentials(ctx, s.db, box); err != nil && !errors.Is(err, ErrNotFound) {
+		return err
+	}
+	if err := rotateProviders(ctx, s.db, box, nil); err != nil {
 		return err
 	}
 	if err := s.validateMCPSecrets(ctx); err != nil {
@@ -255,6 +258,9 @@ func (s *Store) RotateCredentialKey(ctx context.Context, destination string) err
 			if _, err := tx.ExecContext(ctx, "UPDATE installation_credentials SET github_token=?,provider_key=? WHERE id=1", box.seal(c.GitHubToken, credentialContext(c, "github")), box.seal(c.ProviderKey, credentialContext(c, "provider"))); err != nil {
 				return err
 			}
+		}
+		if err := rotateProviders(ctx, tx, s.secrets, box); err != nil {
+			return err
 		}
 		if err := rotateMCPs(ctx, tx, s.secrets, box); err != nil {
 			return err

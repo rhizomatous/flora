@@ -192,3 +192,45 @@ func TestExplicitCapacityFlagOverridesSavedCap(t *testing.T) {
 		t.Fatal("flag lost precedence", err)
 	}
 }
+
+func TestDelayedProvisioningUsesSavedProviderAndModel(t *testing.T) {
+	ctx := context.Background()
+	engine := newFakeEngine()
+	m, s := newTestManager(t, engine, Config{UseSettings: true}, nil)
+	first := storage.Credentials{Provider: "anthropic", Model: "original", ProviderKey: "anthropic-fixture", GitHubToken: "github_pat_fixture"}
+	if err := s.SaveCredentials(ctx, first); err != nil {
+		t.Fatal(err)
+	}
+	queued := newChat(t, s)
+	next := storage.Credentials{Provider: "openai", Model: "new-default", ProviderKey: "openai-fixture", GitHubToken: first.GitHubToken}
+	if err := s.SaveCredentials(ctx, next); err != nil {
+		t.Fatal(err)
+	}
+	fresh := newChat(t, s)
+	for _, test := range []struct {
+		chat        storage.Chat
+		credentials storage.Credentials
+	}{{queued, first}, {fresh, next}} {
+		endpoint, err := m.Start(ctx, test.chat.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		info, err := engine.ContainerInspect(ctx, endpoint.ContainerID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if endpoint.ProviderKey != test.credentials.ProviderKey || !strings.Contains(info.EnvValue("OPENCODE_CONFIG_CONTENT"), `"model":"`+test.credentials.Provider+`/`+test.credentials.Model+`"`) {
+			t.Fatal("default change replaced queued chat model or credential")
+		}
+		if err := m.Stop(ctx, test.chat.ID); err != nil {
+			t.Fatal(err)
+		}
+		restarted, err := m.Start(ctx, test.chat.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if restarted.ContainerID != endpoint.ContainerID || restarted.ProviderKey != endpoint.ProviderKey {
+			t.Fatal("restart changed saved connection")
+		}
+	}
+}

@@ -9,7 +9,6 @@ import {
   SettingsRow,
   Heading,
   Input,
-  NativeSelect,
   Text,
 } from "@flora/florets";
 
@@ -25,7 +24,7 @@ import {
 } from "./settings-schemas";
 import { text } from "./ui";
 
-/** Edits credentials, the fixed provider and model, and installation-wide preferences. */
+/** Edits provider connections, the default model, and installation preferences. */
 export function Installation({
   settings,
   busy,
@@ -43,26 +42,15 @@ export function Installation({
     heading.current?.focus();
   }, []);
 
-  function save(
-    connection: "github" | "model" | "preferences",
-    event: React.SubmitEvent<HTMLFormElement>,
-  ) {
+  function save(connection: "github" | "preferences", event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const fields = new FormData(form);
     void run(async () => {
-      let body: object;
-      if (connection === "github") {
-        body = { githubToken: text(fields, "githubToken") };
-      } else if (connection === "model") {
-        body = {
-          provider: text(fields, "provider"),
-          model: text(fields, "model"),
-          providerKey: text(fields, "providerKey"),
-        };
-      } else {
-        body = { preferences: readPreferences(fields) };
-      }
+      const body =
+        connection === "github"
+          ? { githubToken: text(fields, "githubToken") }
+          : { preferences: readPreferences(fields) };
       const next = await request(settingsSchema, "settings", { method: "PUT", body });
       onSaved(next);
       setDiagnostics(undefined);
@@ -86,9 +74,14 @@ export function Installation({
       <Heading level={1} ref={heading} tabIndex={-1} id="settings-heading">
         Installation settings
       </Heading>
-      <a href="#mcps" className="mt-4 inline-block text-sm underline">
-        MCP servers
-      </a>
+      <nav aria-label="Settings pages" className="mt-4 flex gap-4 text-sm">
+        <a href="#models" className="underline">
+          Models
+        </a>
+        <a href="#mcps" className="underline">
+          MCP servers
+        </a>
+      </nav>
       <SectionStack className="mt-8">
         <Section>
           <SectionHeader inset>
@@ -123,62 +116,6 @@ export function Installation({
             </SettingsGroup>
             <Button type="submit" disabled={busy}>
               Validate and save GitHub
-            </Button>
-          </form>
-        </Section>
-        <Section>
-          <SectionHeader inset>
-            <Heading level={2}>Model provider</Heading>
-            <Text tone="muted">
-              {settings.providerConfigured ? "API key saved" : "No API key saved"}
-            </Text>
-          </SectionHeader>
-          <form
-            aria-label="Model connection"
-            className="space-y-4"
-            onSubmit={(event) => {
-              save("model", event);
-            }}
-          >
-            <SettingsGroup>
-              <SettingsRow label="Hosted provider" htmlFor="hosted-provider">
-                <NativeSelect
-                  id="hosted-provider"
-                  key={settings.provider}
-                  name="provider"
-                  defaultValue={settings.provider === "" ? "openai" : settings.provider}
-                  disabled={busy || settings.provider !== ""}
-                >
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic</option>
-                  <option value="google">Google</option>
-                </NativeSelect>
-              </SettingsRow>
-              <SettingsRow label="Model ID" htmlFor="model-id">
-                <Input
-                  id="model-id"
-                  key={settings.model}
-                  name="model"
-                  defaultValue={settings.model}
-                  required
-                  maxLength={200}
-                  disabled={busy || settings.model !== ""}
-                />
-              </SettingsRow>
-              <SettingsRow label="Provider API key" htmlFor="provider-key">
-                <Input
-                  id="provider-key"
-                  type="password"
-                  name="providerKey"
-                  autoComplete="off"
-                  required={!settings.providerConfigured}
-                  disabled={busy}
-                  maxLength={4096}
-                />
-              </SettingsRow>
-            </SettingsGroup>
-            <Button type="submit" disabled={busy}>
-              Validate and save model
             </Button>
           </form>
         </Section>

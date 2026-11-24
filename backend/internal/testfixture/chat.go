@@ -266,7 +266,14 @@ func New(ctx context.Context, directory string, interactive bool, compaction ...
 	return &Fixture{Store: store, Service: svc, Auth: authentication, Token: token, Project: project, Close: func() { cancel(); runtime.Close(); store.Close() }}, nil
 }
 
-func (p *Provisioner) ModelMetadata(ctx context.Context, _ storage.Credentials) (json.RawMessage, error) {
+func (p *Provisioner) ModelMetadata(ctx context.Context, c storage.Credentials) (json.RawMessage, error) {
+	if c.Provider == "openai" {
+		return json.RawMessage(`{"connected":["openai"],"default":{"openai":"gpt-5"},"all":[{"id":"openai","models":{"gpt-5":{"name":"GPT-5","limit":{"context":400000,"output":128000},"cost":{"input":1.25,"output":10},"variants":{"low":{},"medium":{},"high":{}},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}}}}]}`), nil
+	}
+	if c.Provider == "google" {
+		return json.RawMessage(`{"connected":["google"],"default":{"google":"gemini-2.5-pro"},"all":[{"id":"google","models":{"gemini-2.5-pro":{"name":"Gemini 2.5 Pro","limit":{"context":1048576,"output":65536},"cost":{"input":1.25,"output":10},"capabilities":{"toolcall":true,"input":{"image":true,"pdf":true}}}}}]}`), nil
+	}
+
 	req, err := http.NewRequestWithContext(ctx, "GET", p.url+"/provider", nil)
 	if err != nil {
 		return nil, err

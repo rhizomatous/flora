@@ -145,6 +145,9 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		cleanup = append(cleanup, closeFixture)
 	}
 	configuration := settings.New(store)
+	if scenario == "credential-setup" {
+		configuration.DiscoverModel = func(context.Context, storage.Credentials) (string, error) { return "fixture-model", nil }
+	}
 	if scenario == "settings" || scenario == "credential-setup" {
 		configuration.MaxRunningOverride = 4
 		configuration.Validate = func(_ context.Context, c storage.Credentials) error {

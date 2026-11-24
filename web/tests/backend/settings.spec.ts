@@ -98,12 +98,23 @@ test("settings persistence, credential rotation, and completion sounds", async (
       console.error(page.url(), errors, await page.locator("body").innerText());
       throw error;
     });
-  assert.equal(await page.getByLabel("Hosted provider", { exact: true }).isDisabled(), true);
-  assert.equal(await page.getByLabel("Model ID", { exact: true }).inputValue(), "model");
   assert.equal(
     await page.getByLabel("Fine-grained personal access token", { exact: true }).inputValue(),
     "",
   );
+  await page.getByRole("link", { name: "Models", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Models", exact: true })).toBeFocused();
+  await page.getByRole("button", { name: "Update Anthropic key", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Update Anthropic key", exact: true });
+  await dialog.getByLabel("API key", { exact: true }).fill("invalid-fixture-key");
+  await dialog.getByRole("button", { name: "Update key", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toContainText("Anthropic rejected the credential");
+  await expect(dialog.getByLabel("API key", { exact: true })).toHaveValue("invalid-fixture-key");
+  await dialog.getByLabel("API key", { exact: true }).fill("rotated-fixture-key");
+  await dialog.getByRole("button", { name: "Update key", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Update Anthropic key", exact: true })).toBeFocused();
+  await openSettings(page);
   assert.equal(await page.getByLabel("CPUs per chat", { exact: true }).inputValue(), "2");
   await page.getByText(/startup flag -max-running overrides the saved cap with 4/).waitFor();
   await page.getByLabel("CPUs per chat", { exact: true }).fill("3");
@@ -111,16 +122,6 @@ test("settings persistence, credential rotation, and completion sounds", async (
   await page.getByLabel("Git author name", { exact: true }).fill("Browser Author");
   await page.getByLabel("Git author email", { exact: true }).fill("browser@example.test");
   await page.getByLabel("Play a sound when a chat finishes work", { exact: true }).uncheck();
-  await page.getByLabel("Provider API key", { exact: true }).fill("invalid-fixture-key");
-  await page.getByRole("button", { name: "Validate and save model", exact: true }).click();
-  await page.getByRole("alert").filter({ hasText: "Anthropic rejected the credential" }).waitFor();
-  assert.equal(await page.getByLabel("CPUs per chat", { exact: true }).inputValue(), "3");
-  await page.getByLabel("Provider API key", { exact: true }).fill("rotated-fixture-key");
-  await page.getByRole("button", { name: "Validate and save model", exact: true }).click();
-  await page.getByRole("status").filter({ hasText: "Settings saved" }).waitFor();
-  assert.equal(await page.getByLabel("Provider API key", { exact: true }).inputValue(), "");
-  // Saving the model must keep the unsaved preferences draft intact.
-  assert.equal(await page.getByLabel("CPUs per chat", { exact: true }).inputValue(), "3");
   await page.getByRole("button", { name: "Save preferences", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "Settings saved" }).waitFor();
   await page.getByRole("button", { name: "Check dependencies", exact: true }).click();
@@ -174,4 +175,56 @@ test("settings persistence, credential rotation, and completion sounds", async (
     providerKey: "rotated-fixture-key",
     githubToken: "github_pat_test-secret",
   });
+});
+
+test("Models connects providers independently and saves a searchable default", async ({ page }) => {
+  const errors = pageErrors(page);
+  await logIn(page);
+  await openWorkspaceMenu(page);
+  await page.getByRole("menuitem", { name: "Models", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Models", exact: true })).toBeFocused();
+  const defaultModel = page.getByRole("button", { name: "New chats", exact: true });
+  await expect(defaultModel).toContainText("Installation default");
+  await page.getByRole("button", { name: "Add connection", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Anthropic", exact: true })).toBeDisabled();
+  await page.getByRole("menuitem", { name: "OpenAI", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Connect OpenAI", exact: true });
+  await expect(dialog.getByLabel("API key", { exact: true })).toBeFocused();
+  await dialog.getByLabel("API key", { exact: true }).fill("openai-fixture-key");
+  await dialog.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add connection", exact: true })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Update OpenAI key", exact: true })).toBeVisible();
+  await expect(defaultModel).toContainText("Installation default");
+  await defaultModel.click();
+  const search = page.getByRole("searchbox", { name: "Search default models", exact: true });
+  await search.fill("unavailable-model");
+  await expect(page.getByText("No matching results.", { exact: true })).toBeVisible();
+  await search.fill("openai");
+  await expect(page.getByRole("menuitem")).toHaveCount(1);
+  await search.press("Enter");
+  await expect(defaultModel).toContainText("GPT-5");
+  await expect(defaultModel).toBeFocused();
+  await page.reload();
+  await expect(defaultModel).toContainText("GPT-5");
+  await page.getByLabel("Search available models", { exact: true }).fill("sonnet");
+  await expect(page.getByRole("row")).toHaveCount(2);
+  await page.getByRole("button", { name: "Claude Sonnet 4.6 actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Use as default", exact: true }).click();
+  await expect(defaultModel).toContainText("Claude Sonnet 4.6");
+  await assertFitsPhone(page);
+  await defaultModel.click();
+  await expect(search).toBeVisible();
+  await search.press("Escape");
+  await expect(defaultModel).toBeFocused();
+  await page.getByRole("button", { name: "Update OpenAI key", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Update OpenAI key", exact: true })).toBeFocused();
+  await page.goto("/#chats/new");
+  await expect(page.getByRole("button", { name: "Model: Claude Sonnet 4.6", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /^Model:/ }).click();
+  await page.getByRole("searchbox", { name: "Search models", exact: true }).fill("openai");
+  await page.getByRole("menuitem", { name: "GPT-5", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Model: GPT-5", exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
 });

@@ -77,11 +77,12 @@ logout immediately revokes that session on the server. All API data routes requi
 authentication, except health and account status. Login and setup require the
 configured same-origin HTTPS address.
 
-Settings accept a fine-grained GitHub token and an OpenAI, Anthropic, or Google
-API key. Save validates the GitHub account and access to the chosen model through
+Settings accept a fine-grained GitHub token. Models accepts OpenAI, Anthropic, and
+Google API keys and discovers their available models automatically. Save validates the GitHub account and access to the chosen model through
 the provider's model metadata endpoint. This initial account check does not
-validate repository permissions. The provider and installation default model
-are fixed on first save; keys can be replaced later. Blank keys keep saved values.
+validate repository permissions. Configure multiple providers and choose the default on the Models page. Blank keys
+keep the selected provider's saved key. Default changes affect future chats; existing
+chats retain their saved provider and model.
 
 Choose a model and its supported reasoning effort in the chat composer. OpenCode
 supplies the available models, reasoning variants, and attachment capabilities.
@@ -188,8 +189,7 @@ receive the private hostname mapping and public CA automatically. The
 administrator's GitHub token stays on the host. See the installation guide.
 
 After saving installation credentials and connecting a project with one core
-repository, choose **Start chat**. New containers receive the installation's
-provider key and installation default model. Replacing a saved key does not change an existing
+repository, choose **Start chat**. New containers receive the chat's saved model and its provider's key. Replacing a saved key does not change an existing
 container's environment. Follow-ups use the existing endpoint, workspace, and
 OpenCode session without rotating its git/gh capability.
 

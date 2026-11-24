@@ -386,6 +386,7 @@ export function chatPreview(): Plugin {
         model: "claude-sonnet-4-6",
         githubConfigured: true,
         providerConfigured: true,
+        providers: [{ provider: "anthropic", model: "claude-sonnet-4-6" }],
         preferences: {
           cpus: 2,
           memoryBytes: 4_294_967_296,

@@ -20,7 +20,9 @@ export const diagnosticSchema = z.object({
   ok: z.boolean(),
   message: z.string(),
 });
+const providerSchema = z.object({ provider: z.string(), model: z.string() });
 export const settingsSchema = z.object({
+  providers: providerSchema.array().default([]),
   validation: diagnosticSchema.array().optional(),
   provider: z.string(),
   model: z.string(),

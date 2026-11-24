@@ -24,6 +24,9 @@ func New(assets fs.FS, authentication *auth.Service, credentials *settings.Servi
 	api.environmentRoutes(mux)
 	if len(chats) > 0 {
 		api.chats = chats[0]
+		if credentials.DiscoverModel == nil {
+			credentials.DiscoverModel = api.chats.DiscoverProviderModel
+		}
 	}
 	api.chatRoutes(mux)
 	api.attachmentRoutes(mux)

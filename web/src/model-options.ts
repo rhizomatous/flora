@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const modelOptionSchema = z.object({
+  contextLimit: z.number().default(0),
   provider: z.string(),
   id: z.string(),
   name: z.string(),
