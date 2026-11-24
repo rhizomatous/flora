@@ -389,19 +389,19 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 	for i := range state.Branches {
 		tasks = append(tasks, task{branch: &state.Branches[i]})
 	}
-	creds, err := s.Store.Credentials(ctx)
+	githubToken, err := s.connection.TokenWithClient(ctx, client)
 	if err != nil && len(tasks) > 0 {
 		failure()
 	}
 	secure := *client
 	secure.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	budget := 32
-	blocked := false
+	blocked := err != nil
 	// A missing unverified candidate is not an outage. Remember it for a day so
 	// the same saved message cannot reintroduce it on every scan. Known PRs that
 	// become inaccessible still retain their saved status and show a warning.
 	call := func(path string, payload []byte, target any) int {
-		delayed := githubDelayed(creds.GitHubToken, time.Now())
+		delayed := githubDelayed(githubToken, time.Now())
 		if budget == 0 || blocked || ctx.Err() != nil || delayed {
 			failure()
 			blocked = blocked || delayed
@@ -420,7 +420,7 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 		if payload != nil {
 			req.Header.Set("Content-Type", "application/json")
 		}
-		req.Header.Set("Authorization", "Bearer "+creds.GitHubToken)
+		req.Header.Set("Authorization", "Bearer "+githubToken)
 		req.Header.Set("Accept", "application/vnd.github+json")
 		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 		res, e := secure.Do(req)
@@ -432,11 +432,14 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 		if path == "/graphql" && res.StatusCode == 403 && res.Header.Get("X-RateLimit-Remaining") != "0" && res.Header.Get("Retry-After") == "" {
 			return 403
 		}
+		if res.StatusCode == 401 {
+			s.connection.Invalidate()
+		}
 		if res.StatusCode == 403 || res.StatusCode == 429 || res.StatusCode == 401 {
 			blocked = true
 		}
 		if res.StatusCode == 403 || res.StatusCode == 429 {
-			delayGitHub(creds.GitHubToken, res.Header, time.Now())
+			delayGitHub(githubToken, res.Header, time.Now())
 		}
 		if res.StatusCode == 404 {
 			return 404

@@ -177,7 +177,7 @@ func (s *Store) initializeSecrets(ctx context.Context, file string) error {
 	}
 	if fresh {
 		var exists bool
-		if err := s.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM installation_credentials) OR EXISTS(SELECT 1 FROM environment_variables WHERE secret=1) OR EXISTS(SELECT 1 FROM chat_environment_requests) OR EXISTS(SELECT 1 FROM mcp_servers) OR EXISTS(SELECT 1 FROM model_providers)").Scan(&exists); err != nil {
+		if err := s.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM installation_credentials) OR EXISTS(SELECT 1 FROM environment_variables WHERE secret=1) OR EXISTS(SELECT 1 FROM chat_environment_requests) OR EXISTS(SELECT 1 FROM mcp_servers) OR EXISTS(SELECT 1 FROM model_providers) OR EXISTS(SELECT 1 FROM github_app)").Scan(&exists); err != nil {
 			return ErrSecrets
 		}
 		if exists {
@@ -260,6 +260,9 @@ func (s *Store) RotateCredentialKey(ctx context.Context, destination string) err
 			}
 		}
 		if err := rotateProviders(ctx, tx, s.secrets, box); err != nil {
+			return err
+		}
+		if err := rotateGitHubApp(ctx, tx, s.secrets, box); err != nil {
 			return err
 		}
 		if err := rotateMCPs(ctx, tx, s.secrets, box); err != nil {

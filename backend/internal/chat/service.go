@@ -113,8 +113,12 @@ func (s *Service) requireConnections(ctx context.Context) error {
 	if c.ProviderKey == "" || c.Model == "" {
 		return &ControlError{Reason: "Configure a model provider in installation settings before starting a chat."}
 	}
-	if c.GitHubToken == "" {
-		return &ControlError{Reason: "Connect GitHub in installation settings before starting a chat."}
+	configured, err := s.Store.GitHubConfigured(ctx)
+	if err != nil {
+		return err
+	}
+	if !configured {
+		return &ControlError{Reason: "Connect GitHub on the Connections page before starting a chat."}
 	}
 	return nil
 }
@@ -224,15 +228,16 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 	}
 	credentials, err := s.Store.ProviderCredentials(ctx, c.Execution)
 	if err != nil {
-		fail("Configure GitHub and model-provider credentials in installation settings.")
+		fail("Check the saved GitHub connection and model provider.")
 		return
 	}
 	if credentials.ProviderKey == "" || credentials.Model == "" {
 		fail("Configure a model provider in installation settings before starting a chat.")
 		return
 	}
-	if credentials.GitHubToken == "" {
-		fail("Connect GitHub in installation settings before starting a chat.")
+	configured, connectionErr := s.Store.GitHubConfigured(ctx)
+	if connectionErr != nil || !configured {
+		fail("Connect GitHub on the Connections page before starting a chat.")
 		return
 	}
 	var endpoint provisioning.Endpoint

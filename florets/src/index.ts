@@ -72,6 +72,8 @@ export * from "./components/tooltip";
 export * from "./components/trace";
 export * from "./components/typography";
 export {
+  GitHubLogoIcon,
+  Link2Icon,
   GearIcon,
   SpeakerLoudIcon,
   ExitIcon,

@@ -21,6 +21,7 @@ func New(assets fs.FS, authentication *auth.Service, credentials *settings.Servi
 	api.passkeyRoutes(mux)
 	api.projects = projects.New(credentials.Store)
 	api.routes(mux)
+	api.githubRoutes(mux)
 	api.mcpRoutes(mux)
 	api.projectRoutes(mux)
 	api.environmentRoutes(mux)
