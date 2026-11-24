@@ -115,10 +115,12 @@ func (s *Store) SaveInstallation(ctx context.Context, c Credentials, p *Preferen
 		if err != nil && !errors.Is(err, ErrNotFound) {
 			return err
 		}
-		if err == nil && (saved.Provider != c.Provider || saved.Model != c.Model) {
+		if err == nil && saved.Provider != "" && (saved.Provider != c.Provider || saved.Model != c.Model) {
 			return ErrConflict
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO installation_credentials VALUES(1,?,?,?,?) ON CONFLICT(id) DO UPDATE SET github_token=excluded.github_token,provider_key=excluded.provider_key`, c.Provider, c.Model, s.secrets.seal(c.GitHubToken, credentialContext(c, "github")), s.secrets.seal(c.ProviderKey, credentialContext(c, "provider")))
+		// Installing the first model after GitHub also reencrypts its token,
+		// since both ciphertext identities include the provider and model.
+		_, err = tx.ExecContext(ctx, `INSERT INTO installation_credentials VALUES(1,?,?,?,?) ON CONFLICT(id) DO UPDATE SET provider=excluded.provider,model=excluded.model,github_token=excluded.github_token,provider_key=excluded.provider_key`, c.Provider, c.Model, s.secrets.seal(c.GitHubToken, credentialContext(c, "github")), s.secrets.seal(c.ProviderKey, credentialContext(c, "provider")))
 		if err == nil && p != nil {
 			raw, e := json.Marshal(p)
 			if e != nil {

@@ -75,7 +75,7 @@ type runtimeProviders struct {
 // Discovery never creates a session or submits a prompt.
 func (s *Service) Models(ctx context.Context, chatIDs ...string) ModelOptions {
 	credentials, err := s.Store.Credentials(ctx)
-	if err != nil {
+	if err != nil || credentials.ProviderKey == "" || credentials.Model == "" {
 		return ModelOptions{Models: []ModelOption{}, Error: "Configure a model provider in installation settings."}
 	}
 	fallback := ModelOptions{Default: storage.Execution{Provider: credentials.Provider, Model: credentials.Model}, Models: []ModelOption{{Provider: credentials.Provider, ID: credentials.Model, Name: credentials.Model, Variants: []string{}}}, Error: "Model discovery is unavailable. You can use the installation default or retry."}
@@ -204,7 +204,7 @@ func (s *Service) SetChatModel(ctx context.Context, chatID string, selected stor
 
 func (s *Service) validateExecution(ctx context.Context, selected storage.Execution, attachments []string, chatIDs ...string) error {
 	credentials, err := s.Store.Credentials(ctx)
-	if err != nil {
+	if err != nil || credentials.ProviderKey == "" || credentials.Model == "" {
 		return &ControlError{Reason: "Configure a model provider in installation settings."}
 	}
 	if !selected.Valid() || selected.Provider != credentials.Provider {

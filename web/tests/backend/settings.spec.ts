@@ -112,13 +112,17 @@ test("settings persistence, credential rotation, and completion sounds", async (
   await page.getByLabel("Git author email", { exact: true }).fill("browser@example.test");
   await page.getByLabel("Play a sound when a chat finishes work", { exact: true }).uncheck();
   await page.getByLabel("Provider API key", { exact: true }).fill("invalid-fixture-key");
-  await page.getByRole("button", { name: "Validate and save", exact: true }).click();
+  await page.getByRole("button", { name: "Validate and save model", exact: true }).click();
   await page.getByRole("alert").filter({ hasText: "Anthropic rejected the credential" }).waitFor();
   assert.equal(await page.getByLabel("CPUs per chat", { exact: true }).inputValue(), "3");
   await page.getByLabel("Provider API key", { exact: true }).fill("rotated-fixture-key");
-  await page.getByRole("button", { name: "Validate and save", exact: true }).click();
+  await page.getByRole("button", { name: "Validate and save model", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "Settings saved" }).waitFor();
   assert.equal(await page.getByLabel("Provider API key", { exact: true }).inputValue(), "");
+  // Saving the model must keep the unsaved preferences draft intact.
+  assert.equal(await page.getByLabel("CPUs per chat", { exact: true }).inputValue(), "3");
+  await page.getByRole("button", { name: "Save preferences", exact: true }).click();
+  await page.getByRole("status").filter({ hasText: "Settings saved" }).waitFor();
   await page.getByRole("button", { name: "Check dependencies", exact: true }).click();
   await page.getByText(/Cannot reach Docker/).waitFor();
   await page.getByText(/Image pull failed/).waitFor();
