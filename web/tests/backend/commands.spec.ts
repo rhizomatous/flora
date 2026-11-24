@@ -1,13 +1,14 @@
+import { publicChatID, logIn, pageErrors } from "../helpers.ts";
+
 import assert from "node:assert/strict";
 import { test, expect } from "../fixtures.ts";
-import { logIn, pageErrors } from "../helpers.ts";
 
 test.use({ scenario: "context" });
 
 test("commands support keyboard selection, cancellation, IME, literal slashes and persisted execution", async ({ page, backend }) => {
   const errors = pageErrors(page);
   await logIn(page);
-  await page.goto(`${backend.url}/#chats/${backend.chatID}`);
+  await page.goto(`${backend.url}/#chats/${await publicChatID(page, backend.chatID)}`);
   const composer = page.getByLabel("Follow-up", { exact: true });
   const options = page.getByRole("listbox", { name: "Commands", exact: true });
   await composer.fill("/");

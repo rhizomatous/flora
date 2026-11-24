@@ -4,7 +4,7 @@ test("sidebar searches, collapses projects, and preserves navigation on narrow s
   page,
 }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
-  await page.goto(`${base}/#chats/pagination`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "pagination")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const nav = page.getByRole("navigation", { name: "Main", exact: true });
   const target = nav.getByRole("link", { name: /Fix duplicate notes between pages/ });
@@ -51,7 +51,7 @@ test("sidebar searches, collapses projects, and preserves navigation on narrow s
 
 test("sidebar and page topbars share vertical alignment", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
-  for (const route of ["chats/pagination", "settings"]) {
+  for (const route of [`chats/${await publicChatID(page, "pagination")}`, "settings"]) {
     await page.goto(`${base}/#${route}`);
     const header = await page.locator(".florets-topbar").boundingBox();
     const brand = await page.locator(".sidebar-brand-row").boundingBox();
@@ -90,7 +90,7 @@ test("mobile sidebar focuses its toggle and keeps the skip link keyboard accessi
 }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`${base}/#chats/pagination`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "pagination")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const nav = page.getByRole("navigation", { name: "Main", exact: true });
@@ -112,7 +112,7 @@ test("mobile sidebar focuses its toggle and keeps the skip link keyboard accessi
 
 test("one desktop toggle moves between sidebar and page without losing focus", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
-  await page.goto(`${base}/#chats/pagination`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "pagination")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const toggle = page.getByRole("button", { name: "Menu", exact: true });
   await expect(page.locator('[data-slot="sidebar-trigger"]')).toHaveCount(1);

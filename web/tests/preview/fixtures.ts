@@ -35,7 +35,11 @@ export const test = base.extend<{}, { previewServer: boolean }>({
 export { expect } from "@playwright/test";
 
 /** Resolve the fixture's internal key through the API before checking canonical navigation. */
-export async function publicChatID(page: Page, id: string, origin = page.url()) {
+export async function publicChatID(
+  page: Page,
+  id: string,
+  origin = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199",
+) {
   const response = await page.request.get(
     new URL(`/api/chats/${encodeURIComponent(id)}`, origin).href,
   );

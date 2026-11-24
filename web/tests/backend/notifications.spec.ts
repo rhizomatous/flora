@@ -1,14 +1,8 @@
+import { publicChatID, openWorkspaceMenu, openSettings, assertFitsPhone, logIn, pageErrors,  } from "../helpers.ts";
+
 import assert from "node:assert/strict";
 
 import { test } from "../fixtures.ts";
-
-import {
-  openWorkspaceMenu,
-  openSettings,
-  assertFitsPhone,
-  logIn,
-  pageErrors,
-} from "../helpers.ts";
 
 test.use({ scenario: "notifications" });
 
@@ -80,7 +74,7 @@ test("completion notifications, reconnects, and sound preferences", async ({ pag
   const chatURL = page.url();
   const chatID = new URL(chatURL).hash.slice("#chats/".length);
   await page.getByRole("form", { name: "Questions", exact: true }).waitFor();
-  await page.goto(`${backend.url}/#chats/${backend.otherChatID}`);
+  await page.goto(`${backend.url}/#chats/${await publicChatID(page, backend.otherChatID)}`);
   await page.getByRole("heading", { name: "Other conversation", exact: true }).waitFor();
   const reply = await context.request.post(
     `${backend.url}/api/chats/${chatID}/questions/que_browser/reply`,

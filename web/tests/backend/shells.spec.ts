@@ -1,5 +1,6 @@
+import { publicChatID, logIn, pageErrors } from "../helpers.ts";
+
 import { test, expect } from "../fixtures.ts";
-import { logIn, pageErrors } from "../helpers.ts";
 
 test.use({ scenario: "shells" });
 test.skip(!process.env.FLORA_SHELL_PREVIEW_IMAGE, "Requires a locally built agent image and Docker");
@@ -12,7 +13,7 @@ test("real shell reconnect, resize, exit and tab navigation", async ({ page, bac
     disconnect = async () => { await socket.close(); await server.close(); };
   });
   await logIn(page);
-  await page.goto(`${backend.url}/#chats/${backend.chatID}`);
+  await page.goto(`${backend.url}/#chats/${await publicChatID(page, backend.chatID)}`);
   const draft = page.getByLabel("Follow-up", { exact: true });
   await draft.fill("Keep my draft while I inspect the workspace");
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
@@ -63,7 +64,7 @@ test("real shell reconnect, resize, exit and tab navigation", async ({ page, bac
 
 test("machine stop and wake keep old shells ended and never replace the container", async ({ page, backend }) => {
   await logIn(page);
-  await page.goto(`${backend.url}/#chats/${backend.chatID}`);
+  await page.goto(`${backend.url}/#chats/${await publicChatID(page, backend.chatID)}`);
   await expect(page.getByRole("button", { name: "Chat views", exact: true })).toBeVisible();
   const readChat = () => page.evaluate(async id => {
     const response = await fetch(`/api/chats/${id}`);
@@ -87,16 +88,15 @@ test("machine stop and wake keep old shells ended and never replace the containe
   await expect(allTerminals.first().getByRole("status")).toHaveText("Shell ended");
   const after = await readChat();
   expect(after.chat.ContainerID).toBe(before.chat.ContainerID);
-  await page.goto(`${backend.url}/#chats/${backend.otherChatID}`);
+  await page.goto(`${backend.url}/#chats/${await publicChatID(page, backend.otherChatID)}`);
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "New shell", exact: true })).toBeDisabled();
   await expect(page.getByRole("dialog", { name: "Chat views", exact: true }).getByRole("alert")).toHaveCount(0);
 });
 
-
 test("New shell wakes the saved sleeping machine and keeps unavailable actions disabled", async ({ page, backend }) => {
   await logIn(page);
-  await page.goto(`${backend.url}/#chats/${backend.chatID}`);
+  await page.goto(`${backend.url}/#chats/${await publicChatID(page, backend.chatID)}`);
   await expect(page.getByRole("button", { name: "Chat views", exact: true })).toBeVisible();
   const before = await page.evaluate(async id => (await (await fetch(`/api/chats/${id}`)).json()).chat.ContainerID, backend.chatID);
   await page.getByRole("button", { name: "More chat actions", exact: true }).click();

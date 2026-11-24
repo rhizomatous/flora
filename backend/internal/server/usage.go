@@ -18,6 +18,14 @@ func (a *api) usageRoutes(mux *http.ServeMux) {
 			failure(w, 503, "Could not load usage. Try again.")
 			return
 		}
+		for i := range report.Chats {
+			chat, err := a.settings.Store.Chat(r.Context(), report.Chats[i].ID)
+			if err != nil {
+				failure(w, 503, "Could not load usage. Try again.")
+				return
+			}
+			report.Chats[i].ID = chat.PublicID
+		}
 		jsonResponse(w, 200, report)
 	})
 }

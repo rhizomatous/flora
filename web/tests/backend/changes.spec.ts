@@ -1,8 +1,8 @@
+import { publicChatID, assertFitsPhone, logIn, pageErrors } from "../helpers.ts";
+
 import assert from "node:assert/strict";
 
 import { test, expect } from "../fixtures.ts";
-
-import { assertFitsPhone, logIn, pageErrors } from "../helpers.ts";
 
 test.use({ scenario: "changes" });
 
@@ -13,7 +13,7 @@ test("chat shows saved PRs without requesting full diffs", async ({ page, backen
     if (/\/chats\/[^/]+\/(changes|pulls)/.test(request.url())) reviewRequests.push(request.url());
   });
   await logIn(page);
-  await page.goto(`${backend.url}/#chats/${backend.chatID}`);
+  await page.goto(`${backend.url}/#chats/${await publicChatID(page, backend.chatID)}`);
   await expect(page.getByLabel("Follow-up", { exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Changes", exact: true })).toHaveCount(0);
   await expect(page.getByRole("list", { name: "Pull requests" })).toHaveCount(0);

@@ -2,7 +2,7 @@ import { test, expect, publicChatID } from "./fixtures.ts";
 
 test("linked PRs appear in the sidebar, hover cards, and composer", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
-  await page.goto(`${base}/#chats/pagination`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "pagination")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const row = page.locator(
     `.florets-navigation-link[href='#chats/${await publicChatID(page, "pagination")}']`,
@@ -53,7 +53,7 @@ test("linked PRs appear in the sidebar, hover cards, and composer", async ({ pag
     ["checkout", "example/storefront #42 Draft"],
     ["focus", "example/flora #73 Merged"],
   ] as const) {
-    await page.goto(`${base}/#chats/${chat}`);
+    await page.goto(`${base}/#chats/${await publicChatID(page, chat)}`);
     await page.getByRole("button", { name: "Linked pull requests (1)", exact: true }).click();
     await expect(
       page.getByRole("dialog").getByRole("link", { name: new RegExp(label) }),
@@ -73,7 +73,7 @@ test("linked PRs refresh from the feed without reloading the chat", async ({ pag
       body: merged ? body.replaceAll('"state":"open"', '"state":"merged"') : body,
     });
   });
-  await page.goto(`${base}/#chats/pagination`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "pagination")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await page.getByRole("button", { name: "Linked pull requests (2)", exact: true }).click();
   const dialog = page.getByRole("dialog");
@@ -95,7 +95,7 @@ test("linked PRs refresh from the feed without reloading the chat", async ({ pag
 
 test("transcript PR links show status and react to hover and keyboard focus", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
-  await page.goto(`${base}/#chats/pagination`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "pagination")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const transcript = page.getByRole("region", { name: "Conversation", exact: true });
   const closed = transcript.getByRole("link", {
@@ -118,4 +118,25 @@ test("transcript PR links show status and react to hover and keyboard focus", as
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(open).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
+test("PR navigation uses the loaded chat when the notification feed is unavailable", async ({
+  page,
+}) => {
+  const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
+  const id = await publicChatID(page, "pagination");
+  await page.route("**/api/notifications*", (route) =>
+    route.fulfill({ status: 503, json: { error: "Unavailable" } }),
+  );
+  await page.goto(`${base}/#chats/${id}`);
+  await page.getByRole("button", { name: "Hide controls", exact: true }).click();
+  await page.getByLabel("Follow-up", { exact: true }).fill("Keep this draft");
+  await page.getByRole("button", { name: "Linked pull requests (2)", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("link", { name: /example\/fieldnotes #19 Open/ })
+    .click();
+  await expect(page.getByRole("tab", { name: /#19/ })).toBeVisible();
+  await expect(page).toHaveURL(`${base}/#chats/${id}`);
+  await expect(page.getByLabel("Follow-up", { exact: true })).toHaveValue("Keep this draft");
 });

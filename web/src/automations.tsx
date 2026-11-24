@@ -42,7 +42,6 @@ import {
   type Automation,
   type AutomationDetail,
 } from "./automation-schemas";
-import { useChatReference } from "./chat-identity";
 import { ModelControls } from "./model-controls";
 import { projectSummarySchema, type ProjectSummary } from "./project-schemas";
 import { errorMessage, isExpired, request } from "./request";
@@ -218,7 +217,6 @@ function AutomationForm({
   toggleActive: () => void;
   cancel: () => void;
 }) {
-  const reference = useChatReference();
   const [value, setValue] = useState(initial);
   const [preview, setPreview] = useState("");
   const [previewError, setPreviewError] = useState("");
@@ -327,22 +325,19 @@ function AutomationForm({
             >
               {initial.id ? initial.name : "New automation"}
             </Heading>
-            {initial.mode === "same" && value.mode === "same" && initial.chatID && (
-              <Button
-                variant="outline"
-                size="sm"
-                nativeButton={false}
-                role="link"
-                render={
-                  <a
-                    href={`#chats/${initial.publicChatID ?? reference(initial.chatID)}`}
-                    aria-label="Open chat"
-                  />
-                }
-              >
-                Open chat
-              </Button>
-            )}
+            {initial.mode === "same" &&
+              value.mode === "same" &&
+              (initial.publicChatID ?? "") !== "" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  nativeButton={false}
+                  role="link"
+                  render={<a href={`#chats/${initial.publicChatID}`} aria-label="Open chat" />}
+                >
+                  Open chat
+                </Button>
+              )}
             {initial.id ? (
               <Button
                 type="button"
@@ -607,7 +602,6 @@ export function Automations({
   const [pending, setPending] = useState<"save" | "run" | "active" | null>(null);
   const busy = pending !== null;
   const [error, setError] = useState("");
-  const reference = useChatReference();
   const manualID = useRef<string | null>(null);
   const isNew = path === "automations/new";
   const id = isNew ? "" : (path.split("/")[1] ?? "");
@@ -666,14 +660,15 @@ export function Automations({
       toast.success("Run started", {
         description: name,
         duration: 5000,
-        action: run.chatID
-          ? {
-              label: "Open chat",
-              onClick: () => {
-                window.location.hash = `chats/${run.publicChatID ?? reference(run.chatID)}?run=${encodeURIComponent(run.messageID)}`;
-              },
-            }
-          : undefined,
+        action:
+          (run.publicChatID?.length ?? 0) > 0
+            ? {
+                label: "Open chat",
+                onClick: () => {
+                  window.location.hash = `chats/${run.publicChatID}?run=${encodeURIComponent(run.messageID)}`;
+                },
+              }
+            : undefined,
       });
     }
   }
@@ -768,10 +763,10 @@ export function Automations({
                     {run.reason && (
                       <p className="mt-2 text-sm text-muted-foreground">{run.reason}</p>
                     )}
-                    {run.chatID && (
+                    {(run.publicChatID?.length ?? 0) > 0 && (
                       <Link
                         className="mt-2 inline-block text-sm"
-                        href={`#chats/${run.publicChatID ?? reference(run.chatID)}?run=${encodeURIComponent(run.messageID)}`}
+                        href={`#chats/${run.publicChatID}?run=${encodeURIComponent(run.messageID)}`}
                       >
                         Open chat
                       </Link>

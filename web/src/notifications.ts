@@ -6,7 +6,7 @@ import { isExpired, request } from "./request";
 import { latestRead, readEvent, viewedSchema } from "./sidebar-status";
 import { useCompletionSound } from "./sound";
 
-export type Toast = Completion & { title: string };
+export type Toast = Completion & { title: string; publicChatID: string };
 
 /**
  * Polls the app-wide feed that supplies both the chat list and completion toasts. The cursor
@@ -49,8 +49,11 @@ export function useNotifications(authenticated: boolean, sound: boolean, onExpir
         );
         setError("");
         if (fresh.length === 0) return;
-        const title = (id: string) => feed.chats.find((c) => c.ID === id)?.Title ?? "Chat";
-        setToasts((rows) => [...rows, ...fresh.map((e) => ({ ...e, title: title(e.ChatID) }))]);
+        const completed = fresh.flatMap((event) => {
+          const chat = feed.chats.find((row) => row.ID === event.ChatID);
+          return chat ? [{ ...event, title: chat.Title, publicChatID: chat.PublicID }] : [];
+        });
+        setToasts((rows) => [...rows, ...completed]);
         play();
       } catch (error_) {
         if (!active) return;

@@ -63,7 +63,7 @@ export function ChatSummary({
       {showPullList && ((pulls?.items.length ?? 0) > 0 || (pulls?.error ?? "") !== "") && (
         <section aria-label="Pull requests" className="chat-summary-section">
           <p className="chat-summary-section-label">Pull requests</p>
-          <PullList summary={pulls} chatID={chat?.ID} />
+          <PullList summary={pulls} chat={chat} />
         </section>
       )}
       {chat && (

@@ -82,7 +82,7 @@ test("live work grouping, disclosure state, and focus", async ({ page }) => {
     });
   });
   phase = 0;
-  await page.goto(`${base}/#chats/working`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "working")}`);
   const groups = page.locator('[data-slot="work-summary"]');
   await expect(groups).toHaveCount(1);
   await expect(

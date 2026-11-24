@@ -1,7 +1,8 @@
+import { publicChatID, logIn, pageErrors } from "../helpers.ts";
+
 import assert from "node:assert/strict";
 
 import { test, expect } from "../fixtures.ts";
-import { logIn, pageErrors } from "../helpers.ts";
 
 test.use({ scenario: "context" });
 
@@ -11,7 +12,7 @@ test("context picker adds live references, restores drafts, and supports keyboar
 }) => {
   const errors = pageErrors(page);
   await logIn(page);
-  await page.goto(`${backend.url}/#chats/${backend.chatID}`);
+  await page.goto(`${backend.url}/#chats/${await publicChatID(page, backend.chatID)}`);
   const composer = page.getByLabel("Follow-up", { exact: true });
   await composer.fill("Review ");
   await page.getByRole("button", { name: "Add attachments and context" }).click();
@@ -99,7 +100,7 @@ test("file references do not copy large contents and keep the draft", async ({
   backend,
 }) => {
   await logIn(page);
-  await page.goto(`${backend.url}/#chats/${backend.chatID}`);
+  await page.goto(`${backend.url}/#chats/${await publicChatID(page, backend.chatID)}`);
   await page.getByLabel("Follow-up", { exact: true }).fill("Keep this draft");
   await page.getByRole("button", { name: "Add attachments and context" }).click();
   await page.getByRole("menuitem", { name: "Files", exact: true }).click();

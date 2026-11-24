@@ -71,7 +71,7 @@ function ChatLink({ chat, expanded = false }: { chat: Chat; expanded?: boolean }
 function PullRow({ row }: { row: TrackedPull }) {
   const { pull, repository, chats } = row;
   const [first, ...remaining] = chats;
-  const navigation = usePullNavigation(first?.ID);
+  const navigation = usePullNavigation(first);
   return (
     <Item size="list" render={<li />} className="flex-wrap sm:flex-nowrap">
       <Tooltip>

@@ -10,7 +10,7 @@ test("chat drafts, activity, and responsive layout", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
   await page.request.post(`${base}/__preview/control?action=restart`);
   await page.request.post(`${base}/__preview/control?action=pause`);
-  await page.goto(`${base}/#chats/working`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "working")}`);
   const draft = page.getByLabel("Follow-up", { exact: true });
   await expect(draft).toBeEnabled();
   await draft.fill("Keep this draft");
@@ -45,7 +45,7 @@ test("chat drafts, activity, and responsive layout", async ({ page }) => {
     "aria-expanded",
     "false",
   );
-  await page.goto(`${base}/#chats/completed`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "completed")}`);
   await expect(draft).toHaveValue("");
   await page.locator('[data-slot="markdown"]').waitFor();
   const summary = page.getByRole("button", { name: /Worked for/ }).first();
@@ -81,14 +81,14 @@ test("chat drafts, activity, and responsive layout", async ({ page }) => {
   await expect(draft).toHaveValue("");
   await page.reload();
   await expect(draft).toHaveValue("");
-  await page.goto(`${base}/#chats/working`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "working")}`);
   await expect(draft).toHaveValue("Keep this draft\n");
-  await page.goto(`${base}/#chats/recovery`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "recovery")}`);
   await expect(page.getByRole("button", { name: /1 failed/ })).toHaveAttribute(
     "aria-expanded",
     "false",
   );
-  await page.goto(`${base}/#chats/long`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "long")}`);
   await page.locator('[data-slot="markdown"]').first().waitFor();
   const viewport = page.getByLabel("Conversation", { exact: true });
   await viewport.hover();
@@ -102,7 +102,7 @@ test("chat drafts, activity, and responsive layout", async ({ page }) => {
   await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   assert.deepEqual(await draft.boundingBox(), before);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`${base}/#chats/waiting`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "waiting")}`);
   await expect(page.getByRole("form", { name: "Questions", exact: true })).toBeVisible();
   await expect(draft).toBeEnabled();
   const bounds = await draft.boundingBox();
@@ -124,7 +124,7 @@ test("shared composer stays compact and preserves drafts", async ({ page }) => {
     const message = page.getByLabel("Message", { exact: true });
     await message.fill("Draft a task");
     const start = await page.getByRole("button", { name: "Start chat", exact: true }).boundingBox();
-    await page.goto(`${base}/#chats/completed`);
+    await page.goto(`${base}/#chats/${await publicChatID(page, "completed")}`);
     const followUp = page.getByLabel("Follow-up", { exact: true });
     await followUp.fill("Draft a follow-up");
     const send = await page
@@ -168,7 +168,7 @@ test("shared composer stays compact and preserves drafts", async ({ page }) => {
 
 test("title summary opens independently of the plus menu", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
-  await page.goto(`${base}/#chats/completed`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "completed")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const title = page.getByRole("button", { name: "Review the workspace changes", exact: true });
   const summary = page.getByLabel("Chat summary", { exact: true });

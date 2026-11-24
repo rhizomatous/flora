@@ -1,5 +1,5 @@
 import { detailSchema, feedSchema, type Message, type Subagent } from "../../src/chat-schemas";
-import { test, expect } from "./fixtures.ts";
+import { publicChatID, test, expect } from "./fixtures.ts";
 
 const message = (ID: string, Role: string, text: string): Message => ({
   ID,
@@ -60,7 +60,7 @@ test("subagent links, menus, and restored tabs share a saved conversation", asyn
       },
     }),
   );
-  await page.goto(`${base}/#chats/completed`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "completed")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const draft = page.getByLabel("Follow-up", { exact: true });
   await draft.fill("Keep my draft");
@@ -138,7 +138,7 @@ test("chat hover cards show saved subagent names and tasks", async ({ page }) =>
 test("subagent tabs follow their pane and close like Diffs", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
   await page.setViewportSize({ width: 1600, height: 1000 });
-  await page.goto(`${base}/#chats/subagents`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "subagents")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const main = page.locator(".chat-main-pane");
   await main.getByRole("button", { name: "Chat views", exact: true }).click();

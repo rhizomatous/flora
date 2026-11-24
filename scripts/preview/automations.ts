@@ -8,7 +8,13 @@ import {
   type Automation,
   type AutomationDetail,
 } from "../../web/src/automation-schemas.ts";
+import { publicID } from "./chat-identity.ts";
 import { projects, scenarios } from "./scenarios.ts";
+
+function publicReference(chatID: string, projectID: string) {
+  const project = projects.find((item) => item.id === projectID);
+  return chatID && project ? publicID(chatID, projectID, project.name) : undefined;
+}
 
 type Run = AutomationDetail["runs"][number];
 const inputSchema = automationSchema
@@ -125,6 +131,8 @@ export class PreviewAutomations {
       const item: Automation = {
         ...seed,
         chatID: seed.mode === "same" ? seed.chatID : "",
+        publicChatID:
+          seed.mode === "same" ? publicReference(seed.chatID, chat.projectID) : undefined,
         projectID: chat.projectID,
         instructions: instruction,
         frequency: "weekly",
@@ -142,6 +150,7 @@ export class PreviewAutomations {
           id: `sample-${seed.id}`,
           automationID: item.id,
           chatID: chat.id,
+          publicChatID: publicReference(chat.id, chat.projectID),
           messageID: `saved-${first.info.id}`,
           scheduledAt: new Date(Date.now() - 86_400_000).toISOString(),
           status: frame.questions.length > 0 ? "waiting" : "completed",
@@ -202,6 +211,7 @@ export class PreviewAutomations {
         id: existing?.id ?? randomUUID(),
         nextRun: previewNextRun(input),
         chatID: existing?.mode === input.mode ? existing.chatID : "",
+        publicChatID: existing?.mode === input.mode ? existing.publicChatID : undefined,
         revision: (existing?.revision ?? 0) + 1,
       };
       this.items.set(item.id, item);
@@ -227,9 +237,13 @@ export class PreviewAutomations {
           ? "Simulated preview run. No tools were executed or files changed."
           : "This chat is working or waiting for an answer.",
         chatID: result?.chatID ?? existing.chatID,
+        publicChatID: publicReference(result?.chatID ?? existing.chatID, existing.projectID),
         messageID: result?.messageID ?? "",
       };
-      if (result && existing.mode === "same") existing.chatID = result.chatID;
+      if (result && existing.mode === "same") {
+        existing.chatID = result.chatID;
+        existing.publicChatID = run.publicChatID;
+      }
       this.runs.push(run);
       json(res, run, 202);
       return;

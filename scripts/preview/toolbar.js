@@ -57,7 +57,12 @@ bar.addEventListener("change", (event) => {
   void changeChecks(chat, select.value);
 });
 document.body.append(bar);
-if (!window.location.hash) window.location.hash = "chats/completed";
+if (!window.location.hash) {
+  const script = document.querySelector("script[data-default-chat]");
+  if (script instanceof HTMLScriptElement) {
+    window.location.hash = `chats/${script.dataset.defaultChat}`;
+  }
+}
 
 const updateControls = () => {
   const id = /^#chats\/([^/?]+)(?:\?.*)?$/.exec(window.location.hash)?.[1];

@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures.ts";
+import { publicChatID, test, expect } from "./fixtures.ts";
 
 const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
 
@@ -6,7 +6,7 @@ test("view search supports keyboard selection, empty results, escape, and saved 
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto(`${base}/#chats/subagents`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "subagents")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const draft = page.getByLabel("Follow-up", { exact: true });
   await draft.fill("Keep this unsent search draft");
@@ -85,7 +85,7 @@ test("task searches reuse subagent identities in each pane and expose unavailabl
     );
   });
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto(`${base}/#chats/subagents`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "subagents")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const main = page.locator(".chat-main-pane");
   const search = page.getByRole("searchbox", { name: "Search views", exact: true });
@@ -115,7 +115,7 @@ test("task searches reuse subagent identities in each pane and expose unavailabl
 });
 
 test("pull request search reuses the existing side-panel tab", async ({ page }) => {
-  await page.goto(`${base}/#chats/pagination`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "pagination")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const search = page.getByRole("searchbox", { name: "Search views", exact: true });
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
@@ -141,7 +141,7 @@ test("shell search reuses shell IDs and disables unavailable saved shells", asyn
       },
     }),
   );
-  await page.goto(`${base}/#chats/subagents`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "subagents")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const trigger = page.getByRole("button", { name: "Chat views", exact: true });
   const search = page.getByRole("searchbox", { name: "Search views", exact: true });

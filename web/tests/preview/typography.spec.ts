@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures.ts";
+import { test, expect, publicChatID } from "./fixtures.ts";
 
 const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
 
@@ -73,7 +73,7 @@ test("editable controls keep their text size across viewport widths", async ({ p
     await expect(page.getByLabel("Time", { exact: true })).toHaveCSS("font-size", "14px");
     for (const [route, label] of [
       ["chats/new", "Message"],
-      ["chats/working", "Follow-up"],
+      [`chats/${await publicChatID(page, "working")}`, "Follow-up"],
     ] as const) {
       await page.goto(`${base}/#${route}`);
       await expect(page.getByLabel(label, { exact: true })).toHaveCSS("font-size", "14px");
