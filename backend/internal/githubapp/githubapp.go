@@ -191,7 +191,7 @@ func (s *Service) Start(ctx context.Context, session, origin string) (Start, err
 		"setup_url": origin + "/github/callback", "setup_on_update": false,
 		"public": true, "request_oauth_on_install": false,
 		"hook_attributes":     map[string]any{"url": origin + "/github/events", "active": false},
-		"default_permissions": map[string]string{"contents": "write", "pull_requests": "write", "issues": "write", "checks": "read", "actions": "read", "workflows": "write", "metadata": "read"},
+		"default_permissions": map[string]string{"contents": "write", "pull_requests": "write", "issues": "write", "checks": "read", "statuses": "read", "actions": "read", "workflows": "write", "metadata": "read"},
 	})
 	return Start{URL: "https://github.com/settings/apps/new?state=" + url.QueryEscape(state), Manifest: string(manifest)}, nil
 }

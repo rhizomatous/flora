@@ -72,6 +72,11 @@ func TestManifestBindingAndResumption(t *testing.T) {
 	if manifest["redirect_url"] != "https://flora.test/github/callback" || manifest["setup_url"] != "https://flora.test/github/callback" || manifest["request_oauth_on_install"] != false || manifest["hook_attributes"].(map[string]any)["active"] != false {
 		t.Fatal(manifest)
 	}
+	// Commit status summaries and check runs require separate GitHub permissions.
+	permissions := manifest["default_permissions"].(map[string]any)
+	if permissions["statuses"] != "read" || permissions["checks"] != "read" || permissions["contents"] != "write" || permissions["workflows"] != "write" {
+		t.Fatal("manifest cannot read checks or push workflow changes", permissions)
+	}
 	for _, secret := range []string{app.PrivateKey, app.ClientSecret, app.WebhookSecret, "github_pat_fixture"} {
 		if strings.Contains(start.Manifest, secret) {
 			t.Fatal("manifest exposes credential")
