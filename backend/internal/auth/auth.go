@@ -23,6 +23,7 @@ const iterations = 600000
 
 var ErrPassword = errors.New("Use a password between 12 and 1024 bytes.")
 var ErrLogin = errors.New("Password is incorrect.")
+var ErrRecovery = errors.New("Recovery access expired or was replaced. Obtain a new recovery link from the host.")
 var ErrSetup = errors.New("Setup access expired or was replaced. Obtain a new setup link from the host.")
 
 type Service struct {
@@ -115,7 +116,10 @@ func (s *Service) Login(ctx context.Context, password string) (string, time.Time
 		return "", time.Time{}, err
 	}
 	expires := s.Now().Add(time.Duration(p.SessionSeconds) * time.Second).Truncate(time.Second)
-	err = s.Store.CreateSession(ctx, TokenHash(token), expires)
+	err = s.Store.CompletePasswordLogin(ctx, hash, TokenHash(token), expires, s.Now())
+	if errors.Is(err, storage.ErrNotFound) {
+		err = ErrLogin
+	}
 	return token, expires, err
 }
 

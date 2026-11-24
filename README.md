@@ -77,6 +77,28 @@ logout immediately revokes that session on the server. All API data routes requi
 authentication, except health and account status. Login and setup require the
 configured same-origin HTTPS address.
 
+Passkeys are available during setup and under Installation settings. Flora derives
+its relying-party ID from the DNS hostname in `-public-url`, with the exact HTTPS
+origin (including a non-default port) used for verification. IP-address deployments
+can use passwords. Register multiple passkeys for spare access; the last passkey
+cannot be removed from a passkey-only account.
+
+If all sign-in methods are lost, run this command from an interactive host terminal:
+
+```sh
+sudo /opt/flora/flora -data-dir /var/lib/flora -public-url https://flora.example.com -recover-account
+```
+
+Use the service's data directory, public URL, and credential key options. The
+command works while Flora is running or stopped and prints a 15-minute recovery
+link only to the terminal. Each new link invalidates the previous link. Open it
+to register a replacement passkey or set a new password. Completing recovery
+revokes all sessions and removes old passkeys and the old password, while keeping
+projects, chats, and settings. The link is consumed only on successful recovery.
+For an address change, restart Flora with the new `-public-url`, then issue a
+recovery link using that address and enroll a passkey there. Existing passwords
+still work after an address change.
+
 Settings accept a fine-grained GitHub token and an OpenAI, Anthropic, or Google
 API key. Save validates the GitHub account and access to the chosen model through
 the provider's model metadata endpoint. This initial account check does not

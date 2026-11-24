@@ -38,7 +38,15 @@ func main() {
 	keyFile := flag.String("credential-key-file", "", "private encryption key file outside data-dir (defaults to data-dir.key)")
 	rotateKey := flag.String("rotate-credential-key-to", "", "offline: re-encrypt credentials using this separate key file, then exit")
 	setupLink := flag.String("setup-link", "", "show or replace first-run setup link, then exit")
+	recoverAccount := flag.Bool("recover-account", false, "create a 15-minute account recovery link in the host terminal, then exit")
 	flag.Parse()
+	if *recoverAccount {
+		if *setupLink != "" {
+			slog.Error("Use either -recover-account or -setup-link")
+			os.Exit(1)
+		}
+		*setupLink = "recover"
+	}
 	if *keyFile == "" {
 		*keyFile = filepath.Clean(*dataDir) + ".key"
 	}

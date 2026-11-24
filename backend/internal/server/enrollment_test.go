@@ -67,11 +67,14 @@ func TestInstallerSetupHTTP(t *testing.T) {
 		t.Fatal("setup grants admin access", w.Code)
 	}
 	status := call("/api/auth/status", "", "", cookie)
-	var state map[string]bool
+	var state struct {
+		SetupAuthorized bool `json:"setupAuthorized"`
+		Authenticated   bool `json:"authenticated"`
+	}
 	if err := json.Unmarshal(status.Body.Bytes(), &state); err != nil {
 		t.Fatal(err)
 	}
-	if !state["setupAuthorized"] || state["authenticated"] {
+	if !state.SetupAuthorized || state.Authenticated {
 		t.Fatal(state)
 	}
 	if w := call("/api/auth/setup", body, "https://flora.test", nil); w.Code != 200 {

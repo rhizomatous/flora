@@ -13,6 +13,7 @@ import {
   Text,
 } from "@flora/florets";
 
+import { AccountSettings } from "./account-settings";
 import { EnvironmentEditor } from "./environment";
 import { readPreferences } from "./preferences";
 import { request } from "./request";
@@ -92,6 +93,7 @@ export function Installation({
         MCP servers
       </a>
       <SectionStack className="mt-8">
+        <AccountSettings busy={busy} run={run} />
         <Section>
           <SectionHeader inset>
             <Heading level={2}>GitHub</Heading>

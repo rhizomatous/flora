@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@flora/florets": "0.0.0",
+    "@simplewebauthn/browser": "^14.0.0",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/xterm": "6.0.0",
     "react": "19.3.1",

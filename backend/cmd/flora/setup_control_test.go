@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/auth"
 	"github.com/rhizomatous/flora/backend/internal/storage"
@@ -158,5 +159,60 @@ func TestSetupControlSocketLifecycle(t *testing.T) {
 	closeControl()
 	if _, err := os.Lstat(path); !os.IsNotExist(err) {
 		t.Fatal("socket retained on close", err)
+	}
+}
+
+func TestHostAccountRecovery(t *testing.T) {
+	ctx := context.Background()
+	store, err := storage.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	dir := setupControlDirectory(t)
+	origin := "https://flora.example.com"
+	if _, err := accountRecoveryLink(ctx, store, origin); err == nil {
+		t.Fatal("recovered unclaimed installation")
+	}
+	if err := store.Bootstrap(ctx, "retained-password-hash", auth.TokenHash("old-session"), time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	closeControl, err := serveSetupControl(store, dir, origin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	link, online, err := requestSetupLink(ctx, dir, origin, "recover")
+	if err != nil || !online {
+		t.Fatal(err)
+	}
+	proof := strings.Split(link, "#recover/")[1]
+	service := auth.New(store)
+	if valid, err := service.RecoveryValid(ctx, proof); err != nil || !valid {
+		t.Fatal("invalid online recovery", err)
+	}
+	replacement, _, err := requestSetupLink(ctx, dir, origin, "recover")
+	if err != nil || replacement == link {
+		t.Fatal(err)
+	}
+	if valid, _ := service.RecoveryValid(ctx, proof); valid {
+		t.Fatal("retained replaced proof")
+	}
+	closeControl()
+	link, err = accountRecoveryLink(ctx, store, "https://new.example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	proof = strings.Split(link, "#recover/")[1]
+	if _, _, err := service.RecoverPassword(ctx, "a new host recovery password", proof); err != nil {
+		t.Fatal(err)
+	}
+	if valid, _ := store.SessionValid(ctx, auth.TokenHash("old-session"), time.Now()); valid {
+		t.Fatal("old session survived recovery")
+	}
+	if _, _, err := service.Login(ctx, "a new host recovery password"); err != nil {
+		t.Fatal("replacement password failed", err)
+	}
+	if _, _, err := service.RecoverPassword(ctx, "another recovery password", proof); err != auth.ErrRecovery {
+		t.Fatal("reused recovery link", err)
 	}
 }

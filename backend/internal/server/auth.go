@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/rhizomatous/flora/backend/internal/auth"
 	"github.com/rhizomatous/flora/backend/internal/chat"
 	"github.com/rhizomatous/flora/backend/internal/projects"
@@ -21,15 +22,19 @@ const cookieName = "__Host-flora"
 const setupCookieName = "__Host-flora-setup"
 
 type api struct {
-	auth          *auth.Service
-	settings      *settings.Service
-	projects      *projects.Service
-	chats         *chat.Service
-	origin        string
-	passwordSlots chan struct{}
-	attemptMu     sync.Mutex
-	attempts      int
-	attemptWindow time.Time
+	webauthn         *webauthn.WebAuthn
+	ceremonyMu       sync.Mutex
+	ceremonyWindow   time.Time
+	ceremonyAttempts int
+	auth             *auth.Service
+	settings         *settings.Service
+	projects         *projects.Service
+	chats            *chat.Service
+	origin           string
+	passwordSlots    chan struct{}
+	attemptMu        sync.Mutex
+	attempts         int
+	attemptWindow    time.Time
 }
 
 // The installation has one account. Limit password work globally rather than
@@ -79,7 +84,15 @@ func (a *api) protect(next http.Handler) http.Handler {
 			return
 		}
 		public := (r.Method == "GET" || r.Method == "HEAD") && (r.URL.Path == "/api/health" || r.URL.Path == "/api/auth/status")
-		public = public || (r.Method == "POST" && (r.URL.Path == "/api/auth/setup" || r.URL.Path == "/api/auth/bootstrap" || r.URL.Path == "/api/auth/login"))
+		if r.Method == "POST" {
+			switch r.URL.Path {
+			case "/api/auth/setup", "/api/auth/bootstrap", "/api/auth/login",
+				"/api/auth/recovery", "/api/auth/recover-password",
+				"/api/auth/passkeys/register/begin", "/api/auth/passkeys/register/finish",
+				"/api/auth/passkeys/login/begin", "/api/auth/passkeys/login/finish":
+				public = true
+			}
+		}
 		if !public && (mutation || r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/")) {
 			valid, err := a.auth.Valid(r.Context(), token(r))
 			if err != nil {
@@ -125,7 +138,7 @@ func (a *api) routes(mux *http.ServeMux) {
 		jsonResponse(w, 200, a.settings.Diagnose(ctx))
 	})
 	mux.HandleFunc("GET /api/auth/status", func(w http.ResponseWriter, r *http.Request) {
-		_, err := a.auth.Store.AdministratorHash(r.Context())
+		hash, err := a.auth.Store.AdministratorHash(r.Context())
 		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			failure(w, 500, "Administrator storage unavailable.")
 			return
@@ -140,7 +153,16 @@ func (a *api) routes(mux *http.ServeMux) {
 			failure(w, 500, "Setup storage unavailable.")
 			return
 		}
-		jsonResponse(w, 200, map[string]bool{"setupRequired": errors.Is(err, storage.ErrNotFound), "authenticated": valid, "setupAuthorized": setupValid})
+		recoveryValid, e := a.auth.RecoveryValid(r.Context(), namedToken(r, recoveryCookieName))
+		if e != nil {
+			failure(w, 500, "Recovery storage unavailable.")
+			return
+		}
+		passkeyError := ""
+		if a.webauthn == nil {
+			passkeyError = auth.ErrPasskeyConfig.Error()
+		}
+		jsonResponse(w, 200, map[string]any{"setupRequired": errors.Is(err, storage.ErrNotFound), "authenticated": valid, "setupAuthorized": setupValid, "recoveryAuthorized": recoveryValid, "passwordAvailable": hash != "", "passkeysAvailable": a.webauthn != nil, "passkeyError": passkeyError})
 	})
 	mux.HandleFunc("POST /api/auth/setup", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
@@ -161,7 +183,7 @@ func (a *api) routes(mux *http.ServeMux) {
 		setupCookie(w, value, expires, max(1, int(time.Until(expires).Seconds())))
 		jsonResponse(w, 200, map[string]bool{"setupAuthorized": true})
 	})
-	for _, action := range []string{"bootstrap", "login"} {
+	for _, action := range []string{"bootstrap", "login", "recover-password"} {
 		mux.HandleFunc("POST /api/auth/"+action, func(w http.ResponseWriter, r *http.Request) {
 			var in struct {
 				Password string `json:"password"`
@@ -187,10 +209,14 @@ func (a *api) routes(mux *http.ServeMux) {
 			var err error
 			if action == "bootstrap" {
 				value, expires, err = a.auth.Bootstrap(r.Context(), in.Password, setupToken(r))
+			} else if action == "recover-password" {
+				value, expires, err = a.auth.RecoverPassword(r.Context(), in.Password, namedToken(r, recoveryCookieName))
 			} else {
 				value, expires, err = a.auth.Login(r.Context(), in.Password)
 			}
 			switch {
+			case errors.Is(err, auth.ErrRecovery):
+				failure(w, 403, auth.ErrRecovery.Error())
 			case errors.Is(err, auth.ErrSetup):
 				failure(w, 403, auth.ErrSetup.Error())
 			case errors.Is(err, storage.ErrConflict):
@@ -204,6 +230,12 @@ func (a *api) routes(mux *http.ServeMux) {
 			default:
 				if action == "bootstrap" {
 					setupCookie(w, "", time.Unix(1, 0), -1)
+				}
+				if action == "recover-password" {
+					proofCookie(w, recoveryCookieName, "", time.Unix(1, 0), -1)
+				}
+				if token(r) != "" {
+					_ = a.auth.Logout(r.Context(), token(r))
 				}
 				sessionCookie(w, value, expires, max(1, int(time.Until(expires).Seconds())))
 				jsonResponse(w, 200, map[string]bool{"authenticated": true})
