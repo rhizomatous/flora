@@ -57,7 +57,7 @@ func TestInstallerSetupHTTP(t *testing.T) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	cookie := w.Result().Cookies()[0]
-	if cookie.Name != setupCookieName || !cookie.Secure || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode || cookie.Path != "/" || cookie.MaxAge > 900 || cookie.Domain != "" {
+	if cookie.Name != setupCookieName || !cookie.Secure || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode || cookie.Path != "/" || cookie.MaxAge > 3600 || cookie.MaxAge < 3595 || cookie.Domain != "" {
 		t.Fatal("unsafe setup cookie", cookie)
 	}
 	if strings.Contains(w.Body.String(), secret) {
@@ -74,8 +74,8 @@ func TestInstallerSetupHTTP(t *testing.T) {
 	if !state["setupAuthorized"] || state["authenticated"] {
 		t.Fatal(state)
 	}
-	if w := call("/api/auth/setup", body, "https://flora.test", nil); w.Code != 403 {
-		t.Fatal("link replay", w.Code)
+	if w := call("/api/auth/setup", body, "https://flora.test", nil); w.Code != 200 {
+		t.Fatal("link resume", w.Code)
 	}
 	w = call("/api/auth/bootstrap", `{"password":"long unique password"}`, "https://flora.test", cookie)
 	if w.Code != 200 {

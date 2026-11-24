@@ -23,7 +23,7 @@ const iterations = 600000
 
 var ErrPassword = errors.New("Use a password between 12 and 1024 bytes.")
 var ErrLogin = errors.New("Password is incorrect.")
-var ErrSetup = errors.New("Setup access expired or already used. Obtain a new setup link from the host.")
+var ErrSetup = errors.New("Setup access expired or was replaced. Obtain a new setup link from the host.")
 
 type Service struct {
 	Store *storage.Store

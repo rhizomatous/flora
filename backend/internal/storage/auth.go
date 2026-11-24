@@ -42,7 +42,7 @@ func (s *Store) bootstrap(ctx context.Context, passwordHash, tokenHash string, e
 		}
 		if setup != nil {
 			var valid bool
-			if err := tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM setup_access WHERE session_hash=? AND session_expires>?)", setup.hash, setup.at.Unix()).Scan(&valid); err != nil {
+			if err := tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM setup_access WHERE link_hash=? AND link_expires>?)", setup.hash, setup.at.Unix()).Scan(&valid); err != nil {
 				return err
 			}
 			if !valid {

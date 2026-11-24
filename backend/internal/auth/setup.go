@@ -9,7 +9,6 @@ import (
 )
 
 const SetupLinkLifetime = 24 * time.Hour
-const SetupSessionLifetime = 15 * time.Minute
 
 func NewSetupToken() string { return newToken() }
 
@@ -17,13 +16,11 @@ func (s *Service) RedeemSetup(ctx context.Context, link string) (string, time.Ti
 	if len(link) != 43 {
 		return "", time.Time{}, ErrSetup
 	}
-	session := newToken()
-	expires := s.Now().Add(SetupSessionLifetime).Truncate(time.Second)
-	err := s.Store.RedeemSetup(ctx, TokenHash(link), TokenHash(session), s.Now(), expires)
+	expires, err := s.Store.SetupLinkExpiry(ctx, TokenHash(link), s.Now())
 	if errors.Is(err, storage.ErrNotFound) {
 		err = ErrSetup
 	}
-	return session, expires, err
+	return link, expires, err
 }
 
 // SetupValid grants first-administrator creation only. Call Valid for every
@@ -32,5 +29,5 @@ func (s *Service) SetupValid(ctx context.Context, session string) (bool, error) 
 	if len(session) != 43 {
 		return false, nil
 	}
-	return s.Store.SetupSessionValid(ctx, TokenHash(session), s.Now())
+	return s.Store.SetupLinkValid(ctx, TokenHash(session), s.Now())
 }

@@ -268,7 +268,7 @@ func brokerTLS(ca *x509.Certificate, key *ecdsa.PrivateKey) *tls.Config {
 }
 
 // deploymentSetup retains the host-only link across restarts. Only an explicit
-// replacement resets consumed or expired access. Publish the file before SQLite
+// replacement resets expired access. Publish the file before SQLite
 // so interrupted publication can never resurrect the previously valid link.
 func deploymentSetup(ctx context.Context, store *storage.Store, dir, origin string, replace bool) (string, error) {
 	if _, err := store.AdministratorHash(ctx); err == nil {

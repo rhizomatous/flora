@@ -147,8 +147,8 @@ func TestDeploymentSetupRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if shown, err := deploymentSetup(ctx, store, dir, origin, false); err != nil || shown != "" {
-		t.Fatal("show resurrected consumed link", err)
+	if shown, err := deploymentSetup(ctx, store, dir, origin, false); err != nil || shown != first {
+		t.Fatal("show lost reusable link", err)
 	}
 	replacement, err := deploymentSetup(ctx, store, dir, origin, true)
 	if err != nil || replacement == first {

@@ -10,7 +10,7 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
-func TestSetupExpiryReplacementRestartAndConcurrency(t *testing.T) {
+func TestSetupResumeExpiryReplacementRestartAndConcurrency(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
 	store, err := storage.Open(ctx, root)
@@ -18,6 +18,7 @@ func TestSetupExpiryReplacementRestartAndConcurrency(t *testing.T) {
 		t.Fatal(err)
 	}
 	at := time.Now().Truncate(time.Second)
+	initial := at
 	s := New(store)
 	s.Now = func() time.Time { return at }
 	link := NewSetupToken()
@@ -31,12 +32,17 @@ func TestSetupExpiryReplacementRestartAndConcurrency(t *testing.T) {
 	if _, _, err := s.RedeemSetup(ctx, NewSetupToken()); !errors.Is(err, ErrSetup) {
 		t.Fatal(err)
 	}
-	at = at.Add(SetupLinkLifetime)
-	save(false)
-	if _, _, err := s.RedeemSetup(ctx, link); !errors.Is(err, ErrSetup) {
-		t.Fatal("expired link accepted", err)
+	session, expires, err := s.RedeemSetup(ctx, link)
+	if err != nil {
+		t.Fatal(err)
 	}
-	save(true)
+	if expires != initial.Add(24*time.Hour) {
+		t.Fatal("wrong setup deadline", expires)
+	}
+	at = at.Add(30 * time.Minute)
+	if valid, err := s.SetupValid(ctx, session); err != nil || !valid {
+		t.Fatal("interruption lost setup", err)
+	}
 	second, err := storage.Open(ctx, root)
 	if err != nil {
 		t.Fatal(err)
@@ -44,31 +50,19 @@ func TestSetupExpiryReplacementRestartAndConcurrency(t *testing.T) {
 	other := New(second)
 	other.Now = s.Now
 	var wg sync.WaitGroup
-	results := make(chan string, 8)
 	for i := range 8 {
 		redeemer := s
 		if i%2 == 0 {
 			redeemer = other
 		}
 		wg.Go(func() {
-			session, _, err := redeemer.RedeemSetup(ctx, link)
-			if err == nil {
-				results <- session
-			} else if !errors.Is(err, ErrSetup) {
-				t.Error(err)
+			resumed, deadline, err := redeemer.RedeemSetup(ctx, link)
+			if err != nil || resumed != session || deadline != expires {
+				t.Errorf("resume changed setup access: %v", err)
 			}
 		})
 	}
 	wg.Wait()
-	close(results)
-	sessions := []string{}
-	for session := range results {
-		sessions = append(sessions, session)
-	}
-	if len(sessions) != 1 {
-		t.Fatalf("redemption winners %d", len(sessions))
-	}
-	session := sessions[0]
 	if valid, err := s.Valid(ctx, session); err != nil || valid {
 		t.Fatal("setup session authenticated", err)
 	}
@@ -88,12 +82,16 @@ func TestSetupExpiryReplacementRestartAndConcurrency(t *testing.T) {
 	if valid, err := s.SetupValid(ctx, session); err != nil || !valid {
 		t.Fatal("restart lost setup", err)
 	}
-	if _, _, err := s.RedeemSetup(ctx, link); !errors.Is(err, ErrSetup) {
-		t.Fatal("replayed link", err)
+	if _, deadline, err := s.RedeemSetup(ctx, link); err != nil || deadline != expires {
+		t.Fatal("restart changed link", err)
 	}
-	at = at.Add(SetupSessionLifetime)
+	at = expires
+	save(false)
 	if valid, _ := s.SetupValid(ctx, session); valid {
-		t.Fatal("expired session accepted")
+		t.Fatal("expired setup cookie accepted")
+	}
+	if _, _, err := s.RedeemSetup(ctx, link); !errors.Is(err, ErrSetup) {
+		t.Fatal("expired link accepted", err)
 	}
 	if _, _, err := s.Bootstrap(ctx, "long unique password", session); !errors.Is(err, ErrSetup) {
 		t.Fatal(err)
@@ -108,23 +106,26 @@ func TestSetupExpiryReplacementRestartAndConcurrency(t *testing.T) {
 	link = NewSetupToken()
 	save(true)
 	if valid, _ := s.SetupValid(ctx, old); valid {
-		t.Fatal("replacement retained session")
+		t.Fatal("replacement retained cookie")
+	}
+	if _, _, err := s.RedeemSetup(ctx, old); !errors.Is(err, ErrSetup) {
+		t.Fatal("replacement retained link", err)
 	}
 	if _, _, err := s.Bootstrap(ctx, "long unique password", old); !errors.Is(err, ErrSetup) {
-		t.Fatal("replaced session created account", err)
+		t.Fatal("replaced cookie created account", err)
 	}
 	session, _, err = s.RedeemSetup(ctx, link)
 	if err != nil {
 		t.Fatal(err)
 	}
-	resultsErr := make(chan error, 4)
+	results := make(chan error, 4)
 	for range 4 {
-		wg.Go(func() { _, _, err := s.Bootstrap(ctx, "long unique password", session); resultsErr <- err })
+		wg.Go(func() { _, _, err := s.Bootstrap(ctx, "long unique password", session); results <- err })
 	}
 	wg.Wait()
-	close(resultsErr)
+	close(results)
 	wins := 0
-	for err := range resultsErr {
+	for err := range results {
 		if err == nil {
 			wins++
 		} else if !errors.Is(err, storage.ErrConflict) {
@@ -135,7 +136,10 @@ func TestSetupExpiryReplacementRestartAndConcurrency(t *testing.T) {
 		t.Fatalf("account winners %d", wins)
 	}
 	if valid, _ := s.SetupValid(ctx, session); valid {
-		t.Fatal("account retained setup access")
+		t.Fatal("account retained setup")
+	}
+	if _, _, err := s.RedeemSetup(ctx, link); !errors.Is(err, ErrSetup) {
+		t.Fatal("account retained link", err)
 	}
 	if err := store.SaveSetupLink(ctx, TokenHash(NewSetupToken()), at.Add(time.Hour), true); !errors.Is(err, storage.ErrConflict) {
 		t.Fatal("replaced after account creation", err)

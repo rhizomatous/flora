@@ -53,7 +53,7 @@ test("installer setup, interrupted account creation, and logout", async ({ page,
   assert.deepEqual(errors, []);
 });
 
-test("setup links are single-use across browsers", async ({ page, backend, browser }) => {
+test("setup links reopen in another browser until account creation", async ({ page, backend, browser }) => {
   const secret = "fixture-installer-setup-secret-000000000000";
   const link = `${backend.url}/#setup/${secret}`;
   let exchanges = 0;
@@ -70,11 +70,11 @@ test("setup links are single-use across browsers", async ({ page, backend, brows
     const replay = await other.newPage();
     await replay.goto(link);
     await replay.evaluate(() => document.documentElement.classList.remove("dark"));
-    await expect(replay.getByRole("alert")).toContainText("Setup access expired or already used");
-    await expect(replay.getByRole("heading", { name: "Open your setup link" })).toBeVisible();
+    await expect(replay.getByRole("heading", { name: "Create administrator" })).toBeVisible();
+    await expect(replay.getByRole("alert")).toHaveCount(0);
     await expect(replay).toHaveURL(`${backend.url}/#chats/new`);
     await assertFitsPhone(replay);
-    await expect(replay.getByRole("textbox")).toHaveCount(0);
+    await expect(replay.getByLabel("Password", { exact: true })).toBeVisible();
   } finally {
     await other.close();
   }

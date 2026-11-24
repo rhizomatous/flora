@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"flag"
-	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -38,7 +37,7 @@ func main() {
 	dockerSocket := flag.String("docker-socket", docker.DefaultSocket, "Docker Engine socket on this host")
 	keyFile := flag.String("credential-key-file", "", "private encryption key file outside data-dir (defaults to data-dir.key)")
 	rotateKey := flag.String("rotate-credential-key-to", "", "offline: re-encrypt credentials using this separate key file, then exit")
-	setupLink := flag.String("setup-link", "", "offline: show or replace first-run setup link, then exit (stop Flora first)")
+	setupLink := flag.String("setup-link", "", "show or replace first-run setup link, then exit")
 	flag.Parse()
 	if *keyFile == "" {
 		*keyFile = filepath.Clean(*dataDir) + ".key"
@@ -84,6 +83,13 @@ func main() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if *setupLink != "" {
+		if err := setupLinkCommand(ctx, *dataDir, *keyFile, origin, *setupLink); err != nil {
+			slog.Error("Cannot prepare setup link", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
 	store, unlock, err := openCredentialStore(ctx, *dataDir, *keyFile)
 	if err != nil {
 		slog.Error("Storage initialization failed; check -data-dir ownership, permissions, free space, and schema version", "error", err)
@@ -95,33 +101,7 @@ func main() {
 			slog.Error("Storage close failed", "error", err)
 		}
 	}()
-	if *setupLink != "" {
-		if *setupLink != "show" && *setupLink != "replace" {
-			slog.Error("Use -setup-link show or -setup-link replace")
-			os.Exit(1)
-		}
-		// Never write the ownership secret to redirected stdout or service logs.
-		tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
-		if err != nil {
-			slog.Error("Setup link requires an interactive terminal")
-			os.Exit(1)
-		}
-		defer tty.Close()
-		link, err := deploymentSetup(ctx, store, filepath.Join(*dataDir, "deployment"), origin, *setupLink == "replace")
-		if err != nil {
-			slog.Error("Cannot prepare setup link", "error", err)
-			os.Exit(1)
-		}
-		if link == "" {
-			slog.Info("No unused setup link available; an administrator exists or access was consumed or expired")
-			return
-		}
-		if _, err := fmt.Fprintf(tty, "Flora setup URL: %s\n", link); err != nil {
-			slog.Error("Cannot display setup link")
-			os.Exit(1)
-		}
-		return
-	}
+
 	var chats *chat.Service
 	configuration := settings.New(store)
 	configuration.MaxRunningOverride = maxOverride
@@ -256,6 +236,12 @@ func main() {
 			}
 		}()
 	}
+	closeSetupControl, err := serveSetupControl(store, filepath.Join(*dataDir, "deployment"), origin)
+	if err != nil {
+		slog.Error("Cannot start host setup commands", "error", err)
+		os.Exit(1)
+	}
+	defer closeSetupControl()
 	authentication := auth.New(store)
 	handler := server.New(webassets.FS(), authentication, configuration, origin, chats)
 	srv := &http.Server{

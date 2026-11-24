@@ -140,26 +140,24 @@ Open the installer link from the controlling terminal, or read
 `data-dir/deployment/setup-link` privately as the app owner. Its secret is in the
 URL fragment, which browsers do not send in requests or referrers. Flora removes
 it from the address bar before exchanging it for a restricted setup cookie.
-The link expires after 24 hours and can be redeemed once. The setup session lasts
-15 minutes and survives browser reloads and service restarts until it expires.
-It permits first-account creation only. Normal sign-in remains available after
-account creation; installer links cannot replace an administrator.
+The link and browser setup access expire 24 hours after the link is created.
+Reopen the link in any browser or reload the existing browser to resume setup.
+Reopening does not extend the deadline. Creating the administrator closes setup
+in every browser, including after restart. Normal sign-in remains available.
 
-For a lost, expired or already redeemed link, stop the service and generate a
-replacement from an interactive host terminal:
+Display the current link or replace a lost or expired one from an interactive
+host terminal while Flora keeps running:
 
 ```sh
-sudo systemctl stop flora.service
+sudo /opt/flora/flora -data-dir /var/lib/flora -public-url https://flora.example.com -setup-link show
 sudo /opt/flora/flora -data-dir /var/lib/flora -public-url https://flora.example.com -setup-link replace
-sudo systemctl start flora.service
 ```
 
-Use the service's data directory, public URL and credential key options. Use
-`-setup-link show` instead to display an unredeemed, unexpired link. These commands
-require Flora to be stopped and display secrets only in the controlling terminal.
-Replacement invalidates previous links and setup sessions. If a redemption response
-is lost before the browser receives its cookie, obtain a replacement on the host.
-Keep setup links out of logs and service arguments.
+Use the service's data directory and public URL. The commands contact Flora over
+an owner-only local socket, which is separate from the browser listener. They also
+work when Flora is stopped; in that case, use its credential key options too.
+Links appear only in the controlling terminal. Replacement invalidates previous
+links and browser setup cookies. Keep setup links out of logs and service arguments.
 
 In Settings, save hosted model and GitHub credentials. The provider and installation
 default model are fixed after first save. Individual chat turns can select other
