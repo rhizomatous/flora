@@ -38,11 +38,11 @@ only the selected release archive and its checksums over HTTPS, verifies the che
 and embedded binary identity, then installs `/opt/flora/flora` and starts a small
 root-run `flora.service` with private `/var/lib/flora` storage. Root is needed for
 the managed private broker and local Docker. It enables the service for boot and
-waits for loopback health and the private enrollment file before reporting success.
-The code goes only to `/dev/tty`; without a controlling terminal, only its file
-path is printed. Open the displayed HTTPS URL and use that code to create the
-administrator account, then configure credentials and connect a project in the
-browser. No credentials are requested by the script.
+waits for loopback health and the private setup-link file before reporting success.
+The **Flora setup URL** goes only to `/dev/tty`; without a controlling terminal,
+only its private file path is printed. Open that link to create the administrator,
+then configure credentials and connect a project in the browser. No credentials
+are requested by the script.
 
 Existing binary, data or service paths are refused, including repeat invocations.
 This is a fresh-install command, not an upgrade command. A failed installation
@@ -112,7 +112,7 @@ host-only, so a different browser hostname requires login there; old database
 sessions are not automatically revoked. Remove access to the old endpoint and use
 logout to revoke its session before changing endpoints when needed.
 
-## Private runtime and enrollment
+## Private runtime and first-run setup
 
 Every startup manages the same private infrastructure, regardless of browser TLS.
 Flora creates an owner-labeled Docker bridge, saves its immutable ID and inspected
@@ -128,7 +128,7 @@ even when a route exists. Flora still requires root or `CAP_NET_BIND_SERVICE` an
 these privileges. A root process gives agents a saved non-root UID/GID of 1000.
 Only their workspace/runtime directories receive that ownership.
 
-The private CA, signing key, network identity and enrollment code are persisted in
+The private CA, signing key, network identity and setup link are persisted in
 `data-dir/deployment` with private permissions. The online signer renews short-lived
 broker leaves under the same CA. Agents receive public CA trust and scoped chat
 capabilities, never CA/broker private keys, the administrator session, upstream
@@ -136,10 +136,28 @@ GitHub token, database or Docker socket. This network is not an egress sandbox.
 Missing saved networks, changed CA trust, or existing application data without a
 managed identity fail clearly. Restore the saved state rather than deleting it.
 
-Open your configured HTTPS URL. Enter the enrollment code shown only on the
-controlling terminal, or read `data-dir/deployment/enrollment-code` privately as
-the app owner. Never put it in URLs, service arguments or logs. Enrollment closes
-permanently once the first administrator exists, including after restart.
+Open the installer link from the controlling terminal, or read
+`data-dir/deployment/setup-link` privately as the app owner. Its secret is in the
+URL fragment, which browsers do not send in requests or referrers. Flora removes
+it from the address bar before exchanging it for a restricted setup cookie.
+The link and browser setup access expire 24 hours after the link is created.
+Reopen the link in any browser or reload the existing browser to resume setup.
+Reopening does not extend the deadline. Creating the administrator closes setup
+in every browser, including after restart. Normal sign-in remains available.
+
+Display the current link or replace a lost or expired one from an interactive
+host terminal while Flora keeps running:
+
+```sh
+sudo /opt/flora/flora -data-dir /var/lib/flora -public-url https://flora.example.com -setup-link show
+sudo /opt/flora/flora -data-dir /var/lib/flora -public-url https://flora.example.com -setup-link replace
+```
+
+Use the service's data directory and public URL. The commands contact Flora over
+an owner-only local socket, which is separate from the browser listener. They also
+work when Flora is stopped; in that case, use its credential key options too.
+Links appear only in the controlling terminal. Replacement invalidates previous
+links and browser setup cookies. Keep setup links out of logs and service arguments.
 
 In Settings, save hosted model and GitHub credentials. The provider and installation
 default model are fixed after first save. Individual chat turns can select other

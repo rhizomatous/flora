@@ -52,8 +52,26 @@ unsupported newer schema prevents startup before HTTP begins listening.
 Unit checks do not need Docker or provider credentials. Running the app requires
 Linux, local rootful Docker and a pinned agent image.
 
-Create the administrator with the private enrollment code from the terminal or
-`data-dir/deployment/enrollment-code`.
+Open the **Flora setup URL** printed in your terminal by the installer. For a
+manual launch, open the URL in `data-dir/deployment/setup-link` as the host owner.
+The secret stays in the URL fragment and is removed before exchange for a
+restricted setup cookie. The link and browser access expire 24 hours after the
+link is created. Reopen the link or reload the browser to resume setup. Creating
+the administrator closes setup access in every browser.
+
+To display the current link or replace a lost or expired one, run the installed
+binary from an interactive host terminal:
+
+```sh
+sudo /opt/flora/flora -data-dir /var/lib/flora -public-url https://flora.example.com -setup-link show
+sudo /opt/flora/flora -data-dir /var/lib/flora -public-url https://flora.example.com -setup-link replace
+```
+
+Flora can keep running. Use the same data directory and public URL as the service.
+When Flora is stopped, also use its credential key options. Replacement revokes
+previous links and browser setup cookies. An existing administrator cannot be
+replaced through setup. Commands display links only in the terminal, never
+redirected output or service logs.
 Only the first account creation succeeds. Sessions expire seven days after login by default;
 logout immediately revokes that session on the server. All API data routes require
 authentication, except health and account status. Login and setup require the

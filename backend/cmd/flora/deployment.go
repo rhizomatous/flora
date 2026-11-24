@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -266,29 +267,40 @@ func brokerTLS(ca *x509.Certificate, key *ecdsa.PrivateKey) *tls.Config {
 	}}
 }
 
-func deploymentEnrollment(dir string) (string, error) {
-	path := filepath.Join(dir, "enrollment-code")
-	code, err := privateRead(path)
-	if errors.Is(err, os.ErrNotExist) {
-		token, err := docker.NewPassword()
-		if err != nil {
+// deploymentSetup retains the host-only link across restarts. Only an explicit
+// replacement resets expired access. Publish the file before SQLite
+// so interrupted publication can never resurrect the previously valid link.
+func deploymentSetup(ctx context.Context, store *storage.Store, dir, origin string, replace bool) (string, error) {
+	if _, err := store.AdministratorHash(ctx); err == nil {
+		return "", nil
+	} else if !errors.Is(err, storage.ErrNotFound) {
+		return "", err
+	}
+	path := filepath.Join(dir, "setup-link")
+	raw, err := privateRead(path)
+	if replace || errors.Is(err, os.ErrNotExist) {
+		raw = []byte(origin + "/#setup/" + auth.NewSetupToken())
+		if err := privateWrite(path, raw); err != nil {
 			return "", err
-		}
-		code = []byte(token)
-		if err := privateWrite(path, code); err != nil {
-			return "", err
-		}
-		// Never print enrollment secrets into stdout, stderr or a service journal.
-		if tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0); err == nil {
-			_, _ = fmt.Fprintf(tty, "Flora one-time administrator enrollment code: %s\n", code)
-			_ = tty.Close()
 		}
 	} else if err != nil {
 		return "", err
 	}
-	if len(code) != 48 {
-		return "", errors.New("saved enrollment code damaged")
+	prefix := origin + "/#setup/"
+	link := string(raw)
+	if !strings.HasPrefix(link, prefix) || len(link) != len(prefix)+43 {
+		return "", errors.New("saved setup link damaged or public address changed; replace the setup link")
 	}
-	hashPath := filepath.Join(dir, "enrollment.sha256")
-	return hashPath, privateWrite(hashPath, []byte(auth.TokenHash(string(code))))
+	secret := strings.TrimPrefix(link, prefix)
+	if err := store.SaveSetupLink(ctx, auth.TokenHash(secret), time.Now().Add(auth.SetupLinkLifetime), replace); err != nil {
+		return "", err
+	}
+	valid, err := store.SetupLinkValid(ctx, auth.TokenHash(secret), time.Now())
+	if err != nil {
+		return "", err
+	}
+	if !valid {
+		return "", nil
+	}
+	return link, nil
 }

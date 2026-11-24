@@ -14,7 +14,7 @@ import unittest
 
 
 SOURCE = Path(__file__).with_name('install.sh').read_text()
-SECRET = 'fixture-enrollment-secret'
+SECRET = 'https://flora.example.com:8443/#setup/fixture-secret'
 FAKE = r'''#!/usr/bin/env python3
 import json, os, pathlib, shutil, sys
 p = pathlib.Path(os.environ['FIXTURE'])
@@ -55,7 +55,7 @@ elif name == 'systemctl':
         print('loaded' if mode == 'loaded' else 'not-found')
     elif args[0] == 'start':
         d = p/'data/deployment'; d.mkdir()
-        code = d/'enrollment-code'; code.write_text('fixture-enrollment-secret')
+        code = d/'setup-link'; code.write_text('https://flora.example.com:8443/#setup/fixture-secret')
         code.chmod(0o644 if mode == 'public-code' else 0o600)
         (p/'started').touch()
         if mode == 'start-fail': sys.exit(1)
@@ -216,7 +216,7 @@ class InstallerTest(unittest.TestCase):
     def test_tty(self):
         result, terminal = self.run_installer(tty=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(SECRET, terminal)
+        self.assertIn("Flora setup URL: " + SECRET, terminal)
 
     def test_default_https_port(self):
         result, _ = self.run_installer(args=['--version', 'v1.2.3', '--public-url', 'https://flora.example.com:443'])
@@ -275,7 +275,7 @@ class InstallerTest(unittest.TestCase):
                 self.assertNotEqual(self.run_installer(mode)[0].returncode, 0)
                 self.assert_clean()
                 self.assertTrue((self.root / 'data').is_dir())
-                code = self.root / 'data/deployment/enrollment-code'
+                code = self.root / 'data/deployment/setup-link'
                 if code.exists():
                     self.assertEqual(code.read_text(), SECRET)
                 import shutil

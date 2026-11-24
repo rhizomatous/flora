@@ -28,6 +28,7 @@ import { Projects } from "./projects";
 import { PullRequests } from "./pull-requests-page";
 import { errorMessage, request } from "./request";
 import { settingsSchema, type Settings } from "./settings-schemas";
+import { redeemSetupLink } from "./setup-link";
 import { Sidebar } from "./sidebar";
 import { CompletionToasts } from "./toasts";
 import { text } from "./ui";
@@ -37,18 +38,28 @@ import "./styles.css";
 import { UsagePage } from "./usage-page";
 import { WorkspaceMenu } from "./workspace-menu";
 
+async function openSetupLink() {
+  try {
+    await redeemSetupLink();
+    return "";
+  } catch (error) {
+    return errorMessage(error, "Could not open setup. Obtain a new setup link from the host.");
+  }
+}
+let setupExchange = openSetupLink();
+
 const currentPath = () => window.location.hash.slice(1) || "chats/new";
 
 /** Creates the administrator on first run, otherwise logs in. */
 function Account({
   setupRequired,
-  enrollmentRequired,
+  setupAuthorized,
   busy,
   run,
   onLogin,
 }: {
   setupRequired: boolean;
-  enrollmentRequired?: boolean;
+  setupAuthorized?: boolean;
   busy: boolean;
   run: (task: () => Promise<void>, fallback: string) => Promise<void>;
   onLogin: () => Promise<void>;
@@ -57,19 +68,29 @@ function Account({
   useEffect(() => {
     heading.current?.focus();
   }, []);
+  if (setupRequired && setupAuthorized !== true) {
+    return (
+      <section aria-labelledby="account-heading">
+        <Heading level={1} ref={heading} tabIndex={-1} id="account-heading">
+          Open your setup link
+        </Heading>
+        <Text tone="muted" className="mt-3">
+          Use the Flora setup URL from your installer terminal or ask the host owner for a new link.
+        </Text>
+      </section>
+    );
+  }
   const action = setupRequired ? "Create administrator" : "Log in";
 
   function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const password = text(new FormData(form), "password");
-    const enrollmentCode = text(new FormData(form), "enrollmentCode");
     void run(async () => {
       await request(authenticatedSchema, `auth/${setupRequired ? "bootstrap" : "login"}`, {
         method: "POST",
         body: {
           password,
-          enrollmentCode,
         },
       });
       form.reset();
@@ -84,27 +105,10 @@ function Account({
       </Heading>
       <Text tone="muted" className="mt-3">
         {setupRequired
-          ? "Create the single administrator account for this installation. Use a unique password of at least 12 characters."
-          : "Enter your administrator password. Sessions expire at the absolute lifetime set by the administrator."}
+          ? "Choose a unique password of at least 12 characters."
+          : "Enter your administrator password."}
       </Text>
       <form className="mt-8 space-y-6" onSubmit={submit}>
-        {setupRequired && enrollmentRequired === true && (
-          <FieldLabel className="w-full flex-col items-start">
-            Enrollment code
-            <Input
-              className="mt-2"
-              type="password"
-              name="enrollmentCode"
-              autoComplete="off"
-              maxLength={256}
-              required
-              disabled={busy}
-            />
-            <span className="mt-2 block text-muted-foreground">
-              Enter the one-time code shown by Flora on your host.
-            </span>
-          </FieldLabel>
-        )}
         <FieldLabel className="w-full flex-col items-start">
           Password
           <Input
@@ -151,8 +155,27 @@ function App() {
 
   const notifications = useNotifications(ready, settings?.preferences.sound === true, onExpired);
 
+  async function refresh() {
+    const next = await request(statusSchema, "auth/status");
+    setStatus(next);
+    setSettings(next.authenticated ? await request(settingsSchema, "settings") : undefined);
+  }
+  async function load() {
+    try {
+      const setupError = await setupExchange;
+      if (setupError !== "") setError(setupError);
+      await refresh();
+    } catch (e) {
+      setError(errorMessage(e, "Could not load Flora."));
+    }
+  }
+  const loadOnMount = useEffectEvent(load);
   useEffect(() => {
     const changed = () => {
+      if (window.location.hash.startsWith("#setup/")) {
+        setupExchange = openSetupLink();
+        void loadOnMount();
+      }
       setPath(currentPath());
       setError("");
       setNotice("");
@@ -163,19 +186,6 @@ function App() {
     };
   }, []);
 
-  async function refresh() {
-    const next = await request(statusSchema, "auth/status");
-    setStatus(next);
-    setSettings(next.authenticated ? await request(settingsSchema, "settings") : undefined);
-  }
-  async function load() {
-    try {
-      await refresh();
-    } catch (e) {
-      setError(errorMessage(e, "Could not load Flora."));
-    }
-  }
-  const loadOnMount = useEffectEvent(load);
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect -- load sets state only after awaiting the request.
     void loadOnMount();
@@ -304,9 +314,9 @@ function App() {
             ))}
           {status?.authenticated === false && (
             <Account
-              key={String(status.setupRequired)}
+              key={`${String(status.setupRequired)}-${String(status.setupAuthorized)}`}
               setupRequired={status.setupRequired}
-              enrollmentRequired={status.enrollmentRequired}
+              setupAuthorized={status.setupAuthorized}
               busy={busy}
               run={run}
               onLogin={refresh}

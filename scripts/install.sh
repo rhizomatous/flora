@@ -159,19 +159,19 @@ ready=0 attempt=0
 while [ "$attempt" -lt 30 ]; do
     if systemctl is-active --quiet flora.service && \
         curl --disable --noproxy '*' --fail --silent --max-time 2 http://127.0.0.1:8080/api/health >/dev/null 2>&1 && \
-        [ -f /var/lib/flora/deployment/enrollment-code ]; then
+        [ -f /var/lib/flora/deployment/setup-link ]; then
         ready=1; break
     fi
     attempt=$((attempt + 1)); sleep 1
 done
 [ "$ready" = 1 ] || die 'Startup timed out. Inspect privately with: journalctl -u flora.service'
-code=/var/lib/flora/deployment/enrollment-code
-[ ! -L "$code" ] || die 'Enrollment file must not be a symlink'
-[ "$(stat -c '%u:%a' "$code")" = 0:600 ] || die 'Enrollment file must be root-owned with mode 0600'
+link=/var/lib/flora/deployment/setup-link
+[ ! -L "$link" ] || die 'Setup link file must not be a symlink'
+[ "$(stat -c '%u:%a' "$link")" = 0:600 ] || die 'Setup link file must be root-owned with mode 0600'
 success=1
 printf 'Flora is running. Open %s\n' "$public_url"
-printf 'Enrollment code is in %s (root-only).\n' "$code"
-# Never send the enrollment secret to piped stdout, stderr or the journal.
+printf 'Setup link is in %s (root-only).\n' "$link"
+# Never send the setup secret to piped stdout, stderr or the journal.
 if (exec 3>/dev/tty) 2>/dev/null; then
-    (printf 'Flora enrollment code: '; cat "$code"; printf '\n') >/dev/tty || :
+    (printf 'Flora setup URL: '; cat "$link"; printf '\n') >/dev/tty || :
 fi

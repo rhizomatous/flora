@@ -14,22 +14,48 @@ func (s *Store) AdministratorHash(ctx context.Context) (string, error) {
 	return hash, found(err)
 }
 
-// Bootstrap saves the sole administrator and its first session in one transaction.
-// Concurrent attempts cannot replace the winner or create a second session.
+// Bootstrap saves a trusted host-created administrator and first browser session.
+// HTTP callers must use BootstrapWithSetup to verify ownership in this transaction.
 func (s *Store) Bootstrap(ctx context.Context, passwordHash, tokenHash string, expires time.Time) error {
+	return s.bootstrap(ctx, passwordHash, tokenHash, expires, nil)
+}
+
+type setupGrant struct {
+	hash string
+	at   time.Time
+}
+
+// BootstrapWithSetup consumes restricted access and creates the sole account and
+// browser session atomically. Replacement and expiry are checked in that transaction.
+func (s *Store) BootstrapWithSetup(ctx context.Context, passwordHash, tokenHash string, expires time.Time, setupHash string, at time.Time) error {
+	return s.bootstrap(ctx, passwordHash, tokenHash, expires, &setupGrant{setupHash, at})
+}
+
+func (s *Store) bootstrap(ctx context.Context, passwordHash, tokenHash string, expires time.Time, setup *setupGrant) error {
 	return s.write(ctx, func(tx *sql.Tx) error {
-		result, err := tx.ExecContext(ctx, "INSERT INTO administrator VALUES(1,?) ON CONFLICT(id) DO NOTHING", passwordHash)
-		if err != nil {
+		var admin bool
+		if err := tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM administrator)").Scan(&admin); err != nil {
 			return err
 		}
-		n, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if n == 0 {
+		if admin {
 			return ErrConflict
 		}
-		_, err = tx.ExecContext(ctx, "INSERT INTO browser_sessions VALUES(?,?)", tokenHash, expires.Unix())
+		if setup != nil {
+			var valid bool
+			if err := tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM setup_access WHERE link_hash=? AND link_expires>?)", setup.hash, setup.at.Unix()).Scan(&valid); err != nil {
+				return err
+			}
+			if !valid {
+				return ErrNotFound
+			}
+		}
+		if _, err := tx.ExecContext(ctx, "INSERT INTO administrator VALUES(1,?)", passwordHash); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, "DELETE FROM setup_access"); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, "INSERT INTO browser_sessions VALUES(?,?)", tokenHash, expires.Unix())
 		return err
 	})
 }

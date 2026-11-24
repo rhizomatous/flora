@@ -3,42 +3,124 @@ package auth
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
-func TestEnrollmentRaceRestartAndReplay(t *testing.T) {
+func TestSetupResumeExpiryReplacementRestartAndConcurrency(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
-	file := filepath.Join(root, "enrollment.sha256")
-	const code = "local-test-only-random-installer-code"
-	if err := os.WriteFile(file, []byte(TokenHash(code)), 0600); err != nil {
+	store, err := storage.Open(ctx, root)
+	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := storage.Open(ctx, filepath.Join(root, "data"))
+	at := time.Now().Truncate(time.Second)
+	initial := at
+	s := New(store)
+	s.Now = func() time.Time { return at }
+	link := NewSetupToken()
+	save := func(replace bool) {
+		t.Helper()
+		if err := store.SaveSetupLink(ctx, TokenHash(link), at.Add(SetupLinkLifetime), replace); err != nil {
+			t.Fatal(err)
+		}
+	}
+	save(false)
+	if _, _, err := s.RedeemSetup(ctx, NewSetupToken()); !errors.Is(err, ErrSetup) {
+		t.Fatal(err)
+	}
+	session, expires, err := s.RedeemSetup(ctx, link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if expires != initial.Add(24*time.Hour) {
+		t.Fatal("wrong setup deadline", expires)
+	}
+	at = at.Add(30 * time.Minute)
+	if valid, err := s.SetupValid(ctx, session); err != nil || !valid {
+		t.Fatal("interruption lost setup", err)
+	}
+	second, err := storage.Open(ctx, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := New(second)
+	other.Now = s.Now
+	var wg sync.WaitGroup
+	for i := range 8 {
+		redeemer := s
+		if i%2 == 0 {
+			redeemer = other
+		}
+		wg.Go(func() {
+			resumed, deadline, err := redeemer.RedeemSetup(ctx, link)
+			if err != nil || resumed != session || deadline != expires {
+				t.Errorf("resume changed setup access: %v", err)
+			}
+		})
+	}
+	wg.Wait()
+	if valid, err := s.Valid(ctx, session); err != nil || valid {
+		t.Fatal("setup session authenticated", err)
+	}
+	if err := second.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	store, err = storage.Open(ctx, root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	services := []*Service{New(store), New(store)}
-	for _, s := range services {
-		if err := s.RequireEnrollment(file); err != nil {
-			t.Fatal(err)
-		}
-		for _, codes := range [][]string{nil, {"wrong"}, {""}, {code, code}} {
-			if _, _, err := s.Bootstrap(ctx, "long unique password", codes...); !errors.Is(err, ErrEnrollment) {
-				t.Fatalf("unprotected bootstrap: %v", err)
-			}
-		}
+	s = New(store)
+	s.Now = func() time.Time { return at }
+	if valid, err := s.SetupValid(ctx, session); err != nil || !valid {
+		t.Fatal("restart lost setup", err)
 	}
-	var wg sync.WaitGroup
-	results := make(chan error, 2)
-	for _, s := range services {
-		wg.Go(func() { _, _, err := s.Bootstrap(ctx, "long unique password", code); results <- err })
+	if _, deadline, err := s.RedeemSetup(ctx, link); err != nil || deadline != expires {
+		t.Fatal("restart changed link", err)
+	}
+	at = expires
+	save(false)
+	if valid, _ := s.SetupValid(ctx, session); valid {
+		t.Fatal("expired setup cookie accepted")
+	}
+	if _, _, err := s.RedeemSetup(ctx, link); !errors.Is(err, ErrSetup) {
+		t.Fatal("expired link accepted", err)
+	}
+	if _, _, err := s.Bootstrap(ctx, "long unique password", session); !errors.Is(err, ErrSetup) {
+		t.Fatal(err)
+	}
+	link = NewSetupToken()
+	save(true)
+	session, _, err = s.RedeemSetup(ctx, link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := session
+	link = NewSetupToken()
+	save(true)
+	if valid, _ := s.SetupValid(ctx, old); valid {
+		t.Fatal("replacement retained cookie")
+	}
+	if _, _, err := s.RedeemSetup(ctx, old); !errors.Is(err, ErrSetup) {
+		t.Fatal("replacement retained link", err)
+	}
+	if _, _, err := s.Bootstrap(ctx, "long unique password", old); !errors.Is(err, ErrSetup) {
+		t.Fatal("replaced cookie created account", err)
+	}
+	session, _, err = s.RedeemSetup(ctx, link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	results := make(chan error, 4)
+	for range 4 {
+		wg.Go(func() { _, _, err := s.Bootstrap(ctx, "long unique password", session); results <- err })
 	}
 	wg.Wait()
 	close(results)
@@ -51,56 +133,32 @@ func TestEnrollmentRaceRestartAndReplay(t *testing.T) {
 		}
 	}
 	if wins != 1 {
-		t.Fatalf("bootstrap winners: %d", wins)
+		t.Fatalf("account winners %d", wins)
 	}
-	restarted := New(store)
-	if err := restarted.RequireEnrollment(file); err != nil {
-		t.Fatal(err)
+	if valid, _ := s.SetupValid(ctx, session); valid {
+		t.Fatal("account retained setup")
 	}
-	if _, _, err := restarted.Bootstrap(ctx, "another long password", code); !errors.Is(err, storage.ErrConflict) {
-		t.Fatalf("replay: %v", err)
+	if _, _, err := s.RedeemSetup(ctx, link); !errors.Is(err, ErrSetup) {
+		t.Fatal("account retained link", err)
 	}
-	if _, _, err := restarted.Login(ctx, "long unique password"); err != nil {
+	if err := store.SaveSetupLink(ctx, TokenHash(NewSetupToken()), at.Add(time.Hour), true); !errors.Is(err, storage.ErrConflict) {
+		t.Fatal("replaced after account creation", err)
+	}
+	if _, _, err := s.Login(ctx, "long unique password"); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestEnrollmentFileRejectsUnsafeInputs(t *testing.T) {
-	root := t.TempDir()
-	for _, tc := range []struct {
-		name, body string
-		mode       os.FileMode
-	}{
-		{"public", TokenHash("test"), 0644},
-		{"writable-group", TokenHash("test"), 0660},
-		{"short", "abcdef", 0600},
-		{"long", TokenHash("test") + "\n", 0600},
-		{"invalid", "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", 0600},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			file := filepath.Join(root, tc.name)
-			if err := os.WriteFile(file, []byte(tc.body), tc.mode); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.Chmod(file, tc.mode); err != nil {
-				t.Fatal(err)
-			}
-			if err := New(nil).RequireEnrollment(file); err == nil {
-				t.Fatal("accepted unsafe file")
-			}
-		})
-	}
-	valid := filepath.Join(root, "valid")
-	if err := os.WriteFile(valid, []byte(TokenHash("test")), 0600); err != nil {
+func setupSession(t *testing.T, s *Service) string {
+	t.Helper()
+	ctx := context.Background()
+	link := NewSetupToken()
+	if err := s.Store.SaveSetupLink(ctx, TokenHash(link), s.Now().Add(SetupLinkLifetime), true); err != nil {
 		t.Fatal(err)
 	}
-	link := filepath.Join(root, "link")
-	if err := os.Symlink(valid, link); err != nil {
+	session, _, err := s.RedeemSetup(ctx, link)
+	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{link, root, filepath.Join(root, "absent")} {
-		if err := New(nil).RequireEnrollment(path); err == nil {
-			t.Fatalf("accepted %s", path)
-		}
-	}
+	return session
 }

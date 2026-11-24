@@ -18,6 +18,7 @@ import (
 )
 
 const cookieName = "__Host-flora"
+const setupCookieName = "__Host-flora-setup"
 
 type api struct {
 	auth          *auth.Service
@@ -78,7 +79,7 @@ func (a *api) protect(next http.Handler) http.Handler {
 			return
 		}
 		public := (r.Method == "GET" || r.Method == "HEAD") && (r.URL.Path == "/api/health" || r.URL.Path == "/api/auth/status")
-		public = public || (r.Method == "POST" && (r.URL.Path == "/api/auth/bootstrap" || r.URL.Path == "/api/auth/login"))
+		public = public || (r.Method == "POST" && (r.URL.Path == "/api/auth/setup" || r.URL.Path == "/api/auth/bootstrap" || r.URL.Path == "/api/auth/login"))
 		if !public && (mutation || r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/")) {
 			valid, err := a.auth.Valid(r.Context(), token(r))
 			if err != nil {
@@ -134,13 +135,36 @@ func (a *api) routes(mux *http.ServeMux) {
 			failure(w, 500, "Session storage unavailable.")
 			return
 		}
-		jsonResponse(w, 200, map[string]bool{"setupRequired": errors.Is(err, storage.ErrNotFound), "authenticated": valid, "enrollmentRequired": errors.Is(err, storage.ErrNotFound) && a.auth.EnrollmentRequired()})
+		setupValid, e := a.auth.SetupValid(r.Context(), setupToken(r))
+		if e != nil {
+			failure(w, 500, "Setup storage unavailable.")
+			return
+		}
+		jsonResponse(w, 200, map[string]bool{"setupRequired": errors.Is(err, storage.ErrNotFound), "authenticated": valid, "setupAuthorized": setupValid})
+	})
+	mux.HandleFunc("POST /api/auth/setup", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Secret string `json:"secret"`
+		}
+		if !decode(w, r, &in) {
+			return
+		}
+		value, expires, err := a.auth.RedeemSetup(r.Context(), in.Secret)
+		if errors.Is(err, auth.ErrSetup) {
+			failure(w, 403, auth.ErrSetup.Error())
+			return
+		}
+		if err != nil {
+			failure(w, 500, "Setup storage unavailable.")
+			return
+		}
+		setupCookie(w, value, expires, max(1, int(time.Until(expires).Seconds())))
+		jsonResponse(w, 200, map[string]bool{"setupAuthorized": true})
 	})
 	for _, action := range []string{"bootstrap", "login"} {
 		mux.HandleFunc("POST /api/auth/"+action, func(w http.ResponseWriter, r *http.Request) {
 			var in struct {
-				Password       string `json:"password"`
-				EnrollmentCode string `json:"enrollmentCode"`
+				Password string `json:"password"`
 			}
 			if !decode(w, r, &in) {
 				return
@@ -162,13 +186,13 @@ func (a *api) routes(mux *http.ServeMux) {
 			var expires time.Time
 			var err error
 			if action == "bootstrap" {
-				value, expires, err = a.auth.Bootstrap(r.Context(), in.Password, in.EnrollmentCode)
+				value, expires, err = a.auth.Bootstrap(r.Context(), in.Password, setupToken(r))
 			} else {
 				value, expires, err = a.auth.Login(r.Context(), in.Password)
 			}
 			switch {
-			case errors.Is(err, auth.ErrEnrollment):
-				failure(w, 403, auth.ErrEnrollment.Error())
+			case errors.Is(err, auth.ErrSetup):
+				failure(w, 403, auth.ErrSetup.Error())
 			case errors.Is(err, storage.ErrConflict):
 				failure(w, 409, "Administrator already exists. Log in instead.")
 			case errors.Is(err, auth.ErrPassword):
@@ -178,6 +202,9 @@ func (a *api) routes(mux *http.ServeMux) {
 			case err != nil:
 				failure(w, 500, "Could not save the session. Check storage permissions and free space.")
 			default:
+				if action == "bootstrap" {
+					setupCookie(w, "", time.Unix(1, 0), -1)
+				}
 				sessionCookie(w, value, expires, max(1, int(time.Until(expires).Seconds())))
 				jsonResponse(w, 200, map[string]bool{"authenticated": true})
 			}
@@ -216,4 +243,15 @@ func (a *api) routes(mux *http.ServeMux) {
 		}
 		jsonResponse(w, 200, view)
 	})
+}
+
+func setupToken(r *http.Request) string {
+	c, err := r.Cookie(setupCookieName)
+	if err != nil {
+		return ""
+	}
+	return c.Value
+}
+func setupCookie(w http.ResponseWriter, value string, expires time.Time, maxAge int) {
+	http.SetCookie(w, &http.Cookie{Name: setupCookieName, Value: value, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode, Expires: expires, MaxAge: maxAge})
 }

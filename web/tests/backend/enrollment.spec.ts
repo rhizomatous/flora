@@ -6,20 +6,22 @@ import { openWorkspaceMenu, assertFitsPhone, pageErrors } from "../helpers.ts";
 
 test.use({ scenario: "enrollment" });
 
-test("administrator enrollment and logout", async ({ page, backend }) => {
+test("installer setup, interrupted account creation, and logout", async ({ page, backend }) => {
   const errors = pageErrors(page);
   page.on("request", (request) => {
-    assert.equal(request.url().includes("fixture-installer-enrollment-code"), false);
+    assert.equal(request.url().includes("fixture-installer-setup-secret-000000000000"), false);
   });
   await page.goto(backend.url);
-  await expect(page.getByRole("heading", { name: "Create administrator" })).toBeVisible();
-  await assertFitsPhone(page);
-  await page.getByLabel("Password", { exact: true }).fill("browser test password");
+  await expect(page.getByRole("heading", { name: "Open your setup link" })).toBeVisible();
   const code = page.getByLabel("Enrollment code", { exact: false });
-  await code.fill("wrong");
-  await page.getByRole("button", { name: "Create administrator", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("Enrollment code is incorrect.");
-  await code.fill("fixture-installer-enrollment-code");
+  await expect(code).toHaveCount(0);
+  await page.goto(`${backend.url}/#setup/fixture-installer-setup-secret-000000000000`);
+  await expect(page.getByRole("heading", { name: "Create administrator" })).toBeVisible();
+  await expect(page).toHaveURL(`${backend.url}/#chats/new`);
+  await assertFitsPhone(page);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Create administrator" })).toBeVisible();
+  await page.getByLabel("Password", { exact: true }).fill("browser test password");
   await page.getByRole("button", { name: "Create administrator", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Connect your first project", exact: true }),
@@ -49,4 +51,41 @@ test("administrator enrollment and logout", async ({ page, backend }) => {
   await page.reload();
   await expect(page.getByRole("heading", { name: "Log in", exact: true })).toBeVisible();
   assert.deepEqual(errors, []);
+});
+
+test("setup links reopen in another browser until account creation", async ({ page, backend, browser }) => {
+  const secret = "fixture-installer-setup-secret-000000000000";
+  const link = `${backend.url}/#setup/${secret}`;
+  let exchanges = 0;
+  page.on("request", (request) => {
+    assert.equal(request.url().includes(secret), false);
+    assert.equal(request.headers().referer?.includes(secret) ?? false, false);
+    if (request.url().endsWith("/api/auth/setup")) exchanges++;
+  });
+  await page.goto(link);
+  await expect(page.getByRole("heading", { name: "Create administrator" })).toBeVisible();
+  assert.equal(exchanges, 1);
+  const other = await browser.newContext({ ignoreHTTPSErrors: true, colorScheme: "light" });
+  try {
+    const replay = await other.newPage();
+    await replay.goto(link);
+    await replay.evaluate(() => document.documentElement.classList.remove("dark"));
+    await expect(replay.getByRole("heading", { name: "Create administrator" })).toBeVisible();
+    await expect(replay.getByRole("alert")).toHaveCount(0);
+    await expect(replay).toHaveURL(`${backend.url}/#chats/new`);
+    await assertFitsPhone(replay);
+    await expect(replay.getByLabel("Password", { exact: true })).toBeVisible();
+  } finally {
+    await other.close();
+  }
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Create administrator" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create administrator" })).toBeFocused();
+  await page.getByLabel("Password", { exact: true }).fill("short");
+  await page.getByRole("button", { name: "Create administrator", exact: true }).click();
+  assert.equal(
+    await page.getByLabel("Password", { exact: true }).evaluate((input: HTMLInputElement) => input.validity.tooShort),
+    true,
+  );
+  await expect(page.getByRole("heading", { name: "Create administrator" })).toBeVisible();
 });

@@ -5,9 +5,8 @@ test.use({ scenario: "credential-setup" });
 
 for (const first of ["GitHub", "model"] as const) {
   test(`${first} can be saved before the other connection`, async ({ page, backend, request }) => {
-    await page.goto(backend.url);
+    await page.goto(`${backend.url}/#setup/fixture-installer-setup-secret-000000000000`);
     await page.getByLabel("Password", { exact: true }).fill("browser test password");
-    await page.getByLabel("Enrollment code", { exact: false }).fill("fixture-installer-enrollment-code");
     await page.getByRole("button", { name: "Create administrator", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Connect your first project", exact: true })).toBeVisible();
     await openSettings(page);

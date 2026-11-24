@@ -79,12 +79,12 @@ else:
         assert subprocess.run(['systemctl', 'is-enabled', '--quiet', 'flora.service']).returncode == 0
         deployment = data / 'deployment'
         retained = {name: (deployment / name).read_bytes() for name in
-                    ('deployment.json', 'broker-ca.pem', 'enrollment-code')}
-        code = retained['enrollment-code'].decode().strip()
+                    ('deployment.json', 'broker-ca.pem', 'setup-link')}
+        code = retained['setup-link'].decode().strip()
         assert code and code not in result.stdout + result.stderr
         assert data.stat().st_mode & 0o777 == 0o700
-        assert (deployment / 'enrollment-code').stat().st_mode & 0o777 == 0o600
-        assert (deployment / 'enrollment-code').stat().st_uid == 0
+        assert (deployment / 'setup-link').stat().st_mode & 0o777 == 0o600
+        assert (deployment / 'setup-link').stat().st_uid == 0
         repeat = install(explicit=True)
         assert repeat.returncode != 0 and 'Refusing to overwrite' in repeat.stderr
         subprocess.run(['systemctl', 'restart', 'flora.service'], check=True)
@@ -100,7 +100,7 @@ else:
             assert (deployment / name).read_bytes() == contents, name
         journal = subprocess.check_output(['journalctl', '-u', 'flora.service', '--no-pager'], text=True)
         assert code not in journal
-        print(f'Installer systemd smoke passed: {version} linux/{identity["arch"]}; restart retains private identity; no enrollment secret in output or journal')
+        print(f'Installer systemd smoke passed: {version} linux/{identity["arch"]}; restart retains private identity; no setup secret in output or journal')
     finally:
         subprocess.run(['systemctl', 'stop', 'flora.service'], capture_output=True)
         subprocess.run(['systemctl', 'disable', 'flora.service'], capture_output=True)

@@ -24,13 +24,14 @@ func TestBootstrapRaceAndDurableSession(t *testing.T) {
 	}
 	defer second.Close()
 	services := []*Service{New(first), New(second)}
+	setup := setupSession(t, services[0])
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	wins := 0
 	var winner string
 	for _, s := range services {
 		wg.Go(func() {
-			token, _, err := s.Bootstrap(ctx, "a long unique password")
+			token, _, err := s.Bootstrap(ctx, "a long unique password", setup)
 			if err != nil && !errors.Is(err, storage.ErrConflict) {
 				t.Errorf("bootstrap: %v", err)
 			}
@@ -77,7 +78,7 @@ func TestAbsoluteExpiryAndLogin(t *testing.T) {
 	s := New(store)
 	at := time.Now().Truncate(time.Second)
 	s.Now = func() time.Time { return at }
-	token, expires, err := s.Bootstrap(ctx, "a long unique password")
+	token, expires, err := s.Bootstrap(ctx, "a long unique password", setupSession(t, s))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +103,7 @@ func TestAbsoluteExpiryAndLogin(t *testing.T) {
 	if ok, _ := s.Valid(ctx, fresh); !ok {
 		t.Fatal("new session invalid")
 	}
-	if _, _, err := s.Bootstrap(ctx, "short"); !errors.Is(err, ErrPassword) {
+	if _, _, err := s.Bootstrap(ctx, "short", ""); !errors.Is(err, ErrPassword) {
 		t.Fatal("accepted short password")
 	}
 }

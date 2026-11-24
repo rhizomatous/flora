@@ -142,26 +142,40 @@ func TestDeploymentEngine(t *testing.T) {
 		t.Fatal("missing managed identity", err)
 	}
 	t.Cleanup(func() { _ = exec.Command("docker", "network", "rm", d.NetworkID).Run() })
-	code, err := privateRead(filepath.Join(dir, "enrollment-code"))
+	code, err := privateRead(filepath.Join(dir, "setup-link"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	body := fmt.Sprintf(`{"password":"fixture-password-long","enrollmentCode":%q}`, code)
+	body := `{"password":"fixture-password-long"}`
+	secret := strings.Split(string(code), "#setup/")[1]
+	setupReq, _ := http.NewRequest("POST", proxy.URL+"/api/auth/setup", strings.NewReader(fmt.Sprintf(`{"secret":%q}`, secret)))
+	setupReq.Header.Set("Content-Type", "application/json")
+	setupReq.Header.Set("Origin", proxy.URL)
+	setupResponse, err := client.Do(setupReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = setupResponse.Body.Close()
+	if setupResponse.StatusCode != 200 {
+		t.Fatal("setup exchange failed", setupResponse.StatusCode)
+	}
+	setupCookie := setupResponse.Cookies()[0]
 	request("POST", "/api/auth/bootstrap", "https://attacker.example.com", body, nil, 403)
 	request("POST", "/api/auth/bootstrap", proxy.URL, `{"password":"fixture-password-long"}`, nil, 403)
 	req, _ := http.NewRequest("POST", proxy.URL+"/api/auth/bootstrap", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Origin", proxy.URL)
+	req.AddCookie(setupCookie)
 	r, err := client.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	_ = r.Body.Close()
 	cookies := r.Cookies()
-	if r.StatusCode != 200 || len(cookies) == 0 || !cookies[0].Secure || !cookies[0].HttpOnly || cookies[0].SameSite != http.SameSiteStrictMode {
-		t.Fatal("protected enrollment did not set secure session")
+	if r.StatusCode != 200 || len(cookies) == 0 || !cookies[len(cookies)-1].Secure || !cookies[len(cookies)-1].HttpOnly || cookies[len(cookies)-1].SameSite != http.SameSiteStrictMode {
+		t.Fatal("setup exchange did not set secure session")
 	}
-	cookie := cookies[0]
+	cookie := cookies[len(cookies)-1]
 	request("GET", "/api/chats/unknown/events", proxy.URL, "", nil, 401)
 	request("PUT", "/api/settings", proxy.URL, `{"githubToken":"`+upstreamToken+`","provider":"anthropic","providerKey":"fixture-only-provider-key","model":"fixture"}`, cookie, 200)
 	// Hold setup before OpenCode starts, so this networking test never performs
@@ -245,7 +259,7 @@ func TestDeploymentEngine(t *testing.T) {
 	request("POST", "/api/chats/"+chat.ID+"/stop", proxy.URL, `{}`, cookie, 200)
 	stop(cmd)
 	if bytes.Contains(logs.Bytes(), code) {
-		t.Fatal("enrollment code leaked to logs")
+		t.Fatal("setup link leaked to logs")
 	}
 	publicURL = "https://flora.changed.test"
 	cmd = start()

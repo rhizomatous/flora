@@ -76,14 +76,11 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 			return nil, err
 		}
 		cleanup = append(cleanup, func() { store.Close() })
-		file := filepath.Join(directory, "enrollment.sha256")
-		if err = os.WriteFile(file, []byte(auth.TokenHash("fixture-installer-enrollment-code")), 0600); err != nil {
-			return nil, err
-		}
 		authentication = auth.New(store)
-		if err = authentication.RequireEnrollment(file); err != nil {
+		if err = store.SaveSetupLink(ctx, auth.TokenHash("fixture-installer-setup-secret-000000000000"), time.Now().Add(auth.SetupLinkLifetime), false); err != nil {
 			return nil, err
 		}
+
 	} else {
 		fixture, err = testfixture.New(ctx, directory, scenario == "chat" || scenario == "settings" || scenario == "notifications", scenario == "compaction")
 		if err != nil {

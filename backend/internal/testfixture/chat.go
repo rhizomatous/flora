@@ -90,7 +90,7 @@ func New(ctx context.Context, directory string, interactive bool, compaction ...
 		}
 	}()
 	authentication := auth.New(store)
-	token, _, err := authentication.Bootstrap(ctx, "browser test password")
+	token, _, err := Bootstrap(ctx, authentication, "browser test password")
 	if err != nil {
 		return nil, err
 	}
@@ -294,4 +294,17 @@ func (p *Provisioner) CommandMetadata(ctx context.Context, _ storage.Credentials
 	defer response.Body.Close()
 	raw, err := io.ReadAll(response.Body)
 	return json.RawMessage(raw), err
+}
+
+// Bootstrap exercises ownership exchange before creating a fixture account.
+func Bootstrap(ctx context.Context, service *auth.Service, password string) (string, time.Time, error) {
+	secret := auth.NewSetupToken()
+	if err := service.Store.SaveSetupLink(ctx, auth.TokenHash(secret), service.Now().Add(auth.SetupLinkLifetime), false); err != nil {
+		return "", time.Time{}, err
+	}
+	session, _, err := service.RedeemSetup(ctx, secret)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return service.Bootstrap(ctx, password, session)
 }
