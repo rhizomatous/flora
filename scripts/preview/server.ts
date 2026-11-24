@@ -391,12 +391,12 @@ export function chatPreview(): Plugin {
       const from = url.searchParams.get("from") ?? "";
       const to = url.searchParams.get("to") ?? "";
       const report = previewUsage(from, to);
-      for (const row of report.chats) {
+      const chats = report.chats.map((row) => {
         const scenario = present(scenarios.find((item) => item.id === row.id));
         const project = present(projects.find((item) => item.id === scenario.projectID));
-        row.id = publicID(row.id, project.id, project.name);
-      }
-      json(res, report);
+        return { ...row, publicChatID: publicID(row.id, project.id, project.name) };
+      });
+      json(res, { ...report, chats });
       return;
     }
     if (url.pathname === "/api/projects") {
