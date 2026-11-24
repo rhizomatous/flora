@@ -39,6 +39,9 @@ func Values(ctx context.Context, store *storage.Store, chatID string, extra ...s
 	if _, secrets, err := store.RuntimeEnvironment(ctx, chatID); err == nil {
 		values = append(values, secrets...)
 	}
+	if app, err := store.GitHubApp(ctx); err == nil {
+		values = append(values, app.PrivateKey, app.ClientSecret, app.WebhookSecret)
+	}
 	if c, err := store.Credentials(ctx); err == nil {
 		values = append(values, c.GitHubToken, c.ProviderKey)
 	}

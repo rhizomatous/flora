@@ -2,7 +2,11 @@ package githubbroker
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -263,5 +267,51 @@ func TestUpstreamLeakAndRedirectBoundary(t *testing.T) {
 				t.Fatalf("redaction chunk %d", size)
 			}
 		}
+	}
+}
+
+func TestAppTokensStayBehindBrokerAndRenewAfterRejection(t *testing.T) {
+	s, _, b := fixture(t)
+	ctx := context.Background()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := storage.GitHubApp{ID: 12, Slug: "flora", InstallationID: 40, Enabled: true, PrivateKey: string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))}
+	if err := s.SaveGitHubApp(ctx, app); err != nil {
+		t.Fatal(err)
+	}
+	renewals := 0
+	b.connection.Client.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		renewals++
+		if r.URL.Host != "api.github.com" || r.URL.Path != "/app/installations/40/access_tokens" || r.Method != "POST" {
+			t.Fatal(r.URL)
+		}
+		return response(r, 201, fmt.Sprintf(`{"token":"ghs_host_fixture_%d","expires_at":%q}`, renewals, time.Now().Add(time.Hour).Format(time.RFC3339))), nil
+	})
+	forwards := 0
+	b.transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		forwards++
+		expected := fmt.Sprintf("ghs_host_fixture_%d", renewals)
+		if strings.HasSuffix(r.URL.Path, "/git-upload-pack") {
+			user, password, ok := r.BasicAuth()
+			if !ok || user != "x-access-token" || password != expected {
+				t.Fatal("git did not use installation token")
+			}
+		} else if r.Header.Get("Authorization") != "Bearer "+expected {
+			t.Fatal("API did not use installation token")
+		}
+		if forwards == 1 {
+			return response(r, 401, expected), nil
+		}
+		return response(r, 200, expected), nil
+	})
+	first := request(b, "POST", "/api/v3/repos/octo/demo/issues", "{}", fixtureCapability)
+	if first.Code != 401 || forwards != 1 || strings.Contains(first.Body.String(), "ghs_host_fixture") {
+		t.Fatal("rejected request was replayed or leaked token", first.Code)
+	}
+	next := request(b, "POST", "/octo/demo.git/git-upload-pack", "", fixtureCapability)
+	if next.Code != 200 || renewals != 2 || forwards != 2 || strings.Contains(next.Body.String(), "ghs_host_fixture") {
+		t.Fatal("token not renewed safely", next.Code, renewals, forwards)
 	}
 }

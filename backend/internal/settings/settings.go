@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rhizomatous/flora/backend/internal/githubapp"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
@@ -50,6 +51,7 @@ func invalid(message string) error       { return &ValidationError{message} }
 
 type Service struct {
 	DiscoverModel      func(context.Context, storage.Credentials) (string, error)
+	GitHub             *githubapp.Service
 	RuntimeDiagnostics func(context.Context) []Diagnostic
 	mu                 sync.Mutex
 	MaxRunningOverride int
@@ -79,6 +81,17 @@ func (s *Service) Diagnose(ctx context.Context) []Diagnostic {
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return append(result, Diagnostic{"Credentials", false, "Credential storage is unavailable. Restore the credential encryption key and database."})
 	}
+	app, appErr := s.Store.GitHubApp(ctx)
+	if appErr != nil && !errors.Is(appErr, storage.ErrNotFound) {
+		result = append(result, Diagnostic{"GitHub", false, "GitHub credential storage is unavailable."})
+	} else if app.Enabled {
+		d := Diagnostic{"GitHub", true, "GitHub installation repositories are accessible."}
+		if _, err := s.GitHub.Repositories(ctx, 1); err != nil {
+			d.OK = false
+			d.Message = "GitHub access is unavailable. Check the installation and selected repositories in installation settings."
+		}
+		result = append(result, d)
+	}
 	for _, connection := range []struct {
 		name        string
 		credentials storage.Credentials
@@ -87,6 +100,9 @@ func (s *Service) Diagnose(ctx context.Context) []Diagnostic {
 		{"GitHub", storage.Credentials{GitHubToken: c.GitHubToken}, c.GitHubToken != ""},
 		{"Model provider", storage.Credentials{Provider: c.Provider, Model: c.Model, ProviderKey: c.ProviderKey}, c.ProviderKey != ""},
 	} {
+		if connection.name == "GitHub" && (app.Enabled || (appErr != nil && !errors.Is(appErr, storage.ErrNotFound))) {
+			continue
+		}
 		d := Diagnostic{connection.name, false, "Configure " + connection.name + " in installation settings."}
 		if connection.configured {
 			d = s.validate(ctx, connection.name, connection.credentials)
@@ -96,7 +112,9 @@ func (s *Service) Diagnose(ctx context.Context) []Diagnostic {
 	return result
 }
 
-func New(store *storage.Store) *Service { return &Service{Store: store, Validate: ValidateRemote} }
+func New(store *storage.Store) *Service {
+	return &Service{Store: store, Validate: ValidateRemote, GitHub: githubapp.New(store)}
+}
 
 func (s *Service) View(ctx context.Context) (View, error) {
 	p, err := s.Store.Preferences(ctx)
@@ -115,7 +133,11 @@ func (s *Service) View(ctx context.Context) (View, error) {
 	for _, p := range providers {
 		available = append(available, ProviderView{p.Provider, p.Model})
 	}
-	return View{Providers: available, Provider: c.Provider, Model: c.Model, GitHubConfigured: c.GitHubToken != "", ProviderConfigured: c.ProviderKey != "", Preferences: p, MaxRunningOverride: s.MaxRunningOverride}, err
+	configured, connectionErr := s.Store.GitHubConfigured(ctx)
+	if err == nil {
+		err = connectionErr
+	}
+	return View{Providers: available, Provider: c.Provider, Model: c.Model, GitHubConfigured: configured, ProviderConfigured: c.ProviderKey != "", Preferences: p, MaxRunningOverride: s.MaxRunningOverride}, err
 }
 
 var modelID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$`)

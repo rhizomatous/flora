@@ -148,6 +148,15 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	if scenario == "credential-setup" {
 		configuration.DiscoverModel = func(context.Context, storage.Credentials) (string, error) { return "fixture-model", nil }
 	}
+	configuration.GitHub.Client.Transport = browserTransport(func(r *http.Request) (*http.Response, error) {
+		body := `[{"full_name":"flora/fixture","html_url":"https://github.com/flora/fixture","default_branch":"main"}]`
+		code := 200
+		if r.URL.Path != "/user/repos" {
+			code = 503
+			body = `{}`
+		}
+		return &http.Response{StatusCode: code, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body))}, nil
+	})
 	if scenario == "settings" || scenario == "credential-setup" {
 		configuration.MaxRunningOverride = 4
 		configuration.Validate = func(_ context.Context, c storage.Credentials) error {

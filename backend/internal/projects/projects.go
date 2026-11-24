@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rhizomatous/flora/backend/internal/githubapp"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
@@ -33,12 +34,13 @@ func (e *ValidationError) Error() string { return e.Message }
 func invalid(message string) error       { return &ValidationError{message} }
 
 type Service struct {
-	Store  *storage.Store
-	Client *http.Client
+	connection *githubapp.Service
+	Store      *storage.Store
+	Client     *http.Client
 }
 
 func New(store *storage.Store) *Service {
-	return &Service{Store: store, Client: &http.Client{Timeout: 10 * time.Second}}
+	return &Service{Store: store, connection: githubapp.New(store), Client: &http.Client{Timeout: 10 * time.Second}}
 }
 
 var ownerPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]{0,38}$`)
@@ -144,9 +146,9 @@ func (s *Service) Validate(ctx context.Context, in Input) (Input, error) {
 
 // githubGet keeps credentials on the fixed GitHub host and returns only local error messages.
 func (s *Service) githubGet(ctx context.Context, name, endpoint string, branch bool, out any) error {
-	c, err := s.Store.Credentials(ctx)
-	if errors.Is(err, storage.ErrNotFound) || (err == nil && c.GitHubToken == "") {
-		return invalid("Save a GitHub token in installation settings before connecting a project.")
+	token, err := s.connection.TokenWithClient(ctx, s.Client)
+	if errors.Is(err, storage.ErrNotFound) || (err == nil && token == "") {
+		return invalid("Connect GitHub in installation settings before connecting a project.")
 	}
 	if err != nil {
 		return err
@@ -158,7 +160,7 @@ func (s *Service) githubGet(ctx context.Context, name, endpoint string, branch b
 	if err != nil {
 		return invalid("Unable to prepare GitHub repository validation.")
 	}
-	req.Header.Set("Authorization", "Bearer "+c.GitHubToken)
+	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	res, err := client.Do(req)
@@ -173,14 +175,15 @@ func (s *Service) githubGet(ctx context.Context, name, endpoint string, branch b
 		}
 		return nil
 	case 401:
-		return invalid("GitHub rejected the saved token. Check its value and expiry in installation settings.")
+		s.connection.Invalidate()
+		return invalid("GitHub rejected the connection credential. Check the App installation or token expiry in installation settings.")
 	case 403:
-		return invalid("GitHub denied access or rate limited the request. Check token permissions and try again later.")
+		return invalid("GitHub denied access or rate limited the request. Check connection permissions and try again later.")
 	case 404:
 		if branch {
 			return invalid("Base branch was not found. Check the branch name and repository access.")
 		}
-		return invalid("Repository was not found or the saved token cannot access it. Check the repository and token's selected repositories.")
+		return invalid("Repository was not found or the GitHub connection cannot access it. Check the repository and connection's selected repositories.")
 	default:
 		return invalid("GitHub validation is unavailable. Try again later.")
 	}

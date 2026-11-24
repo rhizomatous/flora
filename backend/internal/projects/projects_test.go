@@ -97,7 +97,7 @@ func TestUsefulRemoteFailuresWithoutSecrets(t *testing.T) {
 		branch  bool
 		message string
 	}{
-		{"invalid token", 401, false, "rejected the saved token"},
+		{"invalid token", 401, false, "rejected the connection credential"},
 		{"permissions", 403, false, "permissions"},
 		{"missing repository", 404, false, "Repository was not found"},
 		{"missing branch", 404, true, "Base branch was not found"},
@@ -152,7 +152,7 @@ func TestMissingCredentialsAndEmptyRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	s.Store = store
+	s = New(store)
 	if _, err := s.Validate(context.Background(), input("a/b", "main")); err == nil || !strings.Contains(err.Error(), "installation settings") {
 		t.Fatal(err)
 	}

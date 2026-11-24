@@ -14,6 +14,7 @@ import {
 
 import { AccountSettings } from "./account-settings";
 import { EnvironmentEditor } from "./environment";
+import { GitHubConnection } from "./github-connection";
 import { readPreferences } from "./preferences";
 import { request } from "./request";
 import { PreferenceFields } from "./settings";
@@ -37,6 +38,7 @@ export function Installation({
   run: (task: () => Promise<void>, fallback: string) => Promise<void>;
   onSaved: (settings: Settings) => void;
 }) {
+  const [githubRevision, setGithubRevision] = useState(0);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -54,6 +56,7 @@ export function Installation({
           : { preferences: readPreferences(fields) };
       const next = await request(settingsSchema, "settings", { method: "PUT", body });
       onSaved(next);
+      if (connection === "github") setGithubRevision((value) => value + 1);
       setDiagnostics(undefined);
       form.reset();
     }, "Request failed. Try again.");
@@ -86,9 +89,11 @@ export function Installation({
       <SectionStack className="mt-8">
         <AccountSettings busy={busy} run={run} />
         <Section>
+          <GitHubConnection key={githubRevision} busy={busy} run={run} onSaved={onSaved} />
+        </Section>
+        <Section>
           <SectionHeader inset>
-            <Heading level={2}>GitHub</Heading>
-            <Text tone="muted">{settings.githubConfigured ? "Token saved" : "No token saved"}</Text>
+            <Heading level={2}>Personal access token</Heading>
           </SectionHeader>
           <form
             aria-label="GitHub connection"
@@ -110,7 +115,7 @@ export function Installation({
                   name="githubToken"
                   autoComplete="off"
                   disabled={busy}
-                  required={!settings.githubConfigured}
+                  required
                   maxLength={4096}
                   aria-describedby="github-help"
                 />

@@ -20,6 +20,7 @@ import (
 
 	"github.com/rhizomatous/flora/backend/internal/agentfiles"
 	"github.com/rhizomatous/flora/backend/internal/docker"
+	"github.com/rhizomatous/flora/backend/internal/githubapp"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
@@ -56,13 +57,14 @@ type Review struct {
 	Stale    bool      `json:"stale"`
 }
 type Service struct {
-	Store  *storage.Store
-	Engine Executor
-	mu     sync.Mutex
+	connection *githubapp.Service
+	Store      *storage.Store
+	Engine     Executor
+	mu         sync.Mutex
 }
 
 func New(store *storage.Store, engine Executor) *Service {
-	return &Service{Store: store, Engine: engine}
+	return &Service{Store: store, Engine: engine, connection: githubapp.New(store)}
 }
 
 // Run refreshes without requiring an open browser. Cancellation waits for the
