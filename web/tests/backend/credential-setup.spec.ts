@@ -14,18 +14,14 @@ for (const first of ["GitHub", "model"] as const) {
     await page.getByLabel("Model ID", { exact: true }).fill("fixture-model");
     await page.getByLabel("Fine-grained personal access token", { exact: true }).fill("github_pat_fixture_only");
     await page.getByLabel("Provider API key", { exact: true }).fill("fixture-provider-only");
-    await page.getByRole("button", { name: `Validate and save ${first}`, exact: true }).click();
+    await page.getByRole("button", { name: `Validate and save ${first === "model" ? "default" : first}`, exact: true }).click();
     await expect(page.getByRole("status").filter({ hasText: "Settings saved" })).toBeVisible();
     const partial = await page.request.get("/api/settings");
     expect(await partial.json()).toMatchObject({ githubConfigured: first === "GitHub", providerConfigured: first === "model" });
     const remaining = first === "GitHub" ? "model" : "GitHub";
     await expect(page.getByLabel(first === "GitHub" ? "Provider API key" : "Fine-grained personal access token", { exact: true })).not.toHaveValue("");
     await page.reload();
-    if (first === "model") {
-      await expect(page.getByLabel("Hosted provider", { exact: true })).toBeDisabled();
-    } else {
-      await expect(page.getByLabel("Hosted provider", { exact: true })).toBeEnabled();
-    }
+    await expect(page.getByLabel("Hosted provider", { exact: true })).toBeEnabled();
     await assertFitsPhone(page);
     if (remaining === "model") {
       await page.getByLabel("Hosted provider", { exact: true }).selectOption("anthropic");
@@ -34,7 +30,7 @@ for (const first of ["GitHub", "model"] as const) {
     } else {
       await page.getByLabel("Fine-grained personal access token", { exact: true }).fill("github_pat_fixture_only");
     }
-    await page.getByRole("button", { name: `Validate and save ${remaining}`, exact: true }).click();
+    await page.getByRole("button", { name: `Validate and save ${remaining === "model" ? "default" : remaining}`, exact: true }).click();
     await expect(page.getByRole("status").filter({ hasText: "Settings saved" })).toBeVisible();
     await expect(page.getByLabel("Provider API key", { exact: true })).toHaveValue("");
     const saved = await request.get(savedSettingsURL(backend));

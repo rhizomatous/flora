@@ -123,6 +123,7 @@ test("long passkey names fit wide and narrow settings with keyboard focus", asyn
   await page.getByRole("button", { name: "Create administrator with passkey", exact: true }).click();
   await openSettings(page);
   await expect(page.getByLabel(`Name for ${name}`, { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add passkey", exact: true })).toBeEnabled();
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 900 });
     for (const theme of ["dark", "light"]) {
