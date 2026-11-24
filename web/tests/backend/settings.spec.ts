@@ -98,7 +98,7 @@ test("settings persistence, credential rotation, and completion sounds", async (
       console.error(page.url(), errors, await page.locator("body").innerText());
       throw error;
     });
-  assert.equal(await page.getByLabel("Hosted provider", { exact: true }).isDisabled(), true);
+  assert.equal(await page.getByLabel("Hosted provider", { exact: true }).isDisabled(), false);
   assert.equal(await page.getByLabel("Model ID", { exact: true }).inputValue(), "model");
   assert.equal(
     await page.getByLabel("Fine-grained personal access token", { exact: true }).inputValue(),
@@ -112,11 +112,11 @@ test("settings persistence, credential rotation, and completion sounds", async (
   await page.getByLabel("Git author email", { exact: true }).fill("browser@example.test");
   await page.getByLabel("Play a sound when a chat finishes work", { exact: true }).uncheck();
   await page.getByLabel("Provider API key", { exact: true }).fill("invalid-fixture-key");
-  await page.getByRole("button", { name: "Validate and save model", exact: true }).click();
+  await page.getByRole("button", { name: "Validate and save default", exact: true }).click();
   await page.getByRole("alert").filter({ hasText: "Anthropic rejected the credential" }).waitFor();
   assert.equal(await page.getByLabel("CPUs per chat", { exact: true }).inputValue(), "3");
   await page.getByLabel("Provider API key", { exact: true }).fill("rotated-fixture-key");
-  await page.getByRole("button", { name: "Validate and save model", exact: true }).click();
+  await page.getByRole("button", { name: "Validate and save default", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "Settings saved" }).waitFor();
   assert.equal(await page.getByLabel("Provider API key", { exact: true }).inputValue(), "");
   // Saving the model must keep the unsaved preferences draft intact.
@@ -174,4 +174,36 @@ test("settings persistence, credential rotation, and completion sounds", async (
     providerKey: "rotated-fixture-key",
     githubToken: "github_pat_test-secret",
   });
+});
+
+test("default models retain independent provider connections", async ({ page }) => {
+  const errors = pageErrors(page);
+  await logIn(page);
+  await openSettings(page);
+  await page.getByLabel("Hosted provider", { exact: true }).selectOption("openai");
+  await page.getByLabel("Model ID", { exact: true }).fill("gpt-fixture");
+  await page.getByLabel("Provider API key", { exact: true }).fill("openai-fixture-key");
+  await page.getByRole("button", { name: "Validate and save default", exact: true }).click();
+  await expect(page.getByLabel("Provider API key", { exact: true })).toHaveValue("");
+  await page.reload();
+  await expect(page.getByLabel("Hosted provider", { exact: true })).toHaveValue("openai");
+  await expect(page.getByLabel("Model ID", { exact: true })).toHaveValue("gpt-fixture");
+  await assertFitsPhone(page);
+  await page.getByLabel("Hosted provider", { exact: true }).selectOption("anthropic");
+  await expect(page.getByLabel("Model ID", { exact: true })).toHaveValue("model");
+  await page.getByLabel("Model ID", { exact: true }).fill("claude-sonnet-4-6");
+  await page.getByRole("button", { name: "Validate and save default", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Validate and save default", exact: true })).toBeEnabled();
+  await page.reload();
+  await expect(page.getByLabel("Hosted provider", { exact: true })).toHaveValue("anthropic");
+  await expect(page.getByLabel("Model ID", { exact: true })).toHaveValue("claude-sonnet-4-6");
+  await page.goto("/#chats/new");
+  await expect(page.getByRole("button", { name: "Model: Claude Sonnet 4.6", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /^Model:/ }).click();
+  await page.getByRole("searchbox", { name: "Search models", exact: true }).fill("openai");
+  await page.getByRole("menuitem", { name: "gpt-fixture", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Model: gpt-fixture", exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Model: gpt-fixture", exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
 });

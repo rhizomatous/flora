@@ -25,7 +25,7 @@ import {
 } from "./settings-schemas";
 import { text } from "./ui";
 
-/** Edits credentials, the fixed provider and model, and installation-wide preferences. */
+/** Edits provider connections, the default model, and installation preferences. */
 export function Installation({
   settings,
   busy,
@@ -37,6 +37,8 @@ export function Installation({
   run: (task: () => Promise<void>, fallback: string) => Promise<void>;
   onSaved: (settings: Settings) => void;
 }) {
+  const [provider, setProvider] = useState(settings.provider || "openai");
+  const selectedProvider = settings.providers.find((item) => item.provider === provider);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -128,9 +130,10 @@ export function Installation({
         </Section>
         <Section>
           <SectionHeader inset>
-            <Heading level={2}>Model provider</Heading>
+            <Heading level={2}>Default model</Heading>
             <Text tone="muted">
-              {settings.providerConfigured ? "API key saved" : "No API key saved"}
+              {settings.providers.map((item) => item.provider).join(", ") ||
+                "No providers configured"}
             </Text>
           </SectionHeader>
           <form
@@ -146,8 +149,11 @@ export function Installation({
                   id="hosted-provider"
                   key={settings.provider}
                   name="provider"
-                  defaultValue={settings.provider === "" ? "openai" : settings.provider}
-                  disabled={busy || settings.provider !== ""}
+                  value={provider}
+                  onChange={(event) => {
+                    setProvider(event.target.value);
+                  }}
+                  disabled={busy}
                 >
                   <option value="openai">OpenAI</option>
                   <option value="anthropic">Anthropic</option>
@@ -157,28 +163,29 @@ export function Installation({
               <SettingsRow label="Model ID" htmlFor="model-id">
                 <Input
                   id="model-id"
-                  key={settings.model}
+                  key={`${provider}:${selectedProvider?.model ?? ""}`}
                   name="model"
-                  defaultValue={settings.model}
+                  defaultValue={selectedProvider?.model ?? ""}
                   required
                   maxLength={200}
-                  disabled={busy || settings.model !== ""}
+                  disabled={busy}
                 />
               </SettingsRow>
               <SettingsRow label="Provider API key" htmlFor="provider-key">
                 <Input
                   id="provider-key"
+                  key={provider}
                   type="password"
                   name="providerKey"
                   autoComplete="off"
-                  required={!settings.providerConfigured}
+                  required={selectedProvider === undefined}
                   disabled={busy}
                   maxLength={4096}
                 />
               </SettingsRow>
             </SettingsGroup>
             <Button type="submit" disabled={busy}>
-              Validate and save model
+              Validate and save default
             </Button>
           </form>
         </Section>

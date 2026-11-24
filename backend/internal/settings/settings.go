@@ -25,7 +25,12 @@ type Input struct {
 	GitHubToken string               `json:"githubToken"`
 	ProviderKey string               `json:"providerKey"`
 }
+type ProviderView struct {
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+}
 type View struct {
+	Providers []ProviderView `json:"providers"`
 	// Validation contains metadata checks performed by this save, never runtime readiness.
 	Validation         []Diagnostic        `json:"validation,omitempty"`
 	Preferences        storage.Preferences `json:"preferences"`
@@ -98,7 +103,15 @@ func (s *Service) View(ctx context.Context) (View, error) {
 	if errors.Is(err, storage.ErrNotFound) {
 		err = nil
 	}
-	return View{Provider: c.Provider, Model: c.Model, GitHubConfigured: c.GitHubToken != "", ProviderConfigured: c.ProviderKey != "", Preferences: p, MaxRunningOverride: s.MaxRunningOverride}, err
+	providers, providerErr := s.Store.Providers(ctx)
+	if providerErr != nil {
+		return View{}, providerErr
+	}
+	available := []ProviderView{}
+	for _, p := range providers {
+		available = append(available, ProviderView{p.Provider, p.Model})
+	}
+	return View{Providers: available, Provider: c.Provider, Model: c.Model, GitHubConfigured: c.GitHubToken != "", ProviderConfigured: c.ProviderKey != "", Preferences: p, MaxRunningOverride: s.MaxRunningOverride}, err
 }
 
 var modelID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$`)
@@ -150,12 +163,15 @@ func (s *Service) save(ctx context.Context, in Input) ([]Diagnostic, error) {
 	c := old
 	modelInput := in.Provider != "" || in.Model != "" || in.ProviderKey != ""
 	if modelInput {
-		if old.Provider != "" {
-			if (in.Provider != "" && in.Provider != old.Provider) || (in.Model != "" && in.Model != old.Model) {
-				return nil, invalid("Provider and model are fixed for this installation.")
+		if in.Provider != "" && in.Provider != old.Provider {
+			prior, err := s.Store.ProviderCredentials(ctx, storage.Execution{Provider: in.Provider})
+			if err != nil && !errors.Is(err, storage.ErrNotFound) {
+				return nil, err
 			}
-		} else {
-			c.Provider, c.Model = in.Provider, in.Model
+			c.Provider, c.Model, c.ProviderKey = in.Provider, prior.Model, prior.ProviderKey
+		}
+		if in.Model != "" {
+			c.Model = in.Model
 		}
 		if c.Provider != "openai" && c.Provider != "anthropic" && c.Provider != "google" {
 			return nil, invalid("Choose OpenAI, Anthropic, or Google as the hosted provider.")
@@ -180,7 +196,7 @@ func (s *Service) save(ctx context.Context, in Input) ([]Diagnostic, error) {
 	if in.GitHubToken != "" {
 		checks = append(checks, s.validate(ctx, "GitHub", storage.Credentials{GitHubToken: c.GitHubToken}))
 	}
-	if modelInput && (in.ProviderKey != "" || old.ProviderKey == "") {
+	if modelInput {
 		checks = append(checks, s.validate(ctx, "Model provider", storage.Credentials{Provider: c.Provider, Model: c.Model, ProviderKey: c.ProviderKey}))
 	}
 	for _, check := range checks {
@@ -194,11 +210,7 @@ func (s *Service) save(ctx context.Context, in Input) ([]Diagnostic, error) {
 		}
 		return checks, s.Store.SavePreferences(ctx, *in.Preferences)
 	}
-	if err := s.Store.SaveInstallation(ctx, c, in.Preferences); errors.Is(err, storage.ErrConflict) {
-		return nil, invalid("Provider and model are already fixed for this installation.")
-	} else {
-		return checks, err
-	}
+	return checks, s.Store.SaveInstallation(ctx, c, in.Preferences)
 }
 
 func safeKey(key string) bool {

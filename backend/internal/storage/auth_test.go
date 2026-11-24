@@ -31,10 +31,8 @@ func TestAuthMigrationFromVersionOne(t *testing.T) {
 	must(t, s.Bootstrap(ctx, "hash", "token-hash", time.Now().Add(time.Hour)))
 	c := Credentials{Provider: "openai", Model: "gpt-test", GitHubToken: "github_pat_secret", ProviderKey: "secret-key"}
 	must(t, s.SaveCredentials(ctx, c))
-	_, err = s.db.Exec("UPDATE installation_credentials SET model='other'")
-	if err == nil {
-		t.Fatal("database permitted model change")
-	}
+	c.Model = "other"
+	must(t, s.SaveCredentials(ctx, c))
 	must(t, s.Close())
 	s, err = Open(ctx, root)
 	must(t, err)

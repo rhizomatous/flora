@@ -43,7 +43,7 @@ func TestSettingsAPIBoundsAndDiagnostics(t *testing.T) {
 			t.Fatal("cross-site settings allowed", w.Code)
 		}
 	}
-	for _, raw := range []string{`{"preferences":{"maxRunning":0}}`, `{"preferences":{"maxRunning":1.5}}`, `{"preferences":{"messageBytes":999999999999999999999}}`, `{"preferences":{"unexpected":1}}`, `{"providerKey":"bad\nkey"}`, `{"model":"other"}`} {
+	for _, raw := range []string{`{"preferences":{"maxRunning":0}}`, `{"preferences":{"maxRunning":1.5}}`, `{"preferences":{"messageBytes":999999999999999999999}}`, `{"preferences":{"unexpected":1}}`, `{"providerKey":"bad\nkey"}`, `{"model":"https://invalid.test"}`} {
 		w := call("PUT", "/api/settings", raw, "https://flora.test", value)
 		if w.Code != 400 {
 			t.Fatal("bad settings accepted", raw, w.Code)

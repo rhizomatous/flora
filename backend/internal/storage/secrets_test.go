@@ -149,7 +149,7 @@ func TestEncryptedCredentialsFailClosed(t *testing.T) {
 				must(t, err)
 			}
 			if mode == "metadata" {
-				_, err = s.db.Exec("DROP TRIGGER immutable_installation_model; UPDATE installation_credentials SET provider='openai'")
+				_, err = s.db.Exec("DROP TRIGGER IF EXISTS immutable_installation_model; UPDATE installation_credentials SET provider='openai'")
 				must(t, err)
 			}
 			if mode == "missing-marker" || mode == "missing-marker-and-key" {

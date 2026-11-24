@@ -42,6 +42,11 @@ func Values(ctx context.Context, store *storage.Store, chatID string, extra ...s
 	if c, err := store.Credentials(ctx); err == nil {
 		values = append(values, c.GitHubToken, c.ProviderKey)
 	}
+	if providers, err := store.Providers(ctx); err == nil {
+		for _, c := range providers {
+			values = append(values, c.ProviderKey)
+		}
+	}
 	if paths, err := store.Paths(ctx, chatID); err == nil {
 		root, err := os.OpenRoot(paths.RuntimeState)
 		if err != nil {

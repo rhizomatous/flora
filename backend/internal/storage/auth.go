@@ -91,7 +91,7 @@ func (s *Store) Credentials(ctx context.Context) (Credentials, error) {
 	return readCredentials(ctx, s.db, s.secrets)
 }
 
-// SaveCredentials replaces upstream credentials but never changes an installed model.
+// SaveCredentials replaces the default connection and retains other providers.
 func (s *Store) SaveCredentials(ctx context.Context, c Credentials) error {
 	return s.SaveInstallation(ctx, c, nil)
 }
@@ -115,8 +115,20 @@ func (s *Store) SaveInstallation(ctx context.Context, c Credentials, p *Preferen
 		if err != nil && !errors.Is(err, ErrNotFound) {
 			return err
 		}
-		if err == nil && saved.Provider != "" && (saved.Provider != c.Provider || saved.Model != c.Model) {
-			return ErrConflict
+		// Freeze legacy chats before replacing the default. Accepted turn snapshots
+		// remain unchanged; old turns without a snapshot use the chat's choice.
+		if saved.Provider != "" {
+			if _, err := tx.ExecContext(ctx, `UPDATE chats SET execution=? WHERE json_extract(execution,'$.model') IS NULL OR json_extract(execution,'$.model')=''`, selectionJSON(&Execution{Provider: saved.Provider, Model: saved.Model})); err != nil {
+				return err
+			}
+			if err := s.saveProvider(ctx, tx, saved); err != nil {
+				return err
+			}
+		}
+		if c.Provider != "" {
+			if err := s.saveProvider(ctx, tx, c); err != nil {
+				return err
+			}
 		}
 		// Installing the first model after GitHub also reencrypts its token,
 		// since both ciphertext identities include the provider and model.

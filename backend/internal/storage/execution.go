@@ -78,7 +78,7 @@ func resolveExecution(ctx context.Context, tx *sql.Tx, chat string, selected *Ex
 			return Execution{}, ErrInvalid
 		}
 		var provider string
-		err := tx.QueryRowContext(ctx, "SELECT provider FROM installation_credentials WHERE id=1").Scan(&provider)
+		err := tx.QueryRowContext(ctx, "SELECT provider FROM installation_credentials WHERE id=1 AND provider=? UNION SELECT provider FROM model_providers WHERE provider=?", selected.Provider, selected.Provider).Scan(&provider)
 		if err != nil {
 			return Execution{}, err
 		}

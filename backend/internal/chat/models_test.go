@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -282,5 +283,70 @@ func TestRuntimeModelRatesPreserveZeroAndMissing(t *testing.T) {
 				t.Fatal("negative rate exposed", m)
 			}
 		}
+	}
+}
+
+func TestMultipleProviderDiscoveryAndAdmission(t *testing.T) {
+	f := newFixture(t)
+	s, _, _ := testService(t, f)
+	ctx := context.Background()
+	original, err := s.Store.Credentials(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := storage.Credentials{Provider: "openai", Model: "gpt-5", ProviderKey: "openai-secret", GitHubToken: original.GitHubToken}
+	if err := s.Store.SaveCredentials(ctx, next); err != nil {
+		t.Fatal(err)
+	}
+	calls := map[string]int{}
+	s.provisioner.(*testProvisioner).metadata = func(_ context.Context, c storage.Credentials) (json.RawMessage, error) {
+		calls[c.Provider]++
+		return json.RawMessage(strings.Replace(testModelCatalog, `"connected":["anthropic"]`, `"connected":["anthropic","openai"]`, 1)), nil
+	}
+	for range 2 {
+		options := s.Models(ctx)
+		if options.Error != "" || len(options.Models) != 4 || options.Default.Provider != "openai" {
+			t.Fatal(options)
+		}
+		raw, _ := json.Marshal(options)
+		if bytes.Contains(raw, []byte("secret")) || bytes.Contains(raw, []byte("SECRET")) {
+			t.Fatal("model choices exposed a key")
+		}
+	}
+	if calls["anthropic"] != 1 || calls["openai"] != 1 {
+		t.Fatal("provider discovery did not reuse cached metadata", calls)
+	}
+	if err := s.validateExecution(ctx, storage.Execution{Provider: "anthropic", Model: "claude-sonnet-4-6", Variant: "high"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.validateExecution(ctx, storage.Execution{Provider: "google", Model: "gemini"}, nil); err == nil {
+		t.Fatal("unconfigured provider accepted")
+	}
+}
+
+func TestSavedChatDefaultSurvivesProviderChangeAndDiscoveryOutage(t *testing.T) {
+	f := newFixture(t)
+	s, _, project := testService(t, f)
+	ctx := context.Background()
+	image, version := s.provisioner.Identity()
+	c, err := s.Store.CreateChatRequest(ctx, project.ID, "Queued", image, version, "queued", "First")
+	if err != nil {
+		t.Fatal(err)
+	}
+	original, err := s.Store.Credentials(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := storage.Credentials{Provider: "openai", Model: "new-default", ProviderKey: "openai-secret", GitHubToken: original.GitHubToken}
+	if err := s.Store.SaveCredentials(ctx, next); err != nil {
+		t.Fatal(err)
+	}
+	s.provisioner.(*testProvisioner).metadata = func(context.Context, storage.Credentials) (json.RawMessage, error) { return nil, errors.New("offline") }
+	if err := s.validateExecution(ctx, c.Execution, nil, c.ID); err != nil {
+		t.Fatal("saved default became unavailable after default change", err)
+	}
+	options := s.Models(ctx, c.ID)
+	if options.Default != c.Execution || options.Error == "" {
+		t.Fatal("offline discovery replaced saved choice", options)
 	}
 }

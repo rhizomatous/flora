@@ -26,7 +26,7 @@ func (s *Service) AttachmentCapabilities(ctx context.Context, chatIDs ...string)
 		return unavailable
 	}
 	for _, m := range options.Models {
-		if m.ID == options.Default.Model {
+		if m.Provider == options.Default.Provider && m.ID == options.Default.Model {
 			value := AttachmentCapabilities{Image: m.Image, PDF: m.PDF}
 			if !value.Image || !value.PDF {
 				value.Reason = "The configured model does not support every attachment type. Unsupported files must be removed before sending."
@@ -149,13 +149,13 @@ func (s *Service) runtimeParts(ctx context.Context, rt *runtime, message storage
 }
 
 func (s *Service) checkSelectedAttachments(ctx context.Context, project string, selected *storage.Execution, ids []string, chatIDs ...string) error {
-	credentials, _ := s.Store.Credentials(ctx)
-	if selected == nil || selected.Model == "" || selected.Model == credentials.Model {
+	if selected == nil || selected.Model == "" {
 		return s.checkAttachments(ctx, project, ids, chatIDs...)
 	}
 	if len(ids) > storage.MaxAttachments {
 		return storage.ErrInvalid
 	}
+	var capabilities *AttachmentCapabilities
 	total := 0
 	for _, id := range ids {
 		a, _, err := s.Store.Attachment(ctx, id)
@@ -163,6 +163,21 @@ func (s *Service) checkSelectedAttachments(ctx context.Context, project string, 
 			return &storage.AttachmentError{Reason: "An attachment expired or belongs to another project. Upload it again."}
 		}
 		total += a.Size
+		if a.MIME != "text/plain" {
+			if capabilities == nil {
+				options := s.Models(ctx, chatIDs...)
+				capabilities = &AttachmentCapabilities{}
+				for _, m := range options.Models {
+					if m.Provider == selected.Provider && m.ID == selected.Model {
+						capabilities.Image, capabilities.PDF = m.Image, m.PDF
+						break
+					}
+				}
+			}
+			if strings.HasPrefix(a.MIME, "image/") && !capabilities.Image || a.MIME == "application/pdf" && !capabilities.PDF {
+				return &storage.AttachmentError{Reason: "The selected model does not support this attachment. Choose another model or remove the file."}
+			}
+		}
 	}
 	if total > storage.MaxAttachmentTotal {
 		return &storage.AttachmentError{Reason: "Attachments must total at most 20 MiB per message."}

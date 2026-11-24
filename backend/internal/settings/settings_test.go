@@ -199,8 +199,8 @@ func TestSettingsValidationAndAtomicRotation(t *testing.T) {
 	if saved.GitHubToken != initial.GitHubToken || saved.ProviderKey != "replacement-provider" {
 		t.Fatal("blank key did not retain saved credential")
 	}
-	if err := service.Save(ctx, Input{Model: "new-model"}); err == nil {
-		t.Fatal("model switched")
+	if err := service.Save(ctx, Input{Model: "new-model"}); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -333,5 +333,48 @@ func TestRemoteValidationOnlyContactsSuppliedConnection(t *testing.T) {
 		if err := validateRemote(context.Background(), c, client); err != nil || calls != 1 {
 			t.Fatal("independent validation failed", err, calls)
 		}
+	}
+}
+
+func TestMultipleProviderDefaultsRetainKeysAndValidateEachModel(t *testing.T) {
+	ctx := context.Background()
+	store, err := storage.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	service := New(store)
+	var validated []storage.Credentials
+	service.Validate = func(_ context.Context, c storage.Credentials) error { validated = append(validated, c); return nil }
+	for _, in := range []Input{
+		{Provider: "anthropic", Model: "sonnet", ProviderKey: "anthropic-secret"},
+		{GitHubToken: "github_pat_secret"},
+		{Provider: "openai", Model: "gpt", ProviderKey: "openai-secret"},
+		{Provider: "anthropic", Model: "haiku"},
+	} {
+		if err := service.Save(ctx, in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	saved, err := store.Credentials(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Provider != "anthropic" || saved.Model != "haiku" || saved.ProviderKey != "anthropic-secret" || saved.GitHubToken != "github_pat_secret" {
+		t.Fatal("default switch lost a connection")
+	}
+	if len(validated) != 4 || validated[3].Model != "haiku" || validated[3].ProviderKey != "anthropic-secret" || validated[3].GitHubToken != "" {
+		t.Fatal("model was not independently validated")
+	}
+	view, err := service.View(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(view)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(view.Providers) != 2 || strings.Contains(string(raw), "secret") {
+		t.Fatal("provider view lost configuration or exposed credentials")
 	}
 }
