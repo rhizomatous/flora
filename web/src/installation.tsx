@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   Button,
-  FieldDescription,
-  FieldLabel,
-  FieldLegend,
-  FieldSet,
+  Section,
+  SectionHeader,
+  SectionStack,
+  SettingsGroup,
+  SettingsRow,
   Heading,
   Input,
   NativeSelect,
@@ -42,24 +43,29 @@ export function Installation({
     heading.current?.focus();
   }, []);
 
-  function save(event: React.SubmitEvent<HTMLFormElement>) {
+  function save(
+    connection: "github" | "model" | "preferences",
+    event: React.SubmitEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
     const form = event.currentTarget;
     const fields = new FormData(form);
     void run(async () => {
-      // Disabled provider and model fields are not submitted, and blank credentials keep the
-      // saved ones; the server treats "" as "unchanged" for all four.
-      const next = await request(settingsSchema, "settings", {
-        method: "PUT",
-        body: {
+      let body: object;
+      if (connection === "github") {
+        body = { githubToken: text(fields, "githubToken") };
+      } else if (connection === "model") {
+        body = {
           provider: text(fields, "provider"),
           model: text(fields, "model"),
-          githubToken: text(fields, "githubToken"),
           providerKey: text(fields, "providerKey"),
-          preferences: readPreferences(fields),
-        },
-      });
+        };
+      } else {
+        body = { preferences: readPreferences(fields) };
+      }
+      const next = await request(settingsSchema, "settings", { method: "PUT", body });
       onSaved(next);
+      setDiagnostics(undefined);
       form.reset();
     }, "Request failed. Try again.");
   }
@@ -80,93 +86,121 @@ export function Installation({
       <Heading level={1} ref={heading} tabIndex={-1} id="settings-heading">
         Installation settings
       </Heading>
-      <Text tone="muted" className="mt-3">
-        Choose one hosted provider and model for all chats. Once saved, the provider and model
-        cannot be changed.
-      </Text>
       <a href="#mcps" className="mt-4 inline-block text-sm underline">
         MCP servers
       </a>
-      <form className="mt-8 space-y-6" onSubmit={save}>
-        <FieldSet disabled={busy}>
-          <FieldLegend>GitHub</FieldLegend>
-          <FieldLabel className="w-full flex-col items-start">
-            Fine-grained personal access token
-            <Input
-              className="mt-2"
-              type="password"
-              name="githubToken"
-              autoComplete="off"
-              required={!settings.githubConfigured}
-              maxLength={4096}
-              aria-describedby="github-help"
+      <SectionStack className="mt-8">
+        <Section>
+          <SectionHeader inset>
+            <Heading level={2}>GitHub</Heading>
+            <Text tone="muted">{settings.githubConfigured ? "Token saved" : "No token saved"}</Text>
+          </SectionHeader>
+          <form
+            aria-label="GitHub connection"
+            className="space-y-4"
+            onSubmit={(event) => {
+              save("github", event);
+            }}
+          >
+            <SettingsGroup>
+              <SettingsRow
+                label="Fine-grained personal access token"
+                htmlFor="github-token"
+                description="Restrict the token to the repositories Flora will use"
+                descriptionId="github-help"
+              >
+                <Input
+                  id="github-token"
+                  type="password"
+                  name="githubToken"
+                  autoComplete="off"
+                  disabled={busy}
+                  required={!settings.githubConfigured}
+                  maxLength={4096}
+                  aria-describedby="github-help"
+                />
+              </SettingsRow>
+            </SettingsGroup>
+            <Button type="submit" disabled={busy}>
+              Validate and save GitHub
+            </Button>
+          </form>
+        </Section>
+        <Section>
+          <SectionHeader inset>
+            <Heading level={2}>Model provider</Heading>
+            <Text tone="muted">
+              {settings.providerConfigured ? "API key saved" : "No API key saved"}
+            </Text>
+          </SectionHeader>
+          <form
+            aria-label="Model connection"
+            className="space-y-4"
+            onSubmit={(event) => {
+              save("model", event);
+            }}
+          >
+            <SettingsGroup>
+              <SettingsRow label="Hosted provider" htmlFor="hosted-provider">
+                <NativeSelect
+                  id="hosted-provider"
+                  key={settings.provider}
+                  name="provider"
+                  defaultValue={settings.provider === "" ? "openai" : settings.provider}
+                  disabled={busy || settings.provider !== ""}
+                >
+                  <option value="openai">OpenAI</option>
+                  <option value="anthropic">Anthropic</option>
+                  <option value="google">Google</option>
+                </NativeSelect>
+              </SettingsRow>
+              <SettingsRow label="Model ID" htmlFor="model-id">
+                <Input
+                  id="model-id"
+                  key={settings.model}
+                  name="model"
+                  defaultValue={settings.model}
+                  required
+                  maxLength={200}
+                  disabled={busy || settings.model !== ""}
+                />
+              </SettingsRow>
+              <SettingsRow label="Provider API key" htmlFor="provider-key">
+                <Input
+                  id="provider-key"
+                  type="password"
+                  name="providerKey"
+                  autoComplete="off"
+                  required={!settings.providerConfigured}
+                  disabled={busy}
+                  maxLength={4096}
+                />
+              </SettingsRow>
+            </SettingsGroup>
+            <Button type="submit" disabled={busy}>
+              Validate and save model
+            </Button>
+          </form>
+        </Section>
+        <Section>
+          <form
+            aria-label="Installation preferences"
+            className="space-y-4"
+            onSubmit={(event) => {
+              save("preferences", event);
+            }}
+          >
+            <PreferenceFields
+              value={settings.preferences}
+              busy={busy}
+              override={settings.maxRunningOverride}
             />
-          </FieldLabel>
-          <FieldDescription id="github-help">
-            Restrict the token to the repositories Flora will use.{" "}
-            {settings.githubConfigured
-              ? "A token is saved. Leave blank to keep it."
-              : "No token saved."}
-          </FieldDescription>
-        </FieldSet>
-        <FieldSet disabled={busy} className="border-t border-border pt-6">
-          <FieldLegend className="mb-0">Model provider</FieldLegend>
-          <FieldLabel className="w-full flex-col items-start">
-            Hosted provider
-            <NativeSelect
-              key={settings.provider}
-              aria-label="Hosted provider"
-              className="mt-2"
-              name="provider"
-              defaultValue={settings.provider === "" ? "openai" : settings.provider}
-              disabled={settings.provider !== ""}
-            >
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic</option>
-              <option value="google">Google</option>
-            </NativeSelect>
-          </FieldLabel>
-          <FieldLabel className="w-full flex-col items-start">
-            Model ID
-            <Input
-              key={settings.model}
-              className="mt-2"
-              name="model"
-              defaultValue={settings.model}
-              required
-              maxLength={200}
-              disabled={settings.model !== ""}
-              placeholder="Exact model ID from your provider"
-            />
-          </FieldLabel>
-          <FieldLabel className="w-full flex-col items-start">
-            Provider API key
-            <Input
-              className="mt-2"
-              type="password"
-              name="providerKey"
-              autoComplete="off"
-              required={!settings.providerConfigured}
-              maxLength={4096}
-              aria-describedby="provider-help"
-            />
-          </FieldLabel>
-          <FieldDescription id="provider-help">
-            {settings.providerConfigured
-              ? "An API key is saved. Leave blank to keep it."
-              : "No API key saved."}{" "}
-            Saved credentials are never displayed.
-          </FieldDescription>
-        </FieldSet>
-        <PreferenceFields
-          value={settings.preferences}
-          busy={busy}
-          override={settings.maxRunningOverride}
-        />
-        <Button type="submit" disabled={busy}>
-          {busy ? "Saving…" : "Validate and save"}
-        </Button>
-      </form>
+            <Button type="submit" disabled={busy}>
+              Save preferences
+            </Button>
+          </form>
+        </Section>
+      </SectionStack>
       <div className="mt-10">
         <EnvironmentEditor path="settings/environment" />
       </div>

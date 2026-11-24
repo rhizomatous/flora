@@ -203,3 +203,135 @@ func TestSettingsValidationAndAtomicRotation(t *testing.T) {
 		t.Fatal("model switched")
 	}
 }
+
+func TestIndependentConnectionsSurviveRestartAndFailure(t *testing.T) {
+	for _, githubFirst := range []bool{true, false} {
+		t.Run(map[bool]string{true: "github-first", false: "model-first"}[githubFirst], func(t *testing.T) {
+			ctx := context.Background()
+			root := t.TempDir()
+			store, err := storage.Open(ctx, root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { store.Close() }()
+			s := New(store)
+			var checked []storage.Credentials
+			s.Validate = func(_ context.Context, c storage.Credentials) error {
+				checked = append(checked, c)
+				if c.GitHubToken == "github_pat_rejected" || c.ProviderKey == "rejected-key" {
+					return invalid("Credential rejected.")
+				}
+				return nil
+			}
+			p := storage.DefaultPreferences()
+			p.AuthorName, p.MaxRunning = "Custom author", 7
+			if err := s.Save(ctx, Input{Preferences: &p}); err != nil {
+				t.Fatal(err)
+			}
+			github := Input{GitHubToken: "github_pat_saved"}
+			model := Input{Provider: "openai", Model: "model-test", ProviderKey: "provider-saved"}
+			first, second := model, github
+			if githubFirst {
+				first, second = github, model
+			}
+			view, err := s.SaveAndView(ctx, first)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if view.GitHubConfigured != githubFirst || view.ProviderConfigured == githubFirst || len(view.Validation) != 1 || !view.Validation[0].OK {
+				t.Fatalf("wrong first-save response: %+v", view)
+			}
+			if len(checked) != 1 || (checked[0].GitHubToken != "" && checked[0].ProviderKey != "") {
+				t.Fatal("validated an unrelated connection")
+			}
+			store.Close()
+			store, err = storage.Open(ctx, root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			s.Store = store
+			view, err = s.View(ctx)
+			if err != nil || view.Preferences != p || view.GitHubConfigured != githubFirst || view.ProviderConfigured == githubFirst || len(view.Validation) != 0 {
+				t.Fatalf("partial configuration lost on restart: %+v %v", view, err)
+			}
+			results := s.Diagnose(ctx)
+			if results[len(results)-2].OK != githubFirst || results[len(results)-1].OK == githubFirst {
+				t.Fatalf("partial diagnostics: %+v", results)
+			}
+			bad := Input{Provider: "openai", Model: "model-test", ProviderKey: "rejected-key"}
+			if !githubFirst {
+				bad = Input{GitHubToken: "github_pat_rejected"}
+			}
+			if err := s.Save(ctx, bad); err == nil {
+				t.Fatal("failed connection was saved")
+			}
+			if err := s.Save(ctx, second); err != nil {
+				t.Fatal(err)
+			}
+			before, err := store.Credentials(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// An unavailable existing connection must not block rotating the other one.
+			s.Validate = func(_ context.Context, c storage.Credentials) error {
+				if c.ProviderKey != "" {
+					return invalid("Model provider unavailable.")
+				}
+				return nil
+			}
+			if err := s.Save(ctx, Input{GitHubToken: "github_pat_rotated"}); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.Save(ctx, Input{ProviderKey: "rejected-key"}); err == nil {
+				t.Fatal("failed replacement was saved")
+			}
+			after, err := store.Credentials(ctx)
+			if err != nil || after.ProviderKey != before.ProviderKey || after.GitHubToken != "github_pat_rotated" {
+				t.Fatal("failed replacement changed credentials", err)
+			}
+			results = s.Diagnose(ctx)
+			if !results[len(results)-2].OK || results[len(results)-1].OK {
+				t.Fatal("failed model check hid working GitHub", results)
+			}
+			s.Validate = func(_ context.Context, c storage.Credentials) error {
+				if c.GitHubToken != "" {
+					return errors.New("github_pat_rotated transport failure")
+				}
+				return nil
+			}
+			if err := s.Save(ctx, Input{ProviderKey: "provider-rotated"}); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.Save(ctx, Input{GitHubToken: "github_pat_rejected"}); err == nil || strings.Contains(err.Error(), "github_pat_") {
+				t.Fatal("unsafe GitHub failure", err)
+			}
+			after, err = store.Credentials(ctx)
+			if err != nil || after.ProviderKey != "provider-rotated" || after.GitHubToken != "github_pat_rotated" {
+				t.Fatal("failed GitHub replacement changed credentials", err)
+			}
+			view, err = s.View(ctx)
+			if err != nil || !view.GitHubConfigured || !view.ProviderConfigured || view.Preferences != p {
+				t.Fatal("independent saves changed preferences", err)
+			}
+		})
+	}
+}
+
+func TestRemoteValidationOnlyContactsSuppliedConnection(t *testing.T) {
+	for _, c := range []storage.Credentials{
+		{GitHubToken: "github_pat_fixture"},
+		{Provider: "openai", Model: "model-test", ProviderKey: "provider-fixture"},
+	} {
+		calls := 0
+		client := &http.Client{Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
+			calls++
+			if (r.URL.Host == "api.github.com") != (c.GitHubToken != "") {
+				t.Fatal("contacted unrelated connection")
+			}
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader("{}"))}, nil
+		})}
+		if err := validateRemote(context.Background(), c, client); err != nil || calls != 1 {
+			t.Fatal("independent validation failed", err, calls)
+		}
+	}
+}

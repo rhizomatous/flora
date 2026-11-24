@@ -49,8 +49,11 @@ func (s *Service) Commands(ctx context.Context, chatID string) ([]CommandOption,
 	}
 	if raw == nil {
 		credentials, err := s.Store.Credentials(ctx)
-		if err != nil {
+		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			return nil, err
+		}
+		if credentials.ProviderKey == "" || credentials.Model == "" {
+			return nil, &ControlError{Reason: "Configure a model provider in installation settings."}
 		}
 		raw, err = s.provisioner.CommandMetadata(ctx, credentials)
 		if err != nil {

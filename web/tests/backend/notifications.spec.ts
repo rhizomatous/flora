@@ -145,7 +145,7 @@ test("completion notifications, reconnects, and sound preferences", async ({ pag
   assert.equal(await toast.getByRole("link").count(), 0, "reload replayed a toast");
   assert.equal(await tones(), 1);
   await page.getByLabel("Play a sound when a chat finishes work").uncheck();
-  await page.getByRole("button", { name: "Validate and save", exact: true }).click();
+  await page.getByRole("button", { name: "Save preferences", exact: true }).click();
   await page.getByText("Settings saved. Credentials are not shown.", { exact: true }).waitFor();
   assert.equal(await sound.count(), 0);
   await page.goto(chatURL);
@@ -172,7 +172,7 @@ test("completion notifications, reconnects, and sound preferences", async ({ pag
   await logIn(realPage, "enter");
   await openSettings(realPage);
   await realPage.getByLabel("Play a sound when a chat finishes work").check();
-  await realPage.getByRole("button", { name: "Validate and save", exact: true }).click();
+  await realPage.getByRole("button", { name: "Save preferences", exact: true }).click();
   await openWorkspaceMenu(realPage);
   await realPage.getByRole("menuitem", { name: "Enable notification sound", exact: true }).focus();
   await realPage.keyboard.press("Enter");

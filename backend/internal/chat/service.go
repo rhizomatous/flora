@@ -78,6 +78,9 @@ func (s *Service) CreateWithEnvironment(ctx context.Context, project, title, req
 	}
 	_, reservedErr := s.Store.ChatRequest(ctx, project, requestID)
 	if errors.Is(reservedErr, storage.ErrNotFound) {
+		if err := s.requireConnections(ctx); err != nil {
+			return storage.Chat{}, err
+		}
 		if selection != nil {
 			if err := s.validateExecution(ctx, *selection, attachments); err != nil {
 				return storage.Chat{}, err
@@ -101,6 +104,21 @@ func (s *Service) CreateWithEnvironment(ctx context.Context, project, title, req
 	return s.Store.Chat(ctx, c.ID)
 }
 
+// requireConnections checks prerequisites before reserving a new chat or message.
+func (s *Service) requireConnections(ctx context.Context) error {
+	c, err := s.Store.Credentials(ctx)
+	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+		return err
+	}
+	if c.ProviderKey == "" || c.Model == "" {
+		return &ControlError{Reason: "Configure a model provider in installation settings before starting a chat."}
+	}
+	if c.GitHubToken == "" {
+		return &ControlError{Reason: "Connect GitHub in installation settings before starting a chat."}
+	}
+	return nil
+}
+
 func (s *Service) Submit(ctx context.Context, chatID, requestID, text string, attachments ...string) (storage.Acceptance, error) {
 	return s.SubmitWithExecution(ctx, chatID, requestID, text, nil, attachments...)
 }
@@ -121,6 +139,9 @@ func (s *Service) SubmitWithContext(ctx context.Context, chatID, requestID, text
 	if _, err := s.Store.MessageRequest(ctx, chatID, requestID); err == nil {
 		return s.Store.AcceptMessageWithContext(ctx, chatID, requestID, text, selection, references, attachments...)
 	} else if !errors.Is(err, storage.ErrNotFound) {
+		return storage.Acceptance{}, err
+	}
+	if err := s.requireConnections(ctx); err != nil {
 		return storage.Acceptance{}, err
 	}
 	if c.ActiveMessageID != "" || c.Status == storage.Working || c.Status == storage.Waiting {
@@ -204,6 +225,14 @@ func (s *Service) run(ctx context.Context, chatID string, message storage.Messag
 	credentials, err := s.Store.Credentials(ctx)
 	if err != nil {
 		fail("Configure GitHub and model-provider credentials in installation settings.")
+		return
+	}
+	if credentials.ProviderKey == "" || credentials.Model == "" {
+		fail("Configure a model provider in installation settings before starting a chat.")
+		return
+	}
+	if credentials.GitHubToken == "" {
+		fail("Connect GitHub in installation settings before starting a chat.")
 		return
 	}
 	var endpoint provisioning.Endpoint

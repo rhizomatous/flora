@@ -26,6 +26,8 @@ type Input struct {
 	ProviderKey string               `json:"providerKey"`
 }
 type View struct {
+	// Validation contains metadata checks performed by this save, never runtime readiness.
+	Validation         []Diagnostic        `json:"validation,omitempty"`
 	Preferences        storage.Preferences `json:"preferences"`
 	MaxRunningOverride int                 `json:"maxRunningOverride,omitempty"`
 	Provider           string              `json:"provider"`
@@ -65,18 +67,24 @@ func (s *Service) Diagnose(ctx context.Context) []Diagnostic {
 		result = append(result, Diagnostic{"Runtime", false, "Chat execution is not configured. Set the pinned agent image and private GitHub transport startup options."})
 	}
 	c, err := s.Store.Credentials(ctx)
-	if err != nil {
-		return append(result, Diagnostic{"Credentials", false, "Save GitHub and hosted model credentials in installation settings."})
+	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+		return append(result, Diagnostic{"Credentials", false, "Credential storage is unavailable. Restore the credential encryption key and database."})
 	}
-	if err := s.Validate(ctx, c); err != nil {
-		message := "Credential validation failed. Check GitHub token permissions, provider key, model access and host networking."
-		var validation *ValidationError
-		if errors.As(err, &validation) {
-			message = validation.Message
+	for _, connection := range []struct {
+		name        string
+		credentials storage.Credentials
+		configured  bool
+	}{
+		{"GitHub", storage.Credentials{GitHubToken: c.GitHubToken}, c.GitHubToken != ""},
+		{"Model provider", storage.Credentials{Provider: c.Provider, Model: c.Model, ProviderKey: c.ProviderKey}, c.ProviderKey != ""},
+	} {
+		d := Diagnostic{connection.name, false, "Configure " + connection.name + " in installation settings."}
+		if connection.configured {
+			d = s.validate(ctx, connection.name, connection.credentials)
 		}
-		return append(result, Diagnostic{"Credentials", false, message})
+		result = append(result, d)
 	}
-	return append(result, Diagnostic{"Credentials", true, "GitHub and hosted model metadata are accessible. This does not check inference quota or repository write permissions."})
+	return result
 }
 
 func New(store *storage.Store) *Service { return &Service{Store: store, Validate: ValidateRemote} }
@@ -95,54 +103,101 @@ func (s *Service) View(ctx context.Context) (View, error) {
 
 var modelID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$`)
 
-// Save validates replacement keys before saving either one. Empty keys retain
-// saved values; the first save requires both. Provider/model can only be set once.
+// Save validates only supplied connections. Blank fields retain saved values;
+// omitted preferences are preserved. A failed request replaces no saved values.
 func (s *Service) Save(ctx context.Context, in Input) error {
+	_, err := s.SaveAndView(ctx, in)
+	return err
+}
+
+// SaveAndView returns saved configuration and the metadata checks from this
+// request. Reads omit validation because saved keys do not prove current access.
+func (s *Service) SaveAndView(ctx context.Context, in Input) (View, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	checks, err := s.save(ctx, in)
+	if err != nil {
+		return View{}, err
+	}
+	view, err := s.View(ctx)
+	view.Validation = checks
+	return view, err
+}
+
+func (s *Service) validate(ctx context.Context, name string, c storage.Credentials) Diagnostic {
+	d := Diagnostic{name, true, "Credential metadata is accessible. Runtime readiness has not been checked."}
+	if err := s.Validate(ctx, c); err != nil {
+		d.OK = false
+		d.Message = name + " validation failed. Check the connection and host networking."
+		var validation *ValidationError
+		if errors.As(err, &validation) {
+			d.Message = name + ": " + validation.Message
+		}
+	}
+	return d
+}
+
+func (s *Service) save(ctx context.Context, in Input) ([]Diagnostic, error) {
 	if in.Preferences != nil {
 		if err := in.Preferences.Validate(); err != nil {
-			return invalid(err.Error())
+			return nil, invalid(err.Error())
 		}
 	}
 	old, err := s.Store.Credentials(ctx)
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
-		return err
+		return nil, err
 	}
-	if old.Provider != "" {
-		if (in.Provider != "" && in.Provider != old.Provider) || (in.Model != "" && in.Model != old.Model) {
-			return invalid("Provider and model are fixed for this installation.")
+	c := old
+	modelInput := in.Provider != "" || in.Model != "" || in.ProviderKey != ""
+	if modelInput {
+		if old.Provider != "" {
+			if (in.Provider != "" && in.Provider != old.Provider) || (in.Model != "" && in.Model != old.Model) {
+				return nil, invalid("Provider and model are fixed for this installation.")
+			}
+		} else {
+			c.Provider, c.Model = in.Provider, in.Model
 		}
-		in.Provider, in.Model = old.Provider, old.Model
-	}
-	if in.Provider != "openai" && in.Provider != "anthropic" && in.Provider != "google" {
-		return invalid("Choose OpenAI, Anthropic, or Google as the hosted provider.")
-	}
-	if !modelID.MatchString(in.Model) {
-		return invalid("Enter a model ID from your hosted provider, without a URL or provider prefix.")
-	}
-	if in.GitHubToken == "" {
-		in.GitHubToken = old.GitHubToken
-	}
-	if in.ProviderKey == "" {
-		in.ProviderKey = old.ProviderKey
-	}
-	if !strings.HasPrefix(in.GitHubToken, "github_pat_") || !safeKey(in.GitHubToken) {
-		return invalid("Enter a fine-grained GitHub personal access token restricted to your selected repositories.")
-	}
-	if !safeKey(in.ProviderKey) {
-		return invalid("Enter a model-provider API key without spaces or line breaks.")
-	}
-	c := storage.Credentials{Provider: in.Provider, Model: in.Model, GitHubToken: in.GitHubToken, ProviderKey: in.ProviderKey}
-	if old.Provider == "" || in.GitHubToken != old.GitHubToken || in.ProviderKey != old.ProviderKey {
-		if err := s.Validate(ctx, c); err != nil {
-			return err
+		if c.Provider != "openai" && c.Provider != "anthropic" && c.Provider != "google" {
+			return nil, invalid("Choose OpenAI, Anthropic, or Google as the hosted provider.")
 		}
+		if !modelID.MatchString(c.Model) {
+			return nil, invalid("Enter a model ID from your hosted provider, without a URL or provider prefix.")
+		}
+		if in.ProviderKey != "" {
+			c.ProviderKey = in.ProviderKey
+		}
+		if !safeKey(c.ProviderKey) {
+			return nil, invalid("Enter a model-provider API key without spaces or line breaks.")
+		}
+	}
+	if in.GitHubToken != "" {
+		if !strings.HasPrefix(in.GitHubToken, "github_pat_") || !safeKey(in.GitHubToken) {
+			return nil, invalid("Enter a fine-grained GitHub personal access token restricted to your selected repositories.")
+		}
+		c.GitHubToken = in.GitHubToken
+	}
+	var checks []Diagnostic
+	if in.GitHubToken != "" {
+		checks = append(checks, s.validate(ctx, "GitHub", storage.Credentials{GitHubToken: c.GitHubToken}))
+	}
+	if modelInput && (in.ProviderKey != "" || old.ProviderKey == "") {
+		checks = append(checks, s.validate(ctx, "Model provider", storage.Credentials{Provider: c.Provider, Model: c.Model, ProviderKey: c.ProviderKey}))
+	}
+	for _, check := range checks {
+		if !check.OK {
+			return nil, invalid(check.Message)
+		}
+	}
+	if c == (storage.Credentials{}) {
+		if in.Preferences == nil {
+			return nil, invalid("Enter a model-provider connection or GitHub token to save.")
+		}
+		return checks, s.Store.SavePreferences(ctx, *in.Preferences)
 	}
 	if err := s.Store.SaveInstallation(ctx, c, in.Preferences); errors.Is(err, storage.ErrConflict) {
-		return invalid("Provider and model are already fixed for this installation.")
+		return nil, invalid("Provider and model are already fixed for this installation.")
 	} else {
-		return err
+		return checks, err
 	}
 }
 
@@ -195,8 +250,13 @@ func validateRemote(ctx context.Context, c storage.Credentials, client *http.Cli
 		}
 		return nil
 	}
-	if err := check("https://api.github.com/user", "GitHub", map[string]string{"Authorization": "Bearer " + c.GitHubToken, "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}); err != nil {
-		return err
+	if c.GitHubToken != "" {
+		if err := check("https://api.github.com/user", "GitHub", map[string]string{"Authorization": "Bearer " + c.GitHubToken, "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}); err != nil {
+			return err
+		}
+	}
+	if c.ProviderKey == "" {
+		return nil
 	}
 	model := url.PathEscape(c.Model)
 	switch c.Provider {
