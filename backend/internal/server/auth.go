@@ -204,18 +204,14 @@ func (a *api) routes(mux *http.ServeMux) {
 		if !decode(w, r, &in) {
 			return
 		}
-		if err := a.settings.Save(r.Context(), in); err != nil {
+		view, err := a.settings.SaveAndView(r.Context(), in)
+		if err != nil {
 			var validation *settings.ValidationError
 			if errors.As(err, &validation) {
 				failure(w, 400, validation.Message)
 			} else {
 				failure(w, 500, "Could not save settings. Check storage permissions and free space.")
 			}
-			return
-		}
-		view, err := a.settings.View(r.Context())
-		if err != nil {
-			failure(w, 500, "Settings storage unavailable.")
 			return
 		}
 		jsonResponse(w, 200, view)

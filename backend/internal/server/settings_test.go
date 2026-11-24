@@ -69,7 +69,7 @@ func TestSettingsAPIBoundsAndDiagnostics(t *testing.T) {
 		t.Fatal("settings response missing saved limits or override")
 	}
 	w = call("POST", "/api/settings/diagnostics", "{}", "https://flora.test", value)
-	if w.Code != 200 || !strings.Contains(w.Body.String(), "socket permissions") || calls != 1 || strings.Contains(w.Body.String(), "test-secret") {
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "socket permissions") || calls != 2 || strings.Contains(w.Body.String(), "test-secret") {
 		t.Fatal("unsafe diagnostics", w.Code, w.Body.String())
 	}
 	message := `{"requestID":"too-big","title":"Big","text":"` + strings.Repeat("é", 513) + `"}`

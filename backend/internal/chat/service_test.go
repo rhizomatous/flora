@@ -660,3 +660,54 @@ func (p *testProvisioner) CommandMetadata(ctx context.Context, _ storage.Credent
 	err := rt.call(ctx, "GET", "/command", nil, &raw)
 	return raw, err
 }
+
+func TestPartialConnectionsRejectChatBeforeReservation(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		credentials storage.Credentials
+		missing     string
+	}{
+		{"none", storage.Credentials{}, "model provider"},
+		{"github-only", storage.Credentials{GitHubToken: "github_pat_fixture"}, "model provider"},
+		{"model-only", storage.Credentials{Provider: "openai", Model: "fixture", ProviderKey: "fixture-key"}, "GitHub"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			store, err := storage.Open(ctx, t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer store.Close()
+			if tc.credentials != (storage.Credentials{}) {
+				if err := store.SaveCredentials(ctx, tc.credentials); err != nil {
+					t.Fatal(err)
+				}
+			}
+			project, err := store.CreateProject(ctx, "Project", storage.Configuration{Repositories: []storage.Repository{{Name: "core", URL: "https://github.com/example/core", BaseBranch: "main", Role: "core"}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			p := &testProvisioner{store: store}
+			s := New(ctx, store, p)
+			_, err = s.Create(ctx, project.ID, "Chat", "request", "Hello")
+			var control *ControlError
+			if !errors.As(err, &control) || !strings.Contains(control.Reason, tc.missing) {
+				t.Fatalf("missing actionable error: %v", err)
+			}
+			chats, err := store.Chats(ctx)
+			if err != nil || len(chats) != 0 || p.starts.Load() != 0 {
+				t.Fatal("incomplete setup reserved a chat or started a runtime")
+			}
+			if tc.credentials.ProviderKey == "" {
+				_, err := s.Commands(ctx, "")
+				if !errors.As(err, &control) || !strings.Contains(control.Reason, "model provider") {
+					t.Fatal("missing command prerequisite", err)
+				}
+				options := s.Models(ctx)
+				if len(options.Models) != 0 || !strings.Contains(options.Error, "model provider") {
+					t.Fatal("incomplete model appeared in discovery", options)
+				}
+			}
+		})
+	}
+}
