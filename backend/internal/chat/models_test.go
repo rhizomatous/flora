@@ -350,3 +350,24 @@ func TestSavedChatDefaultSurvivesProviderChangeAndDiscoveryOutage(t *testing.T) 
 		t.Fatal("offline discovery replaced saved choice", options)
 	}
 }
+
+func TestConnectionDiscoveryUsesRuntimeDefaultOrAvailableModel(t *testing.T) {
+	f := newFixture(t)
+	s, _, _ := testService(t, f)
+	for _, preferred := range []string{"claude-sonnet-4-6", "missing"} {
+		s.provisioner.(*testProvisioner).metadata = func(context.Context, storage.Credentials) (json.RawMessage, error) {
+			return json.RawMessage(strings.Replace(testModelCatalog, `"connected":`, `"default":{"anthropic":"`+preferred+`"},"connected":`, 1)), nil
+		}
+		model, err := s.DiscoverProviderModel(context.Background(), storage.Credentials{Provider: "anthropic", ProviderKey: "fixture-key"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		expected := preferred
+		if preferred == "missing" {
+			expected = "claude-haiku-4-5"
+		}
+		if model != expected {
+			t.Fatalf("discovered %q, want %q", model, expected)
+		}
+	}
+}

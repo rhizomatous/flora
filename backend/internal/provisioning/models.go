@@ -40,7 +40,12 @@ func (m *Manager) runtimeMetadata(ctx context.Context, credentials storage.Crede
 	if err != nil {
 		return nil, err
 	}
-	config, _ := json.Marshal(map[string]any{"model": credentials.Provider + "/" + credentials.Model, "small_model": credentials.Provider + "/" + credentials.Model, "enabled_providers": []string{credentials.Provider}})
+	configuration := map[string]any{"enabled_providers": []string{credentials.Provider}}
+	if credentials.Model != "" {
+		configuration["model"] = credentials.Provider + "/" + credentials.Model
+		configuration["small_model"] = configuration["model"]
+	}
+	config, _ := json.Marshal(configuration)
 	spec := docker.ContainerSpec{
 		Name: "flora-models-" + rand.Text(), Image: image, NetworkID: m.cfg.NetworkID,
 		Entrypoint: []string{"timeout", "-k", "5", "45", "opencode"}, Command: []string{"serve", "--hostname", "0.0.0.0", "--port", "4096"},
