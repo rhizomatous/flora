@@ -46,7 +46,8 @@ type cachedModels struct {
 // runtimeProviders contains only public metadata. Keys and provider options never
 // enter the browser response or the model cache.
 type runtimeProviders struct {
-	All []struct {
+	Default map[string]string `json:"default"`
+	All     []struct {
 		ID     string `json:"id"`
 		Models map[string]struct {
 			Limit struct {
@@ -320,4 +321,30 @@ func validModelRate(value *float64) *float64 {
 		return nil
 	}
 	return value
+}
+
+// DiscoverProviderModel uses only metadata from the pinned runtime. Provider
+// authentication is checked separately before this model becomes a connection.
+func (s *Service) DiscoverProviderModel(ctx context.Context, c storage.Credentials) (string, error) {
+	if s.provisioner == nil {
+		return "", errors.New("runtime unavailable")
+	}
+	raw, err := s.provisioner.ModelMetadata(ctx, c)
+	if err != nil {
+		return "", err
+	}
+	var providers runtimeProviders
+	if err := json.Unmarshal(raw, &providers); err != nil {
+		return "", err
+	}
+	options := providerOptions(providers, ModelOptions{Default: storage.Execution{Provider: c.Provider}, Error: "Models unavailable"})
+	if options.Error != "" || len(options.Models) == 0 {
+		return "", errors.New("models unavailable")
+	}
+	for _, model := range options.Models {
+		if model.ID == providers.Default[c.Provider] {
+			return model.ID, nil
+		}
+	}
+	return options.Models[0].ID, nil
 }

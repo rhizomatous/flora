@@ -99,10 +99,10 @@ For an address change, restart Flora with the new `-public-url`, then issue a
 recovery link using that address and enroll a passkey there. Existing passwords
 still work after an address change.
 
-Settings accept a fine-grained GitHub token and an OpenAI, Anthropic, or Google
-API key. Save validates the GitHub account and access to the chosen model through
+Settings accept a fine-grained GitHub token. Models accepts OpenAI, Anthropic, and
+Google API keys and discovers their available models automatically. Save validates the GitHub account and access to the chosen model through
 the provider's model metadata endpoint. This initial account check does not
-validate repository permissions. Configure multiple providers and change the default model in Settings. Blank keys
+validate repository permissions. Configure multiple providers and choose the default on the Models page. Blank keys
 keep the selected provider's saved key. Default changes affect future chats; existing
 chats retain their saved provider and model.
 

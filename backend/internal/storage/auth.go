@@ -100,6 +100,16 @@ func (s *Store) SaveCredentials(ctx context.Context, c Credentials) error {
 
 // SaveInstallation commits validated credentials and optional limits together.
 func (s *Store) SaveInstallation(ctx context.Context, c Credentials, p *Preferences) error {
+	return s.saveInstallation(ctx, c, p, true)
+}
+
+// SaveModelConnection retains the installation default while adding a provider
+// or rotating its key. The first model connection also establishes the default.
+func (s *Store) SaveModelConnection(ctx context.Context, c Credentials) error {
+	return s.saveInstallation(ctx, c, nil, false)
+}
+
+func (s *Store) saveInstallation(ctx context.Context, c Credentials, p *Preferences, makeDefault bool) error {
 	s.secretMu.Lock()
 	defer s.secretMu.Unlock()
 	if p != nil {
@@ -130,6 +140,14 @@ func (s *Store) SaveInstallation(ctx context.Context, c Credentials, p *Preferen
 		if c.Provider != "" {
 			if err := s.saveProvider(ctx, tx, c); err != nil {
 				return err
+			}
+		}
+		if !makeDefault && saved.Provider != "" {
+			key := c.ProviderKey
+			provider := c.Provider
+			c = saved
+			if provider == saved.Provider {
+				c.ProviderKey = key
 			}
 		}
 		// Installing the first model after GitHub also reencrypts its token,

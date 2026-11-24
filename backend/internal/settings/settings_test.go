@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -376,5 +377,94 @@ func TestMultipleProviderDefaultsRetainKeysAndValidateEachModel(t *testing.T) {
 	}
 	if len(view.Providers) != 2 || strings.Contains(string(raw), "secret") {
 		t.Fatal("provider view lost configuration or exposed credentials")
+	}
+}
+
+func TestConnectionOnlyDiscoveryPreservesDefaultAndGitHub(t *testing.T) {
+	ctx := context.Background()
+	store, err := storage.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	initial := storage.Credentials{Provider: "anthropic", Model: "original", ProviderKey: "anthropic-secret", GitHubToken: "github_pat_secret"}
+	if err := store.SaveCredentials(ctx, initial); err != nil {
+		t.Fatal(err)
+	}
+	service := New(store)
+	var checks []storage.Credentials
+	service.Validate = func(_ context.Context, c storage.Credentials) error { checks = append(checks, c); return nil }
+	service.DiscoverModel = func(_ context.Context, c storage.Credentials) (string, error) {
+		if c.Provider != "openai" || c.Model != "" || c.GitHubToken != "" || c.ProviderKey != "openai-secret" {
+			t.Fatal("discovery received unrelated credentials")
+		}
+		return "discovered-model", nil
+	}
+	makeDefault := false
+	if err := service.Save(ctx, Input{Provider: "openai", ProviderKey: "openai-secret", MakeDefault: &makeDefault}); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := store.Credentials(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved != initial {
+		t.Fatal("adding a connection changed the default", saved)
+	}
+	c, err := store.ProviderCredentials(ctx, storage.Execution{Provider: "openai"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Model != "discovered-model" || c.ProviderKey != "openai-secret" {
+		t.Fatal("discovered connection was not saved")
+	}
+	if len(checks) != 2 || checks[0].Model != "" || checks[1].Model != "discovered-model" {
+		t.Fatal("connection and model access were not checked", checks)
+	}
+	if err := service.Save(ctx, Input{Provider: "anthropic", ProviderKey: "rotated-secret", Model: "validation-model", MakeDefault: &makeDefault}); err != nil {
+		t.Fatal(err)
+	}
+	saved, err = store.Credentials(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Model != initial.Model || saved.ProviderKey != "rotated-secret" || saved.GitHubToken != initial.GitHubToken {
+		t.Fatal("key rotation replaced the default or GitHub")
+	}
+}
+
+func TestFirstConnectionDiscoversDefaultAndFailuresSaveNothing(t *testing.T) {
+	for _, failure := range []bool{true, false} {
+		t.Run(fmt.Sprint(failure), func(t *testing.T) {
+			ctx := context.Background()
+			store, err := storage.Open(ctx, t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer store.Close()
+			service := New(store)
+			service.Validate = func(context.Context, storage.Credentials) error { return nil }
+			service.DiscoverModel = func(context.Context, storage.Credentials) (string, error) {
+				if failure {
+					return "", errors.New("private transport details")
+				}
+				return "discovered", nil
+			}
+			makeDefault := false
+			err = service.Save(ctx, Input{Provider: "google", ProviderKey: "google-secret", MakeDefault: &makeDefault})
+			view, viewErr := service.View(ctx)
+			if viewErr != nil {
+				t.Fatal(viewErr)
+			}
+			if failure {
+				if err == nil || strings.Contains(err.Error(), "private") || len(view.Providers) != 0 {
+					t.Fatal("failed discovery saved configuration or leaked errors", err)
+				}
+				return
+			}
+			if err != nil || view.Provider != "google" || view.Model != "discovered" || !view.ProviderConfigured {
+				t.Fatal("first connection did not establish a default", view, err)
+			}
+		})
 	}
 }

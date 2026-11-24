@@ -159,8 +159,8 @@ work when Flora is stopped; in that case, use its credential key options too.
 Links appear only in the controlling terminal. Replacement invalidates previous
 links and browser setup cookies. Keep setup links out of logs and service arguments.
 
-In Settings, save hosted model and GitHub credentials. Configure multiple providers and change
-the default model at any time. New chats can select a configured provider and model;
+In Settings, connect GitHub. On the Models page, connect hosted providers with
+their API keys and choose the default model. Flora discovers models automatically. New chats can select a configured provider and model;
 existing chats keep their saved choice across default changes and restarts. Individual
 chat turns can select other models from that chat's provider and use their supported reasoning options. Use
 a fine-grained GitHub token limited to intended repositories, with Contents and Pull requests read/write and Metadata read. Add

@@ -17,8 +17,11 @@ import (
 )
 
 type Input struct {
-	// Preferences, when present, replaces the complete non-secret settings record.
-	// Omission preserves it. Blank credential fields preserve their saved values.
+	// MakeDefault=false saves only the connection. The first connection also
+	// establishes a default. An omitted model is discovered for a new connection.
+	MakeDefault *bool `json:"makeDefault,omitempty"`
+	// Preferences, when present, replaces the complete non-secret record.
+	// Omission preserves it. Blank credential fields preserve saved values.
 	Preferences *storage.Preferences `json:"preferences,omitempty"`
 	Provider    string               `json:"provider"`
 	Model       string               `json:"model"`
@@ -46,6 +49,7 @@ func (e *ValidationError) Error() string { return e.Message }
 func invalid(message string) error       { return &ValidationError{message} }
 
 type Service struct {
+	DiscoverModel      func(context.Context, storage.Credentials) (string, error)
 	RuntimeDiagnostics func(context.Context) []Diagnostic
 	mu                 sync.Mutex
 	MaxRunningOverride int
@@ -151,6 +155,10 @@ func (s *Service) validate(ctx context.Context, name string, c storage.Credentia
 }
 
 func (s *Service) save(ctx context.Context, in Input) ([]Diagnostic, error) {
+	connectionOnly := in.MakeDefault != nil && !*in.MakeDefault
+	if connectionOnly && (in.GitHubToken != "" || in.Preferences != nil || in.Provider == "") {
+		return nil, invalid("Save each connection separately.")
+	}
 	if in.Preferences != nil {
 		if err := in.Preferences.Validate(); err != nil {
 			return nil, invalid(err.Error())
@@ -176,7 +184,7 @@ func (s *Service) save(ctx context.Context, in Input) ([]Diagnostic, error) {
 		if c.Provider != "openai" && c.Provider != "anthropic" && c.Provider != "google" {
 			return nil, invalid("Choose OpenAI, Anthropic, or Google as the hosted provider.")
 		}
-		if !modelID.MatchString(c.Model) {
+		if c.Model != "" && !modelID.MatchString(c.Model) || c.Model == "" && !connectionOnly {
 			return nil, invalid("Enter a model ID from your hosted provider, without a URL or provider prefix.")
 		}
 		if in.ProviderKey != "" {
@@ -185,6 +193,20 @@ func (s *Service) save(ctx context.Context, in Input) ([]Diagnostic, error) {
 		if !safeKey(c.ProviderKey) {
 			return nil, invalid("Enter a model-provider API key without spaces or line breaks.")
 		}
+	}
+	if connectionOnly && c.Model == "" {
+		check := s.validate(ctx, "Model provider", storage.Credentials{Provider: c.Provider, ProviderKey: c.ProviderKey})
+		if !check.OK {
+			return nil, invalid(check.Message)
+		}
+		if s.DiscoverModel == nil {
+			return nil, invalid("Model discovery is unavailable. Check the agent runtime in Settings and retry.")
+		}
+		model, err := s.DiscoverModel(ctx, storage.Credentials{Provider: c.Provider, ProviderKey: c.ProviderKey})
+		if err != nil || !modelID.MatchString(model) {
+			return nil, invalid("Could not discover models. Check the provider connection and agent runtime, then retry.")
+		}
+		c.Model = model
 	}
 	if in.GitHubToken != "" {
 		if !strings.HasPrefix(in.GitHubToken, "github_pat_") || !safeKey(in.GitHubToken) {
@@ -209,6 +231,9 @@ func (s *Service) save(ctx context.Context, in Input) ([]Diagnostic, error) {
 			return nil, invalid("Enter a model-provider connection or GitHub token to save.")
 		}
 		return checks, s.Store.SavePreferences(ctx, *in.Preferences)
+	}
+	if connectionOnly {
+		return checks, s.Store.SaveModelConnection(ctx, c)
 	}
 	return checks, s.Store.SaveInstallation(ctx, c, in.Preferences)
 }
@@ -270,14 +295,17 @@ func validateRemote(ctx context.Context, c storage.Credentials, client *http.Cli
 	if c.ProviderKey == "" {
 		return nil
 	}
-	model := url.PathEscape(c.Model)
+	model := ""
+	if c.Model != "" {
+		model = "/" + url.PathEscape(c.Model)
+	}
 	switch c.Provider {
 	case "openai":
-		return check("https://api.openai.com/v1/models/"+model, "OpenAI", map[string]string{"Authorization": "Bearer " + c.ProviderKey})
+		return check("https://api.openai.com/v1/models"+model, "OpenAI", map[string]string{"Authorization": "Bearer " + c.ProviderKey})
 	case "anthropic":
-		return check("https://api.anthropic.com/v1/models/"+model, "Anthropic", map[string]string{"x-api-key": c.ProviderKey, "anthropic-version": "2023-06-01"})
+		return check("https://api.anthropic.com/v1/models"+model, "Anthropic", map[string]string{"x-api-key": c.ProviderKey, "anthropic-version": "2023-06-01"})
 	case "google":
-		return check("https://generativelanguage.googleapis.com/v1beta/models/"+model, "Google", map[string]string{"x-goog-api-key": c.ProviderKey})
+		return check("https://generativelanguage.googleapis.com/v1beta/models"+model, "Google", map[string]string{"x-goog-api-key": c.ProviderKey})
 	}
 	return invalid("Unsupported hosted provider.")
 }
