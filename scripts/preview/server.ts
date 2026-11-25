@@ -399,6 +399,19 @@ export function chatPreview(): Plugin {
       json(res, { ...report, chats });
       return;
     }
+    if (url.pathname === "/api/github/repositories") {
+      json(res, {
+        repositories: projects.flatMap((project) =>
+          project.configuration.repositories.map((repo) => ({
+            full_name: repo.url.replace("https://github.com/", ""),
+            html_url: repo.url,
+            default_branch: repo.baseBranch,
+          })),
+        ),
+        nextPage: 0,
+      });
+      return;
+    }
     if (url.pathname === "/api/projects") {
       json(res, projects);
       return;
