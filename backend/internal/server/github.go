@@ -41,7 +41,7 @@ func (a *api) githubRoutes(mux *http.ServeMux) {
 		query.Set("github_callback", "1")
 		w.Header().Set("Cache-Control", "no-store")
 		destination := "connections/github"
-		if progress, err := a.auth.Store.Onboarding(r.Context()); err == nil && progress.Started && !progress.Paused {
+		if progress, err := a.auth.Store.Onboarding(r.Context()); err == nil && progress.Started && !progress.Completed {
 			destination = "onboarding/github"
 		}
 		http.Redirect(w, r, "/?"+query.Encode()+"#"+destination, http.StatusSeeOther)

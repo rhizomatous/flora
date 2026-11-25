@@ -10,7 +10,6 @@ import {
   LoadingStatus,
   SettingsGroup,
   SettingsRow,
-  Text,
   Toaster,
 } from "@flora/florets";
 
@@ -55,26 +54,39 @@ export function Onboarding({
   busy: boolean;
   run: (task: () => Promise<void>, fallback: string) => Promise<void>;
 }) {
-  const step = setupStep(path, state.step);
-  const index = setupSteps.indexOf(step);
+  const requestedStep = setupStep(path, state.step);
   const heading = useRef<HTMLHeadingElement>(null);
   // Keep visited editors mounted to retain non-secret drafts during back navigation.
-  const [visited, setVisited] = useState<SetupStep[]>([step]);
-  if (!visited.includes(step)) setVisited([...visited, step]);
+  const [visited, setVisited] = useState<SetupStep[]>([]);
   const [projects, setProjects] = useState<Project[]>();
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   const [projectBusy, setProjectBusy] = useState(false);
   const navigating = busy || projectBusy;
+  const modelComplete = settings.providerConfigured && settings.model !== "";
+  const selected = projects?.find((project) => project.id === state.projectID) ?? projects?.[0];
+  const projectComplete = selected !== undefined;
+  let availableStep = 1;
+  if (modelComplete) availableStep = 2;
+  if (modelComplete && settings.githubConfigured) availableStep = 3;
+  if (modelComplete && settings.githubConfigured && projectComplete) availableStep = 4;
+  const index = Math.min(setupSteps.indexOf(requestedStep), availableStep);
+  const step = setupSteps[index] ?? "model";
+  const projectsLoaded = projects !== undefined;
+  if (!visited.includes(step)) setVisited([...visited, step]);
   const persistRoute = useEffectEvent(() => {
-    if (state.step !== step || state.paused || !state.started) {
-      void run(() => onState({ ...state, step, paused: false }), "Could not save setup progress.");
+    if (!projectsLoaded) return;
+    if (state.step !== step || state.completed || !state.started || path !== `onboarding/${step}`) {
+      void run(async () => {
+        await onState({ ...state, step, completed: false });
+        if (path !== `onboarding/${step}`) window.location.hash = `onboarding/${step}`;
+      }, "Could not save setup progress.");
     }
   });
   useEffect(() => {
     persistRoute();
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Refocus and persist when the route changes.
-  }, [step]);
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Validate navigation after saved projects have loaded.
+  }, [step, projectsLoaded, path]);
   useEffect(() => {
     heading.current?.focus();
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Refocus and persist when the route changes.
@@ -98,10 +110,9 @@ export function Onboarding({
     };
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Retry explicitly reloads the saved project list.
   }, [revision]);
-  const selected = projects?.find((project) => project.id === state.projectID) ?? projects?.[0];
   const selectedID = projects === undefined ? state.projectID : (selected?.id ?? "");
   async function navigate(next: SetupStep) {
-    await onState({ ...state, step: next, paused: false, projectID: selectedID });
+    await onState({ ...state, step: next, completed: false, projectID: selectedID });
     setVisited((current) => (current.includes(next) ? current : [...current, next]));
     // oxlint-disable-next-line react/immutability -- Hash navigation changes the browser route.
     window.location.hash = `onboarding/${next}`;
@@ -109,33 +120,26 @@ export function Onboarding({
   function go(next: SetupStep) {
     void run(() => navigate(next), "Could not save setup progress.");
   }
-  const modelComplete = settings.providerConfigured && settings.model !== "";
-  const projectComplete = selected !== undefined;
   const canContinue =
     step === "account" ||
-    step === "finish" ||
+    (step === "finish" && availableStep === 4) ||
     (step === "model" && modelComplete) ||
     (step === "github" && settings.githubConfigured) ||
     (step === "project" && projectComplete);
-  function leave() {
+  function finish() {
     void run(async () => {
-      await onState({ ...state, step, paused: true, projectID: selectedID });
+      await onState({ ...state, step, completed: true, projectID: selectedID });
       window.location.hash = selectedID
         ? `chats/new?project=${encodeURIComponent(selectedID)}`
         : "chats/new";
-    }, "Could not leave setup. Try again.");
+    }, "Could not finish setup. Try again.");
   }
   return (
     <FirstRunLayout
       actions={
-        <>
-          <Button variant="ghost" disabled={navigating} onClick={leave}>
-            Leave setup
-          </Button>
-          <Button variant="ghost" disabled={navigating} onClick={onLogout}>
-            Log out
-          </Button>
-        </>
+        <Button variant="ghost" disabled={navigating} onClick={onLogout}>
+          Log out
+        </Button>
       }
       progress={
         <nav aria-label="Setup progress" className="mt-5 flex justify-center">
@@ -148,7 +152,7 @@ export function Onboarding({
                 size="icon-xs"
                 className="rounded-full"
                 aria-current={step === item ? "step" : undefined}
-                disabled={navigating}
+                disabled={navigating || position > availableStep}
                 onClick={() => {
                   go(item);
                 }}
@@ -243,7 +247,7 @@ export function Onboarding({
                     onState({
                       ...state,
                       step: "project",
-                      paused: false,
+                      completed: false,
                       projectID: project.id,
                     }),
                   "Could not save setup progress.",
@@ -281,18 +285,6 @@ export function Onboarding({
           Back
         </Button>
         <div className="flex flex-wrap gap-2">
-          {step !== "account" && step !== "finish" && !canContinue && (
-            <Button
-              variant="ghost"
-              className="px-1"
-              disabled={navigating}
-              onClick={() => {
-                go(setupSteps[index + 1] ?? "finish");
-              }}
-            >
-              Skip
-            </Button>
-          )}
           {step === "project" && !projectComplete && settings.githubConfigured && projects && (
             <Button type="submit" form="onboarding-project" disabled={navigating}>
               {projectBusy ? "Connecting…" : "Connect project"}
@@ -303,7 +295,7 @@ export function Onboarding({
             <Button
               disabled={navigating}
               onClick={() => {
-                if (step === "finish") leave();
+                if (step === "finish") finish();
                 else go(setupSteps[index + 1] ?? "finish");
               }}
             >
@@ -313,13 +305,6 @@ export function Onboarding({
           )}
         </div>
       </footer>
-      {step === "finish" && (!modelComplete || !projectComplete) && (
-        <Text tone="muted" className="mt-4">
-          {!modelComplete && !projectComplete && "Connect a model and project to start chats"}
-          {!modelComplete && projectComplete && "Connect a model to start chats"}
-          {modelComplete && !projectComplete && "Connect a project to start chats"}
-        </Text>
-      )}
     </FirstRunLayout>
   );
 }

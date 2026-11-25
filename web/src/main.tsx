@@ -86,7 +86,7 @@ function App() {
       ]);
       setSettings(savedSettings);
       setOnboarding(progress);
-      if (progress.started && !progress.paused && !currentPath().startsWith("onboarding/")) {
+      if (progress.started && !progress.completed && !currentPath().startsWith("onboarding/")) {
         window.location.hash = `onboarding/${progress.step}`;
       }
     } else {
@@ -161,7 +161,11 @@ function App() {
     setOnboarding(progress);
   }
 
-  if (ready && onboarding && path.startsWith("onboarding")) {
+  if (
+    ready &&
+    onboarding &&
+    (path.startsWith("onboarding") || (onboarding.started && !onboarding.completed))
+  ) {
     return (
       <Onboarding
         actionError={error}

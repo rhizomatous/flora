@@ -4,9 +4,9 @@ import { assertFitsPhone, logIn, openWorkspaceMenu } from "../helpers.ts";
 test.describe("first run", () => {
   test.use({ scenario: "credential-setup" });
 
-  test("saved setup, drafts, deferral, sign-out, and resume", async ({ page, backend }, testInfo) => {
+  test("required setup, drafts, sign-out, and resume", async ({ page, backend }, testInfo) => {
     async function captureStep(name: string) {
-      await expect(page.getByRole("button", { name: "Leave setup", exact: true })).toBeEnabled();
+      await expect(page.getByRole("button", { name: "Log out", exact: true })).toBeEnabled();
       const closeToasts = page.getByRole("button", { name: "Close toast", exact: true });
       for (const button of await closeToasts.all()) await button.click();
       await expect(closeToasts).toHaveCount(0);
@@ -27,6 +27,18 @@ test.describe("first run", () => {
     await page.getByRole("button", { name: "Create administrator", exact: true }).click();
     const heading = page.getByRole("heading", { name: "Connect a model", exact: true });
     await expect(heading).toBeFocused();
+    await expect(page.getByRole("button", { name: "Leave setup", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Skip", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "3. Connect GitHub", exact: true })).toBeDisabled();
+    await page.goto("/#onboarding/finish");
+    await expect(page).toHaveURL(/#onboarding\/model$/);
+    await expect(heading).toBeVisible();
+    await expect(page.getByRole("button", { name: "Open Flora", exact: true })).toHaveCount(0);
+    await page.getByRole("link", { name: "Flora home", exact: true }).click();
+    await expect(page).toHaveURL(/#onboarding\/model$/);
+    await expect(page.getByRole("button", { name: "Workspace menu", exact: true })).toHaveCount(0);
+    const rejected = await page.request.put("/api/onboarding", { headers: { Origin: backend.url }, data: { step: "finish", completed: true, projectID: "" } });
+    expect(rejected.status()).toBe(400);
     await captureStep("model");
     await expect(page.getByRole("button", { name: "Continue", exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: "Connect Anthropic", exact: true }).click();
@@ -54,9 +66,11 @@ test.describe("first run", () => {
     await page.reload();
     await expect(page.getByRole("heading", { name: "Connect GitHub", exact: true })).toBeFocused();
     await captureStep("github");
-    await page.getByRole("button", { name: "Skip", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Connect a project", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Connect GitHub", exact: true }).click();
+    await expect(page.getByRole("button", { name: "4. Connect a project", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "5. Review setup", exact: true })).toBeDisabled();
+    await page.getByRole("button", { name: "Log out", exact: true }).click();
+    await page.getByLabel("Password", { exact: true }).fill("browser test password");
+    await page.getByRole("button", { name: "Log in", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Connect GitHub", exact: true })).toBeFocused();
     await page.route("https://github.com/**", async (route) => {
       const url = new URL(route.request().url());
@@ -98,7 +112,7 @@ test.describe("first run", () => {
     await setupCommand.click();
 
     expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain("fixture-provider-only");
-    await expect(page.getByRole("button", { name: "Leave setup", exact: true })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Log out", exact: true })).toBeEnabled();
     await captureStep("setup");
     await page.getByRole("button", { name: "Connect project", exact: true }).click();
     await expect(page.getByText("Garden draft", { exact: true })).toBeVisible();
@@ -110,9 +124,9 @@ test.describe("first run", () => {
     expect(savedProjects).toHaveLength(1);
     expect(savedProjects[0].configuration).toMatchObject({ setupCommand: "npm ci", repositories: [{ baseBranch: "main" }] });
     await captureStep("review");
-    await page.getByRole("button", { name: "Leave setup", exact: true }).click();
+    await page.getByRole("button", { name: "Open Flora", exact: true }).click();
     await expect(page.getByRole("heading", { name: "New chat", exact: true })).toBeVisible();
-    expect(await (await page.request.get("/api/onboarding")).json()).toMatchObject({ started: true, step: "finish", paused: true });
+    expect(await (await page.request.get("/api/onboarding")).json()).toMatchObject({ started: true, step: "finish", completed: true });
     await page.request.post("/api/auth/logout", { headers: { Origin: backend.url } });
     await page.reload();
     await expect(page.getByRole("heading", { name: "Log in", exact: true })).toBeVisible();
@@ -144,5 +158,5 @@ test("configured installations open the app without setup", async ({ page, backe
   await logIn(page);
   await expect(page.getByRole("button", { name: "Workspace menu", exact: true })).toBeVisible();
   await expect(page).not.toHaveURL(/onboarding/);
-  expect(await (await page.request.get(`${backend.url}/api/onboarding`)).json()).toMatchObject({ paused: true });
+  expect(await (await page.request.get(`${backend.url}/api/onboarding`)).json()).toMatchObject({ completed: true });
 });

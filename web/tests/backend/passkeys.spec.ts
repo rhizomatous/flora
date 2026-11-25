@@ -1,7 +1,13 @@
 import { test, expect } from "../fixtures.ts";
-import { assertFitsPhone, openSettings } from "../helpers.ts";
+import type { Page } from "@playwright/test";
+import { assertFitsPhone } from "../helpers.ts";
 
 test.use({ scenario: "passkeys" });
+
+async function openAccount(page: Page) {
+  await page.goto("/#onboarding/account");
+  await expect(page.getByRole("heading", { name: "Secure Flora", exact: true })).toBeVisible();
+}
 
 test("passkey setup, sign-in, management, replay rejection and host recovery", async ({ page, backend }) => {
   const cdp = await page.context().newCDPSession(page);
@@ -21,9 +27,7 @@ test("passkey setup, sign-in, management, replay rejection and host recovery", a
   await page.getByLabel("Passkey name", { exact: true }).fill("My phone");
   await page.getByRole("button", { name: "Create administrator with passkey", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Connect a model", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Leave setup", exact: true }).click();
-  await expect(page).toHaveURL(/#chats\/new/);
-  await openSettings(page);
+  await openAccount(page);
   await expect(page.getByLabel("Name for My phone", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Remove My phone", exact: true })).toBeDisabled();
   const original = await cdp.send("WebAuthn.getCredentials", { authenticatorId });
@@ -48,7 +52,7 @@ test("passkey setup, sign-in, management, replay rejection and host recovery", a
   const finished = page.waitForRequest((request) => request.url().endsWith("/auth/passkeys/login/finish"));
   await page.getByRole("button", { name: "Sign in with passkey", exact: true }).click();
   const loginRequest = await finished;
-  await expect(page.getByRole("heading", { name: "Installation settings", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Secure Flora", exact: true })).toBeVisible();
   const replay = await page.request.post("/api/auth/passkeys/login/finish", { headers: { Origin: backend.url }, data: loginRequest.postDataJSON() });
   expect(replay.status()).toBe(400);
   const { credentials } = await cdp.send("WebAuthn.getCredentials", { authenticatorId });
@@ -61,22 +65,22 @@ test("passkey setup, sign-in, management, replay rejection and host recovery", a
   await expect(page.getByRole("heading", { name: "Recover account", exact: true })).toBeVisible();
   await page.getByLabel("Passkey name", { exact: true }).fill("Recovered phone");
   await page.getByRole("button", { name: "Recover with passkey", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Connect your first project", exact: true })).toBeVisible();
-  await openSettings(page);
+  await expect(page.getByRole("heading", { name: "Secure Flora", exact: true })).toBeVisible();
+  await openAccount(page);
   await expect(page.getByLabel("Name for Recovered phone", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Name for Phone renamed", { exact: true })).toHaveCount(0);
   const passwordRecovery = await page.request.post("/__fixture/recovery");
   await page.goto((await passwordRecovery.json()).link);
   await page.getByLabel("New password", { exact: true }).fill("recovered browser password");
   await page.getByRole("button", { name: "Recover with password", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Connect your first project", exact: true })).toBeVisible();
-  await openSettings(page);
+  await expect(page.getByRole("heading", { name: "Secure Flora", exact: true })).toBeVisible();
+  await openAccount(page);
   await expect(page.getByText("No passkeys", { exact: true })).toBeVisible();
   await page.request.post("/api/auth/logout", { headers: { Origin: backend.url } });
   await page.reload();
   await page.getByLabel("Password", { exact: true }).fill("recovered browser password");
   await page.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Installation settings", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Secure Flora", exact: true })).toBeVisible();
 });
 
 test("password administrators can add a passkey and cancelled prompts keep password login", async ({ page, backend }) => {
@@ -90,9 +94,7 @@ test("password administrators can add a passkey and cancelled prompts keep passw
   await page.getByLabel("Password", { exact: true }).fill("existing administrator password");
   await page.getByRole("button", { name: "Create administrator", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Connect a model", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Leave setup", exact: true }).click();
-  await expect(page).toHaveURL(/#chats\/new/);
-  await openSettings(page);
+  await openAccount(page);
   await page.getByLabel("Passkey name", { exact: true }).fill("Desktop");
   await page.getByRole("button", { name: "Add passkey", exact: true }).click();
   await expect(page.getByLabel("Name for Desktop", { exact: true })).toBeVisible();
@@ -111,7 +113,7 @@ test("password administrators can add a passkey and cancelled prompts keep passw
   await expect(page.getByRole("alert")).toContainText("Passkey prompt cancelled");
   await page.getByLabel("Password", { exact: true }).fill("existing administrator password");
   await page.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Installation settings", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Secure Flora", exact: true })).toBeVisible();
   await cdp.send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
 });
 
@@ -127,9 +129,7 @@ test("long passkey names fit wide and narrow settings with keyboard focus", asyn
   await page.getByLabel("Passkey name", { exact: true }).fill(name);
   await page.getByRole("button", { name: "Create administrator with passkey", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Connect a model", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Leave setup", exact: true }).click();
-  await expect(page).toHaveURL(/#chats\/new/);
-  await openSettings(page);
+  await openAccount(page);
   await expect(page.getByLabel(`Name for ${name}`, { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Add passkey", exact: true })).toBeEnabled();
   for (const width of [1280, 390]) {

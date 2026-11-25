@@ -22,7 +22,9 @@ func (a *api) onboardingRoutes(mux *http.ServeMux) {
 			return
 		}
 		if err := a.auth.Store.SaveOnboarding(r.Context(), state); err != nil {
-			if errors.Is(err, storage.ErrInvalid) || errors.Is(err, storage.ErrNotFound) {
+			if errors.Is(err, storage.ErrOnboardingIncomplete) {
+				failure(w, 400, "Connect a model, GitHub, and a project before opening Flora.")
+			} else if errors.Is(err, storage.ErrInvalid) || errors.Is(err, storage.ErrNotFound) {
 				failure(w, 400, "Choose a setup step and an existing project.")
 			} else {
 				failure(w, 500, "Could not save setup progress.")

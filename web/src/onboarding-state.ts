@@ -4,7 +4,7 @@ export const setupSteps = ["account", "model", "github", "project", "finish"] as
 export const onboardingSchema = z.object({
   started: z.boolean(),
   step: z.enum(setupSteps),
-  paused: z.boolean(),
+  completed: z.boolean(),
   projectID: z.string(),
 });
 export type OnboardingState = z.infer<typeof onboardingSchema>;
