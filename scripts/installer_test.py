@@ -92,13 +92,12 @@ class InstallerTest(unittest.TestCase):
                  body='Text with "tag_name": "v9.9.9" and a newline\n    "draft": false,',
                  assets=[dict(name='nested', label='tag_name')])], indent=2) + '\n')
 
-    def assets(self, arch='amd64', version='v1.2.3', mismatch=False, legacy=False, tag='v1.2.3'):
+    def assets(self, arch='amd64', version='v1.2.3', mismatch=False, tag='v1.2.3'):
         self.tag = tag
         identity = json.dumps(dict(version=version, commit='a' * 40,
                                    agent_image='example/agent@sha256:' + 'b' * 64,
                                    harness_version='1.2.27', os='linux', arch=arch), separators=(',', ':'))
-        help_text = '-hostname string' if legacy else '-public-url string'
-        binary = f"#!/bin/sh\nif [ \"$1\" = -help ]; then printf '%s\\n' '  {help_text}' >&2; exit 0; fi\n[ \"$1\" = -version ] || exit 1\nprintf '%s\\n' '{identity}'\n".encode()
+        binary = f"#!/bin/sh\n[ \"$1\" = -version ] || exit 1\nprintf '%s\\n' '{identity}'\n".encode()
         archive = self.root / 'assets' / f'flora-{tag}-linux-{arch}.tar.gz'
         with tarfile.open(archive, 'w:gz') as tar:
             for name, content, mode in [('./flora', binary, 0o755),
@@ -204,13 +203,6 @@ class InstallerTest(unittest.TestCase):
         self.assertIn('Release lookup failed', result.stderr)
         self.assert_clean()
         self.assertFalse(any('releases/download/' in ' '.join(args) for _, args in self.calls()))
-
-    def test_legacy_release(self):
-        self.assets(legacy=True)
-        result, _ = self.run_installer()
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('predates the installer', result.stderr)
-        self.assert_clean()
 
     @unittest.skipUnless(platform.system() == 'Linux', 'controlling-terminal fixture requires Linux')
     def test_tty(self):

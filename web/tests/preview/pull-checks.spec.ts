@@ -5,7 +5,7 @@ test("selected PR overview matches the compact chat and flat checks layout", asy
   const screenshotDir = process.env.FLORA_SCREENSHOT_DIR;
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
   await page.setViewportSize({ width: 1440, height: 1050 });
-  await page.goto(`${base}/#chats/pagination`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "pagination")}`);
   await page.getByRole("combobox", { name: "Preview checks", exact: true }).selectOption("success");
   const inline = page.locator(
     '[data-inline-pr][href="https://github.com/example/fieldnotes/pull/19"]',
@@ -141,7 +141,7 @@ test("PR icons follow checks across the feed, sidebar, inline links, and control
     if (mode === "draft") body = body.replaceAll('"draft":false', '"draft":true');
     await route.fulfill({ response, body });
   });
-  await page.goto(`${base}/#chats/pagination`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "pagination")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const inline = page.locator(
     '[data-inline-pr][href="https://github.com/example/fieldnotes/pull/19"]',
@@ -173,7 +173,7 @@ test("PR icons follow checks across the feed, sidebar, inline links, and control
 test("preview controls let reviewers try yellow and green PR icons", async ({ page }) => {
   const screenshotDir = process.env.FLORA_SCREENSHOT_DIR;
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
-  await page.goto(`${base}/#chats/pagination`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "pagination")}`);
   const select = page.getByRole("combobox", { name: "Preview checks", exact: true });
   const trigger = page.getByRole("button", { name: "Linked pull requests (2)", exact: true });
   for (const state of ["pending", "success"]) {
@@ -235,7 +235,7 @@ test("PR descriptions render Markdown headings, lists, links, code, and tables",
     );
     await route.fulfill({ response, body });
   });
-  await page.goto(`${base}/#chats/pagination`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "pagination")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await page.locator('[data-inline-pr="open"]').click();
   const description = page.locator(
@@ -278,7 +278,7 @@ test("author metadata stays aligned when the avatar replaces its fallback", asyn
   });
   try {
     const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
-    await page.goto(`${base}/#chats/pagination`);
+    await page.goto(`${base}/#chats/${await publicChatID(page, "pagination")}`);
     await page.getByRole("button", { name: "Hide controls", exact: true }).click();
     await page.locator('[data-inline-pr="open"]').click();
     const header = page.locator(

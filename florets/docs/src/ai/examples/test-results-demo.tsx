@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { createChat } from "@shadcn/helpers/ai-sdk";
 import type { UIDataTypes, UIMessage } from "ai";
 import { CheckIcon, CircleDashedIcon, FileCodeIcon, FlaskConicalIcon, XIcon } from "lucide-react";
 
@@ -17,7 +18,7 @@ import {
   TraceLine,
   TraceTitle,
 } from "../../../../src/components/trace";
-import { createChat, getMessageText } from "../lib/ai";
+import { getMessageText } from "../lib/message-text";
 
 type Test = {
   name: string;

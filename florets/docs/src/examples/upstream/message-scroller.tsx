@@ -7,6 +7,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { createChat } from "@shadcn/helpers/ai-sdk";
 import { ArrowUpIcon, StopCircleIcon } from "lucide-react";
 import * as React from "react";
 
@@ -37,7 +38,7 @@ import {
 } from "@flora/florets/components/message-scroller";
 import { Spinner } from "@flora/florets/components/spinner";
 
-import { createChat, getMessageText } from "../../ai/lib/ai";
+import { getMessageText } from "../../ai/lib/message-text";
 import { Example, ExampleWrapper } from "../example";
 
 export function Preview() {

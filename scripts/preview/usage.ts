@@ -29,7 +29,10 @@ function add(target: ReturnType<typeof empty>, row: ReturnType<typeof empty>) {
 }
 
 /** Populated accounting fixtures use runtime dates so every range filters the same records. */
-export function previewUsage(from: string, to: string): UsageReport {
+export function previewUsage(
+  from: string,
+  to: string,
+): Omit<UsageReport, "chats"> & { chats: UsageGroup[] } {
   const start = new Date(from).getTime();
   const end = new Date(to).getTime();
   const bucket = end - start <= 48 * 3_600_000 ? "hour" : "day";

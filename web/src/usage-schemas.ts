@@ -16,6 +16,7 @@ const group = totals.extend({
   project: z.string(),
   lastActivity: z.string(),
 });
+const chatGroup = group.extend({ publicChatID: z.string().regex(/^[A-Z]+-[1-9]\d*$/u) });
 export const usageReportSchema = z.object({
   from: z.string(),
   to: z.string(),
@@ -24,7 +25,7 @@ export const usageReportSchema = z.object({
   series: z.array(group),
   projects: z.array(group),
   models: z.array(group),
-  chats: z.array(group),
+  chats: z.array(chatGroup),
 });
 export type UsageReport = z.infer<typeof usageReportSchema>;
 export type UsageGroup = z.infer<typeof group>;

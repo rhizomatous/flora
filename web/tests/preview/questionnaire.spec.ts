@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { test, expect } from "./fixtures.ts";
+import { publicChatID, test, expect } from "./fixtures.ts";
 
 test("questionnaire validation, navigation, and retry", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -57,7 +57,7 @@ test("questionnaire validation, navigation, and retry", async ({ page }) => {
     });
   });
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
-  await page.goto(`${base}/#chats/waiting`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "waiting")}`);
   const form = page.getByRole("form", { name: "Questions", exact: true });
   await expect(form).toHaveAttribute("data-slot", "questionnaire");
   await form.getByRole("button", { name: "Next", exact: true }).click();

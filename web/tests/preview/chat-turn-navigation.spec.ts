@@ -1,9 +1,9 @@
-import { test, expect } from "./fixtures.ts";
+import { publicChatID, test, expect } from "./fixtures.ts";
 
 test("turn navigation previews replies and jumps without losing the draft", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 1000 });
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
-  await page.goto(`${base}/#chats/pagination`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "pagination")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const nav = page.getByRole("navigation", { name: "Conversation turns" });
   await expect(nav.getByRole("button")).toHaveCount(4);

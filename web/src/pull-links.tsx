@@ -11,6 +11,7 @@ import {
   GitPullRequestIcon,
 } from "@flora/florets";
 
+import type { ChatIdentity } from "./chat-identity";
 import { pullAppearance } from "./pull-appearance";
 import { PullChecksLabel } from "./pull-checks";
 import { openPull, usePullNavigation } from "./pull-navigation";
@@ -108,15 +109,15 @@ export function PullCount({ pulls }: { pulls: Pull[] }) {
 export function PullList({
   summary,
   checks = "none",
-  chatID,
+  chat,
 }: {
   summary: PullSummary | undefined;
   checks?: "none" | "summary";
-  chatID?: string | undefined;
+  chat?: ChatIdentity | undefined;
 }) {
   const id = useId();
   const now = useChecksNow();
-  const navigation = usePullNavigation(chatID);
+  const navigation = usePullNavigation(chat);
   const pulls = summary?.items ?? [];
   const error = summary?.error ?? "";
   let emptyMessage = "No linked pull requests yet.";

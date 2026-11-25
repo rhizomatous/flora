@@ -147,8 +147,6 @@ func TestBranchTipReplacementRetainsCandidatesAndVerifiedPRs(t *testing.T) {
 			t.Fatalf("historical tips retained: %+v", state.Branches)
 		}
 	}
-	// Loading an older artifact also collapses multiple tips for one branch.
-	state.Branches = append([]pullBranch{{Repository: "example/core", HeadRepository: "example/core", Ref: "work", SHA: fmt.Sprintf("%040x", 1)}}, state.Branches...)
 	p, _ := s.Store.Paths(ctx, c.ID)
 	root, err := os.OpenRoot(p.Artifacts)
 	if err != nil {

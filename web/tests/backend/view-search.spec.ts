@@ -1,11 +1,12 @@
+import { publicChatID, logIn } from "../helpers.ts";
+
 import { test, expect } from "../fixtures.ts";
-import { logIn } from "../helpers.ts";
 
 test.use({ scenario: "workspace" });
 
 test("search reuses file identities across repositories and preserves the file browser", async ({ page, backend }) => {
   await logIn(page);
-  await page.goto(`${backend.url}/#chats/${backend.chatID}`);
+  await page.goto(`${backend.url}/#chats/${await publicChatID(page, backend.chatID)}`);
   const trigger = page.getByRole("button", { name: "Chat views", exact: true });
   const search = page.getByRole("searchbox", { name: "Search views", exact: true });
   await trigger.click();

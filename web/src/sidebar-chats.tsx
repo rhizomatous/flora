@@ -67,11 +67,7 @@ function ChatRow({
   return (
     <li
       className="florets-navigation-row"
-      data-active={
-        path.split("?")[0] === `chats/${chat.PublicID}` ||
-        path.split("?")[0] === `chats/${chat.ID}` ||
-        undefined
-      }
+      data-active={path.split("?")[0] === `chats/${chat.PublicID}` || undefined}
     >
       <HoverCard open={summaryOpen} onOpenChange={setSummaryOpen}>
         <HoverCardTrigger
@@ -79,12 +75,7 @@ function ChatRow({
           render={
             <a
               href={`#chats/${chat.PublicID}`}
-              aria-current={
-                path.split("?")[0] === `chats/${chat.PublicID}` ||
-                path.split("?")[0] === `chats/${chat.ID}`
-                  ? "page"
-                  : undefined
-              }
+              aria-current={path.split("?")[0] === `chats/${chat.PublicID}` ? "page" : undefined}
               className="florets-navigation-link"
               aria-label={
                 details

@@ -174,23 +174,6 @@ type branchKey struct{ repository, head, ref string }
 
 func (b pullBranch) key() branchKey { return branchKey{b.Repository, b.HeadRepository, b.Ref} }
 
-// Keep one tip per branch, including when loading older artifacts that retained
-// a tip for every commit. Verified PRs and pending candidates are separate data.
-func compactBranches(state *Pulls) map[branchKey]int {
-	indices := map[branchKey]int{}
-	branches := []pullBranch{}
-	for _, b := range state.Branches {
-		if i, ok := indices[b.key()]; ok {
-			branches[i] = b
-		} else {
-			indices[b.key()] = len(branches)
-			branches = append(branches, b)
-		}
-	}
-	state.Branches = branches
-	return indices
-}
-
 // Observe local branch tips that differ from the recorded checkout, never remote
 // tracking refs. GitHub candidates must match the observed head repository, ref,
 // and commit, so the starting default branch does not link unrelated PRs.
@@ -200,7 +183,10 @@ func (s *Service) observeBranches(ctx context.Context, c storage.Chat, state *Pu
 		return false
 	}
 	failed := false
-	seen := compactBranches(state)
+	seen := make(map[branchKey]int, len(state.Branches))
+	for i, b := range state.Branches {
+		seen[b.key()] = i
+	}
 	for _, r := range c.Configuration.Repositories {
 		base := c.StartingCommits[r.Name]
 		if base == "" && r.Role == "extra" {
@@ -321,7 +307,6 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 	defer root.Close()
 	state := Pulls{Items: []Pull{}}
 	_ = load(root, "pulls.json", &state)
-	compactBranches(&state)
 	if state.Missing == nil {
 		state.Missing = map[string]string{}
 	}
@@ -352,10 +337,6 @@ func (s *Service) verifyPulls(ctx context.Context, c storage.Chat, client *http.
 	known := map[string]Pull{}
 	for _, p := range state.Items {
 		link := pullURL(p.Repository, p.Number)
-		// Older artifacts may omit the repository field.
-		if p.Repository == "" {
-			link = strings.ToLower(p.URL)
-		}
 		links[link] = true
 		known[link] = p
 	}

@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { z } from "zod";
 
 import { chatSchema, detailSchema, feedSchema, type Chat } from "../../src/chat-schemas";
-import { test, expect } from "./fixtures.ts";
+import { publicChatID, test, expect } from "./fixtures.ts";
 
 test.afterEach(async ({ page }) => {
   await page.unrouteAll({ behavior: "wait" });
@@ -82,7 +82,7 @@ test("organize chats across header, sidebar, search, archive, reload, and restor
 }, testInfo) => {
   const state = await organizationAPI(page);
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto(`${base}/#chats/completed`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "completed")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const nav = page.getByRole("navigation", { name: "Main", exact: true });
   const actions = page.getByRole("button", { name: "More chat actions", exact: true });
@@ -161,7 +161,7 @@ test("rename keeps drafts on errors and conflicts and supports keyboard cancella
   page,
 }, testInfo) => {
   const state = await organizationAPI(page);
-  await page.goto(`${base}/#chats/completed`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "completed")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const actions = page.getByRole("button", { name: "More chat actions", exact: true });
   await actions.focus();

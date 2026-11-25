@@ -37,6 +37,7 @@ import {
   ChatComposerFooter,
   ChatReviewStrip,
 } from "./chat-controls";
+import { ChatIdentityContext } from "./chat-identity";
 import { ChatList } from "./chat-list";
 import { latestOrganization } from "./chat-organization";
 import { useChatPanelState } from "./chat-panel-state";
@@ -130,18 +131,11 @@ export function Chats({
   const submitting = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const reference = path.startsWith("chats/") ? (path.slice(6).split("?")[0] ?? "") : "";
-  const known = list?.find((chat) => chat.ID === reference || chat.PublicID === reference);
+  const known = list?.find((chat) => chat.PublicID === reference);
   const id = known?.ID ?? (detail?.chat.PublicID === reference ? detail.chat.ID : reference);
-  useEffect(() => {
-    const chat = detail?.chat;
-    if (!chat || (chat.ID !== id && chat.PublicID !== id)) return;
-    if (reference === chat.PublicID) return;
-    const query = path.includes("?") ? `?${path.split("?")[1]}` : "";
-    window.history.replaceState(null, "", `#chats/${chat.PublicID}${query}`);
-    window.dispatchEvent(new HashChangeEvent("hashchange"));
-  }, [detail, id, reference, path]);
   const readError = useMarkViewed(detail?.chat.ID === id ? detail.chat : undefined);
   const isNew = id === "new" || id.startsWith("new?");
+  const invalidReference = !isNew && reference !== "" && !/^[A-Z]+-[1-9]\d*$/u.test(reference);
   const projectID = new URLSearchParams(path.split("?")[1]).get("project") ?? "";
   const [selectedProjectID, setSelectedProjectID] = useState(() => {
     if (projectID !== "") return projectID;
@@ -181,6 +175,7 @@ export function Chats({
 
   useEffect(() => {
     if (id === "" || isNew) return;
+    if (invalidReference) return;
     let active = true;
     const base = `chats/${encodeURIComponent(id)}`;
 
@@ -272,7 +267,7 @@ export function Chats({
       clearInterval(timer);
       clearTimeout(debounce);
     };
-  }, [id, isNew]);
+  }, [id, isNew, invalidReference]);
 
   async function send(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -380,6 +375,8 @@ export function Chats({
 
   const [panelState, updatePanel] = useChatPanelState(id);
 
+  if (invalidReference) return <Alert role="alert">Chat not found.</Alert>;
+
   if (id === "") {
     return (
       <ChatList
@@ -422,7 +419,7 @@ export function Chats({
     updatePanel({ mainView: view });
   }
 
-  return (
+  const content = (
     <SubagentsContext
       value={{ chatID: id, agents: detail?.chat.ID === id ? detail.subagents : [] }}
     >
@@ -748,6 +745,13 @@ export function Chats({
         )}
       </ResizablePanelGroup>
     </SubagentsContext>
+  );
+  return (
+    <ChatIdentityContext
+      value={known ?? (detail?.chat.PublicID === reference ? detail.chat : undefined)}
+    >
+      {content}
+    </ChatIdentityContext>
   );
 }
 

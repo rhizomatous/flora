@@ -23,7 +23,7 @@ test("preview navigation and pauseable chat replay", async ({ page }) => {
     ["pagination", "Fix duplicate notes between pages", "#19 Open"],
     ["focus", "Restore focus after removing a repository", "#73 Merged"],
   ] as const) {
-    await page.goto(`${base}/#chats/${id}`);
+    await page.goto(`${base}/#chats/${await publicChatID(page, id)}`);
     await expect(page).toHaveURL(`${base}/#chats/${await publicChatID(page, id)}`);
     await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
     await expect(
@@ -40,7 +40,7 @@ test("preview navigation and pauseable chat replay", async ({ page }) => {
     }
     await expect(page.getByRole("button", { name: "Replay chat", exact: true })).toBeEnabled();
   }
-  await page.goto(`${base}/#chats/recovery`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "recovery")}`);
   await Promise.all([
     page.waitForEvent("load"),
     page.getByRole("button", { name: "Replay chat", exact: true }).click(),
@@ -67,7 +67,7 @@ test("preview navigation and pauseable chat replay", async ({ page }) => {
       .getByRole("button", { name: /Worked for.*2 steps.*1 failed/ }),
   ).toBeVisible({ timeout: 15_000 });
   await expect(page).toHaveURL(`${base}/#chats/${await publicChatID(page, "recovery")}`);
-  await page.goto(`${base}/#chats/waiting`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "waiting")}`);
   await Promise.all([
     page.waitForEvent("load"),
     page.getByRole("button", { name: "Replay chat", exact: true }).click(),

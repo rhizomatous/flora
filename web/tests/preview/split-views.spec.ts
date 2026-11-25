@@ -1,8 +1,10 @@
-import { expect, test } from "./fixtures.ts";
+import { publicChatID, expect, test } from "./fixtures.ts";
 
 test("side panel keeps chat drafts, resizes, and hosts independent diff tabs", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto(`${process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199"}/#chats/pagination`);
+  await page.goto(
+    `${process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199"}/#chats/${await publicChatID(page, "pagination")}`,
+  );
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const draft = page.getByLabel("Follow-up", { exact: true });
   await draft.fill("Keep this split-view draft");
@@ -77,7 +79,7 @@ test("side panel keeps chat drafts, resizes, and hosts independent diff tabs", a
 test("panel preferences survive closing, chat navigation, and reload", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 1000 });
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
-  await page.goto(`${base}/#chats/pagination`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "pagination")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const rail = page.getByRole("navigation", { name: "Conversation turns" });
   await expect(rail).toBeVisible();

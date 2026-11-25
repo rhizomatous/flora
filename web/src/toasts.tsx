@@ -1,6 +1,5 @@
 import { Button, Link, Text } from "@flora/florets";
 
-import { useChatReference } from "./chat-identity";
 import type { Toast } from "./notifications";
 
 export function CompletionToasts({
@@ -10,7 +9,6 @@ export function CompletionToasts({
   toasts: Toast[];
   dismiss: (sequence: number) => void;
 }) {
-  const reference = useChatReference();
   return (
     <aside
       aria-label="Completion notifications"
@@ -24,10 +22,7 @@ export function CompletionToasts({
           className="rounded-md border border-border bg-surface-overlay p-4 shadow-lg"
         >
           <Text className="break-words">
-            <Link
-              className="font-medium"
-              href={`#chats/${encodeURIComponent(reference(t.ChatID))}`}
-            >
+            <Link className="font-medium" href={`#chats/${encodeURIComponent(t.publicChatID)}`}>
               {t.title}
             </Link>{" "}
             finished work.

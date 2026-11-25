@@ -3,7 +3,7 @@ import { test, expect, publicChatID } from "./fixtures.ts";
 const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
 
 test("pull requests page filters, searches, and links back to chats", async ({ page }) => {
-  await page.goto(`${base}/#chats/pagination`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "pagination")}`);
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await page.getByRole("link", { name: "Pull requests", exact: true }).click();
   const region = page.getByRole("region", { name: "Pull requests", exact: true });

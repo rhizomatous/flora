@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures.ts";
+import { publicChatID, test, expect } from "./fixtures.ts";
 
 test("chat cost distinguishes no usage, reported zero, and refresh failures", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
@@ -19,7 +19,7 @@ test("chat cost distinguishes no usage, reported zero, and refresh failures", as
     if (typeof body !== "object" || body === null) throw new Error("Missing chat detail");
     await route.fulfill({ response, json: { ...body, usage } });
   });
-  await page.goto(`${base}/#chats/completed`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "completed")}`);
   const cost = page.getByRole("button", { name: "Estimated chat cost", exact: true });
   await expect(cost).toHaveText("$0.04");
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();

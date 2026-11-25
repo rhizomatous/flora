@@ -1,8 +1,9 @@
+import { publicChatID, logIn, assertFitsPhone, pageErrors } from "../helpers.ts";
+
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import { test, expect } from "../fixtures.ts";
-import { logIn, assertFitsPhone, pageErrors } from "../helpers.ts";
 
 test.use({ scenario: "workspace" });
 
@@ -14,7 +15,7 @@ test("canvas file tabs preserve repository identity and read without a runtime o
     if (r.method() !== "GET" && path.startsWith("/api/chats/") && path !== "/api/chats/read") mutations.push(r.url());
   });
   await logIn(page);
-  await page.goto(`${backend.url}/#chats/${backend.chatID}`);
+  await page.goto(`${backend.url}/#chats/${await publicChatID(page, backend.chatID)}`);
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
   await page.getByRole("menuitem", { name: "Files", exact: true }).click();
   await expect(page.getByRole("tab", { name: "Files", exact: true })).toBeVisible();
@@ -66,7 +67,7 @@ test("canvas file tabs preserve repository identity and read without a runtime o
 
 test("highlighted Nix source, numbered lines, icons, and keyboard folder navigation", async ({ page, backend }) => {
   await logIn(page);
-  await page.goto(`${backend.url}/#chats/${backend.otherChatID}`);
+  await page.goto(`${backend.url}/#chats/${await publicChatID(page, backend.otherChatID)}`);
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
   await page.getByRole("menuitem", { name: "Files", exact: true }).click();
   await expect(page.getByRole("button", { name: "Workspace machine" })).toContainText("Asleep");
@@ -93,7 +94,7 @@ test("highlighted Nix source, numbered lines, icons, and keyboard folder navigat
 
 test("narrow main canvas tabs preserve drafts and independent file tabs", async ({ page, backend }) => {
   await logIn(page);
-  await page.goto(`${backend.url}/#chats/${backend.otherChatID}`);
+  await page.goto(`${backend.url}/#chats/${await publicChatID(page, backend.otherChatID)}`);
   const draft = page.getByLabel("Follow-up", { exact: true });
   await draft.fill("Keep this unsent draft while I inspect files.");
   await page.getByRole("button", { name: "Chat views", exact: true }).click();

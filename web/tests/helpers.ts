@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 
 import { expect, type Page } from "@playwright/test";
 
+import { detailSchema } from "../src/chat-schemas";
+
 /** Collects uncaught page errors so a test can assert that none occurred. */
 export function pageErrors(page: Page) {
   const errors: string[] = [];
@@ -19,6 +21,7 @@ export async function logIn(page: Page, submit: "button" | "enter" = "button") {
   await (submit === "enter"
     ? password.press("Enter")
     : page.getByRole("button", { name: "Log in", exact: true }).click());
+  await expect(password).toBeHidden();
 }
 
 /** Resizes to a phone viewport and checks that the page does not scroll horizontally. */
@@ -47,4 +50,11 @@ export async function openWorkspaceMenu(page: Page) {
 export async function openSettings(page: Page) {
   await openWorkspaceMenu(page);
   await page.getByRole("menuitem", { name: "Settings", exact: true }).click();
+}
+
+/** Looks up the public ID used by chat URLs. */
+export async function publicChatID(page: Page, id: string) {
+  const response = await page.request.get(`/api/chats/${encodeURIComponent(id)}`);
+  await expect(response).toBeOK();
+  return detailSchema.parse(await response.json()).chat.PublicID;
 }

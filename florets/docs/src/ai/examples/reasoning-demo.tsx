@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { createChat } from "@shadcn/helpers/ai-sdk";
 import { useState } from "react";
 
 import { Bubble, BubbleContent } from "../../../../src/components/bubble";
@@ -14,7 +15,7 @@ import {
   TraceLine,
   TraceTitle,
 } from "../../../../src/components/trace";
-import { createChat, getMessageText } from "../lib/ai";
+import { getMessageText } from "../lib/message-text";
 
 const chat = createChat()
   .user("Why is the checkout deploy so slow?")

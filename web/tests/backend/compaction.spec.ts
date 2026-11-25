@@ -1,14 +1,15 @@
+import { publicChatID, logIn, pageErrors } from "../helpers.ts";
+
 import type { Route } from "@playwright/test";
 
 import { test, expect } from "../fixtures.ts";
-import { logIn, pageErrors } from "../helpers.ts";
 
 test.use({ scenario: "compaction" });
 
 test("compaction row opens a focused dialog with saved settings and draft recovery", async ({ page, backend }, testInfo) => {
   const errors = pageErrors(page);
   await logIn(page);
-  await page.goto(`${backend.url}/#chats/${backend.chatID}`);
+  await page.goto(`${backend.url}/#chats/${await publicChatID(page, backend.chatID)}`);
   const message = page.getByRole("combobox", { name: "Follow-up", exact: true });
   await message.fill("Keep this message draft");
   const trigger = page.getByRole("button", { name: "Context usage", exact: true });

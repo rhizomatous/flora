@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures.ts";
+import { publicChatID, test, expect } from "./fixtures.ts";
 
 test("plus menu opens a full-width diff tab and preserves both views", async ({ page }) => {
   await page.route("**/api/chats/pagination/changes", (route) =>
@@ -47,7 +47,9 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
     }),
   );
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto(`${process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199"}/#chats/pagination`);
+  await page.goto(
+    `${process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199"}/#chats/${await publicChatID(page, "pagination")}`,
+  );
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   const originalTitle = page.getByRole("button", {
     name: "Fix duplicate notes between pages",
@@ -170,7 +172,9 @@ test("plus menu opens a full-width diff tab and preserves both views", async ({ 
 
 test("live mock shows multiple languages, inline edits, and separated hunks", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto(`${process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199"}/#chats/pagination`);
+  await page.goto(
+    `${process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199"}/#chats/${await publicChatID(page, "pagination")}`,
+  );
   await page.getByRole("button", { name: "Hide controls", exact: true }).click();
   await page.getByRole("button", { name: "Chat views", exact: true }).click();
   await page.getByRole("menuitem", { name: "Diffs", exact: true }).click();

@@ -3,7 +3,14 @@ package server
 import (
 	"net/http"
 	"time"
+
+	"github.com/rhizomatous/flora/backend/internal/storage"
 )
+
+type usageChat struct {
+	storage.UsageGroup
+	PublicChatID string `json:"publicChatID"`
+}
 
 func (a *api) usageRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/usage", func(w http.ResponseWriter, r *http.Request) {
@@ -18,6 +25,18 @@ func (a *api) usageRoutes(mux *http.ServeMux) {
 			failure(w, 503, "Could not load usage. Try again.")
 			return
 		}
-		jsonResponse(w, 200, report)
+		chats := make([]usageChat, 0, len(report.Chats))
+		for _, group := range report.Chats {
+			chat, err := a.settings.Store.Chat(r.Context(), group.ID)
+			if err != nil {
+				failure(w, 503, "Could not load usage. Try again.")
+				return
+			}
+			chats = append(chats, usageChat{UsageGroup: group, PublicChatID: chat.PublicID})
+		}
+		jsonResponse(w, 200, struct {
+			storage.UsageReport
+			Chats []usageChat `json:"chats"`
+		}{UsageReport: report, Chats: chats})
 	})
 }

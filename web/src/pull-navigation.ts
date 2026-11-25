@@ -1,25 +1,24 @@
 import { useContext, type MouseEvent } from "react";
 
-import { useChatReference } from "./chat-identity";
+import { ChatIdentityContext, type ChatIdentity } from "./chat-identity";
 import { useChatPanelState } from "./chat-panel-state";
 import type { Pull } from "./pull-schemas";
-import { SubagentsContext } from "./subagent-state";
 
-export function usePullNavigation(override?: string) {
-  const reference = useChatReference();
-  const { chatID: currentChat } = useContext(SubagentsContext);
-  const chatID = override ?? currentChat;
-  const [state, update] = useChatPanelState(chatID);
+export function usePullNavigation(override?: ChatIdentity) {
+  const currentChat = useContext(ChatIdentityContext);
+  const chat = override ?? currentChat;
+  const [state, update] = useChatPanelState(chat?.ID ?? "");
   return {
-    available: chatID !== "",
+    available: chat !== undefined,
     open(pull: Pull) {
+      if (!chat) return;
       update({
         open: true,
         view: `pull:${pull.url}`,
         pullTabs: [...new Set([...state.pullTabs, pull.url])],
       });
-      if (window.location.hash.split("?")[0] !== `#chats/${reference(chatID)}`) {
-        window.location.hash = `chats/${reference(chatID)}`;
+      if (window.location.hash.split("?")[0] !== `#chats/${chat.PublicID}`) {
+        window.location.hash = `chats/${chat.PublicID}`;
       }
       requestAnimationFrame(() => {
         document

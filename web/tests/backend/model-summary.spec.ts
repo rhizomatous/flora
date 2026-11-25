@@ -1,11 +1,12 @@
+import { publicChatID, logIn, pageErrors } from "../helpers.ts";
+
 import { test, expect } from "../fixtures.ts";
-import { logIn, pageErrors } from "../helpers.ts";
 
 test.use({ scenario: "model-summary" });
 
 test("a failed model save preserves the choice and unsent message", async ({ page, backend }) => {
   await logIn(page);
-  await page.goto(`/#chats/${backend.chatID}`);
+  await page.goto(`/#chats/${await publicChatID(page, backend.chatID)}`);
   await page.getByLabel("Follow-up", { exact: true }).fill("Keep this message");
   let failSave: (() => void) | undefined;
   const released = new Promise<void>((resolve) => { failSave = resolve; });
@@ -26,7 +27,7 @@ test("a failed model save preserves the choice and unsent message", async ({ pag
 
 test("one saved chat model applies before sending and survives a fresh browser session", async ({ page, backend, browser }, testInfo) => {
   await logIn(page);
-  await page.goto(`/#chats/${backend.chatID}`);
+  await page.goto(`/#chats/${await publicChatID(page, backend.chatID)}`);
   await page.getByRole("button", { name: "Model: Claude Haiku 4.5", exact: true }).click();
   await page.getByRole("menuitem", { name: "Claude Sonnet 4.6", exact: true }).click();
   await expect(page.getByRole("button", { name: "Model: Claude Sonnet 4.6", exact: true })).toBeFocused();
@@ -52,7 +53,7 @@ test("one saved chat model applies before sending and survives a fresh browser s
   const otherContext = await browser.newContext({ storageState: await page.context().storageState(), ignoreHTTPSErrors: true, viewport: { width: 1512, height: 838 }, deviceScaleFactor: 2 });
   try {
     const otherPage = await otherContext.newPage();
-    await otherPage.goto(`${backend.url}/#chats/${backend.chatID}`);
+    await otherPage.goto(`${backend.url}/#chats/${await publicChatID(page, backend.chatID)}`);
     await expect(otherPage.getByRole("button", { name: "Model: Claude Sonnet 4.6", exact: true })).toBeVisible();
     await otherPage.getByRole("button", { name: "Review keyboard navigation", exact: true }).focus();
     await expect(otherPage.getByLabel("Chat summary", { exact: true }).getByRole("region", { name: "Subagents", exact: true })).toBeVisible();
@@ -73,7 +74,7 @@ test("one saved chat model applies before sending and survives a fresh browser s
 test("saved composer model agrees across title and sidebar after reload", async ({ page, backend }) => {
   const errors = pageErrors(page);
   await logIn(page);
-  await page.goto(`/#chats/${backend.chatID}`);
+  await page.goto(`/#chats/${await publicChatID(page, backend.chatID)}`);
   const title = page.getByRole("button", { name: "Review keyboard navigation", exact: true });
   const label = "Chat model: anthropic / claude-haiku-4-5";
   await title.focus();
@@ -91,7 +92,7 @@ test("saved composer model agrees across title and sidebar after reload", async 
   await expect.poll(async () => await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await expect(page.getByRole("img", { name: label, exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.goto(`/#chats/${backend.otherChatID}`);
+  await page.goto(`/#chats/${await publicChatID(page, backend.otherChatID)}`);
   await page.getByRole("button", { name: "Plan the next task", exact: true }).focus();
   await expect(page.getByRole("img", { name: "Chat model: anthropic / model", exact: true })).toBeVisible();
   expect(errors).toEqual([]);
@@ -131,7 +132,7 @@ test("model selection restores focus while saving and stays disabled", async ({
   backend,
 }) => {
   await logIn(page);
-  await page.goto(`/#chats/${backend.chatID}`);
+  await page.goto(`/#chats/${await publicChatID(page, backend.chatID)}`);
   let release: (() => void) | undefined;
   const saved = new Promise<void>((resolve) => {
     release = resolve;

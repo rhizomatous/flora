@@ -5,6 +5,7 @@ import type { Message, Part, QuestionRequest } from "@opencode-ai/sdk/v2";
 import type { Plugin } from "vite";
 
 import { PreviewAutomations } from "./automations.ts";
+import { publicID } from "./chat-identity.ts";
 import { previewPullChecks } from "./check-fixtures.ts";
 import { paginationDiffFiles } from "./diff-fixtures.ts";
 import {
@@ -51,42 +52,6 @@ function replayFrames(frames: Frame[]) {
 }
 
 const epoch = "2026-01-01T12:00:00.000Z";
-const publicIDs = new Map<string, string>();
-const projectPrefixes = new Map<string, string>();
-const projectCounters = new Map<string, number>();
-function publicID(id: string, projectID: string, projectName: string) {
-  const saved = publicIDs.get(id);
-  if (saved !== undefined) return saved;
-  let prefix = projectPrefixes.get(projectID);
-  if (prefix === undefined) {
-    const letters = projectName.replaceAll(/[^A-Za-z]/gu, "").toUpperCase() || "CHAT";
-    const base = letters.slice(0, 4);
-    const extra = Math.min(8, letters.length) - base.length;
-    const taken = new Set(projectPrefixes.values());
-    for (let attempt = 0; ; attempt++) {
-      let candidate = letters.slice(0, base.length + attempt);
-      if (attempt > extra) {
-        let suffix = "";
-        for (let number = attempt - extra; number > 0; number = Math.floor(number / 26)) {
-          number--;
-          suffix = String.fromCodePoint(65 + (number % 26)) + suffix;
-        }
-        candidate = base + suffix;
-      }
-      if (!taken.has(candidate)) {
-        prefix = candidate;
-        projectPrefixes.set(projectID, prefix);
-        break;
-      }
-    }
-  }
-  const number = (projectCounters.get(projectID) ?? 0) + 1;
-  projectCounters.set(projectID, number);
-  const canonical = `${prefix}-${number}`;
-  publicIDs.set(id, canonical);
-  return canonical;
-}
-
 /** Projects captured OpenCode history into the same saved-message fields as captureHistory and AcceptMessage. */
 export function messages(frame: Frame, chatID: string) {
   return frame.history.map(({ info, parts }) => {
@@ -425,7 +390,26 @@ export function chatPreview(): Plugin {
     if (url.pathname === "/api/usage") {
       const from = url.searchParams.get("from") ?? "";
       const to = url.searchParams.get("to") ?? "";
-      json(res, previewUsage(from, to));
+      const report = previewUsage(from, to);
+      const chats = report.chats.map((row) => {
+        const scenario = present(scenarios.find((item) => item.id === row.id));
+        const project = present(projects.find((item) => item.id === scenario.projectID));
+        return { ...row, publicChatID: publicID(row.id, project.id, project.name) };
+      });
+      json(res, { ...report, chats });
+      return;
+    }
+    if (url.pathname === "/api/github/repositories") {
+      json(res, {
+        repositories: projects.flatMap((project) =>
+          project.configuration.repositories.map((repo) => ({
+            full_name: repo.url.replace("https://github.com/", ""),
+            html_url: repo.url,
+            default_branch: repo.baseBranch,
+          })),
+        ),
+        nextPage: 0,
+      });
       return;
     }
     if (url.pathname === "/api/projects") {
@@ -640,12 +624,16 @@ export function chatPreview(): Plugin {
       });
     },
     transformIndexHtml() {
+      const scenario = present(scenarios.find((item) => item.id === "completed"));
+      const project = present(projects.find((item) => item.id === scenario.projectID));
+      const defaultChat = publicID(scenario.id, project.id, project.name);
       return [
         {
           tag: "script",
           attrs: {
             type: "module",
             src: `/@fs/${new URL("toolbar.js", import.meta.url).pathname}`,
+            "data-default-chat": defaultChat,
           },
           injectTo: "body",
         },

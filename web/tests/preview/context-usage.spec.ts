@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures.ts";
+import { publicChatID, test, expect } from "./fixtures.ts";
 
 test("context displays the reported snapshot and handles an unknown limit", async ({ page }) => {
   const base = process.env.FLORA_PREVIEW_URL ?? "http://127.0.0.1:5199";
@@ -14,7 +14,7 @@ test("context displays the reported snapshot and handles an unknown limit", asyn
     if (typeof body !== "object" || body === null) throw new Error("Missing detail");
     await route.fulfill({ response, json: { ...body, contextUsage: usage } });
   });
-  await page.goto(`${base}/#chats/completed`);
+  await page.goto(`${base}/#chats/${await publicChatID(page, "completed")}`);
   const trigger = page.getByRole("button", { name: "Context usage", exact: true });
   await trigger.click();
   await expect(page.getByText("79.6K / 200K (40%)", { exact: true })).toBeVisible();

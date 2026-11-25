@@ -28,7 +28,6 @@ import {
   TooltipTrigger,
 } from "@flora/florets";
 
-import { useChatReference } from "./chat-identity";
 import { errorMessage, isExpired, request } from "./request";
 import { usageReportSchema, type UsageReport, type UsageGroup } from "./usage-schemas";
 
@@ -176,8 +175,7 @@ function Breakdown({ report, metric }: { report: UsageReport; metric: Metric }) 
   );
 }
 
-function History({ rows }: { rows: UsageGroup[] }) {
-  const reference = useChatReference();
+function History({ rows }: { rows: UsageReport["chats"] }) {
   const [sort, setSort] = useState("cost");
   const sorted = rows.toSorted((a, b) =>
     sort === "activity"
@@ -227,7 +225,7 @@ function History({ rows }: { rows: UsageGroup[] }) {
             <TableRow key={row.id} className="border-b border-border">
               <TableCell className="min-w-48 py-4">
                 <a
-                  href={`#chats/${encodeURIComponent(reference(row.id))}`}
+                  href={`#chats/${encodeURIComponent(row.publicChatID)}`}
                   className="rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-ring"
                 >
                   {row.label}
