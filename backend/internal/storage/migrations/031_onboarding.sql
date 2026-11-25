@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS onboarding (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    step TEXT NOT NULL DEFAULT 'model',
+    paused INTEGER NOT NULL DEFAULT 0,
+    project_id TEXT NOT NULL DEFAULT ''
+);

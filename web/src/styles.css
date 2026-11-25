@@ -9,3 +9,11 @@
 @import "./sidebar.css";
 
 @source "./";
+
+.first-run {
+  background-image: radial-gradient(
+    circle at 15% 10%,
+    color-mix(in srgb, var(--foreground) 4%, transparent),
+    transparent 50%
+  );
+}

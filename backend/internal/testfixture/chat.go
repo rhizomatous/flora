@@ -101,6 +101,9 @@ func New(ctx context.Context, directory string, interactive bool, compaction ...
 	if err != nil {
 		return nil, err
 	}
+	if err := store.SaveOnboarding(ctx, storage.Onboarding{Step: "finish", Paused: true, ProjectID: project.ID}); err != nil {
+		return nil, err
+	}
 	var mu sync.Mutex
 	history := []json.RawMessage{}
 	var reserved *int64

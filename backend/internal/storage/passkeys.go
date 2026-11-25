@@ -160,6 +160,9 @@ func (s *Store) RegisterPasskey(ctx context.Context, key Passkey, mode, binding,
 			if _, err := tx.ExecContext(ctx, "INSERT INTO administrator VALUES(1,'')"); err != nil {
 				return err
 			}
+			if _, err := tx.ExecContext(ctx, "INSERT INTO onboarding(id) VALUES(1)"); err != nil {
+				return err
+			}
 			if _, err := tx.ExecContext(ctx, "DELETE FROM setup_access"); err != nil {
 				return err
 			}

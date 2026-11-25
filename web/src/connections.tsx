@@ -95,10 +95,12 @@ function clearCallback() {
 }
 
 export function ConnectionsPage({
+  embedded = false,
   path,
   onSaved,
   onExpired,
 }: {
+  embedded?: boolean;
   path: string;
   onSaved: (settings: Settings) => void;
   onExpired: () => void;
@@ -122,9 +124,9 @@ export function ConnectionsPage({
 
   useEffect(() => {
     if (previousDetail.current && !detail) githubRow.current?.focus();
-    else heading.current?.focus();
+    else if (!embedded) heading.current?.focus();
     previousDetail.current = detail;
-  }, [detail]);
+  }, [detail, embedded]);
 
   async function loadRepositories(page = 1) {
     const read = ++repositoryRead.current;
@@ -247,10 +249,10 @@ export function ConnectionsPage({
   return (
     <section
       aria-labelledby="connections-heading"
-      className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8 sm:py-10"
+      className={embedded ? "" : "mx-auto w-full max-w-5xl px-4 py-8 sm:px-8 sm:py-10"}
     >
       <div className="mb-10 px-4">
-        {detail && (
+        {detail && !embedded && (
           <Link
             href="#connections"
             className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground"
@@ -481,7 +483,10 @@ export function ConnectionsPage({
                   <Heading level={2} id="github-repositories-heading">
                     Repositories
                   </Heading>
-                  <ButtonLink variant="outline" href="#projects/new">
+                  <ButtonLink
+                    variant="outline"
+                    href={embedded ? "#onboarding/project" : "#projects/new"}
+                  >
                     Connect project
                     <ChevronRightIcon aria-hidden="true" />
                   </ButtonLink>

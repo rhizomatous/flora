@@ -114,12 +114,14 @@ function ConnectionDialog({
 }
 
 export function ModelConnections({
+  active = true,
   settings,
   models,
   loading,
   busy,
   onSave,
 }: {
+  active?: boolean;
   settings: Settings;
   models: ModelOption[];
   loading: boolean;
@@ -127,6 +129,8 @@ export function ModelConnections({
   onSave: (body: object) => Promise<void>;
 }) {
   const [editing, setEditing] = useState("");
+  // Unmount credential dialogs when their page is hidden so secret drafts are discarded.
+  if (!active && editing !== "") setEditing("");
   const addButton = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const connected = settings.providers;

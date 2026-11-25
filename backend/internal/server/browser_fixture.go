@@ -412,6 +412,27 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	} else {
 		app = New(webassets.FS(), authentication, configuration, origin, fixture.Service)
 	}
+	if scenario == "credential-setup" {
+		validation := projects.New(store)
+		validation.Client.Transport = browserTransport(func(r *http.Request) (*http.Response, error) {
+			if strings.HasPrefix(r.URL.Path, "/repos/") {
+				return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"default_branch":"main"}`))}, nil
+			}
+			return configuration.GitHub.Client.Transport.RoundTrip(r)
+		})
+		a := &api{auth: authentication, projects: validation, settings: configuration, origin: origin}
+		mux := http.NewServeMux()
+		a.projectRoutes(mux)
+		projectHandler := a.protect(mux)
+		original := app
+		app = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/api/projects") {
+				projectHandler.ServeHTTP(w, r)
+				return
+			}
+			original.ServeHTTP(w, r)
+		})
+	}
 	var githubUnavailable atomic.Bool
 	if fixture != nil {
 		validation := projects.New(store)

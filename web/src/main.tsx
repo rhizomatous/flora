@@ -7,7 +7,6 @@ import {
   Button,
   LoadingStatus,
   Toaster,
-  Wordmark,
   SidebarProvider,
   SidebarInset,
 } from "@flora/florets";
@@ -18,10 +17,13 @@ import { Automations } from "./automations";
 import { FolderProvider } from "./chat-folders";
 import { Chats } from "./chats";
 import { ConnectionsPage } from "./connections";
+import { FirstRunLayout } from "./first-run-layout";
 import { Installation } from "./installation";
 import { MCPs } from "./mcps";
 import { ModelsPage } from "./models-page";
 import { useNotifications } from "./notifications";
+import { Onboarding } from "./onboarding";
+import { onboardingSchema, type OnboardingState } from "./onboarding-state";
 import { Projects } from "./projects";
 import { PullRequests } from "./pull-requests-page";
 import { errorMessage, request } from "./request";
@@ -49,6 +51,7 @@ const currentPath = () => window.location.hash.slice(1) || "chats/new";
 
 function App() {
   const [status, setStatus] = useState<Status>();
+  const [onboarding, setOnboarding] = useState<OnboardingState>();
   const [settings, setSettings] = useState<Settings>();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -76,7 +79,20 @@ function App() {
   async function refresh() {
     const next = await request(statusSchema, "auth/status");
     setStatus(next);
-    setSettings(next.authenticated ? await request(settingsSchema, "settings") : undefined);
+    if (next.authenticated && !next.recoveryAuthorized) {
+      const [savedSettings, progress] = await Promise.all([
+        request(settingsSchema, "settings"),
+        request(onboardingSchema, "onboarding"),
+      ]);
+      setSettings(savedSettings);
+      setOnboarding(progress);
+      if (progress.started && !progress.paused && !currentPath().startsWith("onboarding/")) {
+        window.location.hash = `onboarding/${progress.step}`;
+      }
+    } else {
+      setSettings(undefined);
+      setOnboarding(undefined);
+    }
   }
   async function load() {
     try {
@@ -140,16 +156,73 @@ function App() {
     setNotice("Settings saved. Credentials are not shown.");
   }
 
-  const Layout = ready ? SidebarProvider : "div";
-  const newChat = ready && path.startsWith("chats/new");
-  const conversation = ready && path.startsWith("chats/") && !newChat;
-  const pullsPage = ready && path === "pulls";
-  const chatsPage = ready && path.split("?")[0] === "chats";
-  const mcpPage = ready && path.startsWith("mcps");
-  const automationsPage = ready && path === "automations";
-  const connectionsPage = ready && (path === "connections" || path === "connections/github");
-  const modelsPage = ready && path === "models";
-  const automationEditor = ready && path.startsWith("automations/");
+  async function saveOnboarding(next: OnboardingState) {
+    const progress = await request(onboardingSchema, "onboarding", { method: "PUT", body: next });
+    setOnboarding(progress);
+  }
+
+  if (ready && onboarding && path.startsWith("onboarding")) {
+    return (
+      <Onboarding
+        actionError={error}
+        path={path}
+        state={onboarding}
+        settings={settings}
+        onSaved={setSettings}
+        onState={saveOnboarding}
+        onExpired={onExpired}
+        onLogout={logout}
+        busy={busy}
+        run={run}
+      />
+    );
+  }
+  if (!ready) {
+    return (
+      <FirstRunLayout>
+        {error && (
+          <Alert variant="destructive" role="alert" className="mb-6">
+            {error}
+          </Alert>
+        )}
+        {status && (!status.authenticated || status.recoveryAuthorized) && (
+          <Account
+            key={`${String(status.setupRequired)}-${String(status.setupAuthorized)}-${String(status.recoveryAuthorized)}`}
+            status={status}
+            busy={busy}
+            run={run}
+            onLogin={refresh}
+          />
+        )}
+        {(!status || (status.authenticated && !status.recoveryAuthorized)) && (
+          <>
+            {error !== "" && (
+              <Button
+                onClick={() => {
+                  setError("");
+                  void load();
+                }}
+              >
+                Retry loading Flora
+              </Button>
+            )}
+            {error === "" && <LoadingStatus />}
+          </>
+        )}
+      </FirstRunLayout>
+    );
+  }
+
+  const Layout = SidebarProvider;
+  const newChat = path.startsWith("chats/new");
+  const conversation = path.startsWith("chats/") && !newChat;
+  const pullsPage = path === "pulls";
+  const chatsPage = path.split("?")[0] === "chats";
+  const mcpPage = path.startsWith("mcps");
+  const automationsPage = path === "automations";
+  const connectionsPage = path === "connections" || path === "connections/github";
+  const modelsPage = path === "models";
+  const automationEditor = path.startsWith("automations/");
   let contentLayout = "mx-auto w-full max-w-6xl p-4 sm:p-8";
   if (mcpPage || pullsPage || chatsPage || automationsPage) {
     contentLayout = "flex min-h-0 flex-1 flex-col";
@@ -169,47 +242,30 @@ function App() {
     connectionsPage
       ? "h-dvh min-h-0 min-w-0 overflow-hidden md:h-[calc(100dvh-1rem)]"
       : "min-w-0";
-  const Content = ready ? SidebarInset : "main";
+  const Content = SidebarInset;
 
   const layout = (
-    <Layout className={ready ? "min-h-svh" : "mx-auto min-h-svh max-w-4xl px-6 py-10 sm:px-10"}>
-      {ready && <Toaster id="chat-organization" position="bottom-right" closeButton />}
-      {ready ? (
-        <Sidebar path={path} chats={notifications.chats} onExpired={onExpired}>
-          <WorkspaceMenu
-            sound={settings.preferences.sound}
-            audio={notifications.audio}
-            busy={busy}
-            onLogout={logout}
-          />
-        </Sidebar>
-      ) : (
-        <header className="mb-14">
-          <a
-            href="#chats/new"
-            aria-label="Flora home"
-            className="inline-flex rounded-md focus-visible:outline-2 focus-visible:outline-ring"
-          >
-            <Wordmark />
-          </a>
-        </header>
-      )}
-      <Content id="main-content" tabIndex={-1} className={ready ? frameLayout : undefined}>
-        {ready &&
-          !mcpPage &&
-          !newChat &&
-          !conversation &&
-          !pullsPage &&
-          !chatsPage &&
-          !automationsPage && (
-            <header className="florets-topbar flex shrink-0 items-center gap-2 border-b px-3">
-              <span className="sidebar-toggle-space" aria-hidden="true" />
-              {path.startsWith("automations") && (
-                <div ref={setAutomationTopbar} className="flex min-w-0 flex-1 items-center gap-2" />
-              )}
-            </header>
-          )}
-        <div className={ready ? contentLayout : undefined}>
+    <Layout className="min-h-svh">
+      <Toaster id="chat-organization" position="bottom-right" closeButton />
+      <Sidebar path={path} chats={notifications.chats} onExpired={onExpired}>
+        <WorkspaceMenu
+          sound={settings.preferences.sound}
+          audio={notifications.audio}
+          busy={busy}
+          onLogout={logout}
+          setupPath={`onboarding/${onboarding?.step ?? "model"}`}
+        />
+      </Sidebar>
+      <Content id="main-content" tabIndex={-1} className={frameLayout}>
+        {!mcpPage && !newChat && !conversation && !pullsPage && !chatsPage && !automationsPage && (
+          <header className="florets-topbar flex shrink-0 items-center gap-2 border-b px-3">
+            <span className="sidebar-toggle-space" aria-hidden="true" />
+            {path.startsWith("automations") && (
+              <div ref={setAutomationTopbar} className="flex min-w-0 flex-1 items-center gap-2" />
+            )}
+          </header>
+        )}
+        <div className={contentLayout}>
           {error !== "" && (
             <Alert variant="destructive" role="alert" className="mb-6">
               {error}
@@ -220,39 +276,12 @@ function App() {
               {notice}
             </Alert>
           )}
-          {ready && (
-            <>
-              {notifications.error !== "" && (
-                <Alert role="status" className="mb-6">
-                  {notifications.error}
-                </Alert>
-              )}
-              <CompletionToasts toasts={notifications.toasts} dismiss={notifications.dismiss} />
-            </>
+          {notifications.error !== "" && (
+            <Alert role="status" className="mb-6">
+              {notifications.error}
+            </Alert>
           )}
-          {(status === undefined || (status.authenticated && settings === undefined)) &&
-            (error === "" ? (
-              <LoadingStatus />
-            ) : (
-              <Button
-                type="button"
-                onClick={() => {
-                  setError("");
-                  void load();
-                }}
-              >
-                Retry loading Flora
-              </Button>
-            ))}
-          {status && (!status.authenticated || status.recoveryAuthorized) && (
-            <Account
-              key={`${String(status.setupRequired)}-${String(status.setupAuthorized)}-${String(status.recoveryAuthorized)}`}
-              status={status}
-              busy={busy}
-              run={run}
-              onLogin={refresh}
-            />
-          )}
+          <CompletionToasts toasts={notifications.toasts} dismiss={notifications.dismiss} />
           {mcpPage && <MCPs path={path} onExpired={onExpired} />}
           {connectionsPage && (
             <ConnectionsPage path={path} onSaved={setSettings} onExpired={onExpired} />
@@ -260,18 +289,17 @@ function App() {
           {modelsPage && (
             <ModelsPage settings={settings} onSaved={setSettings} onExpired={onExpired} />
           )}
-          {ready && path === "settings" && (
+          {path === "settings" && (
             <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
           )}
-          {ready && path.startsWith("automations") && (
+          {path.startsWith("automations") && (
             <Automations key={path} path={path} onExpired={onExpired} topbar={automationTopbar} />
           )}
-          {ready && path === "usage" && <UsagePage onExpired={onExpired} />}
+          {path === "usage" && <UsagePage onExpired={onExpired} />}
           {pullsPage && (
             <PullRequests chats={notifications.chats} disconnected={notifications.error !== ""} />
           )}
-          {ready &&
-            !path.startsWith("mcps") &&
+          {!path.startsWith("mcps") &&
             !path.startsWith("automations") &&
             path !== "models" &&
             !connectionsPage &&

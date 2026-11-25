@@ -28,10 +28,14 @@ import { errorMessage, isExpired, request } from "./request";
 import { settingsSchema, type Settings } from "./settings-schemas";
 
 export function ModelsPage({
+  embedded = false,
+  active = true,
   settings,
   onSaved,
   onExpired,
 }: {
+  embedded?: boolean;
+  active?: boolean;
   settings: Settings;
   onSaved: (settings: Settings) => void;
   onExpired: () => void;
@@ -39,14 +43,15 @@ export function ModelsPage({
   const heading = useRef<HTMLHeadingElement>(null);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
+  if (!active && open) setOpen(false);
   const { options, loading, error, retry } = useModelDiscovery("models");
   const models = options?.models ?? [];
   const current = models.find(
     (model) => model.provider === settings.provider && model.id === settings.model,
   );
   useEffect(() => {
-    heading.current?.focus();
-  }, []);
+    if (!embedded) heading.current?.focus();
+  }, [embedded]);
   async function save(body: object) {
     setBusy(true);
     try {
@@ -73,18 +78,21 @@ export function ModelsPage({
   }
   return (
     <section
-      aria-labelledby="models-heading"
-      className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8 sm:py-10"
+      aria-labelledby={embedded ? undefined : "models-heading"}
+      aria-label={embedded ? "Models" : undefined}
+      className={embedded ? "" : "mx-auto w-full max-w-5xl px-4 py-8 sm:px-8 sm:py-10"}
     >
-      <Heading
-        level={1}
-        id="models-heading"
-        ref={heading}
-        tabIndex={-1}
-        className="mx-px mb-10 px-4"
-      >
-        Models
-      </Heading>
+      {!embedded && (
+        <Heading
+          level={1}
+          id="models-heading"
+          ref={heading}
+          tabIndex={-1}
+          className="mx-px mb-10 px-4"
+        >
+          Models
+        </Heading>
+      )}
       <SectionStack>
         <Section aria-labelledby="default-model-heading">
           <SectionHeader inset>
@@ -145,6 +153,7 @@ export function ModelsPage({
           </SettingsGroup>
         </Section>
         <ModelConnections
+          active={active}
           settings={settings}
           models={models}
           loading={loading}

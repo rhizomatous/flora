@@ -8,7 +8,9 @@ for (const first of ["GitHub", "model"] as const) {
     await page.goto(`${backend.url}/#setup/fixture-installer-setup-secret-000000000000`);
     await page.getByLabel("Password",{exact:true}).fill("browser test password");
     await page.getByRole("button",{name:"Create administrator",exact:true}).click();
-    await expect(page.getByRole("heading",{name:"Connect your first project",exact:true})).toBeVisible();
+    await expect(page.getByRole("heading",{name:"Connect a model",exact:true})).toBeVisible();
+    await page.getByRole("button",{name:"Leave setup",exact:true}).click();
+    await expect(page).toHaveURL(/#chats\/new/);
     await page.route("https://github.com/**",async route => {
       const url=new URL(route.request().url());
       const state=url.searchParams.get("state");

@@ -22,7 +22,13 @@ import { text, texts } from "./ui";
 
 const blankRepository: Repository = { name: "", url: "", baseBranch: "", role: "core" };
 
-function RepositoryFields({ repositories }: { repositories: Repository[] }) {
+function RepositoryFields({
+  repositories,
+  compact = false,
+}: {
+  repositories: Repository[];
+  compact?: boolean;
+}) {
   const [rows, setRows] = useState(() => repositories.map((repo, key) => ({ repo, key })));
   const nextKey = useRef(rows.length);
   const [available, setAvailable] = useState<GitHubRepository[]>([]);
@@ -78,11 +84,13 @@ function RepositoryFields({ repositories }: { repositories: Repository[] }) {
   }
   return (
     <div ref={container} className="space-y-5">
-      <Text tone="muted">
-        Use owner/repository or an HTTPS GitHub URL. All repositories must be accessible to the
-        GitHub connection. Leave a base branch blank to use its default. Core repositories download
-        before setup; extra repositories are fetched on demand.
-      </Text>
+      {!compact && (
+        <Text tone="muted">
+          Use owner/repository or an HTTPS GitHub URL. All repositories must be accessible to the
+          GitHub connection. Leave a base branch blank to use its default. Core repositories
+          download before setup; extra repositories are fetched on demand.
+        </Text>
+      )}
       {discoveryError && (
         <Alert variant="destructive">
           {discoveryError}
@@ -239,7 +247,17 @@ function readProject(fields: FormData) {
 }
 
 // The parent keys this component by path, so state starts empty for each route.
-export function Projects({ path, onExpired }: { path: string; onExpired: () => void }) {
+export function Projects({
+  path,
+  onExpired,
+  embedded = false,
+  onCreated,
+}: {
+  path: string;
+  onExpired: () => void;
+  embedded?: boolean;
+  onCreated?: (project: Project) => Promise<void>;
+}) {
   const [list, setList] = useState<Project[]>();
   const [project, setProject] = useState<Project>();
   const [error, setError] = useState("");
@@ -252,7 +270,7 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
   const expire = useEffectEvent(onExpired);
 
   useEffect(() => {
-    heading.current?.focus();
+    if (!embedded) heading.current?.focus();
     if (creating) return;
     let active = true;
     const load = async () => {
@@ -274,7 +292,7 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
     return () => {
       active = false;
     };
-  }, [id, creating]);
+  }, [id, creating, embedded]);
 
   async function save(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -290,7 +308,8 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
       );
       setProject(saved);
       setRevision((value) => value + 1);
-      if (creating) window.location.hash = `projects/${saved.id}`;
+      if (creating && onCreated) await onCreated(saved);
+      else if (creating) window.location.hash = `projects/${saved.id}`;
       else setNotice("Project saved. Existing chats keep their original settings.");
     } catch (e) {
       setError(errorMessage(e, "Could not save project. Try again."));
@@ -307,27 +326,32 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
   if (busy) submitLabel = "Validating…";
 
   return (
-    <section aria-labelledby="projects-heading">
-      <div className="flex items-center justify-between gap-4">
-        <Heading
-          level={1}
-          id="projects-heading"
-          ref={heading}
-          tabIndex={-1}
-          className="min-w-0 break-words"
-        >
-          {title}
-        </Heading>
-        {id === "" ? (
-          <ButtonLink href="#projects/new" className="shrink-0">
-            Connect project
-          </ButtonLink>
-        ) : (
-          <Link href="#projects" className="shrink-0 text-sm">
-            All projects
-          </Link>
-        )}
-      </div>
+    <section
+      aria-labelledby={embedded ? undefined : "projects-heading"}
+      aria-label={embedded ? "Project" : undefined}
+    >
+      {!embedded && (
+        <div className="flex items-center justify-between gap-4">
+          <Heading
+            level={1}
+            id="projects-heading"
+            ref={heading}
+            tabIndex={-1}
+            className="min-w-0 break-words"
+          >
+            {title}
+          </Heading>
+          {id === "" ? (
+            <ButtonLink href="#projects/new" className="shrink-0">
+              Connect project
+            </ButtonLink>
+          ) : (
+            <Link href="#projects" className="shrink-0 text-sm">
+              All projects
+            </Link>
+          )}
+        </div>
+      )}
       {id === "" && (
         <Text tone="muted" className="mt-3">
           Manage the GitHub repositories and setup command used by new chats in each project.
@@ -410,6 +434,7 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
               />
             </FieldLabel>
             <RepositoryFields
+              compact={embedded}
               repositories={project?.configuration.repositories ?? [blankRepository]}
             />
             <FieldLabel className="w-full flex-col items-start">
@@ -419,12 +444,14 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
                 className="mt-2 min-h-28 font-mono"
                 defaultValue={project?.configuration.setupCommand}
                 maxLength={8192}
-                aria-describedby="setup-help"
+                aria-describedby={embedded ? undefined : "setup-help"}
               />
             </FieldLabel>
-            <Text tone="muted" id="setup-help">
-              Runs inside the chat container before the agent starts.
-            </Text>
+            {!embedded && (
+              <Text tone="muted" id="setup-help">
+                Runs inside the chat container before the agent starts.
+              </Text>
+            )}
           </FieldSet>
           <Button type="submit" disabled={busy}>
             {submitLabel}

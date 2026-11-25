@@ -23,9 +23,9 @@ test("installer setup, interrupted account creation, and logout", async ({ page,
   await expect(page.getByRole("heading", { name: "Create administrator" })).toBeVisible();
   await page.getByLabel("Password", { exact: true }).fill("browser test password");
   await page.getByRole("button", { name: "Create administrator", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Connect your first project", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Connect a model", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Leave setup", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Connect your first project", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Start chat", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await openWorkspaceMenu(page);

@@ -20,7 +20,9 @@ test("passkey setup, sign-in, management, replay rejection and host recovery", a
   await expect(page).not.toHaveURL(/fixture-installer/);
   await page.getByLabel("Passkey name", { exact: true }).fill("My phone");
   await page.getByRole("button", { name: "Create administrator with passkey", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Connect your first project", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Connect a model", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Leave setup", exact: true }).click();
+  await expect(page).toHaveURL(/#chats\/new/);
   await openSettings(page);
   await expect(page.getByLabel("Name for My phone", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Remove My phone", exact: true })).toBeDisabled();
@@ -87,6 +89,9 @@ test("password administrators can add a passkey and cancelled prompts keep passw
   await page.goto(`${backend.url}/#setup/fixture-installer-setup-secret-000000000000`);
   await page.getByLabel("Password", { exact: true }).fill("existing administrator password");
   await page.getByRole("button", { name: "Create administrator", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Connect a model", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Leave setup", exact: true }).click();
+  await expect(page).toHaveURL(/#chats\/new/);
   await openSettings(page);
   await page.getByLabel("Passkey name", { exact: true }).fill("Desktop");
   await page.getByRole("button", { name: "Add passkey", exact: true }).click();
@@ -121,6 +126,9 @@ test("long passkey names fit wide and narrow settings with keyboard focus", asyn
   const name = "Phone".repeat(20);
   await page.getByLabel("Passkey name", { exact: true }).fill(name);
   await page.getByRole("button", { name: "Create administrator with passkey", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Connect a model", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Leave setup", exact: true }).click();
+  await expect(page).toHaveURL(/#chats\/new/);
   await openSettings(page);
   await expect(page.getByLabel(`Name for ${name}`, { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Add passkey", exact: true })).toBeEnabled();

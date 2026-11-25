@@ -40,7 +40,11 @@ func (a *api) githubRoutes(mux *http.ServeMux) {
 		}
 		query.Set("github_callback", "1")
 		w.Header().Set("Cache-Control", "no-store")
-		http.Redirect(w, r, "/?"+query.Encode()+"#connections/github", http.StatusSeeOther)
+		destination := "connections/github"
+		if progress, err := a.auth.Store.Onboarding(r.Context()); err == nil && progress.Started && !progress.Paused {
+			destination = "onboarding/github"
+		}
+		http.Redirect(w, r, "/?"+query.Encode()+"#"+destination, http.StatusSeeOther)
 	})
 	mux.HandleFunc("GET /api/github/connection", func(w http.ResponseWriter, r *http.Request) {
 		view, err := connection.View(r.Context())
