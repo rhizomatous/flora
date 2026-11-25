@@ -132,7 +132,7 @@ The private CA, signing key, network identity and setup link are persisted in
 `data-dir/deployment` with private permissions. The online signer renews short-lived
 broker leaves under the same CA. Agents receive public CA trust and scoped chat
 capabilities, never CA/broker private keys, the administrator session, upstream
-GitHub token, database or Docker socket. This network is not an egress sandbox.
+GitHub credentials, database or Docker socket. This network is not an egress sandbox.
 Missing saved networks, changed CA trust, or existing application data without a
 managed identity fail clearly. Restore the saved state rather than deleting it.
 
@@ -159,13 +159,20 @@ work when Flora is stopped; in that case, use its credential key options too.
 Links appear only in the controlling terminal. Replacement invalidates previous
 links and browser setup cookies. Keep setup links out of logs and service arguments.
 
-In Settings, connect GitHub. On the Models page, connect hosted providers with
+On the Connections page, connect GitHub. On the Models page, connect hosted providers with
 their API keys and choose the default model. Flora discovers models automatically. New chats can select a configured provider and model;
 existing chats keep their saved choice across default changes and restarts. Individual
-chat turns can select other models from that chat's provider and use their supported reasoning options. Use
-a fine-grained GitHub token limited to intended repositories, with Contents and Pull requests read/write and Metadata read. Add
-Workflows write only if needed. Chat capabilities can use all permissions of that
-token. Run Check dependencies, then create a project and chat. Metadata checks do
+chat turns can select other models from that chat's provider and use their supported reasoning options.
+
+Open **Connections → GitHub** and choose **Connect GitHub** to create an administrator-owned GitHub App, then install
+it on the desired account and select repositories. Flora generates the manifest
+from `-public-url` and saves the App credentials encrypted. The browser returns to
+that address; inbound GitHub webhooks are disabled and are not required. Resume
+interrupted setup from the GitHub connection page, or refresh and choose an installation after an
+organization owner approves access. Project setup can select an available repository.
+
+Chat capabilities use the App installation's GitHub permissions. Run Check dependencies,
+then create a project and chat. Metadata checks do
 not prove inference quota or repository writes. Startup performs no paid inference
 or GitHub writes. See [agent transport limits](agent/README.md).
 

@@ -98,10 +98,8 @@ test("settings persistence, credential rotation, and completion sounds", async (
       console.error(page.url(), errors, await page.locator("body").innerText());
       throw error;
     });
-  assert.equal(
-    await page.getByLabel("Fine-grained personal access token", { exact: true }).inputValue(),
-    "",
-  );
+  await expect(page.getByLabel("Fine-grained personal access token", {exact:true})).toHaveCount(0);
+  await expect(page.getByRole("link",{name:"Connections",exact:true})).toBeVisible();
   await page.getByRole("link", { name: "Models", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Models", exact: true })).toBeFocused();
   await page.getByRole("button", { name: "Update Anthropic key", exact: true }).click();

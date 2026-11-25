@@ -16,10 +16,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rhizomatous/flora/backend/internal/githubapp"
 	"github.com/rhizomatous/flora/backend/internal/storage"
 )
 
 type Broker struct {
+	connection  *githubapp.Service
 	store       *storage.Store
 	transport   http.RoundTripper
 	materialize func(context.Context, string, string) (string, error)
@@ -29,7 +31,7 @@ func New(store *storage.Store) *Broker {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 	transport.DisableCompression = true
-	return &Broker{store: store, transport: transport}
+	return &Broker{store: store, transport: transport, connection: githubapp.New(store)}
 }
 
 func (b *Broker) Revoke(ctx context.Context, chatID string) error {
@@ -117,14 +119,14 @@ func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// Read the saved token for each request so credential rotation takes effect
 	// without restarting containers or replacing their broker credentials.
-	credentials, err := b.store.Credentials(r.Context())
-	if err != nil || credentials.GitHubToken == "" {
-		http.Error(w, "GitHub credential unavailable; check installation settings", http.StatusServiceUnavailable)
+	upstreamToken, err := b.connection.Token(r.Context())
+	if err != nil || upstreamToken == "" {
+		http.Error(w, "GitHub connection unavailable; check the Connections page", http.StatusServiceUnavailable)
 		return
 	}
 	upstream, _ := url.Parse(origin)
 	proxy := &httputil.ReverseProxy{
-		Transport: &authenticatedTransport{base: b.transport, token: credentials.GitHubToken, origin: origin, git: git},
+		Transport: &authenticatedTransport{base: b.transport, token: upstreamToken, origin: origin, git: git},
 		Rewrite: func(p *httputil.ProxyRequest) {
 			p.SetURL(upstream)
 			p.Out.Host = upstream.Host
@@ -137,6 +139,9 @@ func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			p.Out.Header.Set("Accept-Encoding", "identity")
 		},
 		ModifyResponse: func(resp *http.Response) error {
+			if resp.StatusCode == http.StatusUnauthorized {
+				b.connection.Invalidate()
+			}
 			if encoding := resp.Header.Get("Content-Encoding"); encoding != "" && encoding != "identity" {
 				resp.Body.Close()
 				return errors.New("unexpected upstream content encoding")
@@ -151,7 +156,7 @@ func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				resp.Body.Close()
 				return errors.New("upstream redirect denied")
 			}
-			secrets := credentialForms(credentials.GitHubToken)
+			secrets := credentialForms(upstreamToken)
 			for key, values := range resp.Header {
 				for i := range values {
 					values[i] = redact(values[i], secrets)

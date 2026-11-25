@@ -8,6 +8,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  Link2Icon,
   GearIcon,
   SpeakerLoudIcon,
   ExitIcon,
@@ -70,6 +71,18 @@ export function WorkspaceMenu({
           nativeButton={false}
           onClick={() => {
             navigated.current = window.location.hash !== "#settings";
+          }}
+        />
+        <DropdownMenuItem
+          render={
+            <a href="#connections">
+              <Link2Icon aria-hidden="true" />
+              Connections
+            </a>
+          }
+          nativeButton={false}
+          onClick={() => {
+            navigated.current = window.location.hash !== "#connections";
           }}
         />
         <DropdownMenuItem

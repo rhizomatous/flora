@@ -17,6 +17,7 @@ import { statusSchema, authenticatedSchema, type Status } from "./auth-schemas";
 import { Automations } from "./automations";
 import { FolderProvider } from "./chat-folders";
 import { Chats } from "./chats";
+import { ConnectionsPage } from "./connections";
 import { Installation } from "./installation";
 import { MCPs } from "./mcps";
 import { ModelsPage } from "./models-page";
@@ -146,12 +147,13 @@ function App() {
   const chatsPage = ready && path.split("?")[0] === "chats";
   const mcpPage = ready && path.startsWith("mcps");
   const automationsPage = ready && path === "automations";
+  const connectionsPage = ready && (path === "connections" || path === "connections/github");
   const modelsPage = ready && path === "models";
   const automationEditor = ready && path.startsWith("automations/");
   let contentLayout = "mx-auto w-full max-w-6xl p-4 sm:p-8";
   if (mcpPage || pullsPage || chatsPage || automationsPage) {
     contentLayout = "flex min-h-0 flex-1 flex-col";
-  } else if (modelsPage) {
+  } else if (modelsPage || connectionsPage) {
     contentLayout = "min-h-0 flex-1 overflow-y-auto";
   } else if (automationEditor) {
     contentLayout = "min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-8";
@@ -163,7 +165,8 @@ function App() {
     chatsPage ||
     automationsPage ||
     automationEditor ||
-    modelsPage
+    modelsPage ||
+    connectionsPage
       ? "h-dvh min-h-0 min-w-0 overflow-hidden md:h-[calc(100dvh-1rem)]"
       : "min-w-0";
   const Content = ready ? SidebarInset : "main";
@@ -251,6 +254,9 @@ function App() {
             />
           )}
           {mcpPage && <MCPs path={path} onExpired={onExpired} />}
+          {connectionsPage && (
+            <ConnectionsPage path={path} onSaved={setSettings} onExpired={onExpired} />
+          )}
           {modelsPage && (
             <ModelsPage settings={settings} onSaved={setSettings} onExpired={onExpired} />
           )}
@@ -268,6 +274,7 @@ function App() {
             !path.startsWith("mcps") &&
             !path.startsWith("automations") &&
             path !== "models" &&
+            !connectionsPage &&
             path !== "settings" &&
             path !== "pulls" &&
             path !== "usage" &&

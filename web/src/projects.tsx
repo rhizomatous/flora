@@ -15,6 +15,7 @@ import {
 } from "@flora/florets";
 
 import { EnvironmentEditor } from "./environment";
+import { repositoryPageSchema, type GitHubRepository } from "./github-schemas";
 import { projectSchema, type Project, type Repository } from "./project-schemas";
 import { errorMessage, isExpired, request } from "./request";
 import { text, texts } from "./ui";
@@ -24,6 +25,29 @@ const blankRepository: Repository = { name: "", url: "", baseBranch: "", role: "
 function RepositoryFields({ repositories }: { repositories: Repository[] }) {
   const [rows, setRows] = useState(() => repositories.map((repo, key) => ({ repo, key })));
   const nextKey = useRef(rows.length);
+  const [available, setAvailable] = useState<GitHubRepository[]>([]);
+  const [nextPage, setNextPage] = useState(1);
+  const [discoveryError, setDiscoveryError] = useState("");
+  const [loading, setLoading] = useState(true);
+  async function loadRepositories(page: number) {
+    try {
+      const result = await request(repositoryPageSchema, `github/repositories?page=${page}`);
+      setAvailable((current) =>
+        page === 1 ? result.repositories : [...current, ...result.repositories],
+      );
+      setNextPage(result.nextPage);
+      setDiscoveryError("");
+    } catch (e) {
+      setDiscoveryError(errorMessage(e, "Could not load repositories."));
+    } finally {
+      setLoading(false);
+    }
+  }
+  const discover = useEffectEvent(() => loadRepositories(1));
+  useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- Repository state updates after the discovery request resolves.
+    void discover();
+  }, []);
   const container = useRef<HTMLDivElement>(null);
   const addButton = useRef<HTMLButtonElement>(null);
   const pendingFocus = useRef<number | "add" | undefined>(undefined);
@@ -56,9 +80,38 @@ function RepositoryFields({ repositories }: { repositories: Repository[] }) {
     <div ref={container} className="space-y-5">
       <Text tone="muted">
         Use owner/repository or an HTTPS GitHub URL. All repositories must be accessible to the
-        saved GitHub token. Leave a base branch blank to use its default. Core repositories download
+        GitHub connection. Leave a base branch blank to use its default. Core repositories download
         before setup; extra repositories are fetched on demand.
       </Text>
+      {discoveryError && (
+        <Alert variant="destructive">
+          {discoveryError}
+          <Button
+            type="button"
+            variant="link"
+            disabled={loading}
+            onClick={() => {
+              setLoading(true);
+              void loadRepositories(nextPage || 1);
+            }}
+          >
+            Retry repository discovery
+          </Button>
+        </Alert>
+      )}
+      {nextPage > 0 && (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={loading}
+          onClick={() => {
+            setLoading(true);
+            void loadRepositories(nextPage);
+          }}
+        >
+          {loading ? "Loading repositories…" : "Load more repositories"}
+        </Button>
+      )}
       {rows.map(({ repo, key }, index) => (
         <FieldSet
           key={key}
@@ -66,12 +119,50 @@ function RepositoryFields({ repositories }: { repositories: Repository[] }) {
           className="space-y-4 rounded-md border border-border p-4"
         >
           <legend className="px-1 text-sm font-medium">Repository {index + 1}</legend>
+          {available.length > 0 && (
+            <FieldLabel className="w-full flex-col items-start">
+              Choose a repository
+              <NativeSelect
+                aria-label="Choose a repository"
+                className="mt-2 max-w-full"
+                value={
+                  available.some((r) => r.html_url === repo.url || `${r.html_url}.git` === repo.url)
+                    ? repo.url.replace(/\.git$/, "")
+                    : ""
+                }
+                onChange={(event) => {
+                  const selected = event.currentTarget.value;
+                  if (!selected) return;
+                  setRows((current) =>
+                    current.map((row) =>
+                      row.key === key ? { ...row, repo: { ...row.repo, url: selected } } : row,
+                    ),
+                  );
+                }}
+              >
+                <option value="">Select repository</option>
+                {available.map((repository) => (
+                  <option key={repository.full_name} value={repository.html_url}>
+                    {repository.full_name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </FieldLabel>
+          )}
           <FieldLabel className="w-full flex-col items-start">
             GitHub repository
             <Input
               name="repository"
               className="mt-2"
-              defaultValue={repo.url}
+              value={repo.url}
+              onChange={(event) => {
+                const { value } = event.currentTarget;
+                setRows((current) =>
+                  current.map((row) =>
+                    row.key === key ? { ...row, repo: { ...row.repo, url: value } } : row,
+                  ),
+                );
+              }}
               placeholder="owner/repository"
               required
               maxLength={300}
