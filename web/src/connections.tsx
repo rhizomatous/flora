@@ -234,7 +234,9 @@ export function ConnectionsPage({
   }
   const connected = connection?.active === "app" && connection.state === "connected";
   const messages: Record<string, string> = {
-    disconnected: "Create your GitHub App, then install it and choose repositories on GitHub",
+    disconnected: embedded
+      ? "Choose which repositories Flora can access on GitHub"
+      : "Create your GitHub App, then install it and choose repositories on GitHub",
     created: "Your App is ready. Install it on GitHub and choose repositories",
     pending: "An organization owner needs to approve the installation. Refresh after approval",
     revoked: "Repository access was revoked. Reinstall the App to reconnect",
@@ -248,45 +250,48 @@ export function ConnectionsPage({
   );
   return (
     <section
-      aria-labelledby="connections-heading"
+      aria-labelledby={embedded ? undefined : "connections-heading"}
+      aria-label={embedded ? "GitHub connection" : undefined}
       className={embedded ? "" : "mx-auto w-full max-w-5xl px-4 py-8 sm:px-8 sm:py-10"}
     >
-      <div className="mb-10 px-4">
-        {detail && !embedded && (
-          <Link
-            href="#connections"
-            className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground"
-          >
-            <ChevronLeftIcon className="size-4" aria-hidden="true" />
-            Connections
-          </Link>
-        )}
-        <div className="flex items-center gap-4">
-          {detail && <GitHubMark large />}
-          <div className="min-w-0 flex-1">
-            <Heading level={1} id="connections-heading" ref={heading} tabIndex={-1}>
-              {detail ? "GitHub" : "Connections"}
-            </Heading>
-            <Text tone="muted" className="mt-2">
-              {detail ? "Repository and pull request access" : "Connected accounts and services"}
-            </Text>
-          </div>
+      {!embedded && (
+        <div className="mb-10 px-4">
           {detail && (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Refresh GitHub connection"
-              title="Refresh GitHub connection"
-              disabled={busy || repositoryBusy}
-              onClick={() => {
-                void action(load);
-              }}
+            <Link
+              href="#connections"
+              className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground"
             >
-              <RefreshCwIcon aria-hidden="true" className={busy ? "animate-spin" : ""} />
-            </Button>
+              <ChevronLeftIcon className="size-4" aria-hidden="true" />
+              Connections
+            </Link>
           )}
+          <div className="flex items-center gap-4">
+            {detail && <GitHubMark large />}
+            <div className="min-w-0 flex-1">
+              <Heading level={1} id="connections-heading" ref={heading} tabIndex={-1}>
+                {detail ? "GitHub" : "Connections"}
+              </Heading>
+              <Text tone="muted" className="mt-2">
+                {detail ? "Repository and pull request access" : "Connected accounts and services"}
+              </Text>
+            </div>
+            {detail && (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Refresh GitHub connection"
+                title="Refresh GitHub connection"
+                disabled={busy || repositoryBusy}
+                onClick={() => {
+                  void action(load);
+                }}
+              >
+                <RefreshCwIcon aria-hidden="true" className={busy ? "animate-spin" : ""} />
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
       {error !== "" && (
         <Alert
           variant="destructive"
@@ -352,13 +357,30 @@ export function ConnectionsPage({
           {!connection && error === "" && <LoadingStatus>Loading GitHub connection…</LoadingStatus>}
           {connection && (
             <Section aria-labelledby="github-access-heading">
-              <SectionHeader inset>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <Heading level={2} id="github-access-heading">
-                    Repository access
-                  </Heading>
-                  <ConnectionStatus connection={connection} />
-                </div>
+              <SectionHeader inset={!embedded}>
+                {(!embedded || connection.state !== "disconnected") && (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <Heading level={2} id="github-access-heading">
+                      Repository access
+                    </Heading>
+                    <div className="flex items-center gap-2">
+                      <ConnectionStatus connection={connection} />
+                      {embedded && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Refresh GitHub connection"
+                          disabled={busy || repositoryBusy}
+                          onClick={() => {
+                            void action(changed);
+                          }}
+                        >
+                          <RefreshCwIcon aria-hidden="true" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {!connected && (
                   <Text tone="muted">
                     {connection.state === "created" && connection.installations.length > 0
@@ -367,7 +389,13 @@ export function ConnectionsPage({
                   </Text>
                 )}
               </SectionHeader>
-              <SettingsGroup>
+              <SettingsGroup
+                className={
+                  embedded && connection.installations.length === 0
+                    ? "border-0 bg-transparent"
+                    : undefined
+                }
+              >
                 {connection.installations.map((installation) => {
                   const selected =
                     connection.active === "app" && installation.id === connection.installationID;
@@ -462,31 +490,33 @@ export function ConnectionsPage({
                     </div>
                   );
                 })}
-                <div className="p-4">
-                  <Button
-                    variant={connection.installations.length > 0 ? "ghost" : "default"}
-                    disabled={busy}
-                    onClick={connect}
-                  >
-                    <GitHubLogoIcon aria-hidden="true" />
-                    {connectLabel}
-                    <ChevronRightIcon aria-hidden="true" />
-                  </Button>
-                </div>
+                {(!embedded || !connected) && (
+                  <div className={embedded && connection.installations.length === 0 ? "" : "p-4"}>
+                    <Button
+                      className={
+                        embedded && connection.installations.length === 0 ? "w-full" : undefined
+                      }
+                      variant={connection.installations.length > 0 ? "ghost" : "default"}
+                      disabled={busy}
+                      onClick={connect}
+                    >
+                      <GitHubLogoIcon aria-hidden="true" />
+                      {connectLabel}
+                      <ChevronRightIcon aria-hidden="true" />
+                    </Button>
+                  </div>
+                )}
               </SettingsGroup>
             </Section>
           )}
-          {connected && (
+          {connected && !embedded && (
             <Section aria-labelledby="github-repositories-heading">
               <SectionHeader inset>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <Heading level={2} id="github-repositories-heading">
                     Repositories
                   </Heading>
-                  <ButtonLink
-                    variant="outline"
-                    href={embedded ? "#onboarding/project" : "#projects/new"}
-                  >
+                  <ButtonLink variant="outline" href="#projects/new">
                     Connect project
                     <ChevronRightIcon aria-hidden="true" />
                   </ButtonLink>

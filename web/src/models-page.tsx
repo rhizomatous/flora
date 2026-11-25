@@ -76,6 +76,17 @@ export function ModelsPage({
       });
     }
   }
+  const connections = (
+    <ModelConnections
+      active={active}
+      compact={embedded}
+      settings={settings}
+      models={models}
+      loading={loading}
+      busy={busy}
+      onSave={save}
+    />
+  );
   return (
     <section
       aria-labelledby={embedded ? undefined : "models-heading"}
@@ -93,73 +104,71 @@ export function ModelsPage({
           Models
         </Heading>
       )}
-      <SectionStack>
-        <Section aria-labelledby="default-model-heading">
-          <SectionHeader inset>
-            <Heading level={2} id="default-model-heading">
-              Default model
-            </Heading>
-          </SectionHeader>
-          <SettingsGroup>
-            <SettingsRow
-              label="New chats"
-              htmlFor="default-model"
-              description="Used when no model is selected"
-              descriptionId="default-model-help"
-            >
-              <DropdownMenu
-                open={open}
-                onOpenChange={setOpen}
-                search={{
-                  label: "Search default models",
-                  placeholder: "Search models",
-                  filter: matchModel,
-                }}
+      <SectionStack className={embedded ? "gap-6!" : undefined}>
+        {embedded && connections}
+        {(!embedded || settings.providerConfigured) && (
+          <Section aria-labelledby={embedded ? undefined : "default-model-heading"}>
+            {!embedded && (
+              <SectionHeader inset>
+                <Heading level={2} id="default-model-heading">
+                  Default model
+                </Heading>
+              </SectionHeader>
+            )}
+            <SettingsGroup>
+              <SettingsRow
+                label={embedded ? "Default model" : "New chats"}
+                htmlFor="default-model"
+                description={embedded ? undefined : "Used when no model is selected"}
+                descriptionId="default-model-help"
               >
-                <DropdownMenuTrigger
-                  render={
-                    <DropdownButton
-                      id="default-model"
-                      focusableWhenDisabled
-                      aria-describedby="default-model-help"
-                      variant="outline"
-                      disabled={busy || models.length === 0}
-                      className="w-full max-w-72 justify-between"
-                    >
-                      <ModelIcon provider={settings.provider} model={settings.model} />
-                      <span className="min-w-0 flex-1 truncate">
-                        {current?.name ??
-                          (settings.model ? modelDisplayName(settings.model) : "Choose a model")}
-                      </span>
-                    </DropdownButton>
-                  }
-                />
-                <DropdownMenuContent align="end" className="w-80! max-w-[calc(100vw-24px)]">
-                  <ModelPicker
-                    models={models}
-                    selected={
-                      settings.model
-                        ? { provider: settings.provider, model: settings.model, variant: "" }
-                        : undefined
+                <DropdownMenu
+                  open={open}
+                  onOpenChange={setOpen}
+                  search={{
+                    label: "Search default models",
+                    placeholder: "Search models",
+                    filter: matchModel,
+                  }}
+                >
+                  <DropdownMenuTrigger
+                    render={
+                      <DropdownButton
+                        id="default-model"
+                        focusableWhenDisabled
+                        aria-describedby={embedded ? undefined : "default-model-help"}
+                        variant="outline"
+                        disabled={busy || models.length === 0}
+                        className="w-full max-w-72 justify-between"
+                      >
+                        <ModelIcon provider={settings.provider} model={settings.model} />
+                        <span className="min-w-0 flex-1 truncate">
+                          {current?.name ??
+                            (settings.model ? modelDisplayName(settings.model) : "Choose a model")}
+                        </span>
+                      </DropdownButton>
                     }
-                    loading={loading}
-                    onSelect={(model) => {
-                      void setDefault(model);
-                    }}
                   />
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </SettingsRow>
-          </SettingsGroup>
-        </Section>
-        <ModelConnections
-          active={active}
-          settings={settings}
-          models={models}
-          loading={loading}
-          busy={busy}
-          onSave={save}
-        />
+                  <DropdownMenuContent align="end" className="w-80! max-w-[calc(100vw-24px)]">
+                    <ModelPicker
+                      models={models}
+                      selected={
+                        settings.model
+                          ? { provider: settings.provider, model: settings.model, variant: "" }
+                          : undefined
+                      }
+                      loading={loading}
+                      onSelect={(model) => {
+                        void setDefault(model);
+                      }}
+                    />
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </SettingsRow>
+            </SettingsGroup>
+          </Section>
+        )}
+        {!embedded && connections}
         {error !== "" && settings.providers.length > 0 && (
           <Alert role="status" className="flex flex-wrap items-center justify-between gap-3">
             <span>{error}</span>
@@ -168,15 +177,17 @@ export function ModelsPage({
             </Button>
           </Alert>
         )}
-        <ModelCatalog
-          models={models}
-          settings={settings}
-          loading={loading}
-          busy={busy}
-          onDefault={(model) => {
-            void setDefault(model);
-          }}
-        />
+        {!embedded && (
+          <ModelCatalog
+            models={models}
+            settings={settings}
+            loading={loading}
+            busy={busy}
+            onDefault={(model) => {
+              void setDefault(model);
+            }}
+          />
+        )}
       </SectionStack>
     </section>
   );

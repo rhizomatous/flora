@@ -17,3 +17,55 @@
     transparent 50%
   );
 }
+
+.first-run {
+  position: relative;
+  isolation: isolate;
+}
+
+.first-run-setup::before,
+.first-run-art::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--foreground) 15%, transparent) 1px,
+    transparent 1.5px
+  );
+  background-size: 8px 8px;
+  mask-image:
+    radial-gradient(ellipse at 0% 15%, #000 0%, transparent 55%),
+    radial-gradient(ellipse at 100% 90%, #000 0%, transparent 55%);
+}
+
+.first-run-setup::before {
+  position: fixed;
+  z-index: -1;
+}
+
+.first-run-account input,
+.first-run-account button[data-size="default"] {
+  min-height: 40px;
+}
+
+.first-run-art {
+  background-image: radial-gradient(
+    ellipse at 60% 45%,
+    color-mix(in srgb, var(--foreground) 5%, transparent),
+    transparent 65%
+  );
+}
+
+.first-run-art-orbit {
+  position: absolute;
+  width: 76%;
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 64px color-mix(in srgb, var(--border) 30%, transparent),
+    0 0 0 128px color-mix(in srgb, var(--border) 15%, transparent);
+  transform: rotate(-24deg) scaleY(0.8);
+}

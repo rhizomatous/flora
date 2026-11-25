@@ -7,6 +7,8 @@ import {
   CollapsibleTrigger,
   FieldLabel,
   Heading,
+  FlowerMark,
+  KeyRoundIcon,
   Input,
   Text,
 } from "@flora/florets";
@@ -34,7 +36,10 @@ export function Account({
   const recovery = status.recoveryAuthorized;
   if (status.setupRequired && !status.setupAuthorized) {
     return (
-      <section aria-labelledby="account-heading">
+      <section aria-labelledby="account-heading" className="first-run-account text-center">
+        <div className="mb-6 flex justify-center">
+          <FlowerMark className="text-5xl" />
+        </div>
         <Heading level={1} ref={heading} tabIndex={-1} id="account-heading">
           Open your setup link
         </Heading>
@@ -53,8 +58,11 @@ export function Account({
   }
   const passwordAvailable = enrolling || status.passwordAvailable;
   return (
-    <section aria-labelledby="account-heading" className="mx-auto max-w-sm">
-      <Heading level={1} ref={heading} tabIndex={-1} id="account-heading">
+    <section aria-labelledby="account-heading" className="first-run-account mx-auto max-w-sm">
+      <div className="mb-6 flex justify-center">
+        <FlowerMark className="text-5xl" />
+      </div>
+      <Heading level={1} ref={heading} tabIndex={-1} id="account-heading" className="text-center">
         {action}
       </Heading>
       {status.passkeysAvailable &&
@@ -88,6 +96,7 @@ export function Account({
         ) : (
           <Button
             className="mt-8 w-full"
+            variant="outline"
             disabled={busy}
             onClick={() => {
               void run(async () => {
@@ -96,6 +105,7 @@ export function Account({
               }, "Could not sign in with passkey. Try again.");
             }}
           >
+            <KeyRoundIcon aria-hidden="true" />
             Sign in with passkey
           </Button>
         ))}
@@ -109,7 +119,7 @@ export function Account({
       )}
       {passwordAvailable && (
         <form
-          className="mt-8 space-y-6"
+          className={`mt-8 space-y-5 ${status.passkeysAvailable ? "border-t border-border pt-6" : ""}`}
           onSubmit={(event) => {
             event.preventDefault();
             const form = event.currentTarget;
@@ -143,7 +153,7 @@ export function Account({
         </form>
       )}
       {!enrolling && (
-        <Collapsible className="mt-6">
+        <Collapsible className="mt-6 text-center">
           <CollapsibleTrigger render={<Button variant="link" className="p-0" />}>
             Recover account
           </CollapsibleTrigger>

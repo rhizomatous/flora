@@ -20,8 +20,12 @@ import { passkeysSchema, registerPasskey, signInWithPasskey, type Passkeys } fro
 import { request } from "./request";
 import { text } from "./ui";
 
-type Props = { busy: boolean; run: (task: () => Promise<void>, fallback: string) => Promise<void> };
-export function AccountSettings({ busy, run }: Props) {
+type Props = {
+  compact?: boolean;
+  busy: boolean;
+  run: (task: () => Promise<void>, fallback: string) => Promise<void>;
+};
+export function AccountSettings({ compact = false, busy, run }: Props) {
   const [data, setData] = useState<Passkeys>();
   const [failed, setFailed] = useState(false);
   async function load() {
@@ -63,14 +67,27 @@ export function AccountSettings({ busy, run }: Props) {
     );
   }
   if (!data) return <LoadingStatus>Loading passkeys…</LoadingStatus>;
+  if (compact && !data.available) {
+    return (
+      <SettingsGroup>
+        <SettingsRow label="Sign-in method" htmlFor="setup-sign-in-method">
+          <output id="setup-sign-in-method">
+            {data.passwordAvailable ? "Password" : "Passkey"}
+          </output>
+        </SettingsRow>
+      </SettingsGroup>
+    );
+  }
   return (
     <SectionStack>
       <Section>
         <SectionHeader inset>
           <Heading level={2}>Passkeys</Heading>
-          <Text tone="muted" className="break-all">
-            {data.origin}
-          </Text>
+          {!compact && (
+            <Text tone="muted" className="break-all">
+              {data.origin}
+            </Text>
+          )}
         </SectionHeader>
         {!data.recent && (
           <div className="mb-4 space-y-4">
@@ -220,16 +237,19 @@ export function AccountSettings({ busy, run }: Props) {
           </form>
         </div>
       </Section>
-      <Section>
-        <SectionHeader inset>
-          <Heading level={2}>Account recovery</Heading>
-          <Text tone="muted">
-            If you lose access or change Flora&apos;s address, run the installed Flora binary on the
-            host with <code>-recover-account</code> and the service&apos;s <code>-data-dir</code>{" "}
-            and <code>-public-url</code>. Open the recovery link to replace your sign-in methods.
-          </Text>
-        </SectionHeader>
-      </Section>
+      {!compact && (
+        <Section>
+          <SectionHeader inset>
+            <Heading level={2}>Account recovery</Heading>
+            <Text tone="muted">
+              If you lose access or change Flora&apos;s address, run the installed Flora binary on
+              the host with <code>-recover-account</code> and the service&apos;s{" "}
+              <code>-data-dir</code> and <code>-public-url</code>. Open the recovery link to replace
+              your sign-in methods.
+            </Text>
+          </SectionHeader>
+        </Section>
+      )}
     </SectionStack>
   );
 }

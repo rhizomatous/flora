@@ -3,6 +3,8 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import {
   Alert,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   Button,
   Heading,
   LoadingStatus,
@@ -21,14 +23,6 @@ import { projectSchema, type Project } from "./project-schemas";
 import { Projects } from "./projects";
 import { errorMessage, request } from "./request";
 import type { Settings } from "./settings-schemas";
-
-const progressLabels = {
-  account: "Account",
-  model: "Model",
-  github: "GitHub",
-  project: "Project",
-  finish: "Review",
-};
 
 const labels = {
   account: "Secure Flora",
@@ -70,6 +64,8 @@ export function Onboarding({
   const [projects, setProjects] = useState<Project[]>();
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
+  const [projectBusy, setProjectBusy] = useState(false);
+  const navigating = busy || projectBusy;
   const persistRoute = useEffectEvent(() => {
     if (state.step !== step || state.paused || !state.started) {
       void run(() => onState({ ...state, step, paused: false }), "Could not save setup progress.");
@@ -133,41 +129,46 @@ export function Onboarding({
     <FirstRunLayout
       actions={
         <>
-          <Button variant="ghost" disabled={busy} onClick={leave}>
+          <Button variant="ghost" disabled={navigating} onClick={leave}>
             Leave setup
           </Button>
-          <Button variant="ghost" disabled={busy} onClick={onLogout}>
+          <Button variant="ghost" disabled={navigating} onClick={onLogout}>
             Log out
           </Button>
         </>
       }
+      progress={
+        <nav aria-label="Setup progress" className="mt-5 flex justify-center">
+          <div className="flex items-center gap-0.5 rounded-full border border-border bg-surface-panel/80 p-1">
+            {setupSteps.map((item, position) => (
+              <Button
+                key={item}
+                aria-label={`${position + 1}. ${labels[item]}`}
+                variant="ghost"
+                size="icon-xs"
+                className="rounded-full"
+                aria-current={step === item ? "step" : undefined}
+                disabled={navigating}
+                onClick={() => {
+                  go(item);
+                }}
+              >
+                <span
+                  className={`size-1.5 rounded-full ${step === item ? "bg-foreground" : "bg-muted-foreground/40"}`}
+                />
+              </Button>
+            ))}
+          </div>
+        </nav>
+      }
     >
       <Toaster id="chat-organization" position="bottom-right" closeButton />
-      <nav aria-label="Setup progress" className="mb-8 grid grid-cols-5 gap-1">
-        {setupSteps.map((item, position) => (
-          <Button
-            key={item}
-            aria-label={`${position + 1}. ${labels[item]}`}
-            className="w-full px-1"
-            size="sm"
-            variant={step === item ? "secondary" : "ghost"}
-            aria-current={step === item ? "step" : undefined}
-            disabled={busy}
-            onClick={() => {
-              go(item);
-            }}
-          >
-            {position + 1}
-            <span className="hidden sm:inline">. {progressLabels[item]}</span>
-          </Button>
-        ))}
-      </nav>
       {actionError && (
         <Alert variant="destructive" role="alert" className="mb-6">
           {actionError}
         </Alert>
       )}
-      <Heading ref={heading} tabIndex={-1} level={1} className="mb-8">
+      <Heading ref={heading} tabIndex={-1} level={1} className="mb-6">
         {labels[step]}
       </Heading>
       {error && (
@@ -185,7 +186,7 @@ export function Onboarding({
       )}
       {visited.includes("account") && (
         <div hidden={step !== "account"}>
-          <AccountSettings busy={busy} run={run} />
+          <AccountSettings compact busy={busy} run={run} />
         </div>
       )}
       {visited.includes("model") && (
@@ -232,6 +233,7 @@ export function Onboarding({
           {projects && !projectComplete && settings.githubConfigured && (
             <Projects
               embedded
+              onBusyChange={setProjectBusy}
               path="projects/new"
               onExpired={onExpired}
               onCreated={async (project) => {
@@ -266,44 +268,56 @@ export function Onboarding({
           </SettingsRow>
         </SettingsGroup>
       )}
-      <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t pt-5">
+      <footer className="mt-8 flex flex-wrap items-center justify-between gap-3">
         <Button
           variant="ghost"
-          disabled={busy || index === 0}
+          className="-ml-1 px-1"
+          disabled={navigating || index === 0}
           onClick={() => {
             go(setupSteps[index - 1] ?? "account");
           }}
         >
+          <ChevronLeftIcon aria-hidden="true" />
           Back
         </Button>
         <div className="flex flex-wrap gap-2">
           {step !== "account" && step !== "finish" && !canContinue && (
             <Button
               variant="ghost"
-              disabled={busy}
+              className="px-1"
+              disabled={navigating}
               onClick={() => {
                 go(setupSteps[index + 1] ?? "finish");
               }}
             >
-              Set up later
+              Skip
             </Button>
           )}
-          <Button
-            disabled={busy || !canContinue}
-            onClick={() => {
-              if (step === "finish") leave();
-              else go(setupSteps[index + 1] ?? "finish");
-            }}
-          >
-            {step === "finish" ? "Open Flora" : "Continue"}
-          </Button>
+          {step === "project" && !projectComplete && settings.githubConfigured && projects && (
+            <Button type="submit" form="onboarding-project" disabled={navigating}>
+              {projectBusy ? "Connecting…" : "Connect project"}
+              <ChevronRightIcon aria-hidden="true" />
+            </Button>
+          )}
+          {canContinue && (
+            <Button
+              disabled={navigating}
+              onClick={() => {
+                if (step === "finish") leave();
+                else go(setupSteps[index + 1] ?? "finish");
+              }}
+            >
+              {step === "finish" ? "Open Flora" : "Continue"}
+              <ChevronRightIcon aria-hidden="true" />
+            </Button>
+          )}
         </div>
       </footer>
-      {!canContinue && (
+      {step === "finish" && (!modelComplete || !projectComplete) && (
         <Text tone="muted" className="mt-4">
-          {step === "model" && "Connect a model to start chats"}
-          {step === "github" && "Connect GitHub to access repositories"}
-          {step === "project" && "Connect a project to start chats"}
+          {!modelComplete && !projectComplete && "Connect a model and project to start chats"}
+          {!modelComplete && projectComplete && "Connect a model to start chats"}
+          {modelComplete && !projectComplete && "Connect a project to start chats"}
         </Text>
       )}
     </FirstRunLayout>

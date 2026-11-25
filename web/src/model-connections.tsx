@@ -115,6 +115,7 @@ function ConnectionDialog({
 
 export function ModelConnections({
   active = true,
+  compact = false,
   settings,
   models,
   loading,
@@ -122,6 +123,7 @@ export function ModelConnections({
   onSave,
 }: {
   active?: boolean;
+  compact?: boolean;
   settings: Settings;
   models: ModelOption[];
   loading: boolean;
@@ -137,6 +139,55 @@ export function ModelConnections({
   const remaining = hostedProviders.filter(
     (provider) => !connected.some((item) => item.provider === provider.id),
   );
+  const dialog = editing !== "" && (
+    <ConnectionDialog
+      key={editing}
+      returnFocus={returnFocus}
+      provider={editing}
+      configured={connected.some((item) => item.provider === editing)}
+      busy={busy}
+      onClose={() => {
+        setEditing("");
+      }}
+      onSave={onSave}
+    />
+  );
+  if (compact) {
+    return (
+      <SettingsGroup>
+        {hostedProviders.map((provider) => {
+          const configured = connected.some((item) => item.provider === provider.id);
+          return (
+            <div key={provider.id} className="flex items-center gap-3 px-4 py-4 sm:py-5">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-panel">
+                <ModelIcon provider={provider.id} model={undefined} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <Text className="font-medium">{provider.name}</Text>
+                {configured && (
+                  <Text tone="muted" size="xs" className="mt-1">
+                    Connected
+                  </Text>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                disabled={busy}
+                aria-label={`${configured ? "Update" : "Connect"} ${provider.name}${configured ? " key" : ""}`}
+                onClick={(event) => {
+                  returnFocus.current = event.currentTarget;
+                  setEditing(provider.id);
+                }}
+              >
+                {configured ? "Update key" : "Connect"}
+              </Button>
+            </div>
+          );
+        })}
+        {dialog}
+      </SettingsGroup>
+    );
+  }
   return (
     <Section aria-labelledby="connections-heading">
       <SectionHeader inset className="flex-row items-center justify-between gap-3">
@@ -219,19 +270,7 @@ export function ModelConnections({
           })
         )}
       </SettingsGroup>
-      {editing !== "" && (
-        <ConnectionDialog
-          key={editing}
-          returnFocus={returnFocus}
-          provider={editing}
-          configured={connected.some((item) => item.provider === editing)}
-          busy={busy}
-          onClose={() => {
-            setEditing("");
-          }}
-          onSave={onSave}
-        />
-      )}
+      {dialog}
     </Section>
   );
 }
