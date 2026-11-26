@@ -100,7 +100,7 @@ test.describe("first run", () => {
     await page.getByRole("button", { name: "Install GitHub App", exact: true }).click();
     await page.getByRole("link", { name: "Approve GitHub", exact: true }).click();
     await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeEnabled();
-    await page.getByRole("button", {name:"Log out",exact:true}).click();
+    await page.getByRole("button", {name:"Finish later",exact:true}).click();
     await page.getByLabel("Password", {exact:true}).fill("browser test password");
     await page.getByRole("button", {name:"Log in",exact:true}).click();
     await expect(page.getByRole("heading", {name:"Connect GitHub",exact:true})).toBeFocused();

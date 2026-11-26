@@ -59,16 +59,16 @@ export function Onboarding({
   const heading = useRef<HTMLHeadingElement>(null);
   // Keep visited editors mounted to retain non-secret drafts during back navigation.
   const [visited, setVisited] = useState<SetupStep[]>([]);
+  const [githubAvailable, setGithubAvailable] = useState<boolean>();
   const [projects, setProjects] = useState<Project[]>();
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   const [projectBusy, setProjectBusy] = useState(false);
   const navigating = busy || projectBusy;
-  const [githubAvailable, setGithubAvailable] = useState<boolean>();
-  const githubComplete = settings.githubConfigured && githubAvailable !== false;
   const modelComplete = settings.providerConfigured && settings.model !== "";
   const selected = projects?.find((project) => project.id === state.projectID) ?? projects?.[0];
   const projectComplete = selected !== undefined;
+  const githubComplete = settings.githubConfigured && githubAvailable !== false;
   let availableStep = 1;
   if (modelComplete) availableStep = 2;
   if (modelComplete && githubComplete) availableStep = 3;
@@ -307,6 +307,11 @@ export function Onboarding({
             <Button type="submit" form="onboarding-project" disabled={navigating}>
               {projectBusy ? "Connecting…" : "Connect project"}
               <ChevronRightIcon aria-hidden="true" />
+            </Button>
+          )}
+          {(step === "github" || step === "project") && (
+            <Button variant="outline" disabled={navigating} onClick={onLogout}>
+              Finish later
             </Button>
           )}
           {canContinue && (
