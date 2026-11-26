@@ -4,6 +4,12 @@ import {
   Alert,
   Button,
   ButtonLink,
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+  ChevronDownIcon,
+  TextareaPanel,
+  TextareaPanelInput,
   FieldLabel,
   FieldSet,
   Heading,
@@ -11,7 +17,6 @@ import {
   Link,
   NativeSelect,
   Text,
-  Textarea,
 } from "@flora/florets";
 
 import { EnvironmentEditor } from "./environment";
@@ -22,7 +27,48 @@ import { text, texts } from "./ui";
 
 const blankRepository: Repository = { name: "", url: "", baseBranch: "", role: "core" };
 
-function RepositoryFields({ repositories }: { repositories: Repository[] }) {
+function RepositoryChoice({
+  available,
+  url,
+  onSelect,
+}: {
+  available: GitHubRepository[];
+  url: string;
+  onSelect: (url: string) => void;
+}) {
+  return (
+    <FieldLabel className="w-full flex-col items-start">
+      Choose a repository
+      <NativeSelect
+        aria-label="Choose a repository"
+        className="mt-2 max-w-full"
+        value={
+          available.some((r) => r.html_url === url || `${r.html_url}.git` === url)
+            ? url.replace(/\.git$/, "")
+            : ""
+        }
+        onChange={(event) => {
+          if (event.currentTarget.value) onSelect(event.currentTarget.value);
+        }}
+      >
+        <option value="">Select repository</option>
+        {available.map((repository) => (
+          <option key={repository.full_name} value={repository.html_url}>
+            {repository.full_name}
+          </option>
+        ))}
+      </NativeSelect>
+    </FieldLabel>
+  );
+}
+
+function RepositoryFields({
+  repositories,
+  compact = false,
+}: {
+  repositories: Repository[];
+  compact?: boolean;
+}) {
   const [rows, setRows] = useState(() => repositories.map((repo, key) => ({ repo, key })));
   const nextKey = useRef(rows.length);
   const [available, setAvailable] = useState<GitHubRepository[]>([]);
@@ -73,16 +119,18 @@ function RepositoryFields({ repositories }: { repositories: Repository[] }) {
     setRows((current) => [...current, { key, repo: blankRepository }]);
   }
   function removeRepository(key: number) {
-    pendingFocus.current = "add";
+    pendingFocus.current = compact ? (rows.find((row) => row.key !== key)?.key ?? "add") : "add";
     setRows((current) => current.filter((row) => row.key !== key));
   }
   return (
     <div ref={container} className="space-y-5">
-      <Text tone="muted">
-        Use owner/repository or an HTTPS GitHub URL. All repositories must be accessible to the
-        GitHub connection. Leave a base branch blank to use its default. Core repositories download
-        before setup; extra repositories are fetched on demand.
-      </Text>
+      {!compact && (
+        <Text tone="muted">
+          Use owner/repository or an HTTPS GitHub URL. All repositories must be accessible to the
+          GitHub connection. Leave a base branch blank to use its default. Core repositories
+          download before setup; extra repositories are fetched on demand.
+        </Text>
+      )}
       {discoveryError && (
         <Alert variant="destructive">
           {discoveryError}
@@ -116,38 +164,23 @@ function RepositoryFields({ repositories }: { repositories: Repository[] }) {
         <FieldSet
           key={key}
           data-repository-key={key}
-          className="space-y-4 rounded-md border border-border p-4"
+          className={compact ? "space-y-4" : "space-y-4 rounded-md border border-border p-4"}
         >
-          <legend className="px-1 text-sm font-medium">Repository {index + 1}</legend>
-          {available.length > 0 && (
-            <FieldLabel className="w-full flex-col items-start">
-              Choose a repository
-              <NativeSelect
-                aria-label="Choose a repository"
-                className="mt-2 max-w-full"
-                value={
-                  available.some((r) => r.html_url === repo.url || `${r.html_url}.git` === repo.url)
-                    ? repo.url.replace(/\.git$/, "")
-                    : ""
-                }
-                onChange={(event) => {
-                  const selected = event.currentTarget.value;
-                  if (!selected) return;
-                  setRows((current) =>
-                    current.map((row) =>
-                      row.key === key ? { ...row, repo: { ...row.repo, url: selected } } : row,
-                    ),
-                  );
-                }}
-              >
-                <option value="">Select repository</option>
-                {available.map((repository) => (
-                  <option key={repository.full_name} value={repository.html_url}>
-                    {repository.full_name}
-                  </option>
-                ))}
-              </NativeSelect>
-            </FieldLabel>
+          <legend className={compact ? "sr-only" : "px-1 text-sm font-medium"}>
+            Repository {index + 1}
+          </legend>
+          {!compact && available.length > 0 && (
+            <RepositoryChoice
+              available={available}
+              url={repo.url}
+              onSelect={(url) => {
+                setRows((current) =>
+                  current.map((row) =>
+                    row.key === key ? { ...row, repo: { ...row.repo, url } } : row,
+                  ),
+                );
+              }}
+            />
           )}
           <FieldLabel className="w-full flex-col items-start">
             GitHub repository
@@ -168,28 +201,68 @@ function RepositoryFields({ repositories }: { repositories: Repository[] }) {
               maxLength={300}
             />
           </FieldLabel>
-          <FieldLabel className="w-full flex-col items-start">
-            Base branch
-            <Input
-              name="baseBranch"
-              className="mt-2"
-              defaultValue={repo.baseBranch}
-              maxLength={255}
-              placeholder="Repository default branch"
-            />
-          </FieldLabel>
-          <FieldLabel className="w-full flex-col items-start">
-            Repository role
-            <NativeSelect
-              aria-label="Repository role"
-              name="role"
-              className="mt-2"
-              defaultValue={repo.role}
+          <Collapsible defaultOpen={!compact}>
+            {compact && (
+              <CollapsibleTrigger
+                render={<Button type="button" variant="ghost" size="sm" className="-ml-2" />}
+              >
+                Repository options
+                <ChevronDownIcon aria-hidden="true" />
+              </CollapsibleTrigger>
+            )}
+            <CollapsibleContent
+              keepMounted
+              className={compact ? "space-y-4 data-open:pt-3" : "space-y-4"}
             >
-              <option value="core">Core</option>
-              <option value="extra">Extra</option>
-            </NativeSelect>
-          </FieldLabel>
+              {compact && available.length > 0 && (
+                <RepositoryChoice
+                  available={available}
+                  url={repo.url}
+                  onSelect={(url) => {
+                    setRows((current) =>
+                      current.map((row) =>
+                        row.key === key ? { ...row, repo: { ...row.repo, url } } : row,
+                      ),
+                    );
+                  }}
+                />
+              )}
+              <FieldLabel className="w-full flex-col items-start">
+                Base branch
+                <Input
+                  name="baseBranch"
+                  className="mt-2"
+                  defaultValue={repo.baseBranch}
+                  maxLength={255}
+                  placeholder="Repository default branch"
+                />
+              </FieldLabel>
+              <FieldLabel className="w-full flex-col items-start">
+                Repository role
+                <NativeSelect
+                  aria-label="Repository role"
+                  name="role"
+                  className="mt-2"
+                  defaultValue={repo.role}
+                >
+                  <option value="core">Core</option>
+                  <option value="extra">Extra</option>
+                </NativeSelect>
+              </FieldLabel>
+              {compact && index === rows.length - 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  ref={addButton}
+                  disabled={rows.length >= 100}
+                  onClick={addRepository}
+                >
+                  Add repository
+                </Button>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
           {rows.length > 1 && (
             <Button
               variant="link"
@@ -205,18 +278,20 @@ function RepositoryFields({ repositories }: { repositories: Repository[] }) {
           )}
         </FieldSet>
       ))}
-      <Button
-        variant="link"
-        size="sm"
-        type="button"
-        ref={addButton}
-        data-add-repository
-        className="text-sm text-foreground"
-        disabled={rows.length >= 100}
-        onClick={addRepository}
-      >
-        Add repository
-      </Button>
+      {!compact && (
+        <Button
+          variant="link"
+          size="sm"
+          type="button"
+          ref={addButton}
+          data-add-repository
+          className="text-sm text-foreground"
+          disabled={rows.length >= 100}
+          onClick={addRepository}
+        >
+          Add repository
+        </Button>
+      )}
     </div>
   );
 }
@@ -239,7 +314,19 @@ function readProject(fields: FormData) {
 }
 
 // The parent keys this component by path, so state starts empty for each route.
-export function Projects({ path, onExpired }: { path: string; onExpired: () => void }) {
+export function Projects({
+  path,
+  onExpired,
+  embedded = false,
+  onCreated,
+  onBusyChange,
+}: {
+  path: string;
+  onExpired: () => void;
+  embedded?: boolean;
+  onCreated?: (project: Project) => Promise<void>;
+  onBusyChange?: (busy: boolean) => void;
+}) {
   const [list, setList] = useState<Project[]>();
   const [project, setProject] = useState<Project>();
   const [error, setError] = useState("");
@@ -252,7 +339,7 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
   const expire = useEffectEvent(onExpired);
 
   useEffect(() => {
-    heading.current?.focus();
+    if (!embedded) heading.current?.focus();
     if (creating) return;
     let active = true;
     const load = async () => {
@@ -274,12 +361,13 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
     return () => {
       active = false;
     };
-  }, [id, creating]);
+  }, [id, creating, embedded]);
 
   async function save(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const payload = readProject(new FormData(event.currentTarget));
     setBusy(true);
+    onBusyChange?.(true);
     setError("");
     setNotice("");
     try {
@@ -290,13 +378,15 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
       );
       setProject(saved);
       setRevision((value) => value + 1);
-      if (creating) window.location.hash = `projects/${saved.id}`;
+      if (creating && onCreated) await onCreated(saved);
+      else if (creating) window.location.hash = `projects/${saved.id}`;
       else setNotice("Project saved. Existing chats keep their original settings.");
     } catch (e) {
       setError(errorMessage(e, "Could not save project. Try again."));
       if (isExpired(e)) onExpired();
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
     }
   }
 
@@ -307,27 +397,32 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
   if (busy) submitLabel = "Validating…";
 
   return (
-    <section aria-labelledby="projects-heading">
-      <div className="flex items-center justify-between gap-4">
-        <Heading
-          level={1}
-          id="projects-heading"
-          ref={heading}
-          tabIndex={-1}
-          className="min-w-0 break-words"
-        >
-          {title}
-        </Heading>
-        {id === "" ? (
-          <ButtonLink href="#projects/new" className="shrink-0">
-            Connect project
-          </ButtonLink>
-        ) : (
-          <Link href="#projects" className="shrink-0 text-sm">
-            All projects
-          </Link>
-        )}
-      </div>
+    <section
+      aria-labelledby={embedded ? undefined : "projects-heading"}
+      aria-label={embedded ? "Project" : undefined}
+    >
+      {!embedded && (
+        <div className="flex items-center justify-between gap-4">
+          <Heading
+            level={1}
+            id="projects-heading"
+            ref={heading}
+            tabIndex={-1}
+            className="min-w-0 break-words"
+          >
+            {title}
+          </Heading>
+          {id === "" ? (
+            <ButtonLink href="#projects/new" className="shrink-0">
+              Connect project
+            </ButtonLink>
+          ) : (
+            <Link href="#projects" className="shrink-0 text-sm">
+              All projects
+            </Link>
+          )}
+        </div>
+      )}
       {id === "" && (
         <Text tone="muted" className="mt-3">
           Manage the GitHub repositories and setup command used by new chats in each project.
@@ -387,7 +482,8 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
       {(creating || project) && (
         <form
           key={`${project?.id ?? "new"}-${revision}`}
-          className="mt-8 space-y-6"
+          id={embedded ? "onboarding-project" : undefined}
+          className={embedded ? "space-y-5" : "mt-8 space-y-6"}
           onSubmit={(event) => {
             void save(event);
           }}
@@ -410,25 +506,44 @@ export function Projects({ path, onExpired }: { path: string; onExpired: () => v
               />
             </FieldLabel>
             <RepositoryFields
+              compact={embedded}
               repositories={project?.configuration.repositories ?? [blankRepository]}
             />
-            <FieldLabel className="w-full flex-col items-start">
-              Setup command (optional)
-              <Textarea
-                name="setupCommand"
-                className="mt-2 min-h-28 font-mono"
-                defaultValue={project?.configuration.setupCommand}
-                maxLength={8192}
-                aria-describedby="setup-help"
-              />
-            </FieldLabel>
-            <Text tone="muted" id="setup-help">
-              Runs inside the chat container before the agent starts.
-            </Text>
+            <Collapsible defaultOpen={!embedded}>
+              {embedded && (
+                <CollapsibleTrigger
+                  render={<Button type="button" variant="ghost" size="sm" className="-ml-2" />}
+                >
+                  Setup command
+                  <ChevronDownIcon aria-hidden="true" />
+                </CollapsibleTrigger>
+              )}
+              <CollapsibleContent keepMounted className={embedded ? "data-open:pt-3" : undefined}>
+                <FieldLabel className="w-full flex-col items-start">
+                  Setup command (optional)
+                  <TextareaPanel>
+                    <TextareaPanelInput
+                      name="setupCommand"
+                      className="mt-2 min-h-28 font-mono"
+                      defaultValue={project?.configuration.setupCommand}
+                      maxLength={8192}
+                      aria-describedby={embedded ? undefined : "setup-help"}
+                    />
+                  </TextareaPanel>
+                </FieldLabel>
+              </CollapsibleContent>
+            </Collapsible>
+            {!embedded && (
+              <Text tone="muted" id="setup-help">
+                Runs inside the chat container before the agent starts.
+              </Text>
+            )}
           </FieldSet>
-          <Button type="submit" disabled={busy}>
-            {submitLabel}
-          </Button>
+          {!embedded && (
+            <Button type="submit" disabled={busy}>
+              {submitLabel}
+            </Button>
+          )}
         </form>
       )}
       {project && (

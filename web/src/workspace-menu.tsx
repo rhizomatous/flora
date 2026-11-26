@@ -24,11 +24,13 @@ export function WorkspaceMenu({
   audio,
   busy,
   onLogout,
+  setupPath = "onboarding/model",
 }: {
   sound: boolean;
   audio: { ready: boolean; enable: () => Promise<void> };
   busy: boolean;
   onLogout: () => void;
+  setupPath?: string;
 }) {
   const navigated = useRef(false);
   const [attemptedSound, setAttemptedSound] = useState(false);
@@ -150,6 +152,18 @@ export function WorkspaceMenu({
           nativeButton={false}
           onClick={() => {
             navigated.current = window.location.hash !== "#usage";
+          }}
+        />
+        <DropdownMenuItem
+          render={
+            <a href={`#${setupPath}`}>
+              <FlowerMark />
+              Set up Flora
+            </a>
+          }
+          nativeButton={false}
+          onClick={() => {
+            navigated.current = !window.location.hash.startsWith("#onboarding/");
           }}
         />
         <DropdownMenuSeparator />
