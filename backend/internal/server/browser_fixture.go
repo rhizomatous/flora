@@ -423,10 +423,11 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		a := &api{auth: authentication, projects: validation, settings: configuration, origin: origin}
 		mux := http.NewServeMux()
 		a.projectRoutes(mux)
+		a.onboardingRoutes(mux)
 		projectHandler := a.protect(mux)
 		original := app
 		app = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.HasPrefix(r.URL.Path, "/api/projects") {
+			if strings.HasPrefix(r.URL.Path, "/api/projects") || r.URL.Path == "/api/onboarding/project" {
 				projectHandler.ServeHTTP(w, r)
 				return
 			}
@@ -469,6 +470,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		a := &api{auth: authentication, projects: validation, settings: configuration, chats: fixture.Service, origin: origin}
 		mux := http.NewServeMux()
 		a.projectRoutes(mux)
+		a.onboardingRoutes(mux)
 		a.environmentRoutes(mux)
 		a.chatRoutes(mux)
 		a.attachmentRoutes(mux)
@@ -476,7 +478,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		projectHandler := a.protect(a.chatReferences(mux))
 		original := app
 		app = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.HasPrefix(r.URL.Path, "/api/projects") {
+			if strings.HasPrefix(r.URL.Path, "/api/projects") || r.URL.Path == "/api/onboarding/project" {
 				projectHandler.ServeHTTP(w, r)
 				return
 			}

@@ -42,6 +42,7 @@ func TestProjectAPIAndChatSnapshots(t *testing.T) {
 	a := &api{auth: authentication, projects: svc, origin: "https://flora.test"}
 	mux := http.NewServeMux()
 	a.projectRoutes(mux)
+	a.onboardingRoutes(mux)
 	handler := a.protect(mux)
 	call := func(method, path, body, cookie, origin string, want int) *httptest.ResponseRecorder {
 		t.Helper()
@@ -62,7 +63,7 @@ func TestProjectAPIAndChatSnapshots(t *testing.T) {
 		return w
 	}
 	body := `{"name":"Project","configuration":{"repositories":[{"url":"owner/private"},{"url":"other/private","baseBranch":"release","role":"core"},{"url":"owner/extra","baseBranch":"next","role":"extra"}],"setupCommand":"npm ci"}}`
-	for _, route := range []struct{ method, path string }{{"GET", "/api/projects"}, {"GET", "/api/projects/missing"}, {"POST", "/api/projects"}, {"PUT", "/api/projects/missing"}} {
+	for _, route := range []struct{ method, path string }{{"POST", "/api/onboarding/project"}, {"GET", "/api/projects"}, {"GET", "/api/projects/missing"}, {"POST", "/api/projects"}, {"PUT", "/api/projects/missing"}} {
 		call(route.method, route.path, body, "", a.origin, 401)
 		if route.method != "GET" {
 			call(route.method, route.path, body, token, "https://evil.test", 403)
@@ -82,6 +83,20 @@ func TestProjectAPIAndChatSnapshots(t *testing.T) {
 	if w.Header().Get("Location") != "/api/projects/"+p.ID {
 		t.Fatal("missing location")
 	}
+	remoteStatus = 403
+	resumed := call("POST", "/api/onboarding/project", body, token, a.origin, 200)
+	var saved storage.Project
+	if err := json.Unmarshal(resumed.Body.Bytes(), &saved); err != nil {
+		t.Fatal(err)
+	}
+	if saved.ID != p.ID {
+		t.Fatal("retry duplicated an existing project")
+	}
+	progress, err := store.Onboarding(ctx)
+	if err != nil || progress.ProjectID != p.ID {
+		t.Fatalf("selection not persisted: %+v %v", progress, err)
+	}
+	remoteStatus = 200
 	path := "/api/projects/" + p.ID
 	call("GET", path, "", token, "", 200)
 	call("GET", "/api/projects/missing", "", token, "", 404)

@@ -94,3 +94,48 @@ func TestOnboardingCompletionRequiresSavedConfiguration(t *testing.T) {
 		t.Fatal("completion not saved")
 	}
 }
+
+func TestOnboardingProjectRetriesAndExistingSelection(t *testing.T) {
+	store := openTest(t, t.TempDir())
+	defer store.Close()
+	config := Configuration{Repositories: []Repository{{Name: "owner/garden", URL: "https://github.com/owner/garden.git", BaseBranch: "main", Role: "core"}}}
+	// Simultaneous first saves must commit one project and one selection.
+	results := make(chan Project, 8)
+	failures := make(chan error, 8)
+	for range 8 {
+		go func() {
+			p, err := store.CreateOnboardingProject(ctx, "Retry", config)
+			results <- p
+			failures <- err
+		}()
+	}
+	var first Project
+	for range 8 {
+		must(t, <-failures)
+		p := <-results
+		if first.ID == "" {
+			first = p
+		}
+		if p.ID != first.ID {
+			t.Fatalf("retry created another project: %+v", p)
+		}
+	}
+	state, err := store.Onboarding(ctx)
+	must(t, err)
+	if state.ProjectID != first.ID {
+		t.Fatalf("selection not saved: %+v", state)
+	}
+	list, err := store.Projects(ctx)
+	must(t, err)
+	if len(list) != 1 {
+		t.Fatalf("created %d projects", len(list))
+	}
+	other, err := store.CreateProject(ctx, "Existing", config)
+	must(t, err)
+	must(t, store.SaveOnboarding(ctx, Onboarding{Step: "project", ProjectID: other.ID}))
+	saved, err := store.CreateOnboardingProject(ctx, "Retry", config)
+	must(t, err)
+	if saved.ID != other.ID {
+		t.Fatalf("lost existing selection: %+v", saved)
+	}
+}
