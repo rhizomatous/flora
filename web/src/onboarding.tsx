@@ -303,7 +303,7 @@ export function Onboarding({
           Back
         </Button>
         <div className="flex flex-wrap gap-2">
-          {step === "project" && !projectComplete && githubComplete && projects && (
+          {step === "project" && !projectComplete && settings.githubConfigured && projects && (
             <Button type="submit" form="onboarding-project" disabled={navigating}>
               {projectBusy ? "Connecting…" : "Connect project"}
               <ChevronRightIcon aria-hidden="true" />
