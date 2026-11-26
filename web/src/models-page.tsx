@@ -1,29 +1,13 @@
-/* oxlint-disable import/max-dependencies -- The Models page composes provider management, discovery, catalog, and default selection. */
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import {
-  Alert,
-  Button,
-  DropdownButton,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-  Heading,
-  Section,
-  SectionHeader,
-  SectionStack,
-  SettingsGroup,
-  SettingsRow,
-} from "@flora/florets";
+import { Alert, Button, Heading, SectionStack } from "@flora/florets";
 
+import { DefaultModel } from "./default-model";
 import { ModelCatalog } from "./model-catalog";
 import { ModelConnections } from "./model-connections";
 import { useModelDiscovery } from "./model-discovery";
-import { ModelIcon } from "./model-icon";
-import { modelDisplayName } from "./model-label";
-import { matchModel, type ModelOption } from "./model-options";
-import { ModelPicker } from "./model-picker";
+import type { ModelOption } from "./model-options";
 import { errorMessage, isExpired, request } from "./request";
 import { settingsSchema, type Settings } from "./settings-schemas";
 
@@ -33,27 +17,25 @@ export function ModelsPage({
   settings,
   onSaved,
   onExpired,
+  onBusyChange,
 }: {
   embedded?: boolean;
   active?: boolean;
   settings: Settings;
   onSaved: (settings: Settings) => void;
   onExpired: () => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState(false);
-  if (!active && open) setOpen(false);
   const { options, loading, error, retry } = useModelDiscovery("models");
   const models = options?.models ?? [];
-  const current = models.find(
-    (model) => model.provider === settings.provider && model.id === settings.model,
-  );
   useEffect(() => {
     if (!embedded) heading.current?.focus();
   }, [embedded]);
   async function save(body: object) {
     setBusy(true);
+    onBusyChange?.(true);
     try {
       const next = await request(settingsSchema, "settings", { method: "PUT", body });
       onSaved(next);
@@ -64,10 +46,10 @@ export function ModelsPage({
       throw cause;
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
     }
   }
   async function setDefault(model: ModelOption) {
-    setOpen(false);
     try {
       await save({ provider: model.provider, model: model.id });
     } catch (cause) {
@@ -107,66 +89,15 @@ export function ModelsPage({
       <SectionStack className={embedded ? "gap-6!" : undefined}>
         {embedded && connections}
         {(!embedded || settings.providerConfigured) && (
-          <Section aria-labelledby={embedded ? undefined : "default-model-heading"}>
-            {!embedded && (
-              <SectionHeader inset>
-                <Heading level={2} id="default-model-heading">
-                  Default model
-                </Heading>
-              </SectionHeader>
-            )}
-            <SettingsGroup>
-              <SettingsRow
-                label={embedded ? "Default model" : "New chats"}
-                htmlFor="default-model"
-                description={embedded ? undefined : "Used when no model is selected"}
-                descriptionId="default-model-help"
-              >
-                <DropdownMenu
-                  open={open}
-                  onOpenChange={setOpen}
-                  search={{
-                    label: "Search default models",
-                    placeholder: "Search models",
-                    filter: matchModel,
-                  }}
-                >
-                  <DropdownMenuTrigger
-                    render={
-                      <DropdownButton
-                        id="default-model"
-                        focusableWhenDisabled
-                        aria-describedby={embedded ? undefined : "default-model-help"}
-                        variant="outline"
-                        disabled={busy || models.length === 0}
-                        className="w-full max-w-72 justify-between"
-                      >
-                        <ModelIcon provider={settings.provider} model={settings.model} />
-                        <span className="min-w-0 flex-1 truncate">
-                          {current?.name ??
-                            (settings.model ? modelDisplayName(settings.model) : "Choose a model")}
-                        </span>
-                      </DropdownButton>
-                    }
-                  />
-                  <DropdownMenuContent align="end" className="w-80! max-w-[calc(100vw-24px)]">
-                    <ModelPicker
-                      models={models}
-                      selected={
-                        settings.model
-                          ? { provider: settings.provider, model: settings.model, variant: "" }
-                          : undefined
-                      }
-                      loading={loading}
-                      onSelect={(model) => {
-                        void setDefault(model);
-                      }}
-                    />
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </SettingsRow>
-            </SettingsGroup>
-          </Section>
+          <DefaultModel
+            active={active}
+            embedded={embedded}
+            settings={settings}
+            models={models}
+            loading={loading}
+            busy={busy}
+            onSave={save}
+          />
         )}
         {!embedded && connections}
         {error !== "" && settings.providers.length > 0 && (

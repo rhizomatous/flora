@@ -62,7 +62,8 @@ export function Onboarding({
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   const [projectBusy, setProjectBusy] = useState(false);
-  const navigating = busy || projectBusy;
+  const [modelBusy, setModelBusy] = useState(false);
+  const navigating = busy || projectBusy || modelBusy;
   const modelComplete = settings.providerConfigured && settings.model !== "";
   const selected = projects?.find((project) => project.id === state.projectID) ?? projects?.[0];
   const projectComplete = selected !== undefined;
@@ -197,6 +198,7 @@ export function Onboarding({
         <div hidden={step !== "model"}>
           <ModelsPage
             embedded
+            onBusyChange={setModelBusy}
             active={step === "model"}
             settings={settings}
             onSaved={onSaved}
@@ -285,6 +287,11 @@ export function Onboarding({
           Back
         </Button>
         <div className="flex flex-wrap gap-2">
+          {step === "model" && !modelComplete && (
+            <Button variant="outline" disabled={navigating} onClick={onLogout}>
+              Finish later
+            </Button>
+          )}
           {step === "project" && !projectComplete && settings.githubConfigured && projects && (
             <Button type="submit" form="onboarding-project" disabled={navigating}>
               {projectBusy ? "Connecting…" : "Connect project"}

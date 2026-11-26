@@ -460,6 +460,13 @@ func TestFirstConnectionDiscoversDefaultAndFailuresSaveNothing(t *testing.T) {
 				if err == nil || strings.Contains(err.Error(), "private") || len(view.Providers) != 0 {
 					t.Fatal("failed discovery saved configuration or leaked errors", err)
 				}
+				if err := service.Save(ctx, Input{Provider: "google", Model: "manual-model", ProviderKey: "google-secret", MakeDefault: &makeDefault}); err != nil {
+					t.Fatal("manual model did not bypass failed discovery", err)
+				}
+				view, err = service.View(ctx)
+				if err != nil || view.Model != "manual-model" || !view.ProviderConfigured {
+					t.Fatal("manual retry did not establish a default", view, err)
+				}
 				return
 			}
 			if err != nil || view.Provider != "google" || view.Model != "discovered" || !view.ProviderConfigured {
