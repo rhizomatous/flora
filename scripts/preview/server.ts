@@ -321,6 +321,10 @@ export function chatPreview(): Plugin {
       json(res, { authenticated: true, setupRequired: false });
       return;
     }
+    if (url.pathname === "/api/onboarding") {
+      json(res, { started: false, completed: false, step: "finish", projectID: "" });
+      return;
+    }
     if (url.pathname === "/api/auth/passkeys") {
       json(res, {
         passkeys: [],
