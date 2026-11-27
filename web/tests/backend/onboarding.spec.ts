@@ -5,6 +5,10 @@ test.describe("first run", () => {
   test.use({ scenario: "credential-setup" });
 
   test("required setup, drafts, sign-out, and resume", async ({ page, backend }, testInfo) => {
+    let unintendedRequests = 0;
+    page.on("request", request => {
+      if (request.method() === "POST" && /\/api\/(settings\/diagnostics|onboarding\/readiness|projects\/[^/]+\/chats|chats\/[^/]+\/messages)/.test(request.url())) unintendedRequests++;
+    });
     async function captureStep(name: string) {
       await expect(page.getByRole("button", { name: "Log out", exact: true })).toBeEnabled();
       const closeToasts = page.getByRole("button", { name: "Close toast", exact: true });
@@ -81,7 +85,7 @@ test.describe("first run", () => {
     await page.getByRole("button",{name:"Refresh GitHub connection",exact:true}).click();
     await captureStep("github");
     await expect(page.getByRole("button", { name: "4. Connect a project", exact: true })).toBeDisabled();
-    await expect(page.getByRole("button", { name: "5. Review setup", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "5. Review setup", exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: "Log out", exact: true }).click();
     await page.getByLabel("Password", { exact: true }).fill("browser test password");
     await page.getByRole("button", { name: "Log in", exact: true }).click();
@@ -180,18 +184,15 @@ test.describe("first run", () => {
     await expect(page.getByLabel("Project name", { exact: true })).toHaveValue("Garden draft");
     await page.getByRole("button", { name: "Create project", exact: true }).click();
     expect(saves).toBe(2);
-    await expect(page.getByRole("combobox", { name: "Project", exact: true })).toHaveValue(/.+/);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Review setup", exact: true })).toBeFocused();
-    await page.reload();
-    await expect(page.getByRole("heading", { name: "Review setup", exact: true })).toBeFocused();
+    await expect(page).toHaveURL(/#chats\/new$/);
+    await expect(page.getByRole("heading", { name: "New chat", exact: true })).toBeVisible();
     const savedProjects = await (await page.request.get("/api/projects")).json();
     expect(savedProjects).toHaveLength(1);
     expect(savedProjects[0].configuration).toMatchObject({ setupCommand: "npm ci", repositories: [{ baseBranch: "main" }] });
-    await captureStep("review");
-    await page.getByRole("button", { name: "Open Flora", exact: true }).click();
+    expect(await (await page.request.get("/api/onboarding")).json()).toMatchObject({ started: true, step: "project", completed: true });
+    await page.reload();
+    await expect(page).toHaveURL(/#chats\/new$/);
     await expect(page.getByRole("heading", { name: "New chat", exact: true })).toBeVisible();
-    expect(await (await page.request.get("/api/onboarding")).json()).toMatchObject({ started: true, step: "finish", completed: true });
     await page.request.post("/api/auth/logout", { headers: { Origin: backend.url } });
     await page.reload();
     await expect(page.getByRole("heading", { name: "Log in", exact: true })).toBeVisible();
@@ -209,13 +210,14 @@ test.describe("first run", () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await openWorkspaceMenu(page);
     await page.getByRole("menuitem", { name: "Set up Flora", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Review setup", exact: true })).toBeFocused();
+    await expect(page.getByRole("heading", { name: "Connect a project", exact: true })).toBeFocused();
     await page.getByRole("button", { name: "2. Connect a model", exact: true }).click();
     await expect(page.getByRole("button", { name: "Update Anthropic key", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Log out", exact: true }).click();
     await page.getByLabel("Password", { exact: true }).fill("browser test password");
     await page.getByRole("button", { name: "Log in", exact: true }).click();
     await expect(heading).toBeFocused();
+    expect(unintendedRequests).toBe(0);
   });
 });
 
@@ -227,8 +229,12 @@ test("configured installations open the app without setup", async ({ page, backe
 });
 
 
-test("setup selects an existing project for the first chat", async ({ page, backend }) => {
+test("finishing project setup opens home and retains the selection after a failed save", async ({ page, backend }, testInfo) => {
   await logIn(page);
+  let unintendedRequests = 0;
+  page.on("request", request => {
+    if (request.method() === "POST" && /\/api\/(settings\/diagnostics|onboarding\/readiness|projects\/[^/]+\/chats|chats\/[^/]+\/messages)/.test(request.url())) unintendedRequests++;
+  });
   const response = await page.request.post("/api/projects", {headers:{Origin:backend.url}, data:{name:"Existing garden",configuration:{repositories:[{url:"flora/fixture",role:"core"}],setupCommand:""}}});
   expect(response.status()).toBe(201);
   const project = await response.json();
@@ -236,13 +242,54 @@ test("setup selects an existing project for the first chat", async ({ page, back
   const selected = page.getByRole("combobox",{name:"Project",exact:true});
   await selected.selectOption(project.id);
   await expect(selected).toHaveValue(project.id);
-  await page.getByRole("button",{name:"Continue",exact:true}).click();
-  await expect(page.getByRole("heading",{name:"Review setup",exact:true})).toBeFocused();
-  await page.reload();
-  await expect(page.getByRole("status",{name:"Project",exact:true})).toHaveText("Existing garden");
-  expect((await (await page.request.get("/api/onboarding")).json()).projectID).toBe(project.id);
+  let failSave = true;
+  await page.route("**/api/onboarding", async route => {
+    if (route.request().method() === "PUT" && route.request().postDataJSON().completed && failSave) {
+      failSave = false;
+      await route.fulfill({status:503,json:{error:"Could not save setup progress. Try again."}});
+    } else await route.continue();
+  });
   await page.getByRole("button",{name:"Open Flora",exact:true}).click();
-  await expect(page).toHaveURL(new RegExp(`#chats/new\\?project=${project.id}$`));
+  await expect(page.getByRole("alert")).toContainText("Could not save setup progress");
+  await expect(page).toHaveURL(/#onboarding\/project$/);
+  await expect(selected).toHaveValue(project.id);
+  expect((await (await page.request.get("/api/onboarding")).json()).completed).toBe(false);
+  await page.reload();
+  await expect(selected).toHaveValue(project.id);
+  for (const width of [1280,375]) {
+    await page.setViewportSize({width,height:812});
+    for (const dark of [true,false]) {
+      await page.evaluate(value => document.documentElement.classList.toggle("dark",value),dark);
+      await page.screenshot({path:testInfo.outputPath(`final-project-${width}-${dark ? "dark" : "light"}.png`),fullPage:true,animations:"disabled"});
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+  }
+  await page.getByRole("button",{name:"Open Flora",exact:true}).focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/#chats\/new$/);
+  await expect(page.getByRole("combobox",{name:"Message",exact:true})).toBeEmpty();
+  expect(await (await page.request.get("/api/onboarding")).json()).toMatchObject({completed:true,step:"project",projectID:project.id});
+  await page.reload();
+  await expect(page.getByRole("heading",{name:"New chat",exact:true})).toBeVisible();
+  expect(unintendedRequests).toBe(0);
+});
+
+test("saved finish progress returns to the final project action", async ({ page, backend }) => {
+  await logIn(page);
+  const progress = await (await page.request.get("/api/onboarding")).json();
+  await page.request.put("/api/onboarding",{headers:{Origin:backend.url},data:{...progress,step:"project",completed:false}});
+  await page.route("**/api/onboarding", async route => {
+    if (route.request().method() !== "GET") { await route.continue(); return; }
+    const response = await route.fetch();
+    await route.fulfill({response,json:{...await response.json(),step:"finish"}});
+  });
+  await page.goto("/#onboarding/finish");
+  await expect(page).toHaveURL(/#onboarding\/project$/);
+  await expect(page.getByRole("heading",{name:"Connect a project",exact:true})).toBeFocused();
+  await expect(page.getByRole("navigation",{name:"Setup progress"}).getByRole("button")).toHaveCount(4);
+  await expect(page.getByRole("heading",{name:"Review setup",exact:true})).toHaveCount(0);
+  await page.getByRole("button",{name:"Open Flora",exact:true}).click();
+  await expect(page).toHaveURL(/#chats\/new$/);
 });
 
 
