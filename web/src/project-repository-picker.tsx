@@ -3,6 +3,8 @@ import { useLayoutEffect, useRef, useState } from "react";
 import {
   Button,
   ChevronDownIcon,
+  ChevronRightIcon,
+  ExternalLinkIcon,
   Combobox,
   ComboboxEmpty,
   ComboboxInput,
@@ -36,6 +38,7 @@ export function ProjectRepositoryPicker({
   loading: boolean;
   required?: boolean;
 }) {
+  const externalAccess = accessPath.startsWith("https://github.com/");
   const [editing, setEditing] = useState(false);
   const [query, setQuery] = useState("");
   const selected = available.find((repository) =>
@@ -111,11 +114,28 @@ export function ProjectRepositoryPicker({
             </div>
           </Combobox>
           <div className="p-1">
-            <Item size="list" render={<a href={accessPath} aria-label="Manage GitHub access" />}>
+            <Item
+              size="list"
+              render={
+                <a
+                  href={accessPath}
+                  aria-label="Manage GitHub access"
+                  target={externalAccess ? "_blank" : undefined}
+                  rel={externalAccess ? "noreferrer" : undefined}
+                />
+              }
+            >
               <GitHubLogoIcon className="size-4 text-muted-foreground" aria-hidden="true" />
               <ItemContent>
                 <ItemTitle>Manage GitHub access</ItemTitle>
               </ItemContent>
+              <ItemActions>
+                {externalAccess ? (
+                  <ExternalLinkIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRightIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+                )}
+              </ItemActions>
             </Item>
             <Item
               size="list"

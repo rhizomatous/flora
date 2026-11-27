@@ -29,7 +29,7 @@ import {
 } from "@flora/florets";
 
 import { EnvironmentEditor } from "./environment";
-import { repositoryPageSchema, type GitHubRepository } from "./github-schemas";
+import { connectionSchema, repositoryPageSchema, type GitHubRepository } from "./github-schemas";
 import { ProjectRepositoryPicker } from "./project-repository-picker";
 import { projectSchema, type Project, type Repository } from "./project-schemas";
 import { errorMessage, isExpired, request } from "./request";
@@ -58,6 +58,7 @@ function RepositoryFields({
     onReadyChange?.(ready);
   }, [ready, onReadyChange]);
   const nextKey = useRef(rows.length);
+  const [accessURL, setAccessURL] = useState<string>();
   const [available, setAvailable] = useState<GitHubRepository[]>([]);
   const [nextPage, setNextPage] = useState(1);
   const [discoveryError, setDiscoveryError] = useState("");
@@ -77,7 +78,26 @@ function RepositoryFields({
       setLoading(false);
     }
   }
-  const discover = useEffectEvent(() => loadRepositories(1));
+  async function loadAccess() {
+    try {
+      const connection = await request(connectionSchema, "github/connection");
+      const installation = connection.installations.find(
+        (item) => item.id === connection.installationID,
+      );
+      setAccessURL(
+        installation?.html_url ??
+          (connection.slug
+            ? `https://github.com/apps/${encodeURIComponent(connection.slug)}/installations/new`
+            : undefined),
+      );
+    } catch {
+      setAccessURL(undefined);
+    }
+  }
+  async function refreshRepositories() {
+    await Promise.all([loadRepositories(1), loadAccess()]);
+  }
+  const discover = useEffectEvent(refreshRepositories);
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect -- Repository state updates after the discovery request resolves.
     if (active) void discover();
@@ -174,9 +194,9 @@ function RepositoryFields({
           {(compact || available.length > 0) && (
             <ProjectRepositoryPicker
               loading={loading}
-              accessPath={compact ? "#onboarding/github" : "#connections/github"}
+              accessPath={accessURL ?? (compact ? "#onboarding/github" : "#connections/github")}
               onRefresh={() => {
-                void loadRepositories(1);
+                void refreshRepositories();
               }}
               required={compact}
               available={available}

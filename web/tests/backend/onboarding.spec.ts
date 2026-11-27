@@ -249,6 +249,10 @@ test("setup selects an existing project for the first chat", async ({ page, back
 test("repository-first project picker supports browsing, search, and scrolling", async ({ page }, testInfo) => {
   await logIn(page);
   let many = false;
+  const accessURL = "https://github.com/organizations/flora/settings/installations/40";
+  await page.route("**/api/github/connection", async route => {
+    await route.fulfill({json:{state:"connected",slug:"flora-fixture",account:"flora",installationID:40,active:"app",installations:[{id:40,account:{login:"flora"},suspended_at:null,html_url:accessURL}]}});
+  });
   await page.route("**/api/projects", async route => { await route.fulfill({json:[]}); });
   await page.route("**/api/github/repositories*", async route => {
     const names = ["garden", "website", "tendril", ...(many ? Array.from({length:40}, (_,i) => `repository-${i}-with-a-long-name`) : [])];
@@ -256,6 +260,9 @@ test("repository-first project picker supports browsing, search, and scrolling",
   });
   await page.goto("/#onboarding/project");
   await expect(page.getByRole("option")).toHaveCount(3);
+  const access = page.getByRole("link",{name:"Manage GitHub access",exact:true});
+  await expect(access).toHaveAttribute("href",accessURL);
+  await expect(access).toHaveAttribute("target","_blank");
   await expect(page.getByRole("button", {name:"Create project",exact:true})).toBeDisabled();
   async function capture(name: string) {
     await page.mouse.move(0,0);
