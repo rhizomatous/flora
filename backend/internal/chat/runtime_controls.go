@@ -13,7 +13,7 @@ func (s *Service) Runtime(ctx context.Context, id string) (provisioning.RuntimeS
 	if _, err := s.Store.Chat(ctx, id); err != nil {
 		return provisioning.RuntimeState{}, err
 	}
-	r := provisioning.RuntimeState{State: "unknown", ObservedAt: time.Now().UTC(), CollectionError: "Chat runtime is not configured."}
+	r := provisioning.RuntimeState{State: "unknown", ObservedAt: time.Now().UTC(), CollectionError: "This server does not support chat container status checks."}
 	if p, ok := s.provisioner.(interface {
 		Runtime(context.Context, string) (provisioning.RuntimeState, error)
 	}); ok {

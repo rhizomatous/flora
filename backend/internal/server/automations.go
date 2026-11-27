@@ -73,7 +73,7 @@ func (a *api) automationRoutes(mux *http.ServeMux) {
 			in.ChatID = ""
 			if in.Execution != nil {
 				if a.chats == nil {
-					failure(w, 503, "Chat runtime is not configured.")
+					failure(w, 503, chatServiceUnavailable)
 					return
 				}
 				var chatIDs []string
@@ -114,7 +114,7 @@ func (a *api) automationRoutes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("POST /api/automations/{id}/run", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {
-			failure(w, 503, "Chat runtime is not configured.")
+			failure(w, 503, chatServiceUnavailable)
 			return
 		}
 		var in struct {

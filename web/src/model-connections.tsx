@@ -53,7 +53,12 @@ function ConnectionDialog({
     const fields = new FormData(event.currentTarget);
     setError("");
     try {
-      await onSave({ provider, providerKey: text(fields, "providerKey"), makeDefault: false });
+      await onSave({
+        provider,
+        providerKey: text(fields, "providerKey"),
+        model: text(fields, "model"),
+        makeDefault: false,
+      });
       onClose();
     } catch (cause) {
       setError(errorMessage(cause, "Could not connect this provider."));
@@ -66,7 +71,11 @@ function ConnectionDialog({
         if (!open && !busy) onClose();
       }}
     >
-      <DialogContent className="sm:max-w-md" showCloseButton={!busy} finalFocus={returnFocus}>
+      <DialogContent
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md"
+        showCloseButton={!busy}
+        finalFocus={returnFocus}
+      >
         <DialogHeader>
           <DialogTitle>
             {configured
@@ -94,6 +103,19 @@ function ConnectionDialog({
               aria-invalid={error !== ""}
             />
           </div>
+          {!configured && (
+            <div className="space-y-2">
+              <FieldLabel htmlFor="connection-model">Model ID (optional)</FieldLabel>
+              <Input
+                id="connection-model"
+                name="model"
+                placeholder="Auto-discover"
+                maxLength={200}
+                disabled={busy}
+                aria-invalid={error !== ""}
+              />
+            </div>
+          )}
           {error !== "" && (
             <Alert variant="destructive" role="alert">
               {error}

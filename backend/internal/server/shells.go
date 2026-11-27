@@ -18,7 +18,7 @@ func (a *api) shellRoutes(mux *http.ServeMux) {
 	for _, pattern := range []string{"GET /api/chats/{id}/shells", "POST /api/chats/{id}/shells", "DELETE /api/chats/{id}/shells/{shell}", "PUT /api/chats/{id}/shells/{shell}"} {
 		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 			if a.chats == nil {
-				failure(w, 503, "Chat runtime is not configured.")
+				failure(w, 503, chatServiceUnavailable)
 				return
 			}
 			ctx, cancel := context.WithTimeout(r.Context(), chat.ShellRequestTimeout)
@@ -71,7 +71,7 @@ func (a *api) shellRoutes(mux *http.ServeMux) {
 			return
 		}
 		if a.chats == nil {
-			failure(w, 503, "Chat runtime is not configured.")
+			failure(w, 503, chatServiceUnavailable)
 			return
 		}
 		select {

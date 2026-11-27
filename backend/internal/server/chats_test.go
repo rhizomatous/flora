@@ -370,3 +370,28 @@ func TestSavedSubagentAPIWithoutRuntime(t *testing.T) {
 		}
 	}
 }
+
+func TestMissingChatServiceExplainsServerConfiguration(t *testing.T) {
+	store, _, authentication, token, project, cleanup := chatAPI(t)
+	defer cleanup()
+	handler := New(webassets.FS(), authentication, settings.New(store), "https://flora.test")
+	for _, route := range []struct{ method, path string }{
+		{"GET", "/api/models"},
+		{"GET", "/api/commands"},
+		{"GET", "/api/attachments/policy"},
+		{"GET", "/api/chats/missing/runtime"},
+		{"POST", "/api/projects/" + project.ID + "/chats"},
+	} {
+		t.Run(route.method+" "+route.path, func(t *testing.T) {
+			r := httptest.NewRequest(route.method, route.path, strings.NewReader("{}"))
+			r.Header.Set("Origin", "https://flora.test")
+			r.Header.Set("Content-Type", "application/json")
+			r.AddCookie(&http.Cookie{Name: cookieName, Value: token})
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, r)
+			if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), "no chat execution service") || !strings.Contains(w.Body.String(), "startup logs") {
+				t.Fatalf("missing service response: %d %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}

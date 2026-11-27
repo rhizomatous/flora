@@ -1,6 +1,5 @@
 import { SparklesIcon } from "@flora/florets";
 
-import anthropic from "./assets/model-icons/anthropic.svg";
 import claude from "./assets/model-icons/claude.svg";
 import gemini from "./assets/model-icons/gemini.svg";
 import google from "./assets/model-icons/google.svg";
@@ -17,7 +16,7 @@ export function ModelIcon({
 }) {
   let icon: string;
   if (provider === "anthropic") {
-    icon = model?.startsWith("claude-") === true ? claude : anthropic;
+    icon = claude;
   } else if (provider === "google") {
     icon = model?.startsWith("gemini-") === true ? gemini : google;
   } else if (provider === "openai") {
@@ -28,6 +27,7 @@ export function ModelIcon({
   return (
     <span
       aria-hidden="true"
+      data-slot="model-icon"
       className="inline-block size-4 shrink-0 bg-current"
       style={{
         maskImage: `url("${icon}")`,
