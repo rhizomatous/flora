@@ -1,4 +1,11 @@
-import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import {
   Alert,
@@ -16,66 +23,48 @@ import {
   Input,
   Link,
   NativeSelect,
+  SettingsGroup,
+  SettingsRow,
   Text,
 } from "@flora/florets";
 
 import { EnvironmentEditor } from "./environment";
-import { repositoryPageSchema, type GitHubRepository } from "./github-schemas";
+import { connectionSchema, repositoryPageSchema, type GitHubRepository } from "./github-schemas";
+import { ProjectRepositoryPicker } from "./project-repository-picker";
 import { projectSchema, type Project, type Repository } from "./project-schemas";
 import { errorMessage, isExpired, request } from "./request";
 import { text, texts } from "./ui";
 
 const blankRepository: Repository = { name: "", url: "", baseBranch: "", role: "core" };
 
-function RepositoryChoice({
-  available,
-  url,
-  onSelect,
-}: {
-  available: GitHubRepository[];
-  url: string;
-  onSelect: (url: string) => void;
-}) {
-  return (
-    <FieldLabel className="w-full flex-col items-start">
-      Choose a repository
-      <NativeSelect
-        aria-label="Choose a repository"
-        className="mt-2 max-w-full"
-        value={
-          available.some((r) => r.html_url === url || `${r.html_url}.git` === url)
-            ? url.replace(/\.git$/, "")
-            : ""
-        }
-        onChange={(event) => {
-          if (event.currentTarget.value) onSelect(event.currentTarget.value);
-        }}
-      >
-        <option value="">Select repository</option>
-        {available.map((repository) => (
-          <option key={repository.full_name} value={repository.html_url}>
-            {repository.full_name}
-          </option>
-        ))}
-      </NativeSelect>
-    </FieldLabel>
-  );
-}
-
 function RepositoryFields({
   repositories,
   compact = false,
+  onPrimarySelect,
+  onReadyChange,
+  children,
+  active = true,
 }: {
+  active?: boolean;
+  children?: ReactNode;
+  onReadyChange?: (ready: boolean) => void;
   repositories: Repository[];
   compact?: boolean;
+  onPrimarySelect?: (repository: GitHubRepository) => void;
 }) {
   const [rows, setRows] = useState(() => repositories.map((repo, key) => ({ repo, key })));
+  const ready = rows.length > 0 && rows.every(({ repo }) => repo.url !== "");
+  useEffect(() => {
+    onReadyChange?.(ready);
+  }, [ready, onReadyChange]);
   const nextKey = useRef(rows.length);
+  const [accessURL, setAccessURL] = useState<string>();
   const [available, setAvailable] = useState<GitHubRepository[]>([]);
   const [nextPage, setNextPage] = useState(1);
   const [discoveryError, setDiscoveryError] = useState("");
   const [loading, setLoading] = useState(true);
   async function loadRepositories(page: number) {
+    setLoading(true);
     try {
       const result = await request(repositoryPageSchema, `github/repositories?page=${page}`);
       setAvailable((current) =>
@@ -89,11 +78,30 @@ function RepositoryFields({
       setLoading(false);
     }
   }
-  const discover = useEffectEvent(() => loadRepositories(1));
+  async function loadAccess() {
+    try {
+      const connection = await request(connectionSchema, "github/connection");
+      const installation = connection.installations.find(
+        (item) => item.id === connection.installationID,
+      );
+      setAccessURL(
+        installation?.html_url ??
+          (connection.slug
+            ? `https://github.com/apps/${encodeURIComponent(connection.slug)}/installations/new`
+            : undefined),
+      );
+    } catch {
+      setAccessURL(undefined);
+    }
+  }
+  async function refreshRepositories() {
+    await Promise.all([loadRepositories(1), loadAccess()]);
+  }
+  const discover = useEffectEvent(refreshRepositories);
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect -- Repository state updates after the discovery request resolves.
-    void discover();
-  }, []);
+    if (active) void discover();
+  }, [active]);
   const container = useRef<HTMLDivElement>(null);
   const addButton = useRef<HTMLButtonElement>(null);
   const pendingFocus = useRef<number | "add" | undefined>(undefined);
@@ -108,7 +116,7 @@ function RepositoryFields({
     else if (target !== undefined) {
       container.current
         ?.querySelector<HTMLInputElement>(
-          `[data-repository-key="${target}"] input[name="repository"]`,
+          `[data-repository-key="${target}"] ${compact ? 'input[role="combobox"]' : 'input[name="repository"]'}`,
         )
         ?.focus();
     }
@@ -124,6 +132,20 @@ function RepositoryFields({
   }
   return (
     <div ref={container} className="space-y-5">
+      {compact && !loading && !discoveryError && available.length === 0 && (
+        <Alert>
+          No repositories available. Choose repositories in GitHub access, then retry.{" "}
+          <Button
+            type="button"
+            variant="link"
+            onClick={() => {
+              void loadRepositories(1);
+            }}
+          >
+            Retry repositories
+          </Button>
+        </Alert>
+      )}
       {!compact && (
         <Text tone="muted">
           Use owner/repository or an HTTPS GitHub URL. All repositories must be accessible to the
@@ -147,7 +169,7 @@ function RepositoryFields({
           </Button>
         </Alert>
       )}
-      {nextPage > 0 && (
+      {nextPage > 0 && !discoveryError && (
         <Button
           type="button"
           variant="outline"
@@ -164,44 +186,67 @@ function RepositoryFields({
         <FieldSet
           key={key}
           data-repository-key={key}
-          className={compact ? "space-y-4" : "space-y-4 rounded-md border border-border p-4"}
+          className={compact ? "gap-4" : "space-y-4 rounded-md border border-border p-4"}
         >
           <legend className={compact ? "sr-only" : "px-1 text-sm font-medium"}>
             Repository {index + 1}
           </legend>
-          {!compact && available.length > 0 && (
-            <RepositoryChoice
+          {(compact || available.length > 0) && (
+            <ProjectRepositoryPicker
+              loading={loading}
+              accessPath={accessURL ?? (compact ? "#onboarding/github" : "#connections/github")}
+              onRefresh={() => {
+                void refreshRepositories();
+              }}
+              required={compact}
               available={available}
               url={repo.url}
               onSelect={(url) => {
+                const selected = available.find((r) => r.html_url === url);
+                if (index === 0 && selected) onPrimarySelect?.(selected);
                 setRows((current) =>
                   current.map((row) =>
-                    row.key === key ? { ...row, repo: { ...row.repo, url } } : row,
+                    row.key === key
+                      ? {
+                          ...row,
+                          repo: {
+                            ...row.repo,
+                            url,
+                            baseBranch:
+                              available.find((r) => r.html_url === url)?.default_branch ?? "",
+                          },
+                        }
+                      : row,
                   ),
                 );
               }}
             />
           )}
-          <FieldLabel className="w-full flex-col items-start">
-            GitHub repository
-            <Input
-              name="repository"
-              className="mt-2"
-              value={repo.url}
-              onChange={(event) => {
-                const { value } = event.currentTarget;
-                setRows((current) =>
-                  current.map((row) =>
-                    row.key === key ? { ...row, repo: { ...row.repo, url: value } } : row,
-                  ),
-                );
-              }}
-              placeholder="owner/repository"
-              required
-              maxLength={300}
-            />
-          </FieldLabel>
-          <Collapsible defaultOpen={!compact}>
+          {compact ? (
+            <input type="hidden" name="repository" value={repo.url} />
+          ) : (
+            <FieldLabel className="w-full flex-col items-start">
+              GitHub repository
+              <Input
+                name="repository"
+                className="mt-2"
+                value={repo.url}
+                onChange={(event) => {
+                  const { value } = event.currentTarget;
+                  setRows((current) =>
+                    current.map((row) =>
+                      row.key === key ? { ...row, repo: { ...row.repo, url: value } } : row,
+                    ),
+                  );
+                }}
+                placeholder="owner/repository"
+                required
+                maxLength={300}
+              />
+            </FieldLabel>
+          )}
+          {index === 0 && repo.url !== "" && children}
+          <Collapsible defaultOpen={!compact} hidden={compact && repo.url === ""}>
             {compact && (
               <CollapsibleTrigger
                 render={<Button type="button" variant="ghost" size="sm" className="-ml-2" />}
@@ -214,25 +259,20 @@ function RepositoryFields({
               keepMounted
               className={compact ? "space-y-4 data-open:pt-3" : "space-y-4"}
             >
-              {compact && available.length > 0 && (
-                <RepositoryChoice
-                  available={available}
-                  url={repo.url}
-                  onSelect={(url) => {
-                    setRows((current) =>
-                      current.map((row) =>
-                        row.key === key ? { ...row, repo: { ...row.repo, url } } : row,
-                      ),
-                    );
-                  }}
-                />
-              )}
               <FieldLabel className="w-full flex-col items-start">
                 Base branch
                 <Input
                   name="baseBranch"
                   className="mt-2"
-                  defaultValue={repo.baseBranch}
+                  value={repo.baseBranch}
+                  onChange={(event) => {
+                    const baseBranch = event.currentTarget.value;
+                    setRows((current) =>
+                      current.map((row) =>
+                        row.key === key ? { ...row, repo: { ...row.repo, baseBranch } } : row,
+                      ),
+                    );
+                  }}
                   maxLength={255}
                   placeholder="Repository default branch"
                 />
@@ -320,12 +360,16 @@ export function Projects({
   embedded = false,
   onCreated,
   onBusyChange,
+  onReadyChange,
+  active = true,
 }: {
+  active?: boolean;
   path: string;
   onExpired: () => void;
   embedded?: boolean;
   onCreated?: (project: Project) => Promise<void>;
   onBusyChange?: (busy: boolean) => void;
+  onReadyChange?: (ready: boolean) => void;
 }) {
   const [list, setList] = useState<Project[]>();
   const [project, setProject] = useState<Project>();
@@ -334,6 +378,9 @@ export function Projects({
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
   const heading = useRef<HTMLHeadingElement>(null);
+  const [name, setName] = useState("");
+  const [repositoryChosen, setRepositoryChosen] = useState(false);
+  const nameEdited = useRef(false);
   const id = path.startsWith("projects/") ? path.slice(9) : "";
   const creating = id === "new";
   const expire = useEffectEvent(onExpired);
@@ -341,25 +388,25 @@ export function Projects({
   useEffect(() => {
     if (!embedded) heading.current?.focus();
     if (creating) return;
-    let active = true;
+    let alive = true;
     const load = async () => {
       try {
         if (id === "") {
           const projects = await request(projectSchema.array(), "projects");
-          if (active) setList(projects);
+          if (alive) setList(projects);
         } else {
           const loaded = await request(projectSchema, `projects/${encodeURIComponent(id)}`);
-          if (active) setProject(loaded);
+          if (alive) setProject(loaded);
         }
       } catch (e) {
-        if (!active) return;
+        if (!alive) return;
         setError(errorMessage(e, "Could not load projects. Try again."));
         if (isExpired(e)) expire();
       }
     };
     void load();
     return () => {
-      active = false;
+      alive = false;
     };
   }, [id, creating, embedded]);
 
@@ -371,11 +418,12 @@ export function Projects({
     setError("");
     setNotice("");
     try {
-      const saved = await request(
-        projectSchema,
-        creating ? "projects" : `projects/${encodeURIComponent(id)}`,
-        { method: creating ? "POST" : "PUT", body: payload },
-      );
+      let savePath = `projects/${encodeURIComponent(id)}`;
+      if (creating) savePath = embedded ? "onboarding/project" : "projects";
+      const saved = await request(projectSchema, savePath, {
+        method: creating ? "POST" : "PUT",
+        body: payload,
+      });
       setProject(saved);
       setRevision((value) => value + 1);
       if (creating && onCreated) await onCreated(saved);
@@ -396,6 +444,24 @@ export function Projects({
   let submitLabel = creating ? "Validate and connect" : "Validate and save";
   if (busy) submitLabel = "Validating…";
 
+  const nameField = (
+    <SettingsGroup>
+      <SettingsRow label="Project name" htmlFor="project-name">
+        <Input
+          id="project-name"
+          name="name"
+          value={creating ? name : undefined}
+          defaultValue={creating ? undefined : project?.name}
+          onChange={(event) => {
+            nameEdited.current = true;
+            setName(event.currentTarget.value);
+          }}
+          maxLength={200}
+          required
+        />
+      </SettingsRow>
+    </SettingsGroup>
+  );
   return (
     <section
       aria-labelledby={embedded ? undefined : "projects-heading"}
@@ -495,21 +561,22 @@ export function Projects({
           )}
           <FieldSet disabled={busy}>
             <legend className="sr-only">Project settings</legend>
-            <FieldLabel className="w-full flex-col items-start">
-              Project name
-              <Input
-                name="name"
-                className="mt-2"
-                defaultValue={project?.name}
-                maxLength={200}
-                required
-              />
-            </FieldLabel>
+            {!embedded && nameField}
             <RepositoryFields
               compact={embedded}
+              active={active}
+              {...(onReadyChange ? { onReadyChange } : {})}
+              onPrimarySelect={(repository) => {
+                setRepositoryChosen(true);
+                if (creating && !nameEdited.current) {
+                  setName(repository.full_name.split("/").at(-1) ?? "");
+                }
+              }}
               repositories={project?.configuration.repositories ?? [blankRepository]}
-            />
-            <Collapsible defaultOpen={!embedded}>
+            >
+              {embedded && nameField}
+            </RepositoryFields>
+            <Collapsible defaultOpen={!embedded} hidden={embedded && !repositoryChosen}>
               {embedded && (
                 <CollapsibleTrigger
                   render={<Button type="button" variant="ghost" size="sm" className="-ml-2" />}

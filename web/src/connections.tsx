@@ -99,7 +99,9 @@ export function ConnectionsPage({
   path,
   onSaved,
   onExpired,
+  onAvailableChange,
 }: {
+  onAvailableChange?: (available: boolean | undefined) => void;
   embedded?: boolean;
   path: string;
   onSaved: (settings: Settings) => void;
@@ -154,6 +156,9 @@ export function ConnectionsPage({
     const view = await request(connectionSchema, "github/connection");
     if (read !== connectionRead.current) return;
     setConnection(view);
+    onAvailableChange?.(
+      view.slug === "" ? undefined : view.active === "app" && view.state === "connected",
+    );
     setError("");
     if (detail && view.active === "app" && view.state === "connected") await loadRepositories();
     else {
@@ -176,8 +181,8 @@ export function ConnectionsPage({
     }
   }
   async function changed() {
-    onSaved(await request(settingsSchema, "settings"));
     await load();
+    onSaved(await request(settingsSchema, "settings"));
   }
   async function complete() {
     if (!callback) return;
@@ -235,7 +240,7 @@ export function ConnectionsPage({
   const connected = connection?.active === "app" && connection.state === "connected";
   const messages: Record<string, string> = {
     disconnected: embedded
-      ? "Choose which repositories Flora can access on GitHub"
+      ? "Read and update code, issues, and pull requests in the repositories you choose"
       : "Create your GitHub App, then install it and choose repositories on GitHub",
     created: "Your App is ready. Install it on GitHub and choose repositories",
     pending: "An organization owner needs to approve the installation. Refresh after approval",
@@ -509,14 +514,17 @@ export function ConnectionsPage({
               </SettingsGroup>
             </Section>
           )}
-          {connected && !embedded && (
+          {connected && (
             <Section aria-labelledby="github-repositories-heading">
               <SectionHeader inset>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <Heading level={2} id="github-repositories-heading">
                     Repositories
                   </Heading>
-                  <ButtonLink variant="outline" href="#projects/new">
+                  <ButtonLink
+                    variant="outline"
+                    href={embedded ? "#onboarding/project" : "#projects/new"}
+                  >
                     Connect project
                     <ChevronRightIcon aria-hidden="true" />
                   </ButtonLink>

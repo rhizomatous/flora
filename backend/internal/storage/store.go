@@ -267,16 +267,51 @@ func configJSON(c Configuration) ([]byte, error) {
 }
 
 func (s *Store) CreateProject(ctx context.Context, name string, c Configuration) (Project, error) {
+	return s.createProject(ctx, name, c, false)
+}
+
+// CreateOnboardingProject reuses the selected or first saved project. Creating
+// the first project and selecting it commit together, so concurrent submissions
+// and retries after a lost response cannot create another project.
+func (s *Store) CreateOnboardingProject(ctx context.Context, name string, c Configuration) (Project, error) {
+	return s.createProject(ctx, name, c, true)
+}
+
+func (s *Store) createProject(ctx context.Context, name string, c Configuration, onboarding bool) (Project, error) {
 	p := Project{ID: id(), Name: name, Configuration: c, CreatedAt: now()}
 	b, err := configJSON(c)
 	if err != nil || name == "" {
 		return Project{}, ErrInvalid
 	}
 	err = s.write(ctx, func(tx *sql.Tx) error {
+		if onboarding {
+			var existing Project
+			var config string
+			err := tx.QueryRowContext(ctx, `SELECT id,name,config,created_at FROM projects ORDER BY CASE WHEN id=(SELECT project_id FROM onboarding WHERE id=1) THEN 0 ELSE 1 END,created_at,id LIMIT 1`).Scan(&existing.ID, &existing.Name, &config, &existing.CreatedAt)
+			if err == nil {
+				if err := json.Unmarshal([]byte(config), &existing.Configuration); err != nil {
+					return err
+				}
+				p = existing
+			} else if !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+			if err == nil {
+				_, err = tx.ExecContext(ctx, `INSERT INTO onboarding(id,step,completed,project_id) VALUES(1,'project',0,?) ON CONFLICT(id) DO UPDATE SET project_id=excluded.project_id`, p.ID)
+				return err
+			}
+		}
 		if _, err := tx.ExecContext(ctx, "INSERT INTO projects VALUES (?,?,?,?)", p.ID, p.Name, string(b), p.CreatedAt); err != nil {
 			return err
 		}
-		return reserveProjectChatPrefix(ctx, tx, p.ID, p.Name)
+		if err := reserveProjectChatPrefix(ctx, tx, p.ID, p.Name); err != nil {
+			return err
+		}
+		if onboarding {
+			_, err := tx.ExecContext(ctx, `INSERT INTO onboarding(id,step,completed,project_id) VALUES(1,'project',0,?) ON CONFLICT(id) DO UPDATE SET step='project',completed=0,project_id=excluded.project_id`, p.ID)
+			return err
+		}
+		return nil
 	})
 	return p, err
 }

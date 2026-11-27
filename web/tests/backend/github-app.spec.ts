@@ -124,7 +124,13 @@ test("Connections and GitHub details support keyboard navigation, search and nar
   await page.getByRole("button",{name:"Refresh GitHub connection",exact:true}).click();
   await page.getByRole("link",{name:"Connect project",exact:true}).click();
   const select=page.getByRole("combobox",{name:"Choose a repository",exact:true});
-  await expect(select).toBeVisible();await select.selectOption(`https://github.com/${account}/a-long-repository-name-for-testing`);
+  await expect(select).toBeVisible();await select.fill("a-long-repository");await page.getByRole("option",{name:`${account}/a-long-repository-name-for-testing`,exact:true}).click();
   await expect(page.getByRole("textbox",{name:"GitHub repository",exact:true})).toHaveValue(`https://github.com/${account}/a-long-repository-name-for-testing`);
-  await assertFitsPhone(page);assert.deepEqual(errors,[]);
+  await expect(page.locator('[data-slot="combobox-content"]')).toHaveCount(0);
+  await assertFitsPhone(page);
+  await page.getByRole("button",{name:"Change repository",exact:true}).click();
+  await expect(page.getByRole("option",{name:`${account}/a-long-repository-name-for-testing`,exact:true})).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button",{name:"Change repository",exact:true})).toBeFocused();assert.deepEqual(errors,[]);
 });

@@ -8,6 +8,7 @@ import {
   Button,
   Heading,
   LoadingStatus,
+  NativeSelect,
   SettingsGroup,
   SettingsRow,
   Toaster,
@@ -58,6 +59,8 @@ export function Onboarding({
   const heading = useRef<HTMLHeadingElement>(null);
   // Keep visited editors mounted to retain non-secret drafts during back navigation.
   const [visited, setVisited] = useState<SetupStep[]>([]);
+  const [projectReady, setProjectReady] = useState(false);
+  const [githubAvailable, setGithubAvailable] = useState<boolean>();
   const [projects, setProjects] = useState<Project[]>();
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
@@ -66,10 +69,11 @@ export function Onboarding({
   const modelComplete = settings.providerConfigured && settings.model !== "";
   const selected = projects?.find((project) => project.id === state.projectID) ?? projects?.[0];
   const projectComplete = selected !== undefined;
+  const githubComplete = settings.githubConfigured && githubAvailable !== false;
   let availableStep = 1;
   if (modelComplete) availableStep = 2;
-  if (modelComplete && settings.githubConfigured) availableStep = 3;
-  if (modelComplete && settings.githubConfigured && projectComplete) availableStep = 4;
+  if (modelComplete && githubComplete) availableStep = 3;
+  if (modelComplete && githubComplete && projectComplete) availableStep = 4;
   const index = Math.min(setupSteps.indexOf(requestedStep), availableStep);
   const step = setupSteps[index] ?? "model";
   const projectsLoaded = projects !== undefined;
@@ -124,7 +128,7 @@ export function Onboarding({
     step === "account" ||
     (step === "finish" && availableStep === 4) ||
     (step === "model" && modelComplete) ||
-    (step === "github" && settings.githubConfigured) ||
+    (step === "github" && githubComplete) ||
     (step === "project" && projectComplete);
   function finish() {
     void run(async () => {
@@ -208,6 +212,7 @@ export function Onboarding({
         <div hidden={step !== "github"}>
           <ConnectionsPage
             embedded
+            onAvailableChange={setGithubAvailable}
             path="connections/github"
             onSaved={onSaved}
             onExpired={onExpired}
@@ -220,11 +225,26 @@ export function Onboarding({
           {projects && projectComplete && (
             <SettingsGroup>
               <SettingsRow label="Project" htmlFor="setup-project">
-                <output id="setup-project">{selected.name}</output>
+                <NativeSelect
+                  id="setup-project"
+                  className="max-w-full"
+                  value={selected.id}
+                  disabled={navigating}
+                  onChange={(event) => {
+                    const projectID = event.currentTarget.value;
+                    void run(() => onState({ ...state, projectID }), "Could not select project.");
+                  }}
+                >
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </NativeSelect>
               </SettingsRow>
             </SettingsGroup>
           )}
-          {projects && !projectComplete && !settings.githubConfigured && (
+          {projects && !projectComplete && !githubComplete && (
             <Button
               variant="outline"
               onClick={() => {
@@ -234,10 +254,12 @@ export function Onboarding({
               Connect GitHub
             </Button>
           )}
-          {projects && !projectComplete && settings.githubConfigured && (
+          {projects && !projectComplete && githubComplete && (
             <Projects
               embedded
+              active={step === "project"}
               onBusyChange={setProjectBusy}
+              onReadyChange={setProjectReady}
               path="projects/new"
               onExpired={onExpired}
               onCreated={async (project) => {
@@ -263,32 +285,41 @@ export function Onboarding({
             <output id="setup-model">{modelComplete ? settings.model : "Not connected"}</output>
           </SettingsRow>
           <SettingsRow label="GitHub" htmlFor="setup-github">
-            <output id="setup-github">
-              {settings.githubConfigured ? "Connected" : "Not connected"}
-            </output>
+            <output id="setup-github">{githubComplete ? "Connected" : "Not connected"}</output>
           </SettingsRow>
           <SettingsRow label="Project" htmlFor="setup-summary-project">
             <output id="setup-summary-project">{selected?.name ?? "Not connected"}</output>
           </SettingsRow>
         </SettingsGroup>
       )}
-      <footer className="mt-8 flex flex-wrap items-center justify-between gap-3">
+      <footer className="mt-8 flex flex-wrap items-center justify-between gap-2">
         <Button
           variant="ghost"
           className="-ml-1 px-1"
+          aria-label="Back"
           disabled={navigating || index === 0}
           onClick={() => {
             go(setupSteps[index - 1] ?? "account");
           }}
         >
           <ChevronLeftIcon aria-hidden="true" />
-          Back
+          <span className="hidden sm:inline">Back</span>
         </Button>
         <div className="flex flex-wrap gap-2">
           {step === "project" && !projectComplete && settings.githubConfigured && projects && (
-            <Button type="submit" form="onboarding-project" disabled={navigating}>
-              {projectBusy ? "Connecting…" : "Connect project"}
+            <Button type="submit" form="onboarding-project" disabled={navigating || !projectReady}>
+              {projectBusy ? "Creating…" : "Create project"}
               <ChevronRightIcon aria-hidden="true" />
+            </Button>
+          )}
+          {(step === "github" || step === "project") && (
+            <Button
+              variant="ghost"
+              className="order-first px-1 sm:px-2"
+              disabled={navigating}
+              onClick={onLogout}
+            >
+              Finish later
             </Button>
           )}
           {canContinue && (
