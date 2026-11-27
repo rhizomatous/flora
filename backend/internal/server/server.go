@@ -12,6 +12,8 @@ import (
 	"github.com/rhizomatous/flora/backend/internal/settings"
 )
 
+const chatServiceUnavailable = "This server has no chat execution service. Restart Flora and check its startup logs."
+
 // New serves public static assets and protects every API except the explicit
 // health/onboarding/login allowlist. Register future data routes on this mux.
 func New(assets fs.FS, authentication *auth.Service, credentials *settings.Service, origin string, chats ...*chat.Service) http.Handler {

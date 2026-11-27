@@ -14,7 +14,7 @@ func (a *api) attachmentRoutes(mux *http.ServeMux) {
 	store := a.settings.Store
 	mux.HandleFunc("GET /api/attachments/policy", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {
-			failure(w, 503, "Chat runtime is not configured.")
+			failure(w, 503, chatServiceUnavailable)
 			return
 		}
 		id := r.URL.Query().Get("chat")

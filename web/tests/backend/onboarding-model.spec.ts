@@ -46,6 +46,7 @@ test("model setup stays focused on connections and resumes without saved secrets
   await expect(connection).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Update Anthropic key", exact: true })).toBeFocused();
   await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeEnabled();
+  await expect(page.getByText("Models updated", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Metadata access", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Enter model ID", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Retry discovery", exact: true })).toHaveCount(0);

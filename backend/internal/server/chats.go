@@ -103,7 +103,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 	a.folderRoutes(mux)
 	mux.HandleFunc("GET /api/commands", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {
-			failure(w, 503, "Chat runtime is not configured.")
+			failure(w, 503, chatServiceUnavailable)
 			return
 		}
 		items, err := a.chats.Commands(r.Context(), r.URL.Query().Get("chat"))
@@ -144,7 +144,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("GET /api/models", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {
-			failure(w, 503, "Chat runtime is not configured.")
+			failure(w, 503, chatServiceUnavailable)
 			return
 		}
 		id := r.URL.Query().Get("chat")
@@ -158,7 +158,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("GET /api/chats/{id}/compaction", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {
-			failure(w, 503, "Chat runtime is not configured.")
+			failure(w, 503, chatServiceUnavailable)
 			return
 		}
 		result, err := a.chats.Compaction(r.Context(), r.PathValue("id"))
@@ -178,7 +178,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			return
 		}
 		if a.chats == nil {
-			failure(w, 503, "Chat runtime is not configured.")
+			failure(w, 503, chatServiceUnavailable)
 			return
 		}
 		result, err := a.chats.SetCompaction(r.Context(), r.PathValue("id"), storage.Execution{Provider: in.Provider, Model: in.Model}, in.Threshold)
@@ -201,7 +201,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 			return
 		}
 		if a.chats == nil {
-			failure(w, 503, "Chat runtime is not configured.")
+			failure(w, 503, chatServiceUnavailable)
 			return
 		}
 		c, err := a.chats.SetChatModel(r.Context(), r.PathValue("id"), in.Execution, *in.Revision)
@@ -247,7 +247,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("GET /api/chats/{id}/runtime", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {
-			failure(w, 503, "Chat runtime is not configured.")
+			failure(w, 503, chatServiceUnavailable)
 			return
 		}
 		state, err := a.chats.Runtime(r.Context(), r.PathValue("id"))
@@ -259,7 +259,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("POST /api/chats/{id}/keep-awake", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {
-			failure(w, 503, "Chat runtime is not configured.")
+			failure(w, 503, chatServiceUnavailable)
 			return
 		}
 		var body struct {
@@ -281,7 +281,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 	for _, action := range []string{"interrupt", "stop", "wake"} {
 		mux.HandleFunc("POST /api/chats/{id}/"+action, func(w http.ResponseWriter, r *http.Request) {
 			if a.chats == nil {
-				failure(w, 503, "Chat runtime is not configured.")
+				failure(w, 503, chatServiceUnavailable)
 				return
 			}
 			var err error
@@ -342,7 +342,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("POST /api/projects/{id}/chats", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {
-			failure(w, 503, "Chat runtime is not configured. Configure the pinned agent image and private GitHub transport.")
+			failure(w, 503, chatServiceUnavailable)
 			return
 		}
 		var in struct {
@@ -429,7 +429,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("POST /api/chats/{id}/messages", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {
-			failure(w, 503, "Chat runtime is not configured.")
+			failure(w, 503, chatServiceUnavailable)
 			return
 		}
 		var in struct {
@@ -451,7 +451,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("GET /api/chats/{id}/questions", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {
-			failure(w, 503, "Chat runtime is not configured.")
+			failure(w, 503, chatServiceUnavailable)
 			return
 		}
 		list, err := a.chats.Questions(r.Context(), r.PathValue("id"))
@@ -463,7 +463,7 @@ func (a *api) chatRoutes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("POST /api/chats/{id}/questions/{question}/reply", func(w http.ResponseWriter, r *http.Request) {
 		if a.chats == nil {
-			failure(w, 503, "Chat runtime is not configured.")
+			failure(w, 503, chatServiceUnavailable)
 			return
 		}
 		var in struct {

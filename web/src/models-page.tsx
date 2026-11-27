@@ -39,8 +39,10 @@ export function ModelsPage({
     try {
       const next = await request(settingsSchema, "settings", { method: "PUT", body });
       onSaved(next);
-      if (!embedded) retry();
-      toast.success("Models updated", { toasterId: "chat-organization" });
+      if (!embedded) {
+        retry();
+        toast.success("Models updated", { toasterId: "chat-organization" });
+      }
     } catch (cause) {
       if (isExpired(cause)) onExpired();
       throw cause;
