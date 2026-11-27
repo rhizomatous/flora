@@ -128,9 +128,9 @@ test("Connections and GitHub details support keyboard navigation, search and nar
   await expect(page.getByRole("textbox",{name:"GitHub repository",exact:true})).toHaveValue(`https://github.com/${account}/a-long-repository-name-for-testing`);
   await expect(page.locator('[data-slot="combobox-content"]')).toHaveCount(0);
   await assertFitsPhone(page);
-  await select.click();
+  await page.getByRole("button",{name:"Change repository",exact:true}).click();
   await expect(page.getByRole("option",{name:`${account}/a-long-repository-name-for-testing`,exact:true})).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.keyboard.press("Escape");
-  await expect(select).toBeFocused();assert.deepEqual(errors,[]);
+  await expect(page.getByRole("button",{name:"Change repository",exact:true})).toBeFocused();assert.deepEqual(errors,[]);
 });

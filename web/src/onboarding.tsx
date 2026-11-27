@@ -59,6 +59,7 @@ export function Onboarding({
   const heading = useRef<HTMLHeadingElement>(null);
   // Keep visited editors mounted to retain non-secret drafts during back navigation.
   const [visited, setVisited] = useState<SetupStep[]>([]);
+  const [projectReady, setProjectReady] = useState(false);
   const [githubAvailable, setGithubAvailable] = useState<boolean>();
   const [projects, setProjects] = useState<Project[]>();
   const [error, setError] = useState("");
@@ -258,6 +259,7 @@ export function Onboarding({
               embedded
               active={step === "project"}
               onBusyChange={setProjectBusy}
+              onReadyChange={setProjectReady}
               path="projects/new"
               onExpired={onExpired}
               onCreated={async (project) => {
@@ -290,27 +292,33 @@ export function Onboarding({
           </SettingsRow>
         </SettingsGroup>
       )}
-      <footer className="mt-8 flex flex-wrap items-center justify-between gap-3">
+      <footer className="mt-8 flex flex-wrap items-center justify-between gap-2">
         <Button
           variant="ghost"
           className="-ml-1 px-1"
+          aria-label="Back"
           disabled={navigating || index === 0}
           onClick={() => {
             go(setupSteps[index - 1] ?? "account");
           }}
         >
           <ChevronLeftIcon aria-hidden="true" />
-          Back
+          <span className="hidden sm:inline">Back</span>
         </Button>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1 sm:gap-2">
           {step === "project" && !projectComplete && settings.githubConfigured && projects && (
-            <Button type="submit" form="onboarding-project" disabled={navigating}>
-              {projectBusy ? "Connecting…" : "Connect project"}
+            <Button type="submit" form="onboarding-project" disabled={navigating || !projectReady}>
+              {projectBusy ? "Creating…" : "Create project"}
               <ChevronRightIcon aria-hidden="true" />
             </Button>
           )}
           {(step === "github" || step === "project") && (
-            <Button variant="outline" disabled={navigating} onClick={onLogout}>
+            <Button
+              variant="ghost"
+              className="order-first px-1 sm:px-2"
+              disabled={navigating}
+              onClick={onLogout}
+            >
               Finish later
             </Button>
           )}

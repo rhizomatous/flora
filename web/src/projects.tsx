@@ -1,15 +1,16 @@
-import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import {
   Alert,
   Button,
   ButtonLink,
-  Combobox,
-  ComboboxInput,
-  ComboboxContent,
-  ComboboxList,
-  ComboboxItem,
-  ComboboxEmpty,
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
@@ -29,76 +30,33 @@ import {
 
 import { EnvironmentEditor } from "./environment";
 import { repositoryPageSchema, type GitHubRepository } from "./github-schemas";
+import { ProjectRepositoryPicker } from "./project-repository-picker";
 import { projectSchema, type Project, type Repository } from "./project-schemas";
 import { errorMessage, isExpired, request } from "./request";
 import { text, texts } from "./ui";
 
 const blankRepository: Repository = { name: "", url: "", baseBranch: "", role: "core" };
 
-function RepositoryChoice({
-  available,
-  url,
-  onSelect,
-  disabled = false,
-  required = false,
-}: {
-  disabled?: boolean;
-  required?: boolean;
-  available: GitHubRepository[];
-  url: string;
-  onSelect: (url: string) => void;
-}) {
-  return (
-    <FieldLabel className="w-full flex-col items-start">
-      Choose a repository
-      <Combobox
-        autoHighlight
-        disabled={disabled}
-        required={required}
-        items={available}
-        value={available.find((r) => r.html_url === url || `${r.html_url}.git` === url) ?? null}
-        itemToStringLabel={(repository) => repository.full_name}
-        onValueChange={(repository) => {
-          if (repository) onSelect(repository.html_url);
-        }}
-      >
-        <ComboboxInput
-          disabled={disabled}
-          aria-label="Choose a repository"
-          placeholder="Search repositories"
-          className="mt-2 w-full"
-        />
-        <ComboboxContent className="max-w-[calc(100vw-1rem)] min-w-0">
-          <ComboboxEmpty>No matching repositories</ComboboxEmpty>
-          <ComboboxList>
-            {(repository: GitHubRepository) => (
-              <ComboboxItem
-                key={repository.full_name}
-                value={repository}
-                className="min-w-0 whitespace-normal"
-              >
-                <span className="min-w-0 break-all whitespace-normal">{repository.full_name}</span>
-              </ComboboxItem>
-            )}
-          </ComboboxList>
-        </ComboboxContent>
-      </Combobox>
-    </FieldLabel>
-  );
-}
-
 function RepositoryFields({
   repositories,
   compact = false,
   onPrimarySelect,
+  onReadyChange,
+  children,
   active = true,
 }: {
   active?: boolean;
+  children?: ReactNode;
+  onReadyChange?: (ready: boolean) => void;
   repositories: Repository[];
   compact?: boolean;
   onPrimarySelect?: (repository: GitHubRepository) => void;
 }) {
   const [rows, setRows] = useState(() => repositories.map((repo, key) => ({ repo, key })));
+  const ready = rows.length > 0 && rows.every(({ repo }) => repo.url !== "");
+  useEffect(() => {
+    onReadyChange?.(ready);
+  }, [ready, onReadyChange]);
   const nextKey = useRef(rows.length);
   const [available, setAvailable] = useState<GitHubRepository[]>([]);
   const [nextPage, setNextPage] = useState(1);
@@ -157,9 +115,6 @@ function RepositoryFields({
       {compact && !loading && !discoveryError && available.length === 0 && (
         <Alert>
           No repositories available. Choose repositories in GitHub access, then retry.{" "}
-          <ButtonLink variant="link" href="#onboarding/github">
-            Manage GitHub access
-          </ButtonLink>
           <Button
             type="button"
             variant="link"
@@ -181,11 +136,6 @@ function RepositoryFields({
       {discoveryError && (
         <Alert variant="destructive">
           {discoveryError}
-          {compact && (
-            <ButtonLink variant="link" href="#onboarding/github">
-              Manage GitHub access
-            </ButtonLink>
-          )}
           <Button
             type="button"
             variant="link"
@@ -216,14 +166,18 @@ function RepositoryFields({
         <FieldSet
           key={key}
           data-repository-key={key}
-          className={compact ? "space-y-4" : "space-y-4 rounded-md border border-border p-4"}
+          className={compact ? "gap-4" : "space-y-4 rounded-md border border-border p-4"}
         >
           <legend className={compact ? "sr-only" : "px-1 text-sm font-medium"}>
             Repository {index + 1}
           </legend>
           {(compact || available.length > 0) && (
-            <RepositoryChoice
-              disabled={loading || (compact && available.length === 0)}
+            <ProjectRepositoryPicker
+              loading={loading}
+              accessPath={compact ? "#onboarding/github" : "#connections/github"}
+              onRefresh={() => {
+                void loadRepositories(1);
+              }}
               required={compact}
               available={available}
               url={repo.url}
@@ -271,7 +225,8 @@ function RepositoryFields({
               />
             </FieldLabel>
           )}
-          <Collapsible defaultOpen={!compact}>
+          {index === 0 && repo.url !== "" && children}
+          <Collapsible defaultOpen={!compact} hidden={compact && repo.url === ""}>
             {compact && (
               <CollapsibleTrigger
                 render={<Button type="button" variant="ghost" size="sm" className="-ml-2" />}
@@ -385,6 +340,7 @@ export function Projects({
   embedded = false,
   onCreated,
   onBusyChange,
+  onReadyChange,
   active = true,
 }: {
   active?: boolean;
@@ -393,6 +349,7 @@ export function Projects({
   embedded?: boolean;
   onCreated?: (project: Project) => Promise<void>;
   onBusyChange?: (busy: boolean) => void;
+  onReadyChange?: (ready: boolean) => void;
 }) {
   const [list, setList] = useState<Project[]>();
   const [project, setProject] = useState<Project>();
@@ -402,6 +359,7 @@ export function Projects({
   const [revision, setRevision] = useState(0);
   const heading = useRef<HTMLHeadingElement>(null);
   const [name, setName] = useState("");
+  const [repositoryChosen, setRepositoryChosen] = useState(false);
   const nameEdited = useRef(false);
   const id = path.startsWith("projects/") ? path.slice(9) : "";
   const creating = id === "new";
@@ -466,6 +424,24 @@ export function Projects({
   let submitLabel = creating ? "Validate and connect" : "Validate and save";
   if (busy) submitLabel = "Validating…";
 
+  const nameField = (
+    <SettingsGroup>
+      <SettingsRow label="Project name" htmlFor="project-name">
+        <Input
+          id="project-name"
+          name="name"
+          value={creating ? name : undefined}
+          defaultValue={creating ? undefined : project?.name}
+          onChange={(event) => {
+            nameEdited.current = true;
+            setName(event.currentTarget.value);
+          }}
+          maxLength={200}
+          required
+        />
+      </SettingsRow>
+    </SettingsGroup>
+  );
   return (
     <section
       aria-labelledby={embedded ? undefined : "projects-heading"}
@@ -565,33 +541,22 @@ export function Projects({
           )}
           <FieldSet disabled={busy}>
             <legend className="sr-only">Project settings</legend>
-            <SettingsGroup>
-              <SettingsRow label="Project name" htmlFor="project-name">
-                <Input
-                  id="project-name"
-                  name="name"
-                  value={creating ? name : undefined}
-                  defaultValue={creating ? undefined : project?.name}
-                  onChange={(event) => {
-                    nameEdited.current = true;
-                    setName(event.currentTarget.value);
-                  }}
-                  maxLength={200}
-                  required
-                />
-              </SettingsRow>
-            </SettingsGroup>
+            {!embedded && nameField}
             <RepositoryFields
               compact={embedded}
               active={active}
+              {...(onReadyChange ? { onReadyChange } : {})}
               onPrimarySelect={(repository) => {
+                setRepositoryChosen(true);
                 if (creating && !nameEdited.current) {
                   setName(repository.full_name.split("/").at(-1) ?? "");
                 }
               }}
               repositories={project?.configuration.repositories ?? [blankRepository]}
-            />
-            <Collapsible defaultOpen={!embedded}>
+            >
+              {embedded && nameField}
+            </RepositoryFields>
+            <Collapsible defaultOpen={!embedded} hidden={embedded && !repositoryChosen}>
               {embedded && (
                 <CollapsibleTrigger
                   render={<Button type="button" variant="ghost" size="sm" className="-ml-2" />}

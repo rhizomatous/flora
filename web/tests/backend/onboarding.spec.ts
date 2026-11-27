@@ -120,6 +120,8 @@ test.describe("first run", () => {
     await expect(page.getByRole("alert")).toContainText("No repositories available");
     await page.getByRole("button",{name:"Retry repositories",exact:true}).click();
     const repositoryChoice = page.getByRole("combobox", { name: "Choose a repository", exact: true });
+    await expect(page.getByLabel("Project name",{exact:true})).toHaveCount(0);
+    await captureStep("project-repository-picker");
     await repositoryChoice.fill("missing");
     await expect(page.getByText("No matching repositories", { exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
@@ -127,7 +129,13 @@ test.describe("first run", () => {
     await repositoryChoice.fill("fixture");
     await expect(page.getByRole("option", { name: "flora/fixture", exact: true })).toBeVisible();
     await page.keyboard.press("Enter");
+    await expect(page.getByRole("button",{name:"Change repository",exact:true})).toBeFocused();
     await expect(page.getByLabel("Project name", { exact: true })).toHaveValue("fixture");
+    await page.getByRole("button",{name:"Change repository",exact:true}).click();
+    await expect(repositoryChoice).toBeFocused();
+    await repositoryChoice.fill("missing");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("button",{name:"Change repository",exact:true})).toBeFocused();
     await page.getByRole("button", { name: "Repository options", exact: true }).click();
     await expect(page.getByLabel("Base branch", { exact: true })).toHaveValue("main");
     await page.getByRole("button", { name: "Repository options", exact: true }).click();
@@ -137,13 +145,13 @@ test.describe("first run", () => {
     await expect(page.getByRole("heading", { name: "Connect GitHub", exact: true })).toBeFocused();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await expect(page.getByLabel("Project name", { exact: true })).toHaveValue("Garden draft");
-    await expect(repositoryChoice).toHaveValue("flora/fixture");
+    await expect(page.getByRole("button",{name:"Change repository",exact:true})).toContainText("flora/fixture");
     const repositoryOptions = page.getByRole("button", { name: "Repository options", exact: true });
     await repositoryOptions.focus();
     await page.keyboard.press("Enter");
     await page.getByLabel("Base branch", { exact: true }).fill("main");
     await page.getByRole("button", { name: "Add repository", exact: true }).click();
-    await expect(page.getByRole("combobox",{name:"Choose a repository",exact:true}).nth(1)).toBeFocused();
+    await expect(repositoryChoice).toBeFocused();
     await page.getByRole("button", { name: "Remove repository 1", exact: true }).click();
     await expect(repositoryChoice).toBeFocused();
     await repositoryChoice.fill("fixture");
@@ -167,10 +175,10 @@ test.describe("first run", () => {
       if (saves === 1) await route.fulfill({ status: 502, json: { error: "Response lost. Try saving again." } });
       else await route.fulfill({ response });
     });
-    await page.getByRole("button", { name: "Connect project", exact: true }).click();
+    await page.getByRole("button", { name: "Create project", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("Response lost");
     await expect(page.getByLabel("Project name", { exact: true })).toHaveValue("Garden draft");
-    await page.getByRole("button", { name: "Connect project", exact: true }).click();
+    await page.getByRole("button", { name: "Create project", exact: true }).click();
     expect(saves).toBe(2);
     await expect(page.getByRole("combobox", { name: "Project", exact: true })).toHaveValue(/.+/);
     await page.getByRole("button", { name: "Continue", exact: true }).click();
@@ -235,4 +243,44 @@ test("setup selects an existing project for the first chat", async ({ page, back
   expect((await (await page.request.get("/api/onboarding")).json()).projectID).toBe(project.id);
   await page.getByRole("button",{name:"Open Flora",exact:true}).click();
   await expect(page).toHaveURL(new RegExp(`#chats/new\\?project=${project.id}$`));
+});
+
+
+test("repository-first project picker supports browsing, search, and scrolling", async ({ page }, testInfo) => {
+  await logIn(page);
+  let many = false;
+  await page.route("**/api/projects", async route => { await route.fulfill({json:[]}); });
+  await page.route("**/api/github/repositories*", async route => {
+    const names = ["garden", "website", "tendril", ...(many ? Array.from({length:40}, (_,i) => `repository-${i}-with-a-long-name`) : [])];
+    await route.fulfill({json:{repositories:names.map(name => ({full_name:`flora/${name}`,html_url:`https://github.com/flora/${name}`,default_branch:"main"})),nextPage:0}});
+  });
+  await page.goto("/#onboarding/project");
+  await expect(page.getByRole("option")).toHaveCount(3);
+  await expect(page.getByRole("button", {name:"Create project",exact:true})).toBeDisabled();
+  async function capture(name: string) {
+    await page.mouse.move(0,0);
+    for (const width of [1280,375]) {
+      await page.setViewportSize({width,height:width === 375 ? 812 : 900});
+      for (const dark of [true,false]) {
+        await page.evaluate(value => document.documentElement.classList.toggle("dark",value),dark);
+        await page.screenshot({path:testInfo.outputPath(`${name}-${width}-${dark ? "dark" : "light"}.png`),animations:"disabled",fullPage:true});
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      }
+    }
+  }
+  await capture("project-picker");
+  many = true;
+  await page.getByRole("button",{name:"Refresh repositories",exact:true}).click();
+  await expect(page.getByRole("option")).toHaveCount(43);
+  const list = page.getByRole("listbox");
+  await list.hover();
+  await page.mouse.wheel(0,600);
+  await expect.poll(() => list.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
+  await page.getByRole("combobox",{name:"Choose a repository",exact:true}).fill("website");
+  await expect(page.getByRole("option")).toHaveCount(1);
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button",{name:"Change repository",exact:true})).toBeFocused();
+  await expect(page.getByLabel("Project name",{exact:true})).toHaveValue("website");
+  await expect(page.getByRole("button",{name:"Create project",exact:true})).toBeEnabled();
+  await capture("project-selected");
 });
