@@ -305,7 +305,7 @@ export function Onboarding({
           <ChevronLeftIcon aria-hidden="true" />
           <span className="hidden sm:inline">Back</span>
         </Button>
-        <div className="flex flex-wrap gap-1 sm:gap-2">
+        <div className="flex flex-wrap gap-2">
           {step === "project" && !projectComplete && settings.githubConfigured && projects && (
             <Button type="submit" form="onboarding-project" disabled={navigating || !projectReady}>
               {projectBusy ? "Creating…" : "Create project"}
