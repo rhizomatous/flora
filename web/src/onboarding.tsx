@@ -23,6 +23,7 @@ import { projectSchema, type Project } from "./project-schemas";
 import { Projects } from "./projects";
 import { errorMessage, request } from "./request";
 import type { Settings } from "./settings-schemas";
+import { SetupReadiness } from "./setup-readiness";
 
 const labels = {
   account: "Secure Flora",
@@ -39,6 +40,7 @@ export function Onboarding({
   settings,
   onSaved,
   onState,
+  onFinished,
   onExpired,
   onLogout,
   busy,
@@ -50,6 +52,7 @@ export function Onboarding({
   settings: Settings;
   onSaved: (settings: Settings) => void;
   onState: (state: OnboardingState) => Promise<void>;
+  onFinished: (state: OnboardingState) => void;
   onExpired: () => void;
   onLogout: () => void;
   busy: boolean;
@@ -66,7 +69,8 @@ export function Onboarding({
   const [revision, setRevision] = useState(0);
   const [projectBusy, setProjectBusy] = useState(false);
   const [modelBusy, setModelBusy] = useState(false);
-  const navigating = busy || projectBusy || modelBusy;
+  const [readinessBusy, setReadinessBusy] = useState(false);
+  const navigating = busy || projectBusy || modelBusy || readinessBusy;
   const modelComplete = settings.providerConfigured && settings.model !== "";
   const selected = projects?.find((project) => project.id === state.projectID) ?? projects?.[0];
   const projectComplete = selected !== undefined;
@@ -131,14 +135,6 @@ export function Onboarding({
     (step === "model" && modelComplete) ||
     (step === "github" && githubComplete) ||
     (step === "project" && projectComplete);
-  function finish() {
-    void run(async () => {
-      await onState({ ...state, step, completed: true, projectID: selectedID });
-      window.location.hash = selectedID
-        ? `chats/new?project=${encodeURIComponent(selectedID)}`
-        : "chats/new";
-    }, "Could not finish setup. Try again.");
-  }
   return (
     <FirstRunLayout
       actions={
@@ -282,17 +278,12 @@ export function Onboarding({
         </div>
       )}
       {step === "finish" && (
-        <SettingsGroup>
-          <SettingsRow label="Model" htmlFor="setup-model">
-            <output id="setup-model">{modelComplete ? settings.model : "Not connected"}</output>
-          </SettingsRow>
-          <SettingsRow label="GitHub" htmlFor="setup-github">
-            <output id="setup-github">{githubComplete ? "Connected" : "Not connected"}</output>
-          </SettingsRow>
-          <SettingsRow label="Project" htmlFor="setup-summary-project">
-            <output id="setup-summary-project">{selected?.name ?? "Not connected"}</output>
-          </SettingsRow>
-        </SettingsGroup>
+        <SetupReadiness
+          key={`${selectedID}:${JSON.stringify(settings)}`}
+          onFinished={onFinished}
+          onExpired={onExpired}
+          onBusyChange={setReadinessBusy}
+        />
       )}
       <footer className="mt-8 flex flex-wrap items-center justify-between gap-2">
         <Button
@@ -329,15 +320,14 @@ export function Onboarding({
               Finish later
             </Button>
           )}
-          {canContinue && (
+          {canContinue && step !== "finish" && (
             <Button
               disabled={navigating}
               onClick={() => {
-                if (step === "finish") finish();
-                else go(setupSteps[index + 1] ?? "finish");
+                go(setupSteps[index + 1] ?? "finish");
               }}
             >
-              {step === "finish" ? "Open Flora" : "Continue"}
+              Continue
               <ChevronRightIcon aria-hidden="true" />
             </Button>
           )}

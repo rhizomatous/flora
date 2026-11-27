@@ -7,7 +7,8 @@ import (
 
 var ErrOnboardingIncomplete = errors.New("setup configuration is incomplete")
 
-// Onboarding stores navigation separately from connection and project completion.
+// Onboarding stores wizard navigation and handoff separately from readiness and
+// chat activity. Completed records the composer handoff, never a successful chat.
 // An absent row identifies an installation created before guided setup.
 type Onboarding struct {
 	Started   bool   `json:"started"`

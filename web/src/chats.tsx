@@ -609,6 +609,11 @@ export function Chats({
               {(error !== "" || readError !== "") && (
                 <Alert role="alert" className="mt-6">
                   {error || readError}
+                  {error && (
+                    <a className="ml-2 underline" href="#onboarding/finish">
+                      Check setup
+                    </a>
+                  )}
                 </Alert>
               )}
               {isNew && projects === undefined && error === "" && (
@@ -851,6 +856,14 @@ function ChatDetail({
                 chat.StatusReason !== "" && (
                   <Text role="status" className="text-xs text-muted-foreground">
                     {chat.StatusReason}
+                    {chat.Status === "failed" && (
+                      <>
+                        {" "}
+                        <a href="#onboarding/finish" className="underline">
+                          Check setup
+                        </a>
+                      </>
+                    )}
                   </Text>
                 )}
             </MessageScrollerContent>

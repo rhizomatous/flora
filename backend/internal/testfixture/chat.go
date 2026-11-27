@@ -73,6 +73,16 @@ func (*Provisioner) ConfirmInterrupt(context.Context, string) error { return nil
 // New seeds credentials and a project in directory and starts a fake runtime.
 // Call Close before removing directory. Interactive fixtures ask a question on the first turn.
 func New(ctx context.Context, directory string, interactive bool, compaction ...bool) (*Fixture, error) {
+	return newFixture(ctx, directory, interactive, true, compaction...)
+}
+
+// NewUnconfigured starts the same fake runtime without creating an account,
+// credentials, or projects, so first-run tests exercise real setup saves.
+func NewUnconfigured(ctx context.Context, directory string) (*Fixture, error) {
+	return newFixture(ctx, directory, false, false)
+}
+
+func newFixture(ctx context.Context, directory string, interactive, seed bool, compaction ...bool) (*Fixture, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	success := false
 	defer func() {
@@ -90,19 +100,23 @@ func New(ctx context.Context, directory string, interactive bool, compaction ...
 		}
 	}()
 	authentication := auth.New(store)
-	token, _, err := Bootstrap(ctx, authentication, "browser test password")
-	if err != nil {
-		return nil, err
-	}
-	if err := store.SaveCredentials(ctx, storage.Credentials{Provider: "anthropic", Model: "model", ProviderKey: "provider-test-secret", GitHubToken: "github_pat_test-secret"}); err != nil {
-		return nil, err
-	}
-	project, err := store.CreateProject(ctx, "Browser project", storage.Configuration{Repositories: []storage.Repository{{Name: "core", URL: "https://github.com/example/core", BaseBranch: "main", Role: "core"}}})
-	if err != nil {
-		return nil, err
-	}
-	if err := store.SaveOnboarding(ctx, storage.Onboarding{Step: "finish", Completed: true, ProjectID: project.ID}); err != nil {
-		return nil, err
+	var token string
+	var project storage.Project
+	if seed {
+		token, _, err = Bootstrap(ctx, authentication, "browser test password")
+		if err != nil {
+			return nil, err
+		}
+		if err := store.SaveCredentials(ctx, storage.Credentials{Provider: "anthropic", Model: "model", ProviderKey: "provider-test-secret", GitHubToken: "github_pat_test-secret"}); err != nil {
+			return nil, err
+		}
+		project, err = store.CreateProject(ctx, "Browser project", storage.Configuration{Repositories: []storage.Repository{{Name: "core", URL: "https://github.com/example/core", BaseBranch: "main", Role: "core"}}})
+		if err != nil {
+			return nil, err
+		}
+		if err := store.SaveOnboarding(ctx, storage.Onboarding{Step: "finish", Completed: true, ProjectID: project.ID}); err != nil {
+			return nil, err
+		}
 	}
 	var mu sync.Mutex
 	history := []json.RawMessage{}

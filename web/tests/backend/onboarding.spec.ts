@@ -239,7 +239,7 @@ test("setup selects an existing project for the first chat", async ({ page, back
   await page.getByRole("button",{name:"Continue",exact:true}).click();
   await expect(page.getByRole("heading",{name:"Review setup",exact:true})).toBeFocused();
   await page.reload();
-  await expect(page.getByRole("status",{name:"Project",exact:true})).toHaveText("Existing garden");
+  await expect(page.getByRole("region", {name:"Setup readiness"}).getByText("Existing garden",{exact:true})).toBeVisible();
   expect((await (await page.request.get("/api/onboarding")).json()).projectID).toBe(project.id);
   await page.getByRole("button",{name:"Open Flora",exact:true}).click();
   await expect(page).toHaveURL(new RegExp(`#chats/new\\?project=${project.id}$`));

@@ -74,7 +74,17 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 	}()
 	var authentication *auth.Service
 	var fixture *testfixture.Fixture
-	if scenario == "enrollment" || scenario == "credential-setup" || scenario == "passkeys" {
+	if scenario == "credential-setup" {
+		fixture, err = testfixture.NewUnconfigured(ctx, directory)
+		if err != nil {
+			return nil, err
+		}
+		cleanup = append(cleanup, fixture.Close)
+		store, authentication = fixture.Store, fixture.Auth
+		if err = store.SaveSetupLink(ctx, auth.TokenHash("fixture-installer-setup-secret-000000000000"), time.Now().Add(auth.SetupLinkLifetime), false); err != nil {
+			return nil, err
+		}
+	} else if scenario == "enrollment" || scenario == "passkeys" {
 		store, err = storage.Open(ctx, filepath.Join(directory, "data"))
 		if err != nil {
 			return nil, err
@@ -204,6 +214,14 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		}
 		configuration.RuntimeDiagnostics = func(context.Context) []settings.Diagnostic {
 			return []settings.Diagnostic{{Name: "Docker", Message: "Cannot reach Docker. Start Docker and check socket permissions."}, {Name: "Agent image", Message: "Image pull failed. Check registry access and disk space."}}
+		}
+	}
+	if scenario == "credential-setup" || scenario == "chat" {
+		if scenario == "chat" {
+			configuration.Validate = func(context.Context, storage.Credentials) error { return nil }
+		}
+		configuration.RuntimeDiagnostics = func(context.Context) []settings.Diagnostic {
+			return []settings.Diagnostic{{Name: "Docker", OK: true, Message: "Docker reachable"}, {Name: "Agent image", OK: true, Message: "Image available"}, {Name: "Runtime", OK: true, Message: "Network available"}}
 		}
 	}
 	if scenario == "changes" {
@@ -420,7 +438,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 			}
 			return configuration.GitHub.Client.Transport.RoundTrip(r)
 		})
-		a := &api{auth: authentication, projects: validation, settings: configuration, origin: origin}
+		a := &api{auth: authentication, projects: validation, settings: configuration, chats: fixture.Service, origin: origin}
 		mux := http.NewServeMux()
 		a.projectRoutes(mux)
 		a.onboardingRoutes(mux)
@@ -435,7 +453,7 @@ func NewBrowserInstance(scenario string) (_ *BrowserInstance, err error) {
 		})
 	}
 	var githubUnavailable atomic.Bool
-	if fixture != nil {
+	if fixture != nil && scenario != "credential-setup" {
 		validation := projects.New(store)
 		validation.Client.Transport = browserTransport(func(r *http.Request) (*http.Response, error) {
 			code := 200

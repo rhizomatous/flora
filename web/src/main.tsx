@@ -86,7 +86,12 @@ function App() {
       ]);
       setSettings(savedSettings);
       setOnboarding(progress);
-      if (progress.started && !progress.completed && !currentPath().startsWith("onboarding/")) {
+      if (
+        progress.started &&
+        !progress.completed &&
+        !currentPath().startsWith("onboarding/") &&
+        currentPath() !== "settings"
+      ) {
         window.location.hash = `onboarding/${progress.step}`;
       }
     } else {
@@ -164,7 +169,8 @@ function App() {
   if (
     ready &&
     onboarding &&
-    (path.startsWith("onboarding") || (onboarding.started && !onboarding.completed))
+    (path.startsWith("onboarding") ||
+      (onboarding.started && !onboarding.completed && path !== "settings"))
   ) {
     return (
       <Onboarding
@@ -174,6 +180,7 @@ function App() {
         settings={settings}
         onSaved={setSettings}
         onState={saveOnboarding}
+        onFinished={setOnboarding}
         onExpired={onExpired}
         onLogout={logout}
         busy={busy}
@@ -294,7 +301,14 @@ function App() {
             <ModelsPage settings={settings} onSaved={setSettings} onExpired={onExpired} />
           )}
           {path === "settings" && (
-            <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
+            <>
+              {onboarding?.started === true && !onboarding.completed && (
+                <a className="mb-6 inline-block underline" href="#onboarding/finish">
+                  Return to setup
+                </a>
+              )}
+              <Installation settings={settings} busy={busy} run={run} onSaved={saved} />
+            </>
           )}
           {path.startsWith("automations") && (
             <Automations key={path} path={path} onExpired={onExpired} topbar={automationTopbar} />

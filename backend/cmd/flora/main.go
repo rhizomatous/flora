@@ -190,10 +190,19 @@ func main() {
 				return []settings.Diagnostic{{Name: "Docker", Message: "Cannot reach Docker. Start Docker and check the configured socket and service-user permissions."}}
 			}
 			result := []settings.Diagnostic{{Name: "Docker", OK: true, Message: "Docker is reachable."}}
-			if _, err := engine.ImageInspect(ctx, *agentImage); err != nil {
-				return append(result, settings.Diagnostic{Name: "Agent image", Message: "Pinned image is unavailable locally. A chat start will pull a digest-pinned image. If that fails, check registry access, disk space and the installed image reference."})
+			image, err := engine.ImageInspect(ctx, *agentImage)
+			if err != nil {
+				return append(result, settings.Diagnostic{Name: "Agent image", Message: "Pinned agent image is unavailable locally. Install the configured image on the Docker host, then retry."})
 			}
-			return append(result, settings.Diagnostic{Name: "Agent image", OK: true, Message: "Agent image is available locally."})
+			if *agentID != "" && image.ID != *agentID {
+				return append(result, settings.Diagnostic{Name: "Agent image", Message: "Local image differs from the configured image ID. Restore the pinned image or update the startup configuration and restart Flora."})
+			}
+			result = append(result, settings.Diagnostic{Name: "Agent image", OK: true, Message: "Agent image is available locally."})
+			n, err := engine.NetworkInspect(ctx, networkID)
+			if err != nil || n.ID != networkID || n.Driver != "bridge" || n.Internal || len(n.Gateways) != 1 || n.Gateways[0] != brokerGateway {
+				return append(result, settings.Diagnostic{Name: "Runtime", Message: "The configured Docker network is unavailable or changed. Restore the installed network and restart Flora."})
+			}
+			return append(result, settings.Diagnostic{Name: "Runtime", OK: true, Message: "Configured Docker network is available."})
 		}
 		reviewCtx, stopReview := context.WithCancel(ctx)
 		reviewDone := make(chan struct{})
