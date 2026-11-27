@@ -12,7 +12,7 @@ const modelsSchema = z.object({
 });
 
 /** Resolve display names and the installation default through the same discovery API. */
-export function useModelDiscovery(scope: string) {
+export function useModelDiscovery(scope: string, enabled = true) {
   const [options, setOptions] = useState<z.infer<typeof modelsSchema>>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -21,6 +21,7 @@ export function useModelDiscovery(scope: string) {
     ? `models?chat=${encodeURIComponent(scope.slice(5))}`
     : "models";
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     async function load() {
       try {
@@ -38,10 +39,10 @@ export function useModelDiscovery(scope: string) {
       controller.abort();
     };
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- An explicit retry repeats discovery even when the path is unchanged.
-  }, [attempt, path]);
+  }, [attempt, path, enabled]);
   function retry() {
     setLoading(true);
     setAttempt((value) => value + 1);
   }
-  return { options, loading, error, retry };
+  return { options, loading: enabled && loading, error, retry };
 }

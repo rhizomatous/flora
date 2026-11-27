@@ -35,7 +35,6 @@ import { text } from "./ui";
 
 export function DefaultModel({
   active,
-  embedded,
   settings,
   models,
   loading,
@@ -43,7 +42,6 @@ export function DefaultModel({
   onSave,
 }: {
   active: boolean;
-  embedded: boolean;
   settings: Settings;
   models: ModelOption[];
   loading: boolean;
@@ -81,19 +79,14 @@ export function DefaultModel({
     }
   }
   return (
-    <Section aria-labelledby={embedded ? undefined : "default-model-heading"}>
-      {!embedded && (
-        <SectionHeader inset>
-          <Heading level={2} id="default-model-heading">
-            Default model
-          </Heading>
-        </SectionHeader>
-      )}
+    <Section aria-labelledby="default-model-heading">
+      <SectionHeader inset>
+        <Heading level={2} id="default-model-heading">
+          Default model
+        </Heading>
+      </SectionHeader>
       <SettingsGroup>
-        <SettingsRow
-          label={embedded ? "Default for new chats" : "New chats"}
-          htmlFor="default-model"
-        >
+        <SettingsRow label="New chats" htmlFor="default-model">
           <DropdownMenu
             open={open}
             onOpenChange={setOpen}
@@ -151,13 +144,6 @@ export function DefaultModel({
             Enter model ID
           </Button>
         </SettingsRow>
-        {(busy ||
-          settings.validation?.some((check) => check.name === "Model provider" && check.ok) ===
-            true) && (
-          <SettingsRow label="Metadata access" htmlFor="model-validation">
-            <output id="model-validation">{busy ? "Checking…" : "Checked"}</output>
-          </SettingsRow>
-        )}
       </SettingsGroup>
       {manual && (
         <Dialog

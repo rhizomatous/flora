@@ -28,7 +28,7 @@ export function ModelsPage({
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [busy, setBusy] = useState(false);
-  const { options, loading, error, retry } = useModelDiscovery("models");
+  const { options, loading, error, retry } = useModelDiscovery("models", !embedded);
   const models = options?.models ?? [];
   useEffect(() => {
     if (!embedded) heading.current?.focus();
@@ -39,7 +39,7 @@ export function ModelsPage({
     try {
       const next = await request(settingsSchema, "settings", { method: "PUT", body });
       onSaved(next);
-      retry();
+      if (!embedded) retry();
       toast.success("Models updated", { toasterId: "chat-organization" });
     } catch (cause) {
       if (isExpired(cause)) onExpired();
@@ -88,10 +88,9 @@ export function ModelsPage({
       )}
       <SectionStack className={embedded ? "gap-6!" : undefined}>
         {embedded && connections}
-        {(!embedded || settings.providerConfigured) && (
+        {!embedded && (
           <DefaultModel
             active={active}
-            embedded={embedded}
             settings={settings}
             models={models}
             loading={loading}
@@ -100,7 +99,7 @@ export function ModelsPage({
           />
         )}
         {!embedded && connections}
-        {error !== "" && settings.providers.length > 0 && (
+        {!embedded && error !== "" && settings.providers.length > 0 && (
           <Alert role="status" className="flex flex-wrap items-center justify-between gap-3">
             <span>{error}</span>
             <Button variant="outline" size="sm" disabled={loading} onClick={retry}>
