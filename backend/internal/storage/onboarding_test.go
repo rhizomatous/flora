@@ -73,7 +73,7 @@ func TestOnboardingCompletionRequiresSavedConfiguration(t *testing.T) {
 	store := openTest(t, t.TempDir())
 	defer store.Close()
 	project, _ := fixture(t, store)
-	state := Onboarding{Step: "finish", Completed: true, ProjectID: project.ID}
+	state := Onboarding{Step: "project", Completed: true, ProjectID: project.ID}
 	if !errors.Is(store.SaveOnboarding(ctx, state), ErrOnboardingIncomplete) {
 		t.Fatal("finished without a model and GitHub")
 	}
@@ -87,6 +87,11 @@ func TestOnboardingCompletionRequiresSavedConfiguration(t *testing.T) {
 		t.Fatal("finished without a project")
 	}
 	state.ProjectID = project.ID
+	state.Step = "github"
+	if !errors.Is(store.SaveOnboarding(ctx, state), ErrInvalid) {
+		t.Fatal("completed before the final setup step")
+	}
+	state.Step = "project"
 	must(t, store.SaveOnboarding(ctx, state))
 	saved, err := store.Onboarding(ctx)
 	must(t, err)
@@ -137,5 +142,27 @@ func TestOnboardingProjectRetriesAndExistingSelection(t *testing.T) {
 	must(t, err)
 	if saved.ID != other.ID {
 		t.Fatalf("lost existing selection: %+v", saved)
+	}
+}
+
+func TestSavedFinishProgressResumesAtProject(t *testing.T) {
+	store := openTest(t, t.TempDir())
+	defer store.Close()
+	project, _ := fixture(t, store)
+	for _, completed := range []bool{false, true} {
+		_, err := store.db.ExecContext(ctx, `INSERT INTO onboarding(id,step,completed,project_id) VALUES(1,'finish',?,?) ON CONFLICT(id) DO UPDATE SET step='finish',completed=excluded.completed,project_id=excluded.project_id`, completed, project.ID)
+		must(t, err)
+		state, err := store.Onboarding(ctx)
+		must(t, err)
+		if state.Step != "project" || state.Completed != completed || state.ProjectID != project.ID {
+			t.Fatalf("lost finish progress: %+v", state)
+		}
+	}
+	must(t, store.SaveCredentials(ctx, Credentials{Provider: "anthropic", Model: "configured", ProviderKey: "secret", GitHubToken: "github-secret"}))
+	must(t, store.SaveOnboarding(ctx, Onboarding{Step: "finish", Completed: true, ProjectID: project.ID}))
+	var step string
+	must(t, store.db.QueryRowContext(ctx, "SELECT step FROM onboarding WHERE id=1").Scan(&step))
+	if step != "project" {
+		t.Fatalf("saved obsolete step %q", step)
 	}
 }

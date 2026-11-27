@@ -22,6 +22,9 @@ func (s *Store) Onboarding(ctx context.Context) (Onboarding, error) {
 	if errors.Is(found(err), ErrNotFound) {
 		return state, nil
 	}
+	if state.Step == "finish" {
+		state.Step = "project"
+	}
 	state.Started = err == nil
 	return state, err
 }
@@ -30,8 +33,11 @@ func (s *Store) Onboarding(ctx context.Context) (Onboarding, error) {
 // cannot mark a connection complete or persist credentials through this record.
 // Finishing requires a saved default model, GitHub access, and an existing project.
 func (s *Store) SaveOnboarding(ctx context.Context, state Onboarding) error {
+	if state.Step == "finish" {
+		state.Step = "project"
+	}
 	switch state.Step {
-	case "account", "model", "github", "project", "finish":
+	case "account", "model", "github", "project":
 	default:
 		return ErrInvalid
 	}
@@ -41,7 +47,7 @@ func (s *Store) SaveOnboarding(ctx context.Context, state Onboarding) error {
 		}
 	}
 	if state.Completed {
-		if state.Step != "finish" {
+		if state.Step != "project" {
 			return ErrInvalid
 		}
 		credentials, err := s.Credentials(ctx)

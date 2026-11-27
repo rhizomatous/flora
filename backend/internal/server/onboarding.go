@@ -49,6 +49,9 @@ func (a *api) onboardingRoutes(mux *http.ServeMux) {
 		if !decode(w, r, &state) {
 			return
 		}
+		if state.Step == "finish" {
+			state.Step = "project"
+		}
 		if err := a.auth.Store.SaveOnboarding(r.Context(), state); err != nil {
 			if errors.Is(err, storage.ErrOnboardingIncomplete) {
 				failure(w, 400, "Connect a model, GitHub, and a project before opening Flora.")

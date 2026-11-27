@@ -29,7 +29,6 @@ const labels = {
   model: "Connect a model",
   github: "Connect GitHub",
   project: "Connect a project",
-  finish: "Review setup",
 };
 
 export function Onboarding({
@@ -74,7 +73,6 @@ export function Onboarding({
   let availableStep = 1;
   if (modelComplete) availableStep = 2;
   if (modelComplete && githubComplete) availableStep = 3;
-  if (modelComplete && githubComplete && projectComplete) availableStep = 4;
   const index = Math.min(setupSteps.indexOf(requestedStep), availableStep);
   const step = setupSteps[index] ?? "model";
   const projectsLoaded = projects !== undefined;
@@ -127,17 +125,12 @@ export function Onboarding({
   }
   const canContinue =
     step === "account" ||
-    (step === "finish" && availableStep === 4) ||
     (step === "model" && modelComplete) ||
     (step === "github" && githubComplete) ||
     (step === "project" && projectComplete);
-  function finish() {
-    void run(async () => {
-      await onState({ ...state, step, completed: true, projectID: selectedID });
-      window.location.hash = selectedID
-        ? `chats/new?project=${encodeURIComponent(selectedID)}`
-        : "chats/new";
-    }, "Could not finish setup. Try again.");
+  async function finish(projectID: string) {
+    await onState({ ...state, step: "project", completed: true, projectID });
+    window.location.hash = "chats/new";
   }
   return (
     <FirstRunLayout
@@ -266,33 +259,11 @@ export function Onboarding({
               onExpired={onExpired}
               onCreated={async (project) => {
                 setProjects((current) => [...(current ?? []), project]);
-                await run(
-                  () =>
-                    onState({
-                      ...state,
-                      step: "project",
-                      completed: false,
-                      projectID: project.id,
-                    }),
-                  "Could not save setup progress.",
-                );
+                await run(() => finish(project.id), "Could not finish setup. Try again.");
               }}
             />
           )}
         </div>
-      )}
-      {step === "finish" && (
-        <SettingsGroup>
-          <SettingsRow label="Model" htmlFor="setup-model">
-            <output id="setup-model">{modelComplete ? settings.model : "Not connected"}</output>
-          </SettingsRow>
-          <SettingsRow label="GitHub" htmlFor="setup-github">
-            <output id="setup-github">{githubComplete ? "Connected" : "Not connected"}</output>
-          </SettingsRow>
-          <SettingsRow label="Project" htmlFor="setup-summary-project">
-            <output id="setup-summary-project">{selected?.name ?? "Not connected"}</output>
-          </SettingsRow>
-        </SettingsGroup>
       )}
       <footer className="mt-8 flex flex-wrap items-center justify-between gap-2">
         <Button
@@ -333,11 +304,12 @@ export function Onboarding({
             <Button
               disabled={navigating}
               onClick={() => {
-                if (step === "finish") finish();
-                else go(setupSteps[index + 1] ?? "finish");
+                if (step === "project") {
+                  void run(() => finish(selectedID), "Could not finish setup. Try again.");
+                } else go(setupSteps[index + 1] ?? "project");
               }}
             >
-              {step === "finish" ? "Open Flora" : "Continue"}
+              {step === "project" ? "Open Flora" : "Continue"}
               <ChevronRightIcon aria-hidden="true" />
             </Button>
           )}
