@@ -300,6 +300,8 @@ function MessagePart({
     );
   }
   if (p.type === "tool") {
+    const command =
+      p.tool === "bash" ? toolDisplayInputSchema.parse(p.state?.input).command : undefined;
     const output = p.state?.output ?? "";
     const error = p.state?.error ?? "";
     const status = p.state?.status;
@@ -334,11 +336,11 @@ function MessagePart({
             </TraceLine>
           </TraceCollapsibleTrigger>
           <TraceCollapsibleContent>
-            <pre className="overflow-auto text-xs break-words whitespace-pre-wrap">
-              {JSON.stringify(p.state?.input, null, 2)}
+            <pre className="overflow-auto text-xs break-words whitespace-pre-wrap text-foreground">
+              <code>{command ?? JSON.stringify(p.state?.input, null, 2)}</code>
             </pre>
             {output !== "" && (
-              <pre className="mt-3 max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
+              <pre className="mt-3 max-h-96 overflow-auto border-t pt-3 text-xs break-words whitespace-pre-wrap">
                 {output}
               </pre>
             )}
