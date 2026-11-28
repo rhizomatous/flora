@@ -13,18 +13,21 @@ function tool(id: string, [start, end]: [number, number], status = "completed"):
 }
 const user = message("user", [{ type: "text", text: "Please fix it" }], "user");
 
-test("work spans runtime messages and ignores empty text and internal step markers", () => {
+test("work spans runtime messages and ignores empty text and runtime bookkeeping", () => {
   const rows = buildTranscript(
     [
       user,
+      message("snapshot", [{ type: "snapshot", snapshot: "before" }]),
       message("a", [tool("read", [0, 500], "error")]),
       message("b", [
         { type: "step-start" },
         { type: "text", text: "  " },
         tool("check", [500, 2500]),
+        { type: "patch", hash: "after", files: ["/workspace/config.ts"] },
         { type: "step-finish" },
       ]),
       message("c", [{ type: "text", text: "Finished." }]),
+      message("patch", [{ type: "patch", hash: "final", files: ["/workspace/config.ts"] }]),
     ],
     "idle",
   );
