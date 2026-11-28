@@ -50,7 +50,9 @@ test("live work grouping, disclosure state, and focus", async ({ page }) => {
     };
     const messages = [
       message("user", [{ type: "text", text: "Fix the configuration" }], "user"),
+      message("snapshot", [{ type: "snapshot", snapshot: "before" }]),
       message("a", [read]),
+      message("patch", [{ type: "patch", hash: "after", files: ["/workspace/config.ts"] }]),
     ];
     if (phase === 3) {
       messages.push(

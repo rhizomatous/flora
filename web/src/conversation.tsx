@@ -26,7 +26,14 @@ import { PullEventCard } from "./pull-links";
 import type { Pull } from "./pull-schemas";
 import { subagentSession } from "./subagent-state";
 import { SubagentLink } from "./subagents";
-import { formatDuration, isFailedPart, isLivePart, workTiming, type WorkStep } from "./transcript";
+import {
+  formatDuration,
+  isFailedPart,
+  isLivePart,
+  isVisiblePart,
+  workTiming,
+  type WorkStep,
+} from "./transcript";
 
 const Markdown = lazy(async () => {
   const { ReplyMarkdown } = await import("./reply-markdown");
@@ -50,9 +57,7 @@ export function ConversationMessage({
   delegated?: boolean;
   pullEvents?: { pull: Pull; opened: boolean }[] | undefined;
 }) {
-  const parts = m.Payload.parts.filter(
-    (part) => part.type !== "step-start" && part.type !== "step-finish",
-  );
+  const parts = m.Payload.parts.filter(isVisiblePart);
   const failure = m.Payload.info?.error ?? null;
   const [copyStatus, setCopyStatus] = useState("Copy");
   const copyText =
