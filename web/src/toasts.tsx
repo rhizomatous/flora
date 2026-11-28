@@ -1,4 +1,7 @@
-import { Button, Link, Text } from "@flora/florets";
+import { useEffect, useEffectEvent, useRef } from "react";
+import { toast } from "sonner";
+
+import { Link, Toaster } from "@flora/florets";
 
 import type { Toast } from "./notifications";
 
@@ -9,38 +12,75 @@ export function CompletionToasts({
   toasts: Toast[];
   dismiss: (sequence: number) => void;
 }) {
-  return (
-    <aside
-      aria-label="Completion notifications"
-      aria-live="polite"
-      aria-relevant="additions"
-      className="fixed top-16 right-4 z-10 max-h-[40svh] w-[calc(100%-2rem)] max-w-sm space-y-3 overflow-auto rounded-md"
-    >
-      {toasts.map((t) => (
-        <div
-          key={t.Sequence}
-          className="rounded-md border border-border bg-surface-overlay p-4 shadow-lg"
-        >
-          <Text className="break-words">
-            <Link className="font-medium" href={`#chats/${encodeURIComponent(t.publicChatID)}`}>
-              {t.title}
-            </Link>{" "}
-            finished work.
-          </Text>
-          <Button
-            variant="link"
-            size="sm"
-            type="button"
-            className="mt-3 text-sm text-foreground"
-            aria-label={`Dismiss completion for ${t.title}`}
+  const presented = useRef(new Map<number, string>());
+  const remove = useEffectEvent(dismiss);
+
+  useEffect(() => {
+    const active = new Set(toasts.map((completion) => completion.Sequence));
+    for (const [sequence, id] of presented.current) {
+      if (!active.has(sequence)) {
+        toast.dismiss(id);
+        presented.current.delete(sequence);
+      }
+    }
+    for (const completion of toasts) {
+      if (presented.current.has(completion.Sequence)) continue;
+      const id = `completion-${completion.Sequence}`;
+      presented.current.set(completion.Sequence, id);
+      toast.success("Work complete", {
+        id,
+        toasterId: "completions",
+        description: (
+          <Link
+            className="line-clamp-2 break-words text-muted-foreground no-underline hover:underline"
+            href={`#chats/${encodeURIComponent(completion.publicChatID)}`}
             onClick={() => {
-              dismiss(t.Sequence);
+              toast.dismiss(id);
+              remove(completion.Sequence);
             }}
           >
-            Dismiss
-          </Button>
-        </div>
-      ))}
-    </aside>
+            {completion.title}
+          </Link>
+        ),
+        onDismiss: () => {
+          remove(completion.Sequence);
+        },
+        onAutoClose: () => {
+          remove(completion.Sequence);
+        },
+      });
+    }
+  }, [toasts]);
+
+  useEffect(() => {
+    const shown = presented.current;
+    return () => {
+      for (const id of shown.values()) toast.dismiss(id);
+      shown.clear();
+    };
+  }, []);
+
+  return (
+    <Toaster
+      id="completions"
+      position="top-right"
+      offset={{ top: "4rem", right: "1rem" }}
+      mobileOffset={{ top: "4rem", right: "1rem", left: "1rem" }}
+      customAriaLabel="Completion notifications"
+      hotkey={["altKey", "KeyN"]}
+      duration={6000}
+      visibleToasts={3}
+      closeButton
+      toastOptions={{
+        closeButtonAriaLabel: "Dismiss completion",
+        classNames: {
+          toast: "florets-toast gap-3! py-3! pr-10! font-sans text-sm!",
+          success: "[&_[data-icon]]:text-green-700 dark:[&_[data-icon]]:text-green-400",
+          icon: "mt-0.5! self-start",
+          closeButton:
+            "top-3! right-3! left-auto! transform-none! rounded-sm! border-0! bg-transparent! text-muted-foreground! hover:bg-control-hover!",
+        },
+      }}
+    />
   );
 }

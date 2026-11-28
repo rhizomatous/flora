@@ -2,7 +2,9 @@ import { publicChatID, openWorkspaceMenu, openSettings, assertFitsPhone, logIn, 
 
 import assert from "node:assert/strict";
 
-import { test } from "../fixtures.ts";
+import { test, expect } from "../fixtures.ts";
+
+import { chatSchema, detailSchema } from "../../src/chat-schemas";
 
 test.use({ scenario: "notifications" });
 
@@ -58,7 +60,7 @@ test("completion notifications, reconnects, and sound preferences", async ({ pag
     requests.push(new URL(r.url()).pathname);
   });
   const tones = () => page.evaluate(() => Number(sessionStorage.getItem("tones") ?? 0));
-  const toast = page.getByRole("complementary", { name: "Completion notifications" });
+  const toast = page.getByRole("region", { name: "Completion notifications", exact: true });
   const sound = page.getByRole("menuitem", { name: "Enable notification sound", exact: true });
   await logIn(page, "enter");
   await openWorkspaceMenu(page);
@@ -104,9 +106,7 @@ test("completion notifications, reconnects, and sound preferences", async ({ pag
     await page.locator("main").evaluate((el) => el.contains(document.activeElement)),
     true,
   );
-  await toast.getByRole("button", { name: /^Dismiss/ }).focus();
-  await page.keyboard.press("Enter");
-  assert.equal(await page.locator("h1").evaluate((el) => el === document.activeElement), true);
+  await expect(toast.getByRole("link")).toHaveCount(0);
   await page.evaluate(() => {
     window.audioDenied = false;
   });
@@ -147,7 +147,11 @@ test("completion notifications, reconnects, and sound preferences", async ({ pag
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await toast.getByRole("link").waitFor();
   assert.equal(await tones(), 1, "sound ignored saved preference");
-  await toast.getByRole("button").click();
+  await page.getByLabel("Follow-up", { exact: true }).focus();
+  await toast.getByRole("button", { name: "Dismiss completion", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(toast.getByRole("link")).toHaveCount(0);
+  await expect(page.getByLabel("Follow-up", { exact: true })).toBeFocused();
   await page.getByLabel("Follow-up", { exact: true }).fill("interrupt control work");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await page.getByRole("button", { name: "Interrupt", exact: true }).click();
@@ -174,4 +178,98 @@ test("completion notifications, reconnects, and sound preferences", async ({ pag
     .getByRole("menuitem", { name: "Sound enabled for this page", exact: true })
     .waitFor();
   await realAudio.close();
+});
+
+test.describe("completion toast stack", () => {
+  test.use({ scenario: "branches" });
+
+  test("stacks compactly, pauses during interaction, and expires without reading chats or moving focus", async ({ page }, testInfo) => {
+    const errors = pageErrors(page);
+    await logIn(page);
+    await expect(page.getByRole("heading", { name: "New chat", exact: true })).toBeVisible();
+    const projects = (await (await page.request.get("/api/projects")).json()) as { id: string }[];
+    const titles = [
+      "Describe this repo",
+      "Review the release checklist",
+      "Check the completed implementation and review the remaining release tasks across all of the workspace projects",
+    ] as const;
+    const notifications = page.getByRole("region", { name: "Completion notifications", exact: true });
+    const cards = notifications.getByRole("listitem");
+    const chats: string[] = [];
+    // The fixture runtime shares a session, so finish each turn before starting the next.
+    for (const title of titles) {
+      const response = await page.request.post(`/api/projects/${projects[0]!.id}/chats`, {
+        headers: { Origin: new URL(page.url()).origin },
+        data: { title, requestID: title, text: "Plan the release" },
+      });
+      expect(response.status()).toBe(202);
+      chats.push(chatSchema.parse(await response.json()).ID);
+      await expect(notifications.getByRole("link", { name: title, exact: true })).toBeVisible();
+      await cards.first().hover();
+    }
+    await expect(cards).toHaveCount(3);
+    await page.mouse.move(0, 0);
+    await expect(cards.first()).toHaveAttribute("data-expanded", "false");
+    await expect(cards.first()).toHaveAttribute("data-type", "success");
+    await expect(cards.first()).toContainText("Work complete");
+    await page.screenshot({ path: testInfo.outputPath("completion-stack-desktop.png"), animations: "disabled" });
+
+    await cards.first().hover();
+    await expect(cards.last()).toHaveAttribute("data-expanded", "true");
+    await page.waitForTimeout(7000);
+    await expect(cards).toHaveCount(3);
+    await page.screenshot({ path: testInfo.outputPath("completion-stack-expanded.png"), animations: "disabled" });
+
+    await page.mouse.move(0, 0);
+    await page.getByLabel("Message", { exact: true }).focus();
+    await notifications.getByRole("link", { name: titles[0], exact: true }).focus();
+    await expect(cards.first()).toHaveAttribute("data-expanded", "true");
+    await page.waitForTimeout(7000);
+    await expect(cards).toHaveCount(3);
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.screenshot({ path: testInfo.outputPath("completion-stack-mobile-dark.png"), animations: "disabled" });
+    await page.evaluate(() => document.documentElement.classList.remove("dark"));
+    await page.screenshot({ path: testInfo.outputPath("completion-stack-mobile-light.png"), animations: "disabled" });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.screenshot({ path: testInfo.outputPath("completion-stack-desktop-light.png"), animations: "disabled" });
+    await assertFitsPhone(page);
+    for (const card of await cards.all()) {
+      const bounds = await card.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(375);
+      expect(bounds!.height).toBeLessThanOrEqual(100);
+    }
+
+    const composer = page.getByLabel("Message", { exact: true });
+    await composer.focus();
+    await composer.fill("Keep this draft and its focus");
+    await expect(composer).toBeFocused();
+    await expect(cards.first()).toHaveAttribute("data-expanded", "false");
+    await page.evaluate(() => {
+      Object.defineProperty(document, "hidden", { configurable: true, value: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await page.waitForTimeout(7000);
+    await expect(cards).toHaveCount(3);
+    await page.evaluate(() => {
+      Reflect.deleteProperty(document, "hidden");
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await page.waitForTimeout(5000);
+    await expect(cards).toHaveCount(3);
+    await page.waitForTimeout(2000);
+    await expect(cards).toHaveCount(0);
+    await expect(composer).toBeFocused();
+    await expect(composer).toHaveValue("Keep this draft and its focus");
+    for (const chat of chats) {
+      const detail = detailSchema.parse(await (await page.request.get(`/api/chats/${chat}`)).json());
+      expect(detail.chat.LastViewedRevision ?? 0).toBe(0);
+      expect(detail.chat.ActivityRevision).toBeGreaterThan(0);
+    }
+    await page.waitForTimeout(2000);
+    await expect(cards).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
 });

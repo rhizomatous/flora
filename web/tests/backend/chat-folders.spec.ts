@@ -23,7 +23,9 @@ test("folders share moves, preserve drafts and pins, and search collapsed groups
   });
   expect(response.status()).toBe(202);
   await page
-    .getByRole("button", { name: "Dismiss completion for Release checklist", exact: true })
+    .getByRole("region", { name: "Completion notifications", exact: true })
+    .getByRole("listitem").filter({ hasText: "Release checklist" })
+    .getByRole("button", { name: "Dismiss completion", exact: true })
     .click();
   let chat = chatSchema.parse(await response.json());
   await page.getByLabel("Message", { exact: true }).fill("Keep my unsent draft");
@@ -160,7 +162,9 @@ test("concurrent edits preserve drafts and deleted destinations cannot hide chat
   });
   let chat = chatSchema.parse(await created.json());
   await page
-    .getByRole("button", { name: "Dismiss completion for Concurrent work", exact: true })
+    .getByRole("region", { name: "Completion notifications", exact: true })
+    .getByRole("listitem").filter({ hasText: "Concurrent work" })
+    .getByRole("button", { name: "Dismiss completion", exact: true })
     .click();
   await page.getByRole("link", { name: "All chats", exact: true }).click();
   const main = page.getByRole("main");
@@ -228,7 +232,9 @@ test("menus stay anchored off hover and filters keep stable widths", async ({ pa
     });
     expect(response.status()).toBe(202);
     await page
-      .getByRole("button", { name: `Dismiss completion for ${title}`, exact: true })
+      .getByRole("region", { name: "Completion notifications", exact: true })
+      .getByRole("listitem").filter({ hasText: title })
+      .getByRole("button", { name: "Dismiss completion", exact: true })
       .click();
   }
   const folderResponse = await page.request.post("/api/folders", {
