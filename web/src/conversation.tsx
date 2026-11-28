@@ -1,3 +1,4 @@
+/* oxlint-disable import/max-dependencies -- Transcript rendering composes messages, tool details, todo lists, and linked chat activity. */
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
 import {
@@ -28,6 +29,8 @@ import { PullEventCard } from "./pull-links";
 import type { Pull } from "./pull-schemas";
 import { subagentSession } from "./subagent-state";
 import { SubagentLink } from "./subagents";
+import { TodoChecklist } from "./todo-checklist";
+import { hasUnfinishedTodos } from "./todos";
 import {
   formatDuration,
   isFailedPart,
@@ -148,42 +151,48 @@ export function WorkSummary({
   failed: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(() => new Set());
+  const [expandedSteps, setExpandedSteps] = useState<Map<string, boolean>>(() => new Map());
   const root = useRef<HTMLDivElement>(null);
+  const latestTodo = steps.find((step) => step.todo?.latest === true);
+  const history = steps.filter((step) => step !== latestTodo);
   function stepDetails(step: WorkStep) {
+    const expansionKey = step.todo?.latest === true ? `latest:${step.id}` : step.id;
+    const expanded =
+      expandedSteps.get(expansionKey) ??
+      (step.todo?.latest === true && hasUnfinishedTodos(step.todo.items));
+    function onExpandedChange(nextOpen: boolean) {
+      setExpandedSteps((current) => new Map(current).set(expansionKey, nextOpen));
+      if (nextOpen && active && !open && step.todo?.latest !== true) {
+        setOpen(true);
+        requestAnimationFrame(() => {
+          root.current
+            ?.querySelector<HTMLButtonElement>(`[data-step-id="${CSS.escape(step.id)}"] button`)
+            ?.focus();
+        });
+      }
+    }
     return (
       <div key={step.id} data-step-id={step.id}>
-        <MessagePart
-          part={step.part}
-          user={false}
-          live={active}
-          expanded={expandedSteps.has(step.id)}
-          onExpandedChange={(expanded) => {
-            setExpandedSteps((current) => {
-              const next = new Set(current);
-              if (expanded) next.add(step.id);
-              else next.delete(step.id);
-              return next;
-            });
-            if (expanded && active && !open) {
-              setOpen(true);
-              requestAnimationFrame(() => {
-                root.current
-                  ?.querySelector<HTMLButtonElement>(
-                    `[data-step-id="${CSS.escape(step.id)}"] button`,
-                  )
-                  ?.focus();
-              });
-            }
-          }}
-        />
+        {step.todo ? (
+          <TodoChecklist todos={step.todo.items} open={expanded} onOpenChange={onExpandedChange}>
+            <ToolDetails part={step.part} />
+          </TodoChecklist>
+        ) : (
+          <MessagePart
+            part={step.part}
+            user={false}
+            live={active}
+            expanded={expanded}
+            onExpandedChange={onExpandedChange}
+          />
+        )}
       </div>
     );
   }
   const timing = workTiming(steps, active);
   const now = useActivityClock(active && timing !== undefined);
   const failures = steps.filter((step) => isFailedPart(step.part)).length;
-  const running = steps.filter((step) => isLivePart(step.part));
+  const running = history.filter((step) => isLivePart(step.part));
   const elapsed = timing
     ? formatDuration(Math.max(0, (timing.end ?? now) - timing.start))
     : undefined;
@@ -191,32 +200,35 @@ export function WorkSummary({
   if (active) title = elapsed === undefined ? "Working" : `Working for ${elapsed}`;
   return (
     <div ref={root} data-slot="work-summary" className="space-y-2">
-      <Trace>
-        <TraceCollapsible open={open} onOpenChange={setOpen}>
-          <TraceCollapsibleTrigger>
-            <TraceLine status={failed ? "error" : undefined}>
-              <TraceTitle>{title}</TraceTitle>
-              <TraceDescription>
-                {steps.length} {steps.length === 1 ? "step" : "steps"}
-                {steps.some((step) => subagentSession(step.part) !== undefined) &&
-                  " · Subagent activity"}
-                {failures > 0 && (
-                  <>
-                    {" · "}
-                    <span className="inline-flex items-center gap-1 text-destructive">
-                      {failures} failed
-                      <CrossCircledIcon aria-hidden="true" className="size-3.5 shrink-0" />
-                    </span>
-                  </>
-                )}
-              </TraceDescription>
-            </TraceLine>
-          </TraceCollapsibleTrigger>
-          <TraceCollapsibleContent className="space-y-3">
-            {steps.map((step) => stepDetails(step))}
-          </TraceCollapsibleContent>
-        </TraceCollapsible>
-      </Trace>
+      {history.length > 0 && (
+        <Trace>
+          <TraceCollapsible open={open} onOpenChange={setOpen}>
+            <TraceCollapsibleTrigger>
+              <TraceLine status={failed ? "error" : undefined}>
+                <TraceTitle>{title}</TraceTitle>
+                <TraceDescription>
+                  {history.length} {history.length === 1 ? "step" : "steps"}
+                  {steps.some((step) => subagentSession(step.part) !== undefined) &&
+                    " · Subagent activity"}
+                  {failures > 0 && (
+                    <>
+                      {" · "}
+                      <span className="inline-flex items-center gap-1 text-destructive">
+                        {failures} failed
+                        <CrossCircledIcon aria-hidden="true" className="size-3.5 shrink-0" />
+                      </span>
+                    </>
+                  )}
+                </TraceDescription>
+              </TraceLine>
+            </TraceCollapsibleTrigger>
+            <TraceCollapsibleContent className="space-y-3">
+              {history.map((step) => stepDetails(step))}
+            </TraceCollapsibleContent>
+          </TraceCollapsible>
+        </Trace>
+      )}
+      {latestTodo && stepDetails(latestTodo)}
       {active && !open && (
         <div aria-label="Current activity" className="space-y-2">
           {running.map((step) => stepDetails(step))}
@@ -307,9 +319,6 @@ function MessagePart({
     );
   }
   if (p.type === "tool") {
-    const command =
-      p.tool === "bash" ? toolDisplayInputSchema.parse(p.state?.input).command : undefined;
-    const output = p.state?.output ?? "";
     const error = p.state?.error ?? "";
     const status = p.state?.status;
     let description = status;
@@ -343,23 +352,7 @@ function MessagePart({
             </TraceLine>
           </TraceCollapsibleTrigger>
           <TraceCollapsibleContent className="space-y-3">
-            <CodeBlock size="sm">
-              <CodeBlockContent wrap className="max-h-96">
-                {command ?? JSON.stringify(p.state?.input, null, 2)}
-              </CodeBlockContent>
-              {output !== "" && (
-                <CodeBlockContent wrap className="max-h-96 border-t text-muted-foreground">
-                  {output}
-                </CodeBlockContent>
-              )}
-            </CodeBlock>
-            {error !== "" && (
-              <CodeBlock size="sm" variant="destructive" role="alert">
-                <CodeBlockContent wrap className="max-h-96">
-                  {error}
-                </CodeBlockContent>
-              </CodeBlock>
-            )}
+            <ToolDetails part={p} />
           </TraceCollapsibleContent>
         </TraceCollapsible>
       </Trace>
@@ -383,6 +376,34 @@ function MessagePart({
         </TraceCollapsibleContent>
       </TraceCollapsible>
     </Trace>
+  );
+}
+
+function ToolDetails({ part }: { part: Part }) {
+  const command =
+    part.tool === "bash" ? toolDisplayInputSchema.parse(part.state?.input).command : undefined;
+  const output = part.state?.output ?? "";
+  const error = part.state?.error ?? "";
+  return (
+    <>
+      <CodeBlock size="sm">
+        <CodeBlockContent wrap className="max-h-96">
+          {command ?? JSON.stringify(part.state?.input, null, 2)}
+        </CodeBlockContent>
+        {output !== "" && (
+          <CodeBlockContent wrap className="max-h-96 border-t text-muted-foreground">
+            {output}
+          </CodeBlockContent>
+        )}
+      </CodeBlock>
+      {error !== "" && (
+        <CodeBlock size="sm" variant="destructive" role="alert">
+          <CodeBlockContent wrap className="max-h-96">
+            {error}
+          </CodeBlockContent>
+        </CodeBlock>
+      )}
+    </>
   );
 }
 

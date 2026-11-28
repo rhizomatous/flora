@@ -1,6 +1,7 @@
 import type { Part, Message } from "./chat-schemas.ts";
+import { readTodos, type Todo } from "./todos.ts";
 
-export type WorkStep = { id: string; part: Part };
+export type WorkStep = { id: string; part: Part; todo?: { items: Todo[]; latest: boolean } };
 export type TranscriptRow =
   | { kind: "message"; id: string; message: Message }
   | { kind: "work"; id: string; steps: WorkStep[]; active: boolean; failed: boolean };
@@ -27,6 +28,7 @@ export function buildTranscript(messages: Message[], status: string): Transcript
   const rows: TranscriptRow[] = [];
   let work: Extract<TranscriptRow, { kind: "work" }> | undefined;
   let turnStart = 0;
+  let latestTodo: WorkStep["todo"];
   for (const message of messages) {
     if (message.Role === "user") {
       work = undefined;
@@ -59,7 +61,13 @@ export function buildTranscript(messages: Message[], status: string): Transcript
           work = { kind: "work", id: `work:${id}`, steps: [], active: false, failed: false };
           rows.push(work);
         }
-        work.steps.push({ id, part });
+        const step: WorkStep = { id, part };
+        const todos = readTodos(part);
+        if (todos !== undefined) {
+          latestTodo = { items: todos, latest: false };
+          step.todo = latestTodo;
+        }
+        work.steps.push(step);
       }
     }
     if (message.Payload.info?.error !== undefined && message.Payload.info.error !== null) {
@@ -71,6 +79,7 @@ export function buildTranscript(messages: Message[], status: string): Transcript
       });
     }
   }
+  if (latestTodo) latestTodo.latest = true;
   const last = rows.at(-1);
   if (status === "working" || status === "waiting") {
     for (const row of rows.slice(turnStart)) {

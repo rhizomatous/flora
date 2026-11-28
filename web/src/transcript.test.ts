@@ -13,6 +13,37 @@ function tool(id: string, [start, end]: [number, number], status = "completed"):
 }
 const user = message("user", [{ type: "text", text: "Please fix it" }], "user");
 
+test("only the latest saved todo list is promoted across work groups and user turns", () => {
+  const first: Part = {
+    id: "todos",
+    type: "tool",
+    tool: "todowrite",
+    state: {
+      status: "completed",
+      input: { todos: [{ content: "Inspect", status: "pending" }] },
+    },
+  };
+  const cleared: Part = { ...first, state: { status: "completed", input: { todos: [] } } };
+  const failed: Part = { ...first, state: { ...first.state, status: "error", error: "Not saved" } };
+  const messages = [
+    user,
+    message("a", [first]),
+    message("update", [{ type: "text", text: "The plan changed." }]),
+    message("next-user", [{ type: "text", text: "Drop the plan" }], "user"),
+    message("b", [cleared, { ...failed, id: "failed" }]),
+  ];
+  const before = structuredClone(messages);
+  const steps = buildTranscript(messages, "idle").flatMap((row) =>
+    row.kind === "work" ? row.steps : [],
+  );
+  assert.deepEqual(
+    steps.map((step) => step.todo?.latest),
+    [false, true, undefined],
+  );
+  assert.deepEqual(steps[1]?.todo?.items, []);
+  assert.deepEqual(messages, before);
+});
+
 test("work spans runtime messages and ignores empty text and runtime bookkeeping", () => {
   const rows = buildTranscript(
     [

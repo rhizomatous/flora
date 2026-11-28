@@ -114,6 +114,12 @@ test("live work grouping, disclosure state, and focus", async ({ page }) => {
     "data-status",
     "error",
   );
+  const command = groups.locator('[data-step-id="b:check"]');
+  await command.getByRole("button", { name: /Run project checks/ }).click();
+  await expect(command.locator('[data-slot="code-block-content"]')).toHaveText([
+    "npm test",
+    "Checks passed",
+  ]);
   await expect(page.getByText("File not found", { exact: true })).toBeVisible();
   await completed.click();
   await expect(page.getByText("File not found", { exact: true })).toHaveCount(0);
