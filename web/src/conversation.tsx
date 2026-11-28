@@ -6,6 +6,8 @@ import {
   FlowerMark,
   CrossCircledIcon,
   CopyIcon,
+  CodeBlock,
+  CodeBlockContent,
   Message as ChatMessage,
   MessageContent,
   Bubble,
@@ -305,6 +307,8 @@ function MessagePart({
     );
   }
   if (p.type === "tool") {
+    const command =
+      p.tool === "bash" ? toolDisplayInputSchema.parse(p.state?.input).command : undefined;
     const output = p.state?.output ?? "";
     const error = p.state?.error ?? "";
     const status = p.state?.status;
@@ -338,19 +342,23 @@ function MessagePart({
               )}
             </TraceLine>
           </TraceCollapsibleTrigger>
-          <TraceCollapsibleContent>
-            <pre className="overflow-auto text-xs break-words whitespace-pre-wrap">
-              {JSON.stringify(p.state?.input, null, 2)}
-            </pre>
-            {output !== "" && (
-              <pre className="mt-3 max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
-                {output}
-              </pre>
-            )}
+          <TraceCollapsibleContent className="space-y-3">
+            <CodeBlock size="sm">
+              <CodeBlockContent wrap className="max-h-96">
+                {command ?? JSON.stringify(p.state?.input, null, 2)}
+              </CodeBlockContent>
+              {output !== "" && (
+                <CodeBlockContent wrap className="max-h-96 border-t text-muted-foreground">
+                  {output}
+                </CodeBlockContent>
+              )}
+            </CodeBlock>
             {error !== "" && (
-              <pre role="alert" className="mt-3 text-xs break-words whitespace-pre-wrap">
-                {error}
-              </pre>
+              <CodeBlock size="sm" variant="destructive" role="alert">
+                <CodeBlockContent wrap className="max-h-96">
+                  {error}
+                </CodeBlockContent>
+              </CodeBlock>
             )}
           </TraceCollapsibleContent>
         </TraceCollapsible>
