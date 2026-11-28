@@ -215,7 +215,8 @@ test.describe("first run", () => {
     await page.getByRole("button", { name: "Log in", exact: true }).click();
     await page.setViewportSize({ width: 1280, height: 900 });
     await openWorkspaceMenu(page);
-    await page.getByRole("menuitem", { name: "Set up Flora", exact: true }).click();
+    await expect(page.getByRole("menuitem", { name: "Set up Flora", exact: true })).toHaveCount(0);
+    await page.goto("/#onboarding/project");
     await expect(page.getByRole("heading", { name: "Connect a project", exact: true })).toBeFocused();
     await page.getByRole("button", { name: "2. Connect a model", exact: true }).click();
     await expect(page.getByRole("button", { name: "Update Anthropic key", exact: true })).toBeVisible();

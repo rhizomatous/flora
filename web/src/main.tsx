@@ -257,7 +257,6 @@ function App() {
           audio={notifications.audio}
           busy={busy}
           onLogout={logout}
-          setupPath={`onboarding/${onboarding?.step ?? "model"}`}
         />
       </Sidebar>
       <Content id="main-content" tabIndex={-1} className={frameLayout}>
