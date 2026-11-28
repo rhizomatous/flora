@@ -6,6 +6,8 @@ import {
   FlowerMark,
   CrossCircledIcon,
   CopyIcon,
+  CodeBlock,
+  CodeBlockContent,
   Message as ChatMessage,
   MessageContent,
   Bubble,
@@ -335,19 +337,23 @@ function MessagePart({
               )}
             </TraceLine>
           </TraceCollapsibleTrigger>
-          <TraceCollapsibleContent>
-            <pre className="overflow-auto text-xs break-words whitespace-pre-wrap text-foreground">
-              <code>{command ?? JSON.stringify(p.state?.input, null, 2)}</code>
-            </pre>
-            {output !== "" && (
-              <pre className="mt-3 max-h-96 overflow-auto border-t pt-3 text-xs break-words whitespace-pre-wrap">
-                {output}
-              </pre>
-            )}
+          <TraceCollapsibleContent className="space-y-3">
+            <CodeBlock size="sm">
+              <CodeBlockContent wrap className="max-h-96">
+                {command ?? JSON.stringify(p.state?.input, null, 2)}
+              </CodeBlockContent>
+              {output !== "" && (
+                <CodeBlockContent wrap className="max-h-96 border-t text-muted-foreground">
+                  {output}
+                </CodeBlockContent>
+              )}
+            </CodeBlock>
             {error !== "" && (
-              <pre role="alert" className="mt-3 text-xs break-words whitespace-pre-wrap">
-                {error}
-              </pre>
+              <CodeBlock size="sm" variant="destructive" role="alert">
+                <CodeBlockContent wrap className="max-h-96">
+                  {error}
+                </CodeBlockContent>
+              </CodeBlock>
             )}
           </TraceCollapsibleContent>
         </TraceCollapsible>
