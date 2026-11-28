@@ -29,6 +29,7 @@ export function ProjectRepositoryPicker({
   accessPath,
   loading,
   required = false,
+  showAccess = true,
 }: {
   available: GitHubRepository[];
   url: string;
@@ -37,6 +38,7 @@ export function ProjectRepositoryPicker({
   accessPath: string;
   loading: boolean;
   required?: boolean;
+  showAccess?: boolean;
 }) {
   const externalAccess = accessPath.startsWith("https://github.com/");
   const [editing, setEditing] = useState(false);
@@ -76,22 +78,24 @@ export function ProjectRepositoryPicker({
               setEditing(false);
             }}
           >
-            <ComboboxInput
-              ref={search}
-              aria-label="Choose a repository"
-              placeholder="Search repositories"
-              disabled={loading}
-              showTrigger={false}
-              onKeyDown={(event) => {
-                if (event.key === "Escape" && editing) {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  focus.current = "selection";
-                  setEditing(false);
-                }
-              }}
-              className="h-11 w-full rounded-none border-0 bg-transparent shadow-none focus-within:ring-inset"
-            />
+            <div className="px-4 py-3">
+              <ComboboxInput
+                ref={search}
+                aria-label="Choose a repository"
+                placeholder="Search repositories"
+                disabled={loading}
+                showTrigger={false}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape" && editing) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    focus.current = "selection";
+                    setEditing(false);
+                  }
+                }}
+                className="w-full"
+              />
+            </div>
             <div className="border-t border-border p-1">
               <ComboboxEmpty className="block px-3 py-0 [&:not(:empty)]:py-4">
                 {loading ? "Loading repositories…" : "No matching repositories"}
@@ -114,29 +118,31 @@ export function ProjectRepositoryPicker({
             </div>
           </Combobox>
           <div className="p-1">
-            <Item
-              size="list"
-              render={
-                <a
-                  href={accessPath}
-                  aria-label="Manage GitHub access"
-                  target={externalAccess ? "_blank" : undefined}
-                  rel={externalAccess ? "noreferrer" : undefined}
-                />
-              }
-            >
-              <GitHubLogoIcon className="size-4 text-muted-foreground" aria-hidden="true" />
-              <ItemContent>
-                <ItemTitle>Manage GitHub access</ItemTitle>
-              </ItemContent>
-              <ItemActions>
-                {externalAccess ? (
-                  <ExternalLinkIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRightIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-                )}
-              </ItemActions>
-            </Item>
+            {showAccess && (
+              <Item
+                size="list"
+                render={
+                  <a
+                    href={accessPath}
+                    aria-label="Manage GitHub access"
+                    target={externalAccess ? "_blank" : undefined}
+                    rel={externalAccess ? "noreferrer" : undefined}
+                  />
+                }
+              >
+                <GitHubLogoIcon className="size-4 text-muted-foreground" aria-hidden="true" />
+                <ItemContent>
+                  <ItemTitle>Manage GitHub access</ItemTitle>
+                </ItemContent>
+                <ItemActions>
+                  {externalAccess ? (
+                    <ExternalLinkIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRightIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+                  )}
+                </ItemActions>
+              </Item>
+            )}
             <Item
               size="list"
               className="h-auto justify-start text-left"

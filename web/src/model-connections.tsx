@@ -56,7 +56,6 @@ function ConnectionDialog({
       await onSave({
         provider,
         providerKey: text(fields, "providerKey"),
-        model: text(fields, "model"),
         makeDefault: false,
       });
       onClose();
@@ -103,19 +102,6 @@ function ConnectionDialog({
               aria-invalid={error !== ""}
             />
           </div>
-          {!configured && (
-            <div className="space-y-2">
-              <FieldLabel htmlFor="connection-model">Model ID (optional)</FieldLabel>
-              <Input
-                id="connection-model"
-                name="model"
-                placeholder="Auto-discover"
-                maxLength={200}
-                disabled={busy}
-                aria-invalid={error !== ""}
-              />
-            </div>
-          )}
           {error !== "" && (
             <Alert variant="destructive" role="alert">
               {error}

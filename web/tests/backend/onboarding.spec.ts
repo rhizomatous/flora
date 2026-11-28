@@ -104,6 +104,8 @@ test.describe("first run", () => {
     await page.getByRole("button", { name: "Install GitHub App", exact: true }).click();
     await page.getByRole("link", { name: "Approve GitHub", exact: true }).click();
     await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeEnabled();
+    await expect(page.getByRole("heading", {name:"Repositories",exact:true})).toHaveCount(0);
+    await expect(page.getByRole("link", {name:"Connect project",exact:true})).toHaveCount(0);
     await page.getByRole("button", {name:"Finish later",exact:true}).click();
     await page.getByLabel("Password", {exact:true}).fill("browser test password");
     await page.getByRole("button", {name:"Log in",exact:true}).click();
@@ -118,7 +120,7 @@ test.describe("first run", () => {
     });
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("GitHub denied repository access");
-    await expect(page.getByRole("link",{name:"Manage GitHub access",exact:true})).toBeVisible();
+    await expect(page.getByRole("link",{name:"Manage GitHub access",exact:true})).toHaveCount(0);
     await captureStep("project-permission-error");
     await page.getByRole("button",{name:"Retry repository discovery",exact:true}).click();
     await expect(page.getByRole("alert")).toContainText("No repositories available");
@@ -156,7 +158,7 @@ test.describe("first run", () => {
     await page.getByLabel("Base branch", { exact: true }).fill("main");
     await page.getByRole("button", { name: "Add repository", exact: true }).click();
     await expect(repositoryChoice).toBeFocused();
-    await page.getByRole("button", { name: "Remove repository 1", exact: true }).click();
+    await page.getByRole("button", { name: "Remove flora/fixture", exact: true }).click();
     await expect(repositoryChoice).toBeFocused();
     await repositoryChoice.fill("fixture");
     await page.getByRole("option",{name:"flora/fixture",exact:true}).click();
@@ -167,6 +169,10 @@ test.describe("first run", () => {
     const setupCommand = page.getByRole("button", { name: "Setup command", exact: true });
     await setupCommand.click();
     await page.getByLabel("Setup command (optional)", { exact: true }).fill("npm ci");
+    const setupBounds = await page.getByLabel("Setup command (optional)", { exact: true }).boundingBox();
+    const formBounds = await page.locator("#onboarding-project").boundingBox();
+    expect(setupBounds!.width).toBeGreaterThan(formBounds!.width * 0.9);
+    await captureStep("setup-command");
     await setupCommand.click();
 
     expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain("fixture-provider-only");
@@ -308,8 +314,7 @@ test("repository-first project picker supports browsing, search, and scrolling",
   await page.goto("/#onboarding/project");
   await expect(page.getByRole("option")).toHaveCount(3);
   const access = page.getByRole("link",{name:"Manage GitHub access",exact:true});
-  await expect(access).toHaveAttribute("href",accessURL);
-  await expect(access).toHaveAttribute("target","_blank");
+  await expect(access).toHaveCount(0);
   await expect(page.getByRole("button", {name:"Create project",exact:true})).toBeDisabled();
   async function capture(name: string) {
     await page.mouse.move(0,0);
@@ -322,6 +327,7 @@ test("repository-first project picker supports browsing, search, and scrolling",
       }
     }
   }
+  await page.getByRole("combobox",{name:"Choose a repository",exact:true}).focus();
   await capture("project-picker");
   many = true;
   await page.getByRole("button",{name:"Refresh repositories",exact:true}).click();
@@ -337,4 +343,10 @@ test("repository-first project picker supports browsing, search, and scrolling",
   await expect(page.getByLabel("Project name",{exact:true})).toHaveValue("website");
   await expect(page.getByRole("button",{name:"Create project",exact:true})).toBeEnabled();
   await capture("project-selected");
+  await page.getByRole("button", {name:"Repository options",exact:true}).click();
+  await page.getByRole("button", {name:"Add repository",exact:true}).click();
+  await page.getByRole("button", {name:"Repository options",exact:true}).last().click();
+  await page.getByRole("button", {name:"Remove empty repository",exact:true}).click();
+  await expect(page.getByRole("button", {name:"Change repository",exact:true})).toBeFocused();
+  await expect(page.getByRole("button", {name:"Create project",exact:true})).toBeEnabled();
 });

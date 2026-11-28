@@ -115,8 +115,11 @@ function RepositoryFields({
     if (target === "add") addButton.current?.focus();
     else if (target !== undefined) {
       container.current
-        ?.querySelector<HTMLInputElement>(
-          `[data-repository-key="${target}"] ${compact ? 'input[role="combobox"]' : 'input[name="repository"]'}`,
+        ?.querySelector(`[data-repository-key="${target}"]`)
+        ?.querySelector<HTMLElement>(
+          compact
+            ? 'button[aria-label="Change repository"], input[role="combobox"]'
+            : 'input[name="repository"]',
         )
         ?.focus();
     }
@@ -198,6 +201,7 @@ function RepositoryFields({
               onRefresh={() => {
                 void refreshRepositories();
               }}
+              showAccess={!compact}
               required={compact}
               available={available}
               url={repo.url}
@@ -246,7 +250,10 @@ function RepositoryFields({
             </FieldLabel>
           )}
           {index === 0 && repo.url !== "" && children}
-          <Collapsible defaultOpen={!compact} hidden={compact && repo.url === ""}>
+          <Collapsible
+            defaultOpen={!compact}
+            hidden={compact && repo.url === "" && rows.length === 1}
+          >
             {compact && (
               <CollapsibleTrigger
                 render={<Button type="button" variant="ghost" size="sm" className="-ml-2" />}
@@ -301,21 +308,24 @@ function RepositoryFields({
                   Add repository
                 </Button>
               )}
+              {rows.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  className="max-w-full justify-start text-left whitespace-normal"
+                  onClick={() => {
+                    removeRepository(key);
+                  }}
+                >
+                  Remove{" "}
+                  {repo.url
+                    ? repo.url.replace("https://github.com/", "").replace(/\.git$/, "")
+                    : "empty repository"}
+                </Button>
+              )}
             </CollapsibleContent>
           </Collapsible>
-          {rows.length > 1 && (
-            <Button
-              variant="link"
-              size="sm"
-              type="button"
-              className="text-sm text-foreground"
-              onClick={() => {
-                removeRepository(key);
-              }}
-            >
-              Remove repository {index + 1}
-            </Button>
-          )}
         </FieldSet>
       ))}
       {!compact && (
@@ -586,18 +596,19 @@ export function Projects({
                 </CollapsibleTrigger>
               )}
               <CollapsibleContent keepMounted className={embedded ? "data-open:pt-3" : undefined}>
-                <FieldLabel className="w-full flex-col items-start">
-                  Setup command (optional)
-                  <TextareaPanel>
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="project-setup-command">Setup command (optional)</FieldLabel>
+                  <TextareaPanel className="w-full">
                     <TextareaPanelInput
+                      id="project-setup-command"
                       name="setupCommand"
-                      className="mt-2 min-h-28 font-mono"
+                      className="min-h-28 font-mono"
                       defaultValue={project?.configuration.setupCommand}
                       maxLength={8192}
                       aria-describedby={embedded ? undefined : "setup-help"}
                     />
                   </TextareaPanel>
-                </FieldLabel>
+                </div>
               </CollapsibleContent>
             </Collapsible>
             {!embedded && (

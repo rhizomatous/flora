@@ -222,11 +222,11 @@ func (s *Service) save(ctx context.Context, in Input) ([]Diagnostic, error) {
 			return nil, invalid(check.Message)
 		}
 		if s.DiscoverModel == nil {
-			return nil, invalid("Model discovery is unavailable. Enter a model ID or try again.")
+			return nil, invalid("Model discovery is unavailable. Try connecting again.")
 		}
 		model, err := s.DiscoverModel(ctx, storage.Credentials{Provider: c.Provider, ProviderKey: c.ProviderKey})
 		if err != nil || !modelID.MatchString(model) {
-			return nil, invalid("Could not discover models. Enter a model ID or try again.")
+			return nil, invalid("Could not discover models. Try connecting again.")
 		}
 		c.Model = model
 	}

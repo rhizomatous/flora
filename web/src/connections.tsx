@@ -160,8 +160,9 @@ export function ConnectionsPage({
       view.slug === "" ? undefined : view.active === "app" && view.state === "connected",
     );
     setError("");
-    if (detail && view.active === "app" && view.state === "connected") await loadRepositories();
-    else {
+    if (!embedded && detail && view.active === "app" && view.state === "connected") {
+      await loadRepositories();
+    } else {
       setRepositories(undefined);
       setRepositoryError("");
     }
@@ -170,7 +171,9 @@ export function ConnectionsPage({
     setBusy(true);
     try {
       await task();
-      if (success !== undefined) toast.success(success, { toasterId: "chat-organization" });
+      if (!embedded && success !== undefined) {
+        toast.success(success, { toasterId: "chat-organization" });
+      }
     } catch (cause) {
       toast.error(errorMessage(cause, "Could not update the GitHub connection."), {
         toasterId: "chat-organization",
@@ -514,17 +517,14 @@ export function ConnectionsPage({
               </SettingsGroup>
             </Section>
           )}
-          {connected && (
+          {!embedded && connected && (
             <Section aria-labelledby="github-repositories-heading">
               <SectionHeader inset>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <Heading level={2} id="github-repositories-heading">
                     Repositories
                   </Heading>
-                  <ButtonLink
-                    variant="outline"
-                    href={embedded ? "#onboarding/project" : "#projects/new"}
-                  >
+                  <ButtonLink variant="outline" href="#projects/new">
                     Connect project
                     <ChevronRightIcon aria-hidden="true" />
                   </ButtonLink>

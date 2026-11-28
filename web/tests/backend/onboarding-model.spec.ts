@@ -37,10 +37,10 @@ test("model setup stays focused on connections and resumes without saved secrets
   await page.getByRole("button", { name: "Connect Anthropic", exact: true }).click();
   const connection = page.getByRole("dialog", { name: "Connect Anthropic", exact: true });
   await connection.getByLabel("API key", { exact: true }).fill("invalid-fixture-key");
-  await connection.getByLabel("Model ID (optional)", { exact: true }).fill("manual-sonnet");
+  await expect(connection.getByLabel("Model ID (optional)", { exact: true })).toHaveCount(0);
   await connection.getByRole("button", { name: "Connect", exact: true }).click();
   await expect(connection.getByRole("alert")).toContainText("rejected the credential");
-  await expect(connection.getByLabel("Model ID (optional)", { exact: true })).toHaveValue("manual-sonnet");
+  await expect(connection.getByLabel("API key", { exact: true })).toHaveValue("invalid-fixture-key");
   await connection.getByLabel("API key", { exact: true }).fill("valid-fixture-key");
   await connection.getByRole("button", { name: "Connect", exact: true }).click();
   await expect(connection).toHaveCount(0);
@@ -82,7 +82,7 @@ test("model setup stays focused on connections and resumes without saved secrets
   await page.reload();
   await expect(page.getByRole("heading", { name: "Connect GitHub", exact: true })).toBeFocused();
   const settings = await (await page.request.get("/api/settings")).json();
-  expect(settings).toMatchObject({ provider: "anthropic", model: "manual-sonnet", providerConfigured: true });
+  expect(settings).toMatchObject({ provider: "anthropic", model: "fixture-model", providerConfigured: true });
   expect(JSON.stringify(settings)).not.toContain("rotated-fixture-key");
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain("rotated-fixture-key");
   expect(catalogRequests).toBe(0);
