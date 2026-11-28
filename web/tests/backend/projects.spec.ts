@@ -85,7 +85,7 @@ test("project repositories, validation, and keyboard focus", async ({ page, back
       .evaluateAll((inputs: HTMLInputElement[]) => inputs.map((input) => input.value)),
     ["main", "release", "next"],
   );
-  await page.getByRole("button", { name: "Remove repository 2", exact: true }).focus();
+  await page.getByRole("button", { name: "Remove second/app", exact: true }).focus();
   await page.keyboard.press("Enter");
   await page.waitForFunction(
     () => document.activeElement?.matches("[data-add-repository]") === true,
