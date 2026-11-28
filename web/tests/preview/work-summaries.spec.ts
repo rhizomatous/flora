@@ -50,7 +50,9 @@ test("live work grouping, disclosure state, and focus", async ({ page }) => {
     };
     const messages = [
       message("user", [{ type: "text", text: "Fix the configuration" }], "user"),
+      message("snapshot", [{ type: "snapshot", snapshot: "before" }]),
       message("a", [read]),
+      message("patch", [{ type: "patch", hash: "after", files: ["/workspace/config.ts"] }]),
     ];
     if (phase === 3) {
       messages.push(
@@ -112,6 +114,12 @@ test("live work grouping, disclosure state, and focus", async ({ page }) => {
     "data-status",
     "error",
   );
+  const command = groups.locator('[data-step-id="b:check"]');
+  await command.getByRole("button", { name: /Run project checks/ }).click();
+  await expect(command.locator('[data-slot="code-block-content"]')).toHaveText([
+    "npm test",
+    "Checks passed",
+  ]);
   await expect(page.getByText("File not found", { exact: true })).toBeVisible();
   await completed.click();
   await expect(page.getByText("File not found", { exact: true })).toHaveCount(0);

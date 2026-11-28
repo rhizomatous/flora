@@ -6,6 +6,11 @@ export type TranscriptRow =
   | { kind: "message"; id: string; message: Message }
   | { kind: "work"; id: string; steps: WorkStep[]; active: boolean; failed: boolean };
 
+/** Runtime bookkeeping stays in the saved payload but does not appear in the conversation. */
+export function isVisiblePart(part: Part) {
+  return !["step-start", "step-finish", "patch", "snapshot"].includes(part.type);
+}
+
 export function isLivePart(part: Part) {
   return (
     part.state?.status === "running" ||
@@ -35,7 +40,7 @@ export function buildTranscript(messages: Message[], status: string): Transcript
     const savedParts = message.Payload.parts;
     const parts = savedParts.length > 0 ? savedParts : [{ type: "text", text: message.Text }];
     for (const [index, part] of parts.entries()) {
-      if (part.type === "step-start" || part.type === "step-finish") continue;
+      if (!isVisiblePart(part)) continue;
       const id = `${message.ID}:${part.id ?? index}`;
       if (part.type === "text") {
         if ((part.text ?? "").trim() === "") continue;

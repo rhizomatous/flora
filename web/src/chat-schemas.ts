@@ -51,13 +51,13 @@ export const feedSchema = z.object({
   cursor: z.number().int().nonnegative(),
 });
 
-// These optional hints are read from arbitrary tool input only when choosing a display label.
-// Non-string hints are ignored; the original input remains available in the tool details.
+// Read display fields from arbitrary tool inputs, ignoring non-string values.
 /* oxlint-disable promise/prefer-await-to-then, unicorn/prefer-top-level-await, unicorn/no-useless-undefined -- Zod catch supplies synchronous parse fallbacks, not Promise handlers. */
 export const toolDisplayInputSchema = z
   .object({
     description: z.string().optional().catch(undefined),
     filePath: z.string().optional().catch(undefined),
+    command: z.string().optional().catch(undefined),
   })
   .catch({});
 /* oxlint-enable promise/prefer-await-to-then, unicorn/prefer-top-level-await, unicorn/no-useless-undefined */

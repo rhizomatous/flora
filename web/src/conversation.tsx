@@ -7,6 +7,8 @@ import {
   FlowerMark,
   CrossCircledIcon,
   CopyIcon,
+  CodeBlock,
+  CodeBlockContent,
   Message as ChatMessage,
   MessageContent,
   Bubble,
@@ -29,7 +31,14 @@ import { subagentSession } from "./subagent-state";
 import { SubagentLink } from "./subagents";
 import { TodoChecklist } from "./todo-checklist";
 import { hasUnfinishedTodos } from "./todos";
-import { formatDuration, isFailedPart, isLivePart, workTiming, type WorkStep } from "./transcript";
+import {
+  formatDuration,
+  isFailedPart,
+  isLivePart,
+  isVisiblePart,
+  workTiming,
+  type WorkStep,
+} from "./transcript";
 
 const Markdown = lazy(async () => {
   const { ReplyMarkdown } = await import("./reply-markdown");
@@ -53,9 +62,7 @@ export function ConversationMessage({
   delegated?: boolean;
   pullEvents?: { pull: Pull; opened: boolean }[] | undefined;
 }) {
-  const parts = m.Payload.parts.filter(
-    (part) => part.type !== "step-start" && part.type !== "step-finish",
-  );
+  const parts = m.Payload.parts.filter(isVisiblePart);
   const failure = m.Payload.info?.error ?? null;
   const [copyStatus, setCopyStatus] = useState("Copy");
   const copyText =
@@ -344,7 +351,7 @@ function MessagePart({
               )}
             </TraceLine>
           </TraceCollapsibleTrigger>
-          <TraceCollapsibleContent>
+          <TraceCollapsibleContent className="space-y-3">
             <ToolDetails part={p} />
           </TraceCollapsibleContent>
         </TraceCollapsible>
@@ -373,22 +380,28 @@ function MessagePart({
 }
 
 function ToolDetails({ part }: { part: Part }) {
+  const command =
+    part.tool === "bash" ? toolDisplayInputSchema.parse(part.state?.input).command : undefined;
   const output = part.state?.output ?? "";
   const error = part.state?.error ?? "";
   return (
     <>
-      <pre className="overflow-auto text-xs break-words whitespace-pre-wrap">
-        {JSON.stringify(part.state?.input, null, 2)}
-      </pre>
-      {output !== "" && (
-        <pre className="mt-3 max-h-96 overflow-auto text-xs break-words whitespace-pre-wrap">
-          {output}
-        </pre>
-      )}
+      <CodeBlock size="sm">
+        <CodeBlockContent wrap className="max-h-96">
+          {command ?? JSON.stringify(part.state?.input, null, 2)}
+        </CodeBlockContent>
+        {output !== "" && (
+          <CodeBlockContent wrap className="max-h-96 border-t text-muted-foreground">
+            {output}
+          </CodeBlockContent>
+        )}
+      </CodeBlock>
       {error !== "" && (
-        <pre role="alert" className="mt-3 text-xs break-words whitespace-pre-wrap">
-          {error}
-        </pre>
+        <CodeBlock size="sm" variant="destructive" role="alert">
+          <CodeBlockContent wrap className="max-h-96">
+            {error}
+          </CodeBlockContent>
+        </CodeBlock>
       )}
     </>
   );
