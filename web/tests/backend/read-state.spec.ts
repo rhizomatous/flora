@@ -66,7 +66,7 @@ test("read positions sync across tabs and sessions while a bounded bulk action l
   const saved = detailSchema.parse(await (await context.request.get(`${backend.url}/api/chats/${waiting.ID}`)).json());
   expect(saved.chat.LastViewedRevision).toBeGreaterThan(0);
   expect(saved.chat.LastViewedRevision).toBeLessThan(saved.chat.ActivityRevision ?? 0);
-  await page.getByRole("button", { name: "Dismiss completion for Review release plan", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Completion notifications", exact: true }).getByRole("link", { name: "Review release plan", exact: true })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath("new-activity-unread-desktop.png"), animations: "disabled" });
 
   const archived = await create("Archived investigation");
@@ -101,8 +101,8 @@ test("read positions sync across tabs and sessions while a bounded bulk action l
   const archivedRow = main.getByRole("link", { name: "Open chat: Archived investigation", exact: true });
   await expect(archivedRow.getByRole("img", { name: "Unread activity" })).toBeVisible();
   await expect.poll(async () => detailSchema.parse(await (await context.request.get(`${backend.url}/api/chats/${unmatched.ID}`)).json()).chat.Status).toBe("idle");
-  await page.getByRole("button", { name: "Dismiss completion for Archived investigation", exact: true }).click();
-  await page.getByRole("button", { name: "Dismiss completion for Keep this update unread", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Completion notifications", exact: true }).getByRole("link", { name: "Archived investigation", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Completion notifications", exact: true }).getByRole("link", { name: "Keep this update unread", exact: true })).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: testInfo.outputPath("read-action-mobile.png"), animations: "disabled" });
   await main.getByRole("button", { name: "Mark all as read", exact: true }).click();

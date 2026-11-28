@@ -109,7 +109,6 @@ export function useNotifications(authenticated: boolean, sound: boolean, onExpir
 
   function dismiss(sequence: number) {
     setToasts((rows) => rows.filter((row) => row.Sequence !== sequence));
-    document.querySelector("h1")?.focus();
   }
   return { chats, error, toasts, dismiss, audio };
 }
